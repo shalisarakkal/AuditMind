@@ -61,11 +61,12 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
       service, so integration tests run in CI instead of skipping
 - [x] Frontend `npm run lint` + `npm run build` pass locally
 - [x] First commit, on `main` (2026-09-27)
-- [ ] Push to GitHub so CI runs once — no remote configured yet
+- [x] Pushed to GitHub (private repo `shalisarakkal/AuditMind`); first CI run
+      green — backend **21 passed, 0 skipped**, frontend lint + build pass
 - [x] Your review + explicit approval to close out Phase 1 (2026-09-27)
 
-**Status:** Closed 2026-09-27. All tests green locally (21 backend; frontend
-lint + build). Only open item: first CI run, once a GitHub remote is added.
+**Status:** Closed 2026-09-27. All tests green locally and in CI (CI #1 on
+`95440e1`: 21 backend tests passed, 0 skipped; frontend lint + build pass).
 
 **Bugs the test suite caught and fixed during this phase** (kept here as a
 record, not because they need more action):
