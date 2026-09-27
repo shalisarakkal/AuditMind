@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-navy: #0a1a2f;
+  --color-cyan: #00c8ff;
+}
+
+body {
+  background-color: var(--color-navy);
+  color: #ffffff;
+}
