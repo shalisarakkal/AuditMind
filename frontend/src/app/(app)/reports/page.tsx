@@ -3,7 +3,7 @@ export default function ReportsPage() {
     <div>
       <h1 className="text-2xl font-semibold text-white">Reports</h1>
       <p className="mt-2 text-sm text-white/60">
-        Generated audit reports list, wiring up to GET /orgs/:orgId/reports.
+        Claude-generated audit reports arrive in Phase 3 (AI audit &amp; reporting).
       </p>
     </div>
   );

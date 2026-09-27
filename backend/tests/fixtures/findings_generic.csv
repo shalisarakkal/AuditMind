@@ -1,0 +1,7 @@
+hostname,ip,domain,severity,category,description,source
+web-01.acme.io,10.0.1.10,vulnerability_management,critical,CVE-2024-3400,Unpatched remote code execution in web tier,pentest-2026
+db-01.acme.io,10.0.2.20,identity_access,high,MFA-DISABLED,MFA not enforced for database admins,pentest-2026
+,10.0.5.101,monitoring_detection,medium,EDR-MISSING,No EDR agent reporting,pentest-2026
+backup-01.acme.io,,backup_recovery,Low,BACKUP-UNTESTED,Restore not tested in 12 months,
+web-01.acme.io,,not_a_domain,high,BAD-ROW,Invalid domain value,pentest-2026
+db-01.acme.io,,network_config,urgent,BAD-ROW-2,Invalid severity value,pentest-2026

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!DOCTYPE NessusClientData_v2 [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<NessusClientData_v2>
+  <Report name="x">
+    <ReportHost name="10.0.0.1">
+      <ReportItem port="0" protocol="tcp" severity="4" pluginID="1" pluginName="&xxe;" pluginFamily="General"/>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

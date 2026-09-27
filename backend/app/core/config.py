@@ -1,4 +1,11 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.models.enums import Domain
+
+AssetExistingStrategy = Literal["update", "skip", "duplicate"]
+NessusInfoSeverity = Literal["skip", "low"]
 
 
 class Settings(BaseSettings):
@@ -18,6 +25,29 @@ class Settings(BaseSettings):
     CLAUDE_MODEL: str = "claude-sonnet-5"
 
     CORS_ORIGINS: str = "http://localhost:3000"
+
+    # --- File imports (asset import, findings upload). Global only. ---
+    # Files up to this size are processed during the request; larger ones run
+    # in the background and are tracked through their scan record.
+    IMPORT_SYNC_MAX_BYTES: int = 10 * 1024 * 1024
+    # Files over this size are rejected outright (413).
+    IMPORT_MAX_BYTES: int = 100 * 1024 * 1024
+
+    # --- Ingestion behaviour. Global defaults; each org can override them
+    # (see app/services/org_settings.py). ---
+    # True: import the valid rows and report the bad ones.
+    # False: any bad row rejects the whole file.
+    IMPORT_PARTIAL_SUCCESS: bool = True
+    # What to do when an imported asset matches an existing one (by hostname,
+    # else IP): update its non-empty fields, skip it, or insert a duplicate.
+    ASSET_EXISTING_STRATEGY: AssetExistingStrategy = "update"
+    # Nessus severity 0 ("Info") items: skip them, or record them as low.
+    NESSUS_INFO_SEVERITY: NessusInfoSeverity = "skip"
+    # Extra Nessus plugin-family -> domain mappings, merged over the built-in
+    # map. In .env as JSON, e.g. NESSUS_DOMAIN_MAP={"Web Servers": "network_config"}
+    NESSUS_DOMAIN_MAP: dict[str, Domain] = {}
+    # Domain for plugin families with no mapping.
+    NESSUS_DEFAULT_DOMAIN: Domain = Domain.vulnerability_management
 
     @property
     def cors_origins_list(self) -> list[str]:

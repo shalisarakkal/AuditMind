@@ -3,8 +3,9 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_org_member
+from app.api.deps import require_org_role
 from app.db.session import get_db
+from app.models.enums import UserRole
 from app.models.finding import Finding
 from app.models.membership import OrgMembership
 from app.models.risk_score import RiskScore
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/orgs/{org_id}/risk", tags=["risk"])
 
 @router.post("/score", response_model=RiskAssessmentResult)
 def run_risk_assessment(
-    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
+    org_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> RiskAssessmentResult:
     """Rule-based v1 scoring (RISL_SCORING.md). Claude-driven qualitative scoring
     with RAG-backed standards citations lands in a later milestone (PROMPTS_CLAUDE.md)."""

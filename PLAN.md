@@ -88,7 +88,83 @@ record, not because they need more action):
 real data instead of placeholder scores, login page + org picker in the
 frontend (carried over from Phase 1).
 
-- [ ] Not started — Phase 1 approved, ready to begin
+Split into **2a (backend)** and **2b (frontend)**. There is a single check-in:
+Phase 2 is marked complete only after both 2a and 2b are done and tested.
+Built with the feature-dev workflow (explore → clarify → design → implement →
+review).
+
+### Phase 2a — Backend
+
+Design: approach C ("pragmatic balance"): one ingestion service shared by the
+sync and background paths, a defusedxml Nessus parser, and per-org settings.
+
+- [x] Asset import `POST /orgs/{id}/assets/import` (CSV/JSON): per-row report
+      with line numbers; existing assets matched by hostname (case-insensitive),
+      else IP (only against unnamed assets); update/skip/duplicate strategy
+- [x] Findings upload `POST /orgs/{id}/findings/import`: generic CSV/JSON +
+      native `.nessus`; hosts matched/created as assets; duplicates (same asset
+      + source + category) skipped; Nessus Info skipped or recorded as low;
+      plugin family -> domain map; each upload recorded as a scan
+- [x] Files <= 10 MB processed in the request (201 + report); larger ones
+      (up to 100 MB, else 413) in the background (202; poll
+      `GET /orgs/{id}/scans/{scan_id}`); migration `0004`
+- [x] Per-org ingestion settings `GET/PATCH /orgs/{id}/settings` overriding
+      the `.env` defaults (only overrides stored; null resets)
+- [x] Dashboard `GET /orgs/{id}/dashboard`, computed live
+- [x] Role enforcement: viewers read-only; discover + settings + members
+      admin-only
+- [x] Login accepts JSON and the OAuth2 form, so Swagger "Authorize" works
+- [x] Tests: 192 backend tests passing (unit: parsing, Nessus incl. XXE and
+      billion-laughs files, settings resolution; integration: imports, dedup,
+      background path incl. a real 11 MB file, size limits, dashboard,
+      settings API, full role matrix, form login). Live smoke test against
+      uvicorn passed (incl. real background import)
+- Known follow-up (pre-existing, not Phase 2): `alembic check` reports model
+  vs. migration drift on enum column types and the `users.email` index
+
+### Phase 2b — Frontend
+
+- [x] API client (`src/lib/apiClient.ts`): bearer token from localStorage;
+      an expired session (401 with a token) logs out and goes to /login
+- [x] Login/register pages + logout; route groups `(auth)` / `(app)`, with
+      a client-side guard (the JWT lives in localStorage, so no `proxy.ts`)
+- [x] Sidebar org picker: remembered choice, validated against the fresh org
+      list, "+ New organization"; pages remount on switch
+- [x] Dashboard (live scores, top issues, recent imports), Assets table +
+      Import, Findings grouped by domain + Upload (CSV/JSON/.nessus); large
+      uploads poll the scan; per-row report panel; Import/Upload hidden for
+      viewers
+- [x] Settings → Ingestion: per-org overrides (admins edit/reset; others
+      read-only), incl. the org's own Nessus family → domain mappings
+- [x] Tests: Vitest + Testing Library, 45 tests (API client, auth/org
+      context, guard, org picker, import button incl. background polling,
+      report panel, settings panel, login/register, pages incl. viewer role);
+      `npm test` added to CI
+- [x] Browser E2E run against the real backend (register, import, Nessus
+      upload, settings override/reset, dashboard, viewer view). Found and
+      fixed: pre-hydration form submit could put credentials in the URL;
+      sidebar logout off-screen on long pages; misaligned findings tables
+- Out of scope, later phases: radar chart, per-asset risk score, AI
+  explanation, remediation status, connector status
+
+### Phase 2 code review (feature-dev: 3 reviewers — simplicity, bugs/security, conventions)
+
+- [x] High: import uploads were fully received before auth ran (FastAPI parses
+      the body before dependencies) — `UploadSizeLimitMiddleware` now rejects
+      oversized uploads (declared or streamed) before auth; tests prove a 401
+      used to come only after the whole body was read
+- [x] Medium: two concurrent imports into one org could create the same host
+      twice — imports into an org are serialised with a Postgres advisory
+      lock (not a unique index, since the "duplicate" strategy allows repeats);
+      a threaded test reproduced the race before the fix
+- [x] Low: DATA_MODEL.md documents the new columns and import semantics;
+      form-login test uses the shared fixture; new Nessus mapping rows start
+      on the org's default domain
+
+### Phase 2 sign-off
+
+- [ ] Full suite green locally and in CI
+- [ ] Your review + explicit approval to close out Phase 2
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ARRAY, DateTime, ForeignKey, String
+from sqlalchemy import ARRAY, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,11 @@ from app.db.base_class import Base
 
 class Asset(Base):
     __tablename__ = "assets"
+    __table_args__ = (
+        # Import matching: by hostname (case-insensitive), else by IP.
+        Index("ix_assets_org_hostname", "org_id", text("lower(hostname)")),
+        Index("ix_assets_org_ip", "org_id", "ip"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(

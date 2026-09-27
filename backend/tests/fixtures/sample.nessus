@@ -1,0 +1,63 @@
+<?xml version="1.0" ?>
+<NessusClientData_v2>
+  <Policy><policyName>Basic Network Scan</policyName></Policy>
+  <Report name="Acme weekly scan" xmlns:cm="http://www.nessus.org/cm">
+    <ReportHost name="web-01.acme.io">
+      <HostProperties>
+        <tag name="HOST_START">Mon Sep 28 02:00:00 2026</tag>
+        <tag name="host-ip">10.0.1.10</tag>
+        <tag name="host-fqdn">web-01.acme.io</tag>
+        <tag name="operating-system">Linux Kernel 5.15</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings">
+        <risk_factor>None</risk_factor>
+        <synopsis>This plugin displays information about the Nessus scan.</synopsis>
+        <plugin_output>Nessus version : 10.8.0</plugin_output>
+      </ReportItem>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="4" pluginID="187095" pluginName="Apache 2.4.x &lt; 2.4.58 Multiple Vulnerabilities" pluginFamily="Web Servers">
+        <risk_factor>Critical</risk_factor>
+        <synopsis>The remote web server is affected by multiple vulnerabilities.</synopsis>
+        <description>The version of Apache httpd installed on the remote host is prior to 2.4.58.</description>
+        <solution>Upgrade to Apache version 2.4.58 or later.</solution>
+        <cve>CVE-2023-45802</cve>
+        <cve>CVE-2023-43622</cve>
+        <cvss3_base_score>9.8</cvss3_base_score>
+      </ReportItem>
+      <ReportItem port="8443" svc_name="www" protocol="tcp" severity="2" pluginID="51192" pluginName="SSL Certificate Cannot Be Trusted" pluginFamily="General">
+        <risk_factor>Medium</risk_factor>
+        <synopsis>The SSL certificate for this service cannot be trusted.</synopsis>
+      </ReportItem>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="51192" pluginName="SSL Certificate Cannot Be Trusted" pluginFamily="General">
+        <risk_factor>Medium</risk_factor>
+        <synopsis>The SSL certificate for this service cannot be trusted.</synopsis>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.0.2.20">
+      <HostProperties>
+        <tag name="host-ip">10.0.2.20</tag>
+        <tag name="hostname">db-01</tag>
+      </HostProperties>
+      <ReportItem port="3389" svc_name="msrdp" protocol="tcp" severity="3" pluginID="18405" pluginName="Microsoft Windows Remote Desktop Protocol Server MitM Weakness" pluginFamily="Windows">
+        <risk_factor>High</risk_factor>
+        <synopsis>It may be possible to get access to the remote host.</synopsis>
+      </ReportItem>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="1" pluginID="10399" pluginName="SMB Use Domain SID to Enumerate Users" pluginFamily="Windows : User management">
+        <risk_factor>Low</risk_factor>
+        <synopsis>Nessus was able to enumerate domain users.</synopsis>
+      </ReportItem>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="3" pluginID="42263" pluginName="Unencrypted Telnet Server" pluginFamily="Firewalls">
+        <risk_factor>High</risk_factor>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.0.3.30">
+      <HostProperties>
+        <tag name="host-ip">10.0.3.30</tag>
+      </HostProperties>
+      <ReportItem port="22" svc_name="ssh" protocol="tcp" severity="9" pluginID="99999" pluginName="Corrupt severity item" pluginFamily="General">
+      </ReportItem>
+      <ReportItem port="22" svc_name="ssh" protocol="tcp" severity="0" pluginID="10267" pluginName="SSH Server Type and Version Information" pluginFamily="Service detection">
+        <synopsis>An SSH server is listening on this port.</synopsis>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

@@ -1,0 +1,6 @@
+type,hostname,ip,environment
+server,app-01.acme.io,10.0.1.11,production
+router,edge-01.acme.io,10.0.0.1,production
+server,,,production
+workstation,laptop-7,999.1.1.1,corporate
+network_device,fw-01.acme.io,10.0.0.2,production

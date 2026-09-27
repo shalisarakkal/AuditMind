@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Sidebar from "@/components/Sidebar";
+
+import { AppProvider } from "@/context/AppContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,10 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-navy">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 p-8">{children}</main>
-        </div>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );

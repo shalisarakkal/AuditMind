@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
@@ -35,8 +37,43 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Token:
     return Token(access_token=token)
 
 
-@router.post("/login", response_model=Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+_LOGIN_BODY_DOCS = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {"schema": LoginRequest.model_json_schema()},
+            "application/x-www-form-urlencoded": {
+                "schema": {
+                    "type": "object",
+                    "required": ["username", "password"],
+                    "properties": {
+                        "username": {"type": "string", "description": "Your email address"},
+                        "password": {"type": "string", "format": "password"},
+                    },
+                }
+            },
+        },
+    }
+}
+
+
+@router.post("/login", response_model=Token, openapi_extra=_LOGIN_BODY_DOCS)
+async def login(request: Request, db: Session = Depends(get_db)) -> Token:
+    """JSON {email, password}, or an OAuth2 password form (username = email),
+    which is what Swagger's Authorize button sends."""
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            data = await request.json()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON body")
+    else:
+        form = await request.form()
+        data = {"email": form.get("username"), "password": form.get("password")}
+    try:
+        payload = LoginRequest.model_validate(data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors(include_url=False))
+
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")

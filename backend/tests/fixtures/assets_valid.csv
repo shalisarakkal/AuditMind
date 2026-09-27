@@ -1,0 +1,5 @@
+Type,Hostname,IP,Environment,Criticality,Tags,Cloud_ID
+server,web-01.acme.io,10.0.1.10,production,high,web;dmz,
+database,db-01.acme.io,10.0.2.20,production,critical,pci;data,
+workstation,,10.0.5.101,corporate,low,,
+cloud_resource,s3-backups,,production,high,backup,arn:aws:s3:::acme-backups

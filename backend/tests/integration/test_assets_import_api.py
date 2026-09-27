@@ -1,0 +1,183 @@
+import json
+
+import pytest
+
+from app.models.asset import Asset
+from app.models.scan import Scan
+from tests.conftest import requires_db
+from tests.helpers import first_org_id, register, upload
+
+pytestmark = requires_db
+
+
+@pytest.fixture
+def admin(client):
+    headers = register(client, "owner@acmecorp.io")
+    return headers, first_org_id(client, headers)
+
+
+def _import(client, admin, filename, content=None):
+    headers, org_id = admin
+    return upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, filename, content)
+
+
+def _assets(client, admin):
+    headers, org_id = admin
+    return client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers).json()
+
+
+def test_csv_import_creates_assets_and_records_a_scan(client, admin, db_session):
+    resp = _import(client, admin, "assets_valid.csv")
+
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["status"] == "completed"
+    assert body["report"] == {"created": 4, "updated": 0, "skipped": 0, "duplicates": 0, "failed": 0, "errors": []}
+
+    assets = {a["hostname"] or a["ip"]: a for a in _assets(client, admin)}
+    assert set(assets) == {"web-01.acme.io", "db-01.acme.io", "10.0.5.101", "s3-backups"}
+    assert assets["web-01.acme.io"]["tags"] == ["web", "dmz"]
+    assert assets["s3-backups"]["cloud_id"] == "arn:aws:s3:::acme-backups"
+
+    scan = db_session.get(Scan, body["scan_id"])
+    assert (scan.scan_type, scan.source, scan.filename) == ("asset_import", "upload", "assets_valid.csv")
+    assert scan.status.value == "completed"
+    assert scan.summary == body["report"]
+    assert scan.completed_at is not None
+
+
+def test_partial_import_reports_bad_rows_with_line_numbers(client, admin):
+    body = _import(client, admin, "assets_with_errors.csv").json()
+
+    assert body["status"] == "completed"
+    report = body["report"]
+    assert (report["created"], report["failed"]) == (2, 3)
+    assert report["errors"] == [
+        {"row": 3, "message": "type 'router' must be one of: server, workstation, network_device, database, cloud_resource, application"},
+        {"row": 4, "message": "hostname or ip is required"},
+        {"row": 5, "message": "ip '999.1.1.1' is not a valid IP address"},
+    ]
+    assert {a["hostname"] for a in _assets(client, admin)} == {"app-01.acme.io", "fw-01.acme.io"}
+
+
+def test_json_import_updates_matching_assets_by_default(client, admin):
+    _import(client, admin, "assets_valid.csv")
+
+    body = _import(client, admin, "assets_valid.json").json()
+
+    # web-01 matches by hostname; 10.0.0.1 and crm are new.
+    assert (body["report"]["created"], body["report"]["updated"]) == (2, 1)
+    web = next(a for a in _assets(client, admin) if a["hostname"] == "web-01.acme.io")
+    assert web["tags"] == ["web", "dmz"]
+    assert web["criticality"] == "high"
+
+
+def test_update_only_overwrites_non_empty_fields_and_matches_case_insensitively(client, admin):
+    _import(client, admin, "a.csv", b"type,hostname,ip,environment,criticality\nserver,Web-01,10.0.0.1,prod,high\n")
+
+    body = _import(client, admin, "b.csv", b"type,hostname,environment\ndatabase,WEB-01,staging\n").json()
+
+    assert body["report"]["updated"] == 1
+    [asset] = _assets(client, admin)
+    assert asset["type"] == "database"
+    assert asset["environment"] == "staging"
+    assert asset["criticality"] == "high"  # empty in the second file, kept
+    assert asset["ip"] == "10.0.0.1"
+    assert asset["hostname"] == "WEB-01"
+
+
+def test_ip_only_match_never_merges_differently_named_hosts(client, admin):
+    _import(client, admin, "a.csv", b"type,hostname,ip\nserver,alpha,10.0.0.1\nserver,,10.0.0.2\n")
+
+    body = _import(client, admin, "b.csv", b"type,hostname,ip\nserver,beta,10.0.0.1\nserver,gamma,10.0.0.2\n").json()
+
+    # beta shares alpha's IP but has another name: new asset. gamma adopts the
+    # nameless 10.0.0.2 record.
+    assert (body["report"]["created"], body["report"]["updated"]) == (1, 1)
+    by_ip = {}
+    for asset in _assets(client, admin):
+        by_ip.setdefault(asset["ip"], set()).add(asset["hostname"])
+    assert by_ip == {"10.0.0.1": {"alpha", "beta"}, "10.0.0.2": {"gamma"}}
+
+
+def test_duplicate_rows_within_one_file_are_matched(client, admin):
+    body = _import(client, admin, "a.csv", b"type,hostname\nserver,web\nserver,WEB\n").json()
+    assert (body["report"]["created"], body["report"]["updated"]) == (1, 1)
+    assert len(_assets(client, admin)) == 1
+
+
+@pytest.mark.parametrize(
+    "strategy, expected_report, expected_assets",
+    [("skip", {"created": 0, "skipped": 1}, ["prod"]), ("duplicate", {"created": 1, "skipped": 0}, ["prod", "staging"])],
+)
+def test_existing_asset_strategy_from_env(client, admin, monkeypatch, strategy, expected_report, expected_assets):
+    from app.core.config import settings
+
+    _import(client, admin, "a.csv", b"type,hostname,environment\nserver,web,prod\n")
+    monkeypatch.setattr(settings, "ASSET_EXISTING_STRATEGY", strategy)
+
+    report = _import(client, admin, "b.csv", b"type,hostname,environment\nserver,web,staging\n").json()["report"]
+
+    assert {k: report[k] for k in expected_report} == expected_report
+    assert sorted(a["environment"] for a in _assets(client, admin)) == expected_assets
+
+
+def test_all_or_nothing_writes_nothing_and_fails_the_scan(client, admin, monkeypatch, db_session):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "IMPORT_PARTIAL_SUCCESS", False)
+    resp = _import(client, admin, "assets_with_errors.csv")
+
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert (body["report"]["created"], body["report"]["failed"], len(body["report"]["errors"])) == (0, 3, 3)
+    assert _assets(client, admin) == []
+    assert db_session.get(Scan, body["scan_id"]).status.value == "failed"
+
+
+def test_file_where_every_row_fails_is_marked_failed(client, admin):
+    body = _import(client, admin, "a.csv", b"type,hostname\nrouter,a\n").json()
+    assert body["status"] == "failed"
+    assert body["report"]["failed"] == 1
+
+
+@pytest.mark.parametrize(
+    "filename, content, message",
+    [
+        ("empty.csv", b"", "The CSV file has no header row"),
+        ("header-only.csv", b"type,hostname\n", "The file contains no rows"),
+        ("bad.json", b"{oops", "Invalid JSON"),
+        ("wrong-shape.json", json.dumps({"items": []}).encode(), 'Expected a JSON list of records, or {"assets": [...]}'),
+        ("latin1.csv", "type,hostname\nserver,caf\xe9".encode("latin-1"), "The file is not valid UTF-8 text"),
+    ],
+)
+def test_unreadable_files_fail_the_scan_with_a_file_level_error(client, admin, filename, content, message):
+    resp = _import(client, admin, filename, content)
+
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["status"] == "failed"
+    [error] = body["report"]["errors"]
+    assert error["row"] == 0
+    assert error["message"].startswith(message)
+    assert _assets(client, admin) == []
+
+
+def test_unsupported_file_type_is_rejected_before_any_scan(client, admin, db_session):
+    resp = _import(client, admin, "scan.nessus", b"<NessusClientData_v2/>")
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Unsupported file type; expected .csv, .json"
+    assert db_session.query(Scan).count() == 0
+
+
+def test_assets_are_scoped_to_the_org(client, admin, db_session):
+    _import(client, admin, "assets_valid.csv")
+    other = register(client, "other@globex.io", "Globex")
+    other_org = first_org_id(client, other)
+
+    body = upload(client, f"/api/v1/orgs/{other_org}/assets/import", other, "assets_valid.csv").json()
+
+    # Same hostnames in another org are new assets there, not updates.
+    assert body["report"]["created"] == 4
+    assert db_session.query(Asset).count() == 8

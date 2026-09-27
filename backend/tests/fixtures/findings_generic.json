@@ -1,0 +1,5 @@
+[
+  {"hostname": "web-01.acme.io", "ip": "10.0.1.10", "domain": "network_config", "severity": "high", "category": "OPEN-RDP", "description": "RDP exposed to the internet", "source": "manual-review"},
+  {"hostname": "mail.acme.io", "domain": "incident_response", "severity": "medium", "description": "No incident runbook for mail compromise", "source": "manual-review"},
+  {"ip": "10.0.9.9", "domain": "compliance_alignment", "severity": "low", "category": "CIS-1.1", "source": "manual-review"}
+]

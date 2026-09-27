@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, String, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -17,6 +17,12 @@ class Organization(Base):
     size: Mapped[str | None] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    # Per-org overrides of the .env ingestion defaults; only overridden keys are
+    # stored (see app/services/org_settings.py). Always reassign, never mutate
+    # in place, so SQLAlchemy sees the change.
+    ingestion_overrides: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
 
     memberships: Mapped[list["OrgMembership"]] = relationship(

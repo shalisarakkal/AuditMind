@@ -23,3 +23,5 @@ class ScanRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     source: str | None
+    filename: str | None
+    summary: dict | None

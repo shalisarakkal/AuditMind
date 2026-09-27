@@ -1,0 +1,7 @@
+{
+  "assets": [
+    {"type": "server", "hostname": "web-01.acme.io", "ip": "10.0.1.10", "environment": "production", "criticality": "high", "tags": ["web", "dmz"]},
+    {"type": "application", "hostname": "crm.acme.io", "environment": "production", "tags": ["saas"]},
+    {"type": "network_device", "ip": "10.0.0.1", "criticality": "critical"}
+  ]
+}

@@ -9,8 +9,10 @@ from app.models.enums import UserRole
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.user import User
+from app.schemas.org_settings import IngestionSettingsRead, IngestionSettingsUpdate
 from app.schemas.organization import MemberAdd, MyOrganizationRead, OrganizationCreate, OrganizationRead
 from app.schemas.user import MemberRead, UserRead
+from app.services.org_settings import apply_overrides, resolve_ingestion_settings
 
 router = APIRouter(prefix="/orgs", tags=["orgs"])
 
@@ -23,6 +25,19 @@ def _my_org(membership: OrgMembership) -> MyOrganizationRead:
 
 def _member(membership: OrgMembership) -> MemberRead:
     return MemberRead(**UserRead.model_validate(membership.user).model_dump(), role=membership.role)
+
+
+def _ingestion_settings(org: Organization) -> IngestionSettingsRead:
+    effective = resolve_ingestion_settings(org)
+    return IngestionSettingsRead(
+        import_partial_success=effective.import_partial_success,
+        asset_existing_strategy=effective.asset_existing_strategy,
+        nessus_info_severity=effective.nessus_info_severity,
+        nessus_domain_map=effective.nessus_domain_map,
+        nessus_default_domain=effective.nessus_default_domain,
+        overridden=sorted(effective.overridden),
+        nessus_domain_map_override=org.ingestion_overrides.get("nessus_domain_map", {}),
+    )
 
 
 @router.get("", response_model=list[MyOrganizationRead])
@@ -88,3 +103,28 @@ def add_member(
     db.commit()
     db.refresh(membership)
     return _member(membership)
+
+
+@router.get("/{org_id}/settings", response_model=IngestionSettingsRead)
+def get_ingestion_settings(
+    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
+) -> IngestionSettingsRead:
+    """Ingestion settings in effect for this org: its overrides, else the
+    global .env defaults. `overridden` lists the keys the org overrides."""
+    return _ingestion_settings(db.get(Organization, org_id))
+
+
+@router.patch("/{org_id}/settings", response_model=IngestionSettingsRead)
+def update_ingestion_settings(
+    org_id: uuid.UUID,
+    payload: IngestionSettingsUpdate,
+    db: Session = Depends(get_db),
+    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+) -> IngestionSettingsRead:
+    """Admins only. Send a value to override a setting, null to clear the
+    override; omitted fields are unchanged."""
+    org = db.get(Organization, org_id)
+    apply_overrides(org, payload.model_dump(mode="json", exclude_unset=True))
+    db.commit()
+    db.refresh(org)
+    return _ingestion_settings(org)
