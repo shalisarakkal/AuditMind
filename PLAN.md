@@ -233,10 +233,15 @@ copies a profile and adjusts it. All 22 clarifying answers: the recommendations.
 
 ### Phase 2 sign-off
 
-- [ ] Full suite green locally and in CI
-- [ ] Your review + explicit approval to close out Phase 2
+- [x] Full suite green locally and in CI (413 backend, 77 frontend; CI green
+      on fbaca45)
+- [x] Your review + explicit approval to close out Phase 2 (2026-09-28)
 
-## Phase 2d — Imports at scale, then data lifecycle (after Phase 2 sign-off)
+**Status:** Closed 2026-09-28. Known gaps carried into Phase 2d part 1:
+background import progress is lost on navigation, and pages are slow during
+very large (500K-row) imports.
+
+## Phase 2d — Imports at scale, then data lifecycle (next; Phase 2 signed off)
 
 Its own phase, built with the feature-dev workflow once Phase 2 is signed off
 and before Phase 3, so Phase 3's reports and documents get the same lifecycle
