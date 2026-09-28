@@ -11,7 +11,7 @@ Message = MutableMapping[str, Any]
 Receive = Callable[[], Awaitable[Message]]
 Send = Callable[[Message], Awaitable[None]]
 
-IMPORT_PATH_SUFFIXES = ("/assets/import", "/findings/import")
+IMPORT_PATH_SUFFIXES = ("/assets/import", "/findings/import", "/imports")
 # Room for the multipart envelope around the file itself; the exact file
 # limit is enforced again when the endpoint reads the upload.
 _MULTIPART_OVERHEAD_BYTES = 1024 * 1024

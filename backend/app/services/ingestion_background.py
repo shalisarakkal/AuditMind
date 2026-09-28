@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.scan import Scan
-from app.services.ingestion_service import ImportKind, process_import
+from app.services.ingestion_service import ImportKind, RowReader, process_import
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +35,16 @@ def _new_session() -> Iterator[Session]:
 open_session: Callable[[], AbstractContextManager[Session]] = _new_session
 
 
-def run_import_job(scan_id: uuid.UUID, kind: ImportKind, fmt: str, content: bytes) -> None:
+def run_import_job(
+    scan_id: uuid.UUID, kind: ImportKind, fmt: str, content: bytes, profile: RowReader | None = None
+) -> None:
     with open_session() as db:
         scan = db.get(Scan, scan_id)
         if scan is None:
             logger.error("Background import: scan %s not found", scan_id)
             return
         try:
-            process_import(db, scan, kind, fmt, content)
+            process_import(db, scan, kind, fmt, content, profile)
         except Exception:
             # process_import has already marked the scan failed.
             logger.exception("Background import failed (scan %s)", scan_id)

@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 
+import PairRows, { type Choice, type Pair, rowsToMap, selectClass } from "@/components/PairRows";
 import { api } from "@/lib/apiClient";
-import { DOMAIN_LABELS, DOMAIN_ORDER } from "@/lib/domain";
-import type { Domain, IngestionSettings } from "@/lib/types";
+import { ASSET_TYPE_LABELS, ASSET_TYPES, DOMAIN_LABELS, DOMAIN_ORDER } from "@/lib/domain";
+import type { IngestionSettings } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 type Props = { orgId: string; isAdmin: boolean };
 
-type Choice = { value: string; label: string };
+const DOMAIN_CHOICES: Choice[] = DOMAIN_ORDER.map((d) => ({ value: d, label: DOMAIN_LABELS[d] }));
+const TYPE_CHOICES: Choice[] = ASSET_TYPES.map((t) => ({ value: t, label: ASSET_TYPE_LABELS[t] }));
 
 const FIELDS: {
   key: "import_partial_success" | "asset_existing_strategy" | "nessus_info_severity" | "nessus_default_domain";
@@ -49,12 +51,9 @@ const FIELDS: {
     key: "nessus_default_domain",
     label: "Nessus default domain",
     help: "For plugin families with no mapping.",
-    choices: DOMAIN_ORDER.map((d) => ({ value: d, label: DOMAIN_LABELS[d] })),
+    choices: DOMAIN_CHOICES,
   },
 ];
-
-const selectClass =
-  "rounded-md border border-white/15 bg-navy px-2 py-1.5 text-sm text-white focus:border-cyan focus:outline-none disabled:opacity-60";
 
 export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
   const { data, error, loading } = useApi<IngestionSettings>(`/orgs/${orgId}/settings`);
@@ -137,103 +136,113 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
         })}
       </div>
 
-      <DomainMapEditor settings={settings} isAdmin={isAdmin} saving={saving} onSave={save} />
+      <MapEditor
+        title="Nessus plugin family → domain"
+        help="Families not listed go to the default domain above. This organization's own mappings take precedence."
+        own={settings.nessus_domain_map_override}
+        effective={settings.nessus_domain_map}
+        choices={DOMAIN_CHOICES}
+        newValue={settings.nessus_default_domain}
+        keyLabel="Plugin family"
+        valueLabel="Domain for plugin family"
+        keyPlaceholder="e.g. Web Servers"
+        emptyText="No custom mappings."
+        addLabel="+ Add mapping"
+        saveLabel="Save mappings"
+        onSave={(map) => save({ nessus_domain_map: map })}
+        isAdmin={isAdmin}
+        saving={saving}
+      />
+      <MapEditor
+        title="Asset type names"
+        help="Names that imports and new assets may use for a type, e.g. laptop → Workstation. The name is kept as the asset's subtype."
+        own={settings.asset_type_aliases_override}
+        effective={settings.asset_type_aliases}
+        choices={TYPE_CHOICES}
+        newValue="server"
+        keyLabel="Type name"
+        valueLabel="Category for type name"
+        keyPlaceholder="e.g. hypervisor"
+        emptyText="No names of its own."
+        addLabel="+ Add type name"
+        saveLabel="Save type names"
+        onSave={(map) => save({ asset_type_aliases: map })}
+        isAdmin={isAdmin}
+        saving={saving}
+      />
     </div>
   );
 }
 
-function DomainMapEditor({
-  settings,
-  isAdmin,
-  saving,
-  onSave,
-}: {
-  settings: IngestionSettings;
+type MapEditorProps = {
+  title: string;
+  help: string;
+  /** The org's own entries (what an admin edits). */
+  own: Record<string, string>;
+  /** Everything in effect; entries not in `own` are shown as inherited. */
+  effective: Record<string, string>;
+  choices: Choice[];
+  newValue: string;
+  keyLabel: string;
+  valueLabel: string;
+  keyPlaceholder: string;
+  emptyText: string;
+  addLabel: string;
+  saveLabel: string;
+  /** Saves the org's entries; null when there are none (clears the override). */
+  onSave(map: Record<string, string> | null): Promise<void>;
   isAdmin: boolean;
   saving: boolean;
-  onSave(changes: Record<string, unknown>): Promise<void>;
-}) {
-  const [rows, setRows] = useState<[string, Domain][]>([]);
-  useEffect(() => setRows(Object.entries(settings.nessus_domain_map_override)), [settings.nessus_domain_map_override]);
+};
 
-  const inherited = Object.entries(settings.nessus_domain_map).filter(
-    ([family]) => !(family in settings.nessus_domain_map_override),
-  );
-  const cleaned = rows.filter(([family]) => family.trim());
+/** A map setting layered built-in -> server -> org: the org's own entries
+ * are editable, the rest are listed as inherited. */
+function MapEditor(props: MapEditorProps) {
+  const { own, effective, choices, isAdmin, saving } = props;
+  const [rows, setRows] = useState<Pair[]>([]);
+  useEffect(() => setRows(Object.entries(own)), [own]);
+
+  const label = (value: string) => choices.find((c) => c.value === value)?.label ?? value;
+  const inherited = Object.entries(effective).filter(([key]) => !(key in own));
+  const cleaned = rowsToMap(rows);
 
   return (
     <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h3 className="text-sm font-medium text-white">Nessus plugin family → domain</h3>
-      <p className="mt-1 text-xs text-white/50">
-        Families not listed go to the default domain above. This organization&apos;s own mappings take precedence.
-      </p>
+      <h3 className="text-sm font-medium text-white">{props.title}</h3>
+      <p className="mt-1 text-xs text-white/50">{props.help}</p>
 
       <div className="mt-4 space-y-2">
         <p className="text-xs uppercase tracking-wide text-white/50">This organization</p>
-        {rows.length === 0 && <p className="text-sm text-white/50">No custom mappings.</p>}
-        {rows.map(([family, domain], i) => (
-          <div key={i} className="flex flex-wrap gap-2">
-            <input
-              aria-label={`Plugin family ${i + 1}`}
-              value={family}
-              disabled={!isAdmin}
-              onChange={(e) => setRows(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))}
-              placeholder="e.g. Web Servers"
-              className="flex-1 rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white placeholder:text-white/40 focus:border-cyan focus:outline-none"
-            />
-            <select
-              aria-label={`Domain for plugin family ${i + 1}`}
-              value={domain}
-              disabled={!isAdmin}
-              onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value as Domain] : r)))}
-              className={selectClass}
-            >
-              {DOMAIN_ORDER.map((d) => (
-                <option key={d} value={d}>
-                  {DOMAIN_LABELS[d]}
-                </option>
-              ))}
-            </select>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setRows(rows.filter((_, j) => j !== i))}
-                className="px-2 text-xs text-white/60 hover:text-white"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        ))}
+        <PairRows
+          rows={rows}
+          onChange={setRows}
+          keyLabel={props.keyLabel}
+          valueLabel={props.valueLabel}
+          keyPlaceholder={props.keyPlaceholder}
+          valueChoices={choices}
+          newValue={props.newValue}
+          addLabel={props.addLabel}
+          disabled={!isAdmin}
+          emptyText={props.emptyText}
+        />
         {isAdmin && (
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setRows([...rows, ["", settings.nessus_default_domain]])}
-              className="text-sm text-cyan hover:underline"
-            >
-              + Add mapping
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() =>
-                onSave({ nessus_domain_map: cleaned.length ? Object.fromEntries(cleaned.map(([f, d]) => [f.trim(), d])) : null })
-              }
-              className="rounded-md bg-cyan px-3 py-1 text-sm font-medium text-navy disabled:opacity-60"
-            >
-              Save mappings
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => props.onSave(Object.keys(cleaned).length ? cleaned : null)}
+            className="rounded-md bg-cyan px-3 py-1 text-sm font-medium text-navy disabled:opacity-60"
+          >
+            {props.saveLabel}
+          </button>
         )}
       </div>
 
       <div className="mt-5">
         <p className="text-xs uppercase tracking-wide text-white/50">Inherited (built-in and server defaults)</p>
-        <ul className="mt-2 grid gap-1 text-sm text-white/70 sm:grid-cols-2">
-          {inherited.map(([family, domain]) => (
-            <li key={family}>
-              {family} → {DOMAIN_LABELS[domain]}
+        <ul className="mt-2 grid max-h-48 gap-1 overflow-auto text-sm text-white/70 sm:grid-cols-2">
+          {inherited.map(([key, value]) => (
+            <li key={key}>
+              {key} → {label(value)}
             </li>
           ))}
         </ul>

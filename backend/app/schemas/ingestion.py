@@ -14,7 +14,21 @@ class RowError(BaseModel):
     message: str
 
 
+class RowWarning(BaseModel):
+    """A row that was imported, but with something worth checking (an unusual
+    IP, a value that couldn't be read and was defaulted). Same `row` numbering
+    as RowError. Warnings never count as failures."""
+
+    row: int
+    message: str
+
+
 class ImportReport(BaseModel):
+    """For files that create assets and findings together (profile imports),
+    created/updated/skipped count assets, and findings_created/duplicates
+    count findings. Otherwise created/updated/skipped count the file's own
+    records."""
+
     created: int = 0
     updated: int = 0
     # Assets left untouched (strategy "skip"), and Nessus Info items when
@@ -23,7 +37,11 @@ class ImportReport(BaseModel):
     # Findings identical to one already recorded (same asset, source, category).
     duplicates: int = 0
     failed: int = 0
+    findings_created: int = 0
     errors: list[RowError] = []
+    warnings: list[RowWarning] = []
+    # All warnings, when there are more than the report lists.
+    warnings_total: int = 0
 
 
 class ImportResponse(BaseModel):

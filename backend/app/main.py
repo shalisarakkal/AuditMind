@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import ai, assets, auth, dashboard, findings, orgs, reports, risk, scans
+from app.api.routes import ai, assets, auth, dashboard, findings, import_profiles, orgs, reports, risk, scans
 from app.core.config import settings
 from app.core.middleware import UploadSizeLimitMiddleware
 
@@ -26,6 +26,7 @@ app.include_router(findings.router, prefix=api_router_prefix)
 app.include_router(risk.router, prefix=api_router_prefix)
 app.include_router(reports.router, prefix=api_router_prefix)
 app.include_router(dashboard.router, prefix=api_router_prefix)
+app.include_router(import_profiles.router, prefix=api_router_prefix)
 app.include_router(ai.router, prefix=api_router_prefix)
 
 

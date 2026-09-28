@@ -14,6 +14,8 @@ function settings(overrides: Partial<IngestionSettings> = {}): IngestionSettings
     nessus_default_domain: "vulnerability_management",
     overridden: [],
     nessus_domain_map_override: {},
+    asset_type_aliases: { laptop: "workstation", lambda: "cloud_resource" },
+    asset_type_aliases_override: {},
     ...overrides,
   };
 }
@@ -98,7 +100,7 @@ describe("IngestionSettingsPanel", () => {
     expect(await screen.findByLabelText("Plugin family 1")).toHaveValue("Web Servers");
     expect(screen.queryByText("Web Servers → Incident Response")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove plugin family 1" }));
     fireEvent.click(screen.getByRole("button", { name: "Save mappings" }));
 
     await waitFor(() => expect(patches).toEqual([{ nessus_domain_map: null }]));
@@ -123,5 +125,29 @@ describe("IngestionSettingsPanel", () => {
     expect(await screen.findByText("Only organization admins can change these settings.")).toBeInTheDocument();
     for (const select of screen.getAllByRole("combobox")) expect(select).toBeDisabled();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("edits the org's own asset type names", async () => {
+    const patches = setup(settings({ asset_type_aliases_override: { hypervisor: "server" } }));
+
+    expect(await screen.findByLabelText("Type name 1")).toHaveValue("hypervisor");
+    expect(screen.getByText("laptop → Workstation")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "+ Add type name" }));
+    fireEvent.change(screen.getByLabelText("Type name 2"), { target: { value: " Hologram " } });
+    fireEvent.change(screen.getByLabelText("Category for type name 2"), { target: { value: "application" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save type names" }));
+
+    await waitFor(() =>
+      expect(patches).toEqual([{ asset_type_aliases: { hypervisor: "server", Hologram: "application" } }]),
+    );
+  });
+
+  it("removing every type name clears the override", async () => {
+    const patches = setup(settings({ asset_type_aliases_override: { hypervisor: "server" } }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove type name 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save type names" }));
+
+    await waitFor(() => expect(patches).toEqual([{ asset_type_aliases: null }]));
   });
 });

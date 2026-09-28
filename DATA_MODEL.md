@@ -10,7 +10,7 @@ This document defines the core data entities and relationships for the cyber res
 ### 2.1 organizations
 - **Fields:** `id`, `name`, `industry`, `size`, `ingestion_overrides`, `created_at`
 - **Purpose:** Represents a customer/company.
-- **`ingestion_overrides`** (JSONB, default `{}`): the org's overrides of the global ingestion defaults in `.env` (`import_partial_success`, `asset_existing_strategy`, `nessus_info_severity`, `nessus_domain_map`, `nessus_default_domain`). Only overridden keys are stored, so a changed `.env` default still applies to orgs that haven't overridden it. Read/changed via `GET`/`PATCH /orgs/{org_id}/settings`.
+- **`ingestion_overrides`** (JSONB, default `{}`): the org's overrides of the global ingestion defaults in `.env` (`import_partial_success`, `asset_existing_strategy`, `nessus_info_severity`, `nessus_domain_map`, `nessus_default_domain`, `asset_type_aliases`). Only overridden keys are stored, so a changed `.env` default still applies to orgs that haven't overridden it. Read/changed via `GET`/`PATCH /orgs/{org_id}/settings`.
 
 ### 2.2 users
 - **Fields:** `id`, `email`, `name`, `auth_provider`, `created_at`
@@ -18,13 +18,17 @@ This document defines the core data entities and relationships for the cyber res
 - **Purpose:** Application users (admins, auditors, viewers). Role is per org, on the membership.
 
 ### 2.3 assets
-- **Fields:** `id`, `org_id`, `type`, `hostname`, `ip`, `cloud_id`, `environment`, `criticality`, `tags`, `created_at`
+- **Fields:** `id`, `org_id`, `type`, `subtype`, `type_known`, `hostname`, `ip`, `cloud_id`, `environment`, `criticality`, `tags`, `details`, `created_at`
 - **Purpose:** Any infrastructure component (server, VM, DB, device, SaaS).
-- **Import matching:** imported assets and findings' hosts match an existing asset by hostname (case-insensitive), else by IP (only against assets with no hostname). Indexed on `(org_id, lower(hostname))` and `(org_id, ip)`. No uniqueness constraint: the `duplicate` import strategy may create repeats.
+- **`type`** is one of `server`, `workstation`, `network_device`, `database`, `cloud_resource`, `application`. Imports and `POST /assets` also accept a known name for one (e.g. laptop → workstation, VM → server, Lambda/bucket → cloud_resource); the name list is built in, extended by `.env` `ASSET_TYPE_ALIASES` and the org's `asset_type_aliases` setting (and a profile's own names). **`subtype`** keeps the source's name (`laptop`, `Lambda`, an OS such as `Windows Server 2022`).
+- **`details`** (JSONB, default `{}`): extra facts from profile imports (endpoint ID, agent version, last heartbeat, OS, open ports, region). Merged, not replaced, on re-import, so facts from different tools accumulate.
+- **Identity:** every asset needs a hostname, an IP or a `cloud_id` (cloud resources are often known only by their ID).
+- **Import matching:** imported assets and findings' hosts match an existing asset by `cloud_id` (exact), else hostname (case-insensitive) and category, else IP (only against assets with no hostname). A row with a cloud ID matches by name or IP only an asset with no cloud ID of its own. By name or IP, a row whose category is known matches only an asset of that category or one whose type is a guess, so a server and a router sharing a name stay two assets (the import report warns). A row with no known category (a finding, an endpoint agent's default type) matches any; with several candidates it goes to the oldest and the report warns.
+- **`type_known`** is false when the type is a guess: a profile's default type (endpoint agents default to workstation), a type worked out from an unrecognised or blank OS (recorded as server), or the placeholder for a finding's unknown host. A known type from a later import replaces a guess; a guess never replaces a known type. Indexed on `(org_id, cloud_id)`, `(org_id, lower(hostname))` and `(org_id, ip)`. No uniqueness constraint: the `duplicate` import strategy may create repeats.
 
 ### 2.4 scans
 - **Fields:** `id`, `org_id`, `scan_type`, `scope`, `status`, `started_at`, `completed_at`, `source`, `filename`, `summary`
-- **Purpose:** Logical scan/ingestion events (vuln scan, config import, IAM review). Every file import is recorded as a scan: `scan_type` `asset_import` / `findings_csv` / `findings_json` / `nessus`, `source` `upload`, `filename` the uploaded file, and `summary` (JSONB) the import report (created/updated/skipped/duplicates/failed + row errors). `status` goes `pending` → `running` → `completed`/`failed`; large imports run in the background and are polled through it.
+- **Purpose:** Logical scan/ingestion events (vuln scan, config import, IAM review). Every file import is recorded as a scan: `scan_type` `asset_import` / `findings_csv` / `findings_json` / `nessus`, or `<family>_import` for a profile import (e.g. `endpoint_agent_import`), `source` `upload`, `filename` the uploaded file, `profile` the import profile used (built-in key or the org's profile id), and `summary` (JSONB) the import report (created/updated/skipped/duplicates/failed/findings_created + row errors and warnings; for profile imports the first three count assets). `status` goes `pending` → `running` → `completed`/`failed`; large imports run in the background and are polled through it.
 
 ### 2.5 findings
 - **Fields:** `id`, `scan_id`, `org_id`, `asset_id`, `category`, `domain`, `severity`, `description`, `raw_data`, `source`, `created_at`
@@ -48,6 +52,11 @@ This document defines the core data entities and relationships for the cyber res
 - **Fields:** `user_id`, `org_id` (composite primary key), `role` (`admin` | `auditor` | `viewer`), `created_at`
 - **Relations:** `user_id → users.id`, `org_id → organizations.id`
 - **Purpose:** Which orgs a user can access, and their role in each. Drives org selection: the client lists the user's orgs and scopes every call to the one picked (`/orgs/{org_id}/...`).
+
+### 2.10 import_profiles
+- **Fields:** `id`, `org_id`, `name` (unique per org), `family`, `column_map` (JSONB), `params` (JSONB), `created_at`, `updated_at`
+- **Relations:** `org_id → organizations.id` (deleted with the org)
+- **Purpose:** An org's own copy of a built-in import profile. `family` picks the code that reads the file (`generic_assets`, `generic_findings`, `endpoint_agent`, `network_scan`, `cloud_inventory`, `directory`); `column_map` gives the file's column for each field, with alternative names separated by `|` (the first one the file has is read); `params` holds that family's rule settings (thresholds, maps, default values, type names), validated on save. The built-in profiles themselves live in code (`app/services/import_profiles.py`), not in this table. Findings from a profile import have `source` = the family, so an org's copy and the built-in dedup against each other.
 
 ---
 

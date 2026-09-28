@@ -23,10 +23,12 @@ WRITE_ROUTES = [
     ("post", "/risk/score", {}, {"admin", "auditor"}),
     ("post", "/reports/generate", {"json": {"title": "Q3"}}, {"admin", "auditor"}),
     ("patch", "/settings", {"json": {"asset_existing_strategy": "skip"}}, {"admin"}),
+    ("post", "/imports", {"files": {"file": ("e.csv", b"DeviceName\nDEV-1\n")}, "data": {"profile": "endpoint_agent"}}, {"admin", "auditor"}),
+    ("post", "/import-profiles", {"json": {"name": "Our EDR", "copy_from": "endpoint_agent"}}, {"admin"}),
     ("post", "/members", {"json": {"email": "nobody@example.io"}}, {"admin"}),
 ]
 
-READ_ROUTES = ["", "/users", "/assets", "/findings", "/scans", "/reports", "/dashboard", "/settings"]
+READ_ROUTES = ["", "/users", "/assets", "/findings", "/scans", "/reports", "/dashboard", "/settings", "/import-profiles"]
 
 
 @pytest.fixture

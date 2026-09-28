@@ -1,0 +1,9 @@
+IPAddress,Hostname,OSDetected,OpenPorts,Vulnerabilities,RiskScore
+251.88.70.177,SRV-176,CentOS 8,"935,376,493,175,182",Outdated Software,6.3
+166.193.129.60,SRV-194,Windows Server 2022,"135,779,370,292,155,946,396,21",Outdated Software,8.1
+127.12.12.238,SRV-460,Windows Server 2022,"50,206,740",TLS1.0,4.6
+10.0.5.21,SRV-501,Ubuntu 22.04,"22,80,443",,1.2
+10.0.5.22,,Windows 11,"3389,445",SMBv1 Enabled,9.4
+10.0.5.23,SRV-503,Cisco IOS 15,"23,161",Telnet Enabled,7.0
+999.1.1.1,SRV-504,CentOS 8,22,Outdated Software,5.0
+10.0.5.25,SRV-505,Debian 12,"22,abc",Weak Ciphers,eleven

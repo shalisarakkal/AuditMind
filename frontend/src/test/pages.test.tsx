@@ -6,7 +6,8 @@ import FindingsPage from "@/app/(app)/findings/page";
 import DashboardPage from "@/app/(app)/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import type { Asset, DashboardSummary, Finding } from "@/lib/types";
-import { json, renderSignedIn } from "@/test/helpers";
+import { json, renderSignedIn, requestInit } from "@/test/helpers";
+import { BUILTIN_PROFILES } from "@/test/profiles";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), usePathname: () => "/" }));
 
@@ -14,8 +15,16 @@ const ASSETS: Asset[] = [
   {
     id: "a1", org_id: "org-1", type: "server", hostname: "web-01.acme.io", ip: "10.0.1.10", cloud_id: null,
     environment: "production", criticality: "high", tags: ["web", "dmz"], created_at: "2026-09-27T10:00:00Z",
+    subtype: null, details: {},
   },
 ];
+
+const ENDPOINT_ASSET: Asset = {
+  ...ASSETS[0], id: "a2", type: "workstation", subtype: "endpoint", hostname: "DEV-446", ip: null, tags: null,
+  details: { endpoint_id: "EP-00000", agent_version: "v5.3", open_ports: [135, 21] },
+};
+
+const PROFILES = { "GET /orgs/org-1/import-profiles": () => BUILTIN_PROFILES };
 
 function finding(overrides: Partial<Finding>): Finding {
   return {
@@ -25,12 +34,15 @@ function finding(overrides: Partial<Finding>): Finding {
   };
 }
 
-const IMPORT_REPORT = { created: 1, updated: 0, skipped: 0, duplicates: 0, failed: 0, errors: [] };
+const IMPORT_REPORT = {
+  created: 1, updated: 0, skipped: 0, duplicates: 0, failed: 0, findings_created: 0, errors: [], warnings: [],
+};
 
 describe("Assets page", () => {
   it("lists the org's assets and imports a file for admins", async () => {
     let assets: Asset[] = [];
     await renderSignedIn(<AssetsPage />, "admin", {
+      ...PROFILES,
       "GET /orgs/org-1/assets": () => assets,
       "POST /orgs/org-1/assets/import": () => {
         assets = ASSETS;
@@ -39,7 +51,11 @@ describe("Assets page", () => {
     });
     expect(await screen.findByText("No assets yet.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["x"], "assets.csv")] } });
+    fireEvent.change(screen.getByTestId("assets-file-input"), {
+      target: { files: [new File(["type,hostname\nserver,web-01\n"], "assets.csv")] },
+    });
+    expect(await screen.findByLabelText("Source")).toHaveValue("generic_assets");
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
 
     expect(await screen.findByText("web-01.acme.io")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Import result" })).toHaveTextContent("Created 1");
@@ -48,11 +64,53 @@ describe("Assets page", () => {
     expect(row).toHaveTextContent("webdmz");
   });
 
+  it("imports a tool export with its detected profile", async () => {
+    const report = { ...IMPORT_REPORT, created: 7, findings_created: 8, warnings: [{ row: 9, message: "odd value" }] };
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "auditor", {
+      ...PROFILES,
+      "GET /orgs/org-1/assets": () => [],
+      "POST /orgs/org-1/imports": () => json({ scan_id: "s1", status: "completed", report }, 201),
+    });
+    await screen.findByText("No assets yet.");
+
+    const csv = "EndPointID,DeviceName,LastHeartbeat,ThreatsDetected,ComplianceStatus\nEP-1,DEV-1,x,0,ok\n";
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File([csv], "edr.csv")] } });
+    expect(await screen.findByLabelText("Source")).toHaveValue("endpoint_agent");
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+
+    const panel = await screen.findByRole("region", { name: "Import result" });
+    expect(panel).toHaveTextContent("Assets created 7");
+    expect(panel).toHaveTextContent("Findings created 8");
+    expect(panel).toHaveTextContent("Warnings 1");
+    const upload = fetchMock.mock.calls.findIndex(([url]) => String(url).endsWith("/imports"));
+    expect((requestInit(fetchMock, upload).body as FormData).get("profile")).toBe("endpoint_agent");
+  });
+
+  it("shows type, subtype and expandable details", async () => {
+    await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => [...ASSETS, ENDPOINT_ASSET] });
+
+    const row = (await screen.findByText("DEV-446")).closest("tr")!;
+    expect(row).toHaveTextContent("Workstation");
+    expect(row).toHaveTextContent("endpoint");
+    expect(screen.getByText("web-01.acme.io").closest("tr")).toHaveTextContent("Server");
+    // Only assets with details get the toggle.
+    expect(screen.getAllByRole("button", { name: /details/ })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show details for DEV-446" }));
+    const details = row.nextElementSibling as HTMLElement;
+    expect(details).toHaveTextContent("Endpoint IDEP-00000");
+    expect(details).toHaveTextContent("Agent versionv5.3");
+    expect(details).toHaveTextContent("Open ports135, 21");
+    fireEvent.click(screen.getByRole("button", { name: "Hide details for DEV-446" }));
+    expect(screen.queryByText("EP-00000")).not.toBeInTheDocument();
+  });
+
   it("hides the import button from viewers", async () => {
+    // Viewers don't load import profiles either (no route mocked for them).
     await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => ASSETS });
 
     expect(await screen.findByText("web-01.acme.io")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Import assets" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
   });
 
   it("shows a load error", async () => {
@@ -66,6 +124,7 @@ describe("Assets page", () => {
 describe("Findings page", () => {
   it("groups findings by domain, most severe first, with their asset", async () => {
     await renderSignedIn(<FindingsPage />, "auditor", {
+      ...PROFILES,
       "GET /orgs/org-1/assets": () => ASSETS,
       "GET /orgs/org-1/findings": () => [
         finding({ category: "LOW-ONE", description: "Minor issue", severity: "low" }),
@@ -83,7 +142,7 @@ describe("Findings page", () => {
     expect(rows[0]).toHaveTextContent("web-01.acme.io");
     expect(screen.getByRole("region", { name: "Identity & Access" })).toHaveTextContent("MFA off");
     expect(screen.queryByRole("region", { name: "Backup & Recovery" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Upload findings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import data" })).toBeInTheDocument();
   });
 
   it("hides the upload button from viewers", async () => {
@@ -92,7 +151,7 @@ describe("Findings page", () => {
       "GET /orgs/org-1/findings": () => [],
     });
     expect(await screen.findByText("No findings yet.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Upload findings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
   });
 });
 
@@ -109,7 +168,7 @@ describe("Dashboard page", () => {
       {
         id: "s1", org_id: "org-1", scan_type: "nessus", scope: null, status: "completed",
         started_at: "2026-09-27T10:00:00Z", completed_at: "2026-09-27T10:01:00Z", source: "upload",
-        filename: "weekly.nessus", summary: IMPORT_REPORT,
+        filename: "weekly.nessus", summary: IMPORT_REPORT, profile: null,
       },
     ],
     asset_count: 12,
@@ -140,16 +199,21 @@ describe("Dashboard page", () => {
 });
 
 describe("Settings page", () => {
-  it("shows the ingestion settings to non-admins read-only", async () => {
+  it("shows the ingestion settings and import profiles to non-admins read-only", async () => {
     await renderSignedIn(<SettingsPage />, "auditor", {
+      ...PROFILES,
       "GET /orgs/org-1/settings": () => ({
         import_partial_success: true, asset_existing_strategy: "update", nessus_info_severity: "skip",
         nessus_domain_map: {}, nessus_default_domain: "vulnerability_management", overridden: [],
-        nessus_domain_map_override: {},
+        nessus_domain_map_override: {}, asset_type_aliases: { laptop: "workstation" }, asset_type_aliases_override: {},
       }),
     });
 
     await waitFor(() => expect(screen.getByLabelText("Nessus Info items")).toBeDisabled());
     expect(screen.getByText("Only organization admins can change these settings.")).toBeInTheDocument();
+    expect(screen.getByText("laptop → Workstation")).toBeInTheDocument();
+    expect(await screen.findByText("Endpoint agent export")).toBeInTheDocument();
+    expect(screen.getByText("Only organization admins can change import profiles.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Copy|Edit|Delete) / })).not.toBeInTheDocument();
   });
 });

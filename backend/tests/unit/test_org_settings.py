@@ -1,6 +1,7 @@
 from app.core.config import settings
 from app.models.enums import Domain
 from app.models.organization import Organization
+from app.services.asset_types import BUILTIN_TYPE_ALIASES
 from app.services.nessus_parser import DEFAULT_NESSUS_DOMAIN_MAP
 from app.services.org_settings import apply_overrides, resolve_ingestion_settings
 
@@ -66,3 +67,17 @@ def test_clearing_a_key_that_is_not_set_is_harmless():
     org = _org()
     apply_overrides(org, {"import_partial_success": None})
     assert org.ingestion_overrides == {}
+
+
+def test_type_names_layer_builtin_then_env_then_org(monkeypatch):
+    monkeypatch.setattr(settings, "ASSET_TYPE_ALIASES", {"hypervisor": "server", "laptop": "server"})
+    effective = resolve_ingestion_settings(_org(asset_type_aliases={"hypervisor": "application"}))
+    aliases = effective.asset_type_aliases
+    assert aliases["hypervisor"] == "application"  # org beats .env
+    assert aliases["laptop"] == "server"  # .env beats built-in
+    assert aliases["lambda"] == "cloud_resource"  # built-in kept
+    assert effective.overridden == {"asset_type_aliases"}
+
+
+def test_type_names_default_to_the_builtin_list():
+    assert resolve_ingestion_settings(_org()).asset_type_aliases == BUILTIN_TYPE_ALIASES

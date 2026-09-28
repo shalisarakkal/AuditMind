@@ -25,3 +25,4 @@ class ScanRead(BaseModel):
     source: str | None
     filename: str | None
     summary: dict | None
+    profile: str | None

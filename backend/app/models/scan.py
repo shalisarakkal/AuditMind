@@ -26,6 +26,8 @@ class Scan(Base):
     # File imports: the uploaded filename and the per-row import report.
     filename: Mapped[str | None] = mapped_column(String(255))
     summary: Mapped[dict | None] = mapped_column(JSONB)
+    # The import profile the file was read with (built-in key or custom id).
+    profile: Mapped[str | None] = mapped_column(String(100))
 
     organization: Mapped["Organization"] = relationship(back_populates="scans")
     findings: Mapped[list["Finding"]] = relationship(back_populates="scan", cascade="all, delete-orphan")

@@ -34,14 +34,14 @@ def test_concurrent_imports_share_one_asset(db_session, monkeypatch):
 
     # Widen the race: pause between looking a host up and creating it, so
     # without serialisation both imports would miss and both insert.
-    find_asset = ingestion_service._find_asset
+    find_asset = ingestion_service._find_assets
 
     def slow_find_asset(*args, **kwargs):
         match = find_asset(*args, **kwargs)
         time.sleep(0.5)
         return match
 
-    monkeypatch.setattr(ingestion_service, "_find_asset", slow_find_asset)
+    monkeypatch.setattr(ingestion_service, "_find_assets", slow_find_asset)
 
     Session = sessionmaker(bind=db_session.get_bind(), autoflush=False)
     errors: list[BaseException] = []

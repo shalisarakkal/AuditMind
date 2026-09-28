@@ -1,0 +1,8 @@
+[
+  {"Provider": "Azure", "ResourceID": "res-00001", "Type": "Lambda", "Region": "us-east-1", "Owner": "team1", "Tags": {"env": "prod", "app": "risk"}, "Status": "Running"},
+  {"Provider": "AWS", "ResourceID": "res-00002", "Type": "Database", "Region": "westus", "Owner": "team8", "Tags": {"env": "test", "app": "risk"}, "Status": "Active"},
+  {"Provider": "GCP", "ResourceID": "res-00003", "Type": "Bucket", "Region": "us-central1", "Owner": "team6", "Tags": {"env": "dev"}, "Status": "Stopped"},
+  {"Provider": "AWS", "ResourceID": "res-00004", "Type": "VM", "Region": "eastus", "Owner": "team2", "Tags": {}, "Status": "Running"},
+  {"Provider": "AWS", "ResourceID": "res-00005", "Type": "Hologram", "Region": "eastus", "Owner": "team2", "Tags": {}, "Status": "Running"},
+  {"Provider": "AWS", "Type": "Storage", "Region": "eastus", "Owner": "team3", "Tags": {}, "Status": "Running"}
+]

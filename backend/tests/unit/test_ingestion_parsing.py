@@ -114,8 +114,8 @@ def test_validate_asset_accepts_ip_or_hostname_alone_and_json_types():
     "record, message",
     [
         ({"hostname": "a"}, "type is required"),
-        ({"type": "router", "hostname": "a"}, "type 'router' must be one of"),
-        ({"type": "server"}, "hostname or ip is required"),
+        ({"type": "hologram", "hostname": "a"}, "type 'hologram' must be one of"),
+        ({"type": "server"}, "hostname, ip or cloud_id is required"),
         ({"type": "server", "ip": "999.1.1.1"}, "not a valid IP address"),
         ({"type": "server", "hostname": "x" * 256}, "hostname is longer than 255"),
         ({"type": "server", "hostname": "a", "tags": 5}, "tags must be"),
@@ -147,7 +147,7 @@ def test_validate_finding_enums_are_case_insensitive_and_source_defaults():
         ({"hostname": "a", "severity": "high"}, "domain is required"),
         ({"hostname": "a", "domain": "nope", "severity": "high"}, "domain 'nope' must be one of"),
         ({"hostname": "a", "domain": "network_config", "severity": "urgent"}, "severity 'urgent' must be one of"),
-        ({"domain": "network_config", "severity": "low"}, "hostname or ip is required"),
+        ({"domain": "network_config", "severity": "low"}, "hostname, ip or cloud_id is required"),
     ],
 )
 def test_validate_finding_errors(record, message):
@@ -204,10 +204,88 @@ def test_nessus_finding_info_items_follow_settings():
 def test_nessus_finding_invalid_severity_and_missing_host():
     with pytest.raises(ValueError, match="invalid Nessus severity"):
         nessus_finding(_item(severity="9"), _settings())
-    with pytest.raises(ValueError, match="hostname or ip is required"):
+    with pytest.raises(ValueError, match="hostname, ip or cloud_id is required"):
         nessus_finding(_item(hostname=None, ip=None), _settings())
 
 
 def test_json_raw_data_round_trips():
     row = validate_finding(1, {"ip": "10.0.0.1", "domain": "backup_recovery", "severity": "low", "extra": [1, 2]})
     assert json.loads(json.dumps(row.raw_data))["extra"] == [1, 2]
+
+
+# --- Type names, subtypes and warnings ---
+
+
+def test_validate_asset_resolves_type_names_to_a_category_and_subtype():
+    row = validate_asset(1, {"type": "Laptop", "hostname": "pc-1"})
+    assert (row.type, row.subtype) == ("workstation", "Laptop")
+    # An explicit subtype column wins over the name.
+    row = validate_asset(1, {"type": "vm", "subtype": "hyper-v guest", "hostname": "vm-1"})
+    assert (row.type, row.subtype) == ("server", "hyper-v guest")
+    # A category name has no subtype.
+    assert validate_asset(1, {"type": "Workstation", "hostname": "pc-2"}).subtype is None
+
+
+def test_validate_asset_uses_the_given_type_names():
+    with pytest.raises(ValueError, match="must be one of"):
+        validate_asset(1, {"type": "hypervisor", "hostname": "h"}, {})
+    assert validate_asset(1, {"type": "hypervisor", "hostname": "h"}, {"hypervisor": "server"}).type == "server"
+
+
+@pytest.mark.parametrize(
+    "ip, kind",
+    [
+        ("127.12.12.238", "loopback"),
+        ("::1", "loopback"),
+        ("0.0.0.0", "unspecified"),
+        ("169.254.10.1", "link-local"),
+        ("fe80::1", "link-local"),
+        ("224.0.0.5", "multicast"),
+        ("251.88.70.177", "reserved"),
+    ],
+)
+def test_unusual_ips_are_accepted_with_a_warning(ip, kind):
+    warnings = []
+    row = validate_asset(1, {"type": "server", "ip": ip}, warnings=warnings)
+    assert row.ip == ip
+    article = "an" if kind == "unspecified" else "a"
+    assert warnings == [f"ip {ip} is {article} {kind} address; imported anyway"]
+
+
+@pytest.mark.parametrize("ip", ["10.0.0.1", "192.168.1.20", "172.16.4.4", "8.8.8.8", "2001:db8::1"])
+def test_normal_and_private_ips_have_no_warning(ip):
+    warnings = []
+    validate_asset(1, {"type": "server", "ip": ip}, warnings=warnings)
+    assert warnings == []
+
+
+def test_findings_and_nessus_items_warn_about_unusual_ips_too():
+    warnings = []
+    validate_finding(1, {"ip": "127.0.0.1", "domain": "backup_recovery", "severity": "low"}, warnings)
+    nessus_finding(_item(hostname=None, ip="0.0.0.0"), _settings(), warnings)
+    assert warnings == [
+        "ip 127.0.0.1 is a loopback address; imported anyway",
+        "ip 0.0.0.0 is an unspecified address; imported anyway",
+    ]
+
+
+def test_profile_imports_accept_csv_and_json_only():
+    assert detect_format("export.csv", "profile") == "csv"
+    assert detect_format("export.json", "profile") == "json"
+    with pytest.raises(IngestionError):
+        detect_format("scan.nessus", "profile")
+
+
+def test_a_cloud_id_alone_identifies_assets_and_findings():
+    row = validate_asset(1, {"type": "Lambda", "cloud_id": "arn:aws:lambda:x"})
+    assert (row.type, row.hostname, row.ip, row.cloud_id) == ("cloud_resource", None, None, "arn:aws:lambda:x")
+    finding = validate_finding(1, {"cloud_id": "arn:aws:lambda:x", "domain": "network_config", "severity": "low"})
+    assert finding.cloud_id == "arn:aws:lambda:x"
+
+
+@pytest.mark.parametrize(
+    "tags, expected",
+    [({"env": "prod", "app": "risk"}, ["env:prod", "app:risk"]), ({"pci": ""}, ["pci"]), ({}, None)],
+)
+def test_tags_given_as_an_object(tags, expected):
+    assert validate_asset(1, {"type": "server", "hostname": "h", "tags": tags}).tags == expected

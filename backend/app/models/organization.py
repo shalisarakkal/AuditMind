@@ -30,3 +30,6 @@ class Organization(Base):
     )
     assets: Mapped[list["Asset"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
     scans: Mapped[list["Scan"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
+    import_profiles: Mapped[list["ImportProfile"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )

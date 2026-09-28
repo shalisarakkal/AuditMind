@@ -1,8 +1,10 @@
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.models.enums import Domain
+from app.services.asset_types import check_alias_targets
 
 AssetExistingStrategy = Literal["update", "skip", "duplicate"]
 NessusInfoSeverity = Literal["skip", "low"]
@@ -48,6 +50,15 @@ class Settings(BaseSettings):
     NESSUS_DOMAIN_MAP: dict[str, Domain] = {}
     # Domain for plugin families with no mapping.
     NESSUS_DEFAULT_DOMAIN: Domain = Domain.vulnerability_management
+    # Extra asset type names -> category, merged over the built-in list (see
+    # app/services/asset_types.py). In .env as JSON,
+    # e.g. ASSET_TYPE_ALIASES={"hypervisor": "server"}
+    ASSET_TYPE_ALIASES: dict[str, str] = {}
+
+    @field_validator("ASSET_TYPE_ALIASES")
+    @classmethod
+    def _check_type_aliases(cls, value: dict[str, str]) -> dict[str, str]:
+        return check_alias_targets(value)
 
     @property
     def cors_origins_list(self) -> list[str]:

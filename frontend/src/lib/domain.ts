@@ -1,4 +1,4 @@
-import type { Domain, RiskTier, ScanStatus, Severity, UserRole } from "@/lib/types";
+import type { AssetType, Domain, RiskTier, ScanStatus, Severity, UserRole } from "@/lib/types";
 
 // Display order matches the backend Domain enum.
 export const DOMAIN_ORDER: Domain[] = [
@@ -22,6 +22,17 @@ export const DOMAIN_LABELS: Record<Domain, string> = {
 };
 
 export const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low"];
+
+export const ASSET_TYPES: AssetType[] = ["server", "workstation", "network_device", "database", "cloud_resource", "application"];
+
+export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  server: "Server",
+  workstation: "Workstation",
+  network_device: "Network device",
+  database: "Database",
+  cloud_resource: "Cloud resource",
+  application: "Application",
+};
 
 export const TIER_COLORS: Record<RiskTier, string> = {
   low: "text-emerald-400",
@@ -50,6 +61,11 @@ export const SCAN_TYPE_LABELS: Record<string, string> = {
   findings_csv: "Findings (CSV)",
   findings_json: "Findings (JSON)",
   nessus: "Nessus scan",
+  generic_assets_import: "Asset import",
+  generic_findings_import: "Findings import",
+  endpoint_agent_import: "Endpoint agent export",
+  network_scan_import: "Network scan export",
+  cloud_inventory_import: "Cloud inventory export",
 };
 
 /** Admins and auditors can import and upload; viewers are read-only. */

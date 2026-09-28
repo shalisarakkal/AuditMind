@@ -8,6 +8,7 @@ from app.models.finding import Finding
 from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.document import Document
+from app.models.import_profile import ImportProfile
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "RiskScore",
     "Report",
     "Document",
+    "ImportProfile",
 ]

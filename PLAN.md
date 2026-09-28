@@ -88,8 +88,9 @@ record, not because they need more action):
 real data instead of placeholder scores, login page + org picker in the
 frontend (carried over from Phase 1).
 
-Split into **2a (backend)** and **2b (frontend)**. There is a single check-in:
-Phase 2 is marked complete only after both 2a and 2b are done and tested.
+Split into **2a (backend)** and **2b (frontend)**, plus **2c (import
+profiles)**, added after 2a/2b were built. There is a single check-in: Phase 2
+is marked complete only after 2a, 2b and 2c are done and tested.
 Built with the feature-dev workflow (explore → clarify → design → implement →
 review).
 
@@ -121,6 +122,10 @@ sync and background paths, a defusedxml Nessus parser, and per-org settings.
       uvicorn passed (incl. real background import)
 - Known follow-up (pre-existing, not Phase 2): `alembic check` reports model
   vs. migration drift on enum column types and the `users.email` index
+- Known follow-up (pre-existing): `alembic downgrade` below 0002 fails, as the
+  app's DB user doesn't own the `vector` extension it tries to drop
+- Follow-up: a 10,000-row file takes 12–29 s to import (row-by-row matching),
+  all while the page waits for files under 10 MB; batch the lookups
 
 ### Phase 2b — Frontend
 
@@ -161,10 +166,129 @@ sync and background paths, a defusedxml Nessus parser, and per-org settings.
       form-login test uses the shared fixture; new Nessus mapping rows start
       on the org's default domain
 
+### Phase 2c — Import profiles (tool exports, asset type names)
+
+Why: real exports (endpoint agents, network scans, cloud inventories) have
+their own columns, and each row describes a device *and* its problems. Design:
+approach C ("pragmatic") — built-in families in code, settings as data; an org
+copies a profile and adjusts it. All 22 clarifying answers: the recommendations.
+
+- [x] Import profiles: built-ins for generic assets, generic findings, endpoint
+      agent, network scan and cloud inventory exports; each row -> an asset +
+      its findings in one scan (`POST /orgs/{id}/imports`, form field
+      `profile`); findings' source is the family, so copies dedup together
+- [x] Org copies: `GET/POST/PATCH/DELETE /orgs/{id}/import-profiles` (admins
+      write; members read): column names, default values, the family's rule
+      settings, the profile's own type names; validated, no formula language
+- [x] Rules: endpoint threats (>=1 high, >=5 critical), compliance status map,
+      stale heartbeat (>7 days; ISO/US dates, day-first option); network scan
+      risk-score bands, vulnerability -> domain map, risky ports, OS -> type;
+      cloud resource type names
+- [x] Asset type = fixed category + `subtype` (the source's own name); type
+      names layered built-in -> `.env` `ASSET_TYPE_ALIASES` -> org setting;
+      used by all imports and manual `POST /assets` (which now validates type)
+- [x] `assets.details` (merged on re-import), `scans.profile`; migration `0005`
+- [x] Import report `warnings` (never failures): loopback/reserved/multicast/
+      link-local/unspecified IPs and unreadable values; `findings_created`
+- [x] Frontend: "Import data" on Assets and Findings with a Source picker
+      (detected from the file's columns); warnings in the report; subtype +
+      expandable details on Assets; Settings: asset type names, import
+      profiles (copy/edit/delete)
+- [x] Tests: 404 backend (was 192), 77 frontend (was 45); sample exports in
+      `temp/` and `backend/tests/fixtures/`
+- [x] Real-file fixes (your 10K test files, 2026-09-28): a cloud ID alone
+      identifies an asset (matching: cloud ID, then hostname, then IP; index
+      on `(org_id, cloud_id)`); tags given as an object become `env:prod`;
+      profile columns take alternative names (`ResourceType|Type`), and
+      detection needs half a profile's fields, not all; tool profiles keep
+      the file's other columns as details; "None"/"N/A" vulnerabilities raise
+      no finding; the report counts warnings beyond its 1,000-row list
+- [x] New built-in profile: Directory (Active Directory) export: disabled
+      accounts and logins older than 90 days raise Identity & Access findings;
+      type from the Type column, else the OS
+- [x] All four 10K files imported through the live API with no failed rows
+      (10,000 cloud resources; AD, endpoint and network exports)
+- [x] Code review (3 reviewers), all fixed: the Import confirm button could
+      upload twice on a fast double-click (now guarded); a blank number in the
+      profile editor now names the field instead of sending a bad save; the
+      profile API's response building is shared; DATA_MODEL.md and PLAN.md
+      updated
+- [x] Browser E2E run (separate test account, deleted afterwards) with the
+      three sample exports: detection, imports, warnings, details, type names,
+      copy/edit/validate a profile, re-import. Found and fixed: generic asset
+      and cloud inventory profiles were labelled "Assets + findings"; a finding
+      quoted an unreadable risk score; "Endpoint id" -> "Endpoint ID"; report
+      tables' columns didn't line up
+- [x] Asset matching by hostname + category (decided 2026-09-28): a row
+      with a known category merges only into an asset of that category, so a
+      server and a router sharing a name stay two assets (the report warns).
+      Subtype isn't part of the match, so the same host from AD ("Server"), a
+      network scan ("Windows Server 2022") and Nessus still merges. New
+      `assets.type_known` (migration `0006`): false for a guessed type (a
+      profile default such as endpoint agents' workstation, an unrecognised
+      OS, a findings upload's placeholder); a guess matches any category and
+      a known type replaces it, never the reverse. A row with no known
+      category and several candidates goes to the oldest, with a warning.
+      Tests: 413 backend (5 new, 4 updated to same-category repeats)
+
 ### Phase 2 sign-off
 
 - [ ] Full suite green locally and in CI
 - [ ] Your review + explicit approval to close out Phase 2
+
+## Phase 2d — Imports at scale, then data lifecycle (after Phase 2 sign-off)
+
+Its own phase, built with the feature-dev workflow once Phase 2 is signed off
+and before Phase 3, so Phase 3's reports and documents get the same lifecycle
+from the start. Two parts, each tested and checked in with you before the
+next: part 1 first, because part 2 changes the same import write path.
+Decisions so far (2026-09-28); the full clarifying round comes at the start of
+the phase.
+
+### Part 1 — Import progress and performance
+
+Found 2026-09-28 with the 500K-row test files: leaving the page during a
+background import loses its progress message and report, and pages load
+slowly while it runs.
+
+- [ ] Progress survives navigation and refresh: background imports tracked
+      app-wide, not inside the Import button; on load, the app asks the server
+      for the org's running imports. The report shows when an import finishes,
+      wherever the user is
+- [ ] Faster imports: load the org's assets and existing findings once per
+      import instead of several queries per row (a 500K-row file is ~2
+      million queries today; expected 10-50x faster, and the API stays
+      responsive meanwhile). Same matching rules; the existing tests must
+      pass unchanged
+- [ ] Assets and Findings lists paged (100 per page, total count, next/previous)
+      instead of loading everything (12,674 assets = 5.5 MB today)
+- Later (Phase 4 hardening, not this part): background imports in a separate
+  worker process, and scans left "running" by a server restart
+
+### Part 2 — Data lifecycle: archive, restore, purge
+
+- [ ] Archive manually (never automatically): an upload (its scan, report and
+      findings), a manually added asset or finding, or a whole organization.
+      Archived data leaves the dashboard, scores and lists, and shows in an
+      Archived view
+- [ ] Shared assets, the safe approach: record which uploads touched each
+      asset; archiving an upload archives only assets no other active upload
+      uses, and its facts on the others
+- [ ] Restore any archived item until it's purged. Archived findings don't
+      count for duplicate checks; on restore, one that now duplicates an active
+      finding is purged instead (the restore report says how many)
+- [ ] Purge: only from the archive, admins only; an organization purge asks
+      for its name. A purge log keeps what, who, when and how many rows
+- [ ] Auto-purge `ARCHIVE_RETENTION_DAYS` (default 180) after archiving, set
+      in `.env` and overridable per organization; each archived item shows a
+      countdown ("Deleted in 173 days"). Runs daily in the app, plus a
+      command for Task Scheduler/cron
+- [ ] Organization archive: frozen for members; admins can restore or purge
+- [ ] Repeat-upload warning (decided 2026-09-28): store each upload's SHA-256
+      content hash; uploading a file whose hash matches an active upload in
+      the same org warns ("already imported on <date> by <user>") and only
+      proceeds when the user confirms. Warn, never block: re-importing after a
+      settings or profile change is legitimate. Archived uploads don't count
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
@@ -173,6 +297,9 @@ CIS/NIST/ISO docs (pgvector is already set up), Claude-driven risk scoring with 
 generation endpoint.
 
 - [ ] Not started
+- Claude auth: keep `ANTHROPIC_API_KEY` in `backend/.env` for local dev, and
+  keep every Claude call going through `app/services/claude_service.py`, so the
+  auth method can change in one place later (see Phase 4).
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
@@ -180,6 +307,20 @@ generation endpoint.
 export, security hardening (rate limiting, audit logging, secrets handling).
 
 - [ ] Not started
+- [ ] UI polish (requested 2026-09-28; can be done any time, needs no other
+      phase):
+  - File upload: drag and drop, and several files at once (each gets its own
+    source choice and report)
+  - Logos: an AuditMind product logo (sidebar, login/register, browser tab),
+    plus each organization's own logo, uploaded by its admins (needs a small
+    backend addition to store it)
+  - Product name and the current organization's name shown in the UI header
+- [ ] Keyless Claude auth for deployed environments (no long-lived API key):
+      identity federation with the host platform's workload identity, or
+      Amazon Bedrock / Google Vertex AI with cloud IAM if hosted on AWS/GCP.
+      Decide once hosting is chosen; confirm what the Claude API supports at
+      that point. Likely shape: a `CLAUDE_AUTH_MODE` setting read by
+      `claude_service.py`, with local dev staying on the API key.
 
 ## Test policy
 

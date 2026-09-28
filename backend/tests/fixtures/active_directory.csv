@@ -1,0 +1,7 @@
+AssetID,Hostname,Type,OS,Owner,LastLogin,Status
+AD-00001,HOST-101,Server,Ubuntu 22.04,user1@acme.io,2026-09-25 08:48:47,Active
+AD-00002,HOST-102,Laptop,Windows 11,user2@acme.io,2026-09-20 16:15:47,Disabled
+AD-00003,HOST-103,,macOS 14,user3@acme.io,2026-05-01 10:00:00,Active
+AD-00004,HOST-104,Workstation,Windows 10,user4@acme.io,not-a-date,Pending
+AD-00005,HOST-105,Workstation,Windows 10,user5@acme.io,2026-09-26 09:00:00,Quarantined
+AD-00006,,Server,Windows Server 2022,user6@acme.io,2026-09-26 09:00:00,Active

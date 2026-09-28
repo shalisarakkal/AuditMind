@@ -7,7 +7,7 @@ import ImportReportPanel, { type ImportResult } from "@/components/ImportReportP
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
 import { DOMAIN_LABELS, DOMAIN_ORDER, SEVERITY_BADGES, SEVERITY_ORDER, canWrite } from "@/lib/domain";
-import type { Asset, Finding } from "@/lib/types";
+import type { Asset, Finding, ImportProfile } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 export default function FindingsPage() {
@@ -15,6 +15,8 @@ export default function FindingsPage() {
   const org = selectedOrg!;
   const findings = useApi<Finding[]>(`/orgs/${org.id}/findings`);
   const assets = useApi<Asset[]>(`/orgs/${org.id}/assets`);
+  const writer = canWrite(org.role);
+  const profiles = useApi<ImportProfile[]>(writer ? `/orgs/${org.id}/import-profiles` : null);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const hostById = new Map((assets.data ?? []).map((a) => [a.id, a.hostname ?? a.ip ?? "—"]));
@@ -22,19 +24,20 @@ export default function FindingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Findings</h1>
           <p className="mt-1 text-sm text-white/60">
             {findings.data ? `${list.length} findings in ${org.name}, grouped by domain` : org.name}
           </p>
         </div>
-        {canWrite(org.role) && (
+        {writer && (
           <ImportButton
             orgId={org.id}
             kind="findings"
             accept=".csv,.json,.nessus"
-            label="Upload findings"
+            label="Import data"
+            profiles={profiles.data}
             onComplete={(r) => {
               setResult(r);
               findings.reload();
@@ -44,10 +47,11 @@ export default function FindingsPage() {
         )}
       </div>
 
-      {canWrite(org.role) && !result && (
+      {writer && !result && (
         <p className="text-xs text-white/50">
-          A native Nessus export (.nessus), or CSV/JSON with columns: hostname and/or ip, domain, severity, category,
-          description, source.
+          A native Nessus export (.nessus); CSV/JSON generic findings (hostname and/or ip, domain, severity, category,
+          description, source); or a tool export such as an endpoint agent or network scan, which records the hosts as
+          assets too. Pick the file, then its source.
         </p>
       )}
       {result && <ImportReportPanel result={result} onDismiss={() => setResult(null)} />}

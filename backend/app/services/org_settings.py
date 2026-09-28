@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from app.core.config import AssetExistingStrategy, NessusInfoSeverity, settings
 from app.models.enums import Domain
 from app.models.organization import Organization
+from app.services.asset_types import BUILTIN_TYPE_ALIASES
 from app.services.nessus_parser import DEFAULT_NESSUS_DOMAIN_MAP
 
 OVERRIDABLE_KEYS = (
@@ -18,6 +19,7 @@ OVERRIDABLE_KEYS = (
     "nessus_info_severity",
     "nessus_domain_map",
     "nessus_default_domain",
+    "asset_type_aliases",
 )
 
 
@@ -30,6 +32,8 @@ class IngestionSettings:
     # org's own additions (later entries win).
     nessus_domain_map: dict[str, Domain]
     nessus_default_domain: Domain
+    # Asset type name -> category, layered the same way.
+    asset_type_aliases: dict[str, str]
     overridden: frozenset[str]
 
 
@@ -47,14 +51,20 @@ def resolve_ingestion_settings(org: Organization) -> IngestionSettings:
         nessus_info_severity=overrides.get("nessus_info_severity", settings.NESSUS_INFO_SEVERITY),
         nessus_domain_map=domain_map,
         nessus_default_domain=Domain(overrides.get("nessus_default_domain", settings.NESSUS_DEFAULT_DOMAIN)),
+        asset_type_aliases={
+            **BUILTIN_TYPE_ALIASES,
+            **settings.ASSET_TYPE_ALIASES,
+            **overrides.get("asset_type_aliases", {}),
+        },
         overridden=frozenset(key for key in overrides if key in OVERRIDABLE_KEYS),
     )
 
 
 def apply_overrides(org: Organization, changes: dict) -> None:
     """Apply a PATCH: a value sets that override, None clears it (back to the
-    global default). Keys not in `changes` are left alone. The nessus_domain_map
-    override is replaced wholesale, not merged with the previous one."""
+    global default). Keys not in `changes` are left alone. Map overrides
+    (nessus_domain_map, asset_type_aliases) are replaced wholesale, not merged
+    with the previous one."""
     overrides = dict(org.ingestion_overrides or {})
     for key, value in changes.items():
         if value is None:

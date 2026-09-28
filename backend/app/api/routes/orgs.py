@@ -37,6 +37,8 @@ def _ingestion_settings(org: Organization) -> IngestionSettingsRead:
         nessus_default_domain=effective.nessus_default_domain,
         overridden=sorted(effective.overridden),
         nessus_domain_map_override=org.ingestion_overrides.get("nessus_domain_map", {}),
+        asset_type_aliases=effective.asset_type_aliases,
+        asset_type_aliases_override=org.ingestion_overrides.get("asset_type_aliases", {}),
     )
 
 

@@ -81,9 +81,12 @@ export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
-  upload: <T>(path: string, file: File) => {
+  delete: (path: string) => request<void>("DELETE", path),
+  /** Multipart upload: the file, plus any extra form fields. */
+  upload: <T>(path: string, file: File, fields: Record<string, string> = {}) => {
     const form = new FormData();
     form.append("file", file);
+    for (const [name, value] of Object.entries(fields)) form.append(name, value);
     return request<T>("POST", path, form);
   },
 };

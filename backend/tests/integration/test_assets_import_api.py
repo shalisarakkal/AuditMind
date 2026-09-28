@@ -32,7 +32,17 @@ def test_csv_import_creates_assets_and_records_a_scan(client, admin, db_session)
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["status"] == "completed"
-    assert body["report"] == {"created": 4, "updated": 0, "skipped": 0, "duplicates": 0, "failed": 0, "errors": []}
+    assert body["report"] == {
+        "created": 4,
+        "updated": 0,
+        "skipped": 0,
+        "duplicates": 0,
+        "failed": 0,
+        "findings_created": 0,
+        "errors": [],
+        "warnings": [],
+        "warnings_total": 0,
+    }
 
     assets = {a["hostname"] or a["ip"]: a for a in _assets(client, admin)}
     assert set(assets) == {"web-01.acme.io", "db-01.acme.io", "10.0.5.101", "s3-backups"}
@@ -53,8 +63,12 @@ def test_partial_import_reports_bad_rows_with_line_numbers(client, admin):
     report = body["report"]
     assert (report["created"], report["failed"]) == (2, 3)
     assert report["errors"] == [
-        {"row": 3, "message": "type 'router' must be one of: server, workstation, network_device, database, cloud_resource, application"},
-        {"row": 4, "message": "hostname or ip is required"},
+        {
+            "row": 3,
+            "message": "type 'hologram' must be one of: server, workstation, network_device, database, "
+            "cloud_resource, application, or a known name for one (see Settings > Asset type names)",
+        },
+        {"row": 4, "message": "hostname, ip or cloud_id is required"},
         {"row": 5, "message": "ip '999.1.1.1' is not a valid IP address"},
     ]
     assert {a["hostname"] for a in _assets(client, admin)} == {"app-01.acme.io", "fw-01.acme.io"}
@@ -75,11 +89,11 @@ def test_json_import_updates_matching_assets_by_default(client, admin):
 def test_update_only_overwrites_non_empty_fields_and_matches_case_insensitively(client, admin):
     _import(client, admin, "a.csv", b"type,hostname,ip,environment,criticality\nserver,Web-01,10.0.0.1,prod,high\n")
 
-    body = _import(client, admin, "b.csv", b"type,hostname,environment\ndatabase,WEB-01,staging\n").json()
+    body = _import(client, admin, "b.csv", b"type,hostname,environment\nVM,WEB-01,staging\n").json()
 
     assert body["report"]["updated"] == 1
     [asset] = _assets(client, admin)
-    assert asset["type"] == "database"
+    assert (asset["type"], asset["subtype"]) == ("server", "VM")
     assert asset["environment"] == "staging"
     assert asset["criticality"] == "high"  # empty in the second file, kept
     assert asset["ip"] == "10.0.0.1"
@@ -137,7 +151,7 @@ def test_all_or_nothing_writes_nothing_and_fails_the_scan(client, admin, monkeyp
 
 
 def test_file_where_every_row_fails_is_marked_failed(client, admin):
-    body = _import(client, admin, "a.csv", b"type,hostname\nrouter,a\n").json()
+    body = _import(client, admin, "a.csv", b"type,hostname\nhologram,a\n").json()
     assert body["status"] == "failed"
     assert body["report"]["failed"] == 1
 
@@ -181,3 +195,58 @@ def test_assets_are_scoped_to_the_org(client, admin, db_session):
     # Same hostnames in another org are new assets there, not updates.
     assert body["report"]["created"] == 4
     assert db_session.query(Asset).count() == 8
+
+
+def test_unusual_ips_are_imported_with_a_warning(client, admin):
+    body = _import(client, admin, "a.csv", b"type,hostname,ip\nserver,lo,127.0.0.1\nlaptop,pc,10.0.0.9\n").json()
+
+    assert body["status"] == "completed"
+    assert (body["report"]["created"], body["report"]["failed"]) == (2, 0)
+    assert body["report"]["warnings"] == [{"row": 2, "message": "ip 127.0.0.1 is a loopback address; imported anyway"}]
+    assert {a["hostname"]: (a["type"], a["subtype"]) for a in _assets(client, admin)} == {
+        "lo": ("server", None),
+        "pc": ("workstation", "laptop"),
+    }
+
+
+def test_a_later_row_replaces_the_type_and_its_subtype_together(client, admin):
+    # The same host twice: the last row wins, and "Workstation" (a category,
+    # so no subtype) must not keep the earlier row's "Laptop" subtype.
+    body = _import(client, admin, "a.csv", b"type,hostname\nLaptop,host-1\nWorkstation,host-1\n").json()
+
+    assert (body["report"]["created"], body["report"]["updated"]) == (1, 1)
+    [asset] = _assets(client, admin)
+    assert (asset["type"], asset["subtype"]) == ("workstation", None)
+
+    _import(client, admin, "a.csv", b"type,subtype,hostname\nworkstation,thin client,host-1\nLaptop,,host-1\n")
+    [asset] = _assets(client, admin)
+    assert (asset["type"], asset["subtype"]) == ("workstation", "Laptop")
+
+
+def test_an_asset_listed_twice_with_different_values_is_warned_about(client, admin):
+    content = (
+        b"type,hostname,environment\n"
+        b"Laptop,host-1,dev\n"
+        b"server,host-2,prod\n"
+        b"Desktop,HOST-1,prod\n"  # same host and category, other values
+        b"server,host-2,prod\n"  # an exact repeat: no warning
+    )
+
+    report = _import(client, admin, "a.csv", content).json()["report"]
+
+    assert (report["created"], report["updated"]) == (2, 2)
+    assert report["warnings"] == [
+        {
+            "row": 4,
+            "message": "HOST-1 appears on 2 rows with different values; later rows overwrite earlier ones (the last is row 4)",
+        }
+    ]
+
+
+def test_no_repeat_warning_when_repeats_become_separate_assets(client, admin):
+    headers, org_id = admin
+    client.patch(f"/api/v1/orgs/{org_id}/settings", headers=headers, json={"asset_existing_strategy": "duplicate"})
+
+    report = _import(client, admin, "a.csv", b"type,hostname\nLaptop,host-1\nServer,host-1\n").json()["report"]
+
+    assert (report["created"], report["warnings"]) == (2, [])

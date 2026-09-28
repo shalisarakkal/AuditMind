@@ -1,0 +1,9 @@
+ResourceID,ResourceName,ResourceType,Region,Environment,Tags
+i-0a1b2c3d4e5f60001,web-prod-01,VM,us-east-1,production,web;dmz
+arn:aws:lambda:us-east-1:111122223333:function:invoice-processor,invoice-processor,Lambda,us-east-1,production,billing
+arn:aws:s3:::acme-backups,acme-backups,Bucket,us-east-1,production,backup
+vol-0f9e8d7c6b5a40001,web-prod-01-data,Storage,us-east-1,production,
+arn:aws:rds:us-east-1:111122223333:db:orders-db,orders-db,Database,us-east-1,production,pci
+/subscriptions/0000/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/az-app-01,az-app-01,Virtual Machine,eastus,staging,app
+laptop-fin-07,LAPTOP-FIN-07,Laptop,,production,finance
+x-123,mystery-thing,Hologram,us-east-1,dev,

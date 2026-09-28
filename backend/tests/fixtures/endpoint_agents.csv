@@ -1,0 +1,9 @@
+EndPointID,DeviceName,AgentVersion,LastHeartbeat,ThreatsDetected,ComplianceStatus
+EP-00000,DEV-446,v5.3,8/8/2026 21:14,2,Warning
+EP-00001,DEV-356,v4.1,9/21/2026 15:48,2,Compliant
+EP-00002,LAPTOP-FIN-07,v5.3,9/26/2026 09:02,0,Compliant
+EP-00003,LAPTOP-HR-12,v3.9,7/1/2026 11:30,5,Non-Compliant
+EP-00004,DEV-512,v5.3,9/27/2026 08:15,0,Warning
+EP-00005,,v5.2,9/25/2026 10:00,1,Compliant
+EP-00006,DEV-777,v5.3,not-a-date,0,Compliant
+EP-00007,DEV-778,v5.3,9/26/2026 12:00,-3,Unknown

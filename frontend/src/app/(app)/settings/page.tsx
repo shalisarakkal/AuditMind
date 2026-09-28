@@ -1,5 +1,6 @@
 "use client";
 
+import ImportProfilesPanel from "@/components/ImportProfilesPanel";
 import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
 import { useApp } from "@/context/AppContext";
 
@@ -23,6 +24,17 @@ export default function SettingsPage() {
           </p>
         </div>
         <IngestionSettingsPanel orgId={org.id} isAdmin={org.role === "admin"} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-medium text-white">Import profiles</h2>
+          <p className="text-sm text-white/60">
+            How each kind of export is read: the column for each field and the rules that raise findings. To read your own
+            tool&apos;s export, copy the closest profile and adjust its columns and settings.
+          </p>
+        </div>
+        <ImportProfilesPanel orgId={org.id} isAdmin={org.role === "admin"} />
       </section>
 
       <section>
