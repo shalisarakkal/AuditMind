@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.api.deps import require_org_member
 from app.db.session import get_db
@@ -14,13 +14,12 @@ from app.models.scan import Scan
 from app.schemas.dashboard import DashboardSummary, DomainScore
 from app.schemas.finding import FindingRead
 from app.schemas.scan import ScanRead
-from app.services.scoring_service import overall_score, score_all_domains
+from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
 
 router = APIRouter(prefix="/orgs/{org_id}/dashboard", tags=["dashboard"])
 
 TOP_FINDINGS = 5
 RECENT_SCANS = 5
-_SEVERITY_RANK = {Severity.critical: 0, Severity.high: 1, Severity.medium: 2, Severity.low: 3}
 
 
 @router.get("", response_model=DashboardSummary)
@@ -28,12 +27,28 @@ def get_dashboard(
     org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
 ) -> DashboardSummary:
     """Scores computed live from the org's current findings, the most severe
-    findings (newest first within a severity), and the latest scans."""
-    findings = db.query(Finding).filter(Finding.org_id == org_id).all()
-    domain_scores = score_all_domains(findings)
+    findings (newest first within a severity), and the latest scans. The
+    database does the counting: an org can have hundreds of thousands of
+    findings."""
+    counts = count_org_findings(db, org_id)
+    domain_scores = score_all_from_counts(counts)
     overall, overall_tier = overall_score(domain_scores)
 
-    top = sorted(findings, key=lambda f: (_SEVERITY_RANK[f.severity], -f.created_at.timestamp()))[:TOP_FINDINGS]
+    # Most severe first, newest first within a severity: one small query per
+    # severity (index ix_findings_org_severity_created) rather than sorting
+    # every finding.
+    top: list[Finding] = []
+    for severity in Severity:
+        if len(top) == TOP_FINDINGS:
+            break
+        top += (
+            db.query(Finding)
+            .options(defer(Finding.raw_data))
+            .filter(Finding.org_id == org_id, Finding.severity == severity)
+            .order_by(Finding.created_at.desc(), Finding.id)
+            .limit(TOP_FINDINGS - len(top))
+            .all()
+        )
     recent_scans = (
         db.query(Scan)
         .filter(Scan.org_id == org_id)
@@ -42,8 +57,9 @@ def get_dashboard(
         .all()
     )
     by_severity = {severity: 0 for severity in Severity}
-    for finding in findings:
-        by_severity[finding.severity] += 1
+    for by_domain in counts.values():
+        for severity, count in by_domain.items():
+            by_severity[severity] += count
 
     return DashboardSummary(
         overall_score=overall,
@@ -53,7 +69,16 @@ def get_dashboard(
             for domain, (score, tier, justification) in domain_scores.items()
         ],
         top_findings=[FindingRead.model_validate(f) for f in top],
-        recent_scans=[ScanRead.model_validate(s) for s in recent_scans],
+        recent_scans=[_brief(s) for s in recent_scans],
         asset_count=db.query(func.count(Asset.id)).filter(Asset.org_id == org_id).scalar(),
         findings_by_severity=by_severity,
     )
+
+
+def _brief(scan: Scan) -> ScanRead:
+    """A recent scan without its report's row lists (up to 1,000 errors and
+    warnings each): the dashboard shows only names, status and counts."""
+    brief = ScanRead.model_validate(scan)
+    if brief.summary:
+        brief.summary = {k: v for k, v in brief.summary.items() if k not in ("errors", "warnings")}
+    return brief

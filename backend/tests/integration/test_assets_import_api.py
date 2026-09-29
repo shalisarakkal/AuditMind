@@ -23,7 +23,7 @@ def _import(client, admin, filename, content=None):
 
 def _assets(client, admin):
     headers, org_id = admin
-    return client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers).json()
+    return client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers, params={"limit": 500}).json()["items"]
 
 
 def test_csv_import_creates_assets_and_records_a_scan(client, admin, db_session):
@@ -250,3 +250,70 @@ def test_no_repeat_warning_when_repeats_become_separate_assets(client, admin):
     report = _import(client, admin, "a.csv", b"type,hostname\nLaptop,host-1\nServer,host-1\n").json()["report"]
 
     assert (report["created"], report["warnings"]) == (2, [])
+
+
+def test_a_tool_export_imported_as_a_generic_list_explains_itself(client, admin):
+    # Some rows also fail for another reason first (an unknown type name).
+    records = [{"ResourceID": f"res-{i}", "Type": "Lambda"} for i in range(3)] + [{"ResourceID": "x", "Type": "Hologram"}]
+    content = json.dumps(records).encode()
+
+    report = _import(client, admin, "cloud_assets.json", content).json()["report"]
+
+    assert (report["created"], report["failed"]) == (0, 4)
+    assert report["errors"][0]["message"] == "hostname, ip or cloud_id is required"
+    assert report["warnings"] == [
+        {
+            "row": 0,
+            "message": "Nothing was imported: this file's columns (resourceid, type) don't match this source, which "
+            "needs a hostname, ip or cloud_id column and expects type, hostname and/or ip or cloud_id, and "
+            "optionally subtype, environment, criticality, tags. If the file is a tool's export, import it with "
+            "that tool's source; event logs (cloud activity, audit or endpoint security events) can't be "
+            "imported yet.",
+        }
+    ]
+
+
+def test_an_activity_log_imported_as_a_generic_list_explains_itself(client, admin):
+    # Fails with "type is required", not the identity error: the note is about
+    # the columns, whichever error the rows hit.
+    columns = ["operation_id", "time", "operation_name", "subscription_id", "resource_group", "resource_type"]
+    records = [dict.fromkeys(columns + ["status", "caller", "extra"], "x")]
+
+    report = _import(client, admin, "azure_activity.json", json.dumps(records).encode()).json()["report"]
+
+    assert report["errors"][0]["message"] == "type is required"
+    [note] = report["warnings"]
+    assert note["row"] == 0
+    assert note["message"].startswith(
+        "Nothing was imported: this file's columns (operation_id, time, operation_name, subscription_id, "
+        "resource_group, resource_type, status, caller, ...) don't match this source"
+    )
+
+    headers, org_id = admin
+    findings = upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, "a.json", json.dumps(records).encode())
+    assert "expects hostname and/or ip or cloud_id, domain, severity" in findings.json()["report"]["warnings"][0]["message"]
+
+
+def test_no_source_note_for_a_generic_file_with_bad_values(client, admin):
+    # The right columns, but nothing valid: the rows' own errors say why.
+    report = _import(client, admin, "a.csv", b"type,hostname\nhologram,web-01\n").json()["report"]
+    assert (report["created"], report["failed"], report["warnings"]) == (0, 1, [])
+
+
+def test_no_source_hint_when_only_some_rows_lack_an_identity(client, admin):
+    report = _import(client, admin, "a.csv", b"type,hostname\nserver,web-01\nserver,\n").json()["report"]
+
+    assert (report["created"], report["failed"], report["warnings"]) == (1, 1, [])
+
+
+def test_type_names_match_whatever_their_spacing(client, admin):
+    content = b"type,hostname\nLoadBalancer,lb-1\nload-balancer,lb-2\nVIRTUAL_MACHINE,vm-1\n"
+
+    report = _import(client, admin, "a.csv", content).json()["report"]
+
+    assert (report["created"], report["failed"]) == (3, 0)
+    assert {(a["hostname"], a["type"], a["subtype"]) for a in _assets(client, admin)} == {
+        ("lb-1", "network_device", "LoadBalancer"),
+        ("lb-2", "network_device", "load-balancer"),
+        ("vm-1", "server", "VIRTUAL_MACHINE"),
+    }

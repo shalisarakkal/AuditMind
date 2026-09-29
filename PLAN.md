@@ -26,6 +26,14 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 - Two local databases: `auditmind` (dev), `auditmind_test` (integration tests
   only, created/dropped tables per test run — never shares state with dev).
 
+- **Dev database performance (found 2026-09-28):** Postgres's data is on
+  `S:\Program Files\PostgreSQL\18\data`, a 5400-rpm hard disk (Hitachi
+  HDS5C4040), with the default 128 MB `shared_buffers`. At ~2 GB of data
+  (1.5M assets, 2.15M findings) most queries read from disk, and scattered
+  reads cost ~5-10 ms each: slow counts, slow large imports. Moving the data
+  directory to the SSD (C:, 299 GB free) and raising `shared_buffers` to
+  ~2 GB would fix it; left as is for now (your call, 2026-09-28).
+
 ## Phase 1 — Foundations (Week 1 of the roadmap)
 
 **Scope:** repo structure, data model, auth, basic Claude wiring.
@@ -256,19 +264,204 @@ Found 2026-09-28 with the 500K-row test files: leaving the page during a
 background import loses its progress message and report, and pages load
 slowly while it runs.
 
-- [ ] Progress survives navigation and refresh: background imports tracked
-      app-wide, not inside the Import button; on load, the app asks the server
-      for the org's running imports. The report shows when an import finishes,
-      wherever the user is
-- [ ] Faster imports: load the org's assets and existing findings once per
-      import instead of several queries per row (a 500K-row file is ~2
-      million queries today; expected 10-50x faster, and the API stays
-      responsive meanwhile). Same matching rules; the existing tests must
-      pass unchanged
-- [ ] Assets and Findings lists paged (100 per page, total count, next/previous)
-      instead of loading everything (12,674 assets = 5.5 MB today)
+Decisions (2026-09-28): approach 3 (balanced); findings as one list, most
+severe first, with a domain filter showing counts; search on both lists;
+sidebar indicator on every page plus progress and report on the page;
+"Writing rows: 120,000 / 500,000 (24%)"; everyone's running imports show,
+the report only to its uploader, until they dismiss it (for good).
+
+- [x] Progress survives navigation and refresh: `ImportsProvider` in the
+      signed-in layout follows `GET /scans?tracked=true` (the org's running
+      imports and the user's undismissed reports), polling while any runs;
+      the Import button hands each upload to it. Sidebar indicator on every
+      page; progress and report (`ImportStatus`) on the Assets/Findings page
+      the import affects; `POST /scans/{id}/dismiss`. Migration `0007`:
+      `scans.started_by`, `dismissed_at`, `progress` (written every 2,000
+      rows through its own short session), earlier finished scans marked
+      dismissed
+- [x] Faster imports: `import_matching.py` indexes the org's assets and
+      finding keys once per import (after the org lock); new rows go in with
+      COPY, updates are gathered per asset. 500K-row AD export: 34 min ->
+      37 s (12K repeated hosts, live through the API), 64 s worst case (500K
+      new assets), peak memory 1.1 GB. Same matching rules and warning texts;
+      the concurrency test now slows the index load instead of a per-row
+      lookup. Findings got their first indexes
+- [x] Assets and Findings lists paged: `{items, total}` (+ `domain_counts`
+      for findings), `limit` (default 100, max 500) / `offset`, `q` search;
+      findings carry their asset's hostname/IP, so the page no longer loads
+      every asset
+- [x] Tests: 430 backend (17 new), 84 frontend (7 new). Browser E2E
+      (throwaway account): 500K import started on Assets, left for the
+      Dashboard, reloaded on Assets mid-import (progress recovered at 70%),
+      report shown on Assets and Findings, dismissed
+- [x] Code review (3 reviewers, 2026-09-28), every finding reproduced first,
+      then fixed and re-checked against its reproduction:
+  - High: a manually added finding could point at another org's asset, and
+    the findings list then showed that org's hostname/IP. Now 422 for a
+    foreign asset_id/scan_id, and the list only joins the org's own assets
+  - Medium: overlapping polls let an older response undo a newer one (a
+    finished import flipped back to "running", lists reloaded twice, a
+    dismissed report could return). Now one poll at a time, older responses
+    dropped, dismissed reports never re-shown; polls use the light
+    `?active=true` list and fetch reports only when an import starts or ends
+  - Medium: a failure to save progress failed the whole import; now logged
+    and the import carries on
+  - Low: a failed status fetch after an accepted upload showed as an upload
+    error (now followed by polling); an old upload error stayed after a new
+    file or Cancel; the COPY cursor wasn't closed; the sidebar linked tool
+    exports to Assets even when started from Findings
+  - Behaviour change, verified: the committed code could create a duplicate
+    asset when an earlier row in the same file gave a host its IP (updates
+    weren't visible to later rows); the rewrite fixes it. Old vs new
+    compared on 1,230 random files: identical once that is accounted for
+  - Incident: the review's scratch tests ran outside backend/, `.env` wasn't
+    found, and the test fixture fell back to DATABASE_URL, dropping the dev
+    database's tables (data not recoverable; schema recreated with
+    migrations). Tests now only run against a database named *_test, and
+    the skip message no longer prints the database password
+  - Tests: 433 backend, 91 frontend
+- [x] Dashboard speed (reported 2026-09-28 after re-importing: 24,300
+      findings): it loaded every finding (7 MB of raw_data) to count them,
+      and sent the recent imports' full reports. Now the database counts per
+      domain and severity (`count_org_findings`, also used by POST
+      /risk/score), the top 5 come from one ordered query, and recent imports
+      carry their counts without the error/warning lists. 1.1 s -> 0.04-0.13 s,
+      521 KB -> 6 KB, same scores, tiers, counts and top findings on that data
+      (justifications now list the most severe first)
+- [x] Findings search also matches the asset's hostname or IP, partially and
+      in any case (reported 2026-09-28: "DEV-122" found nothing); it
+      searched only description and category before
+- [x] Column sorting and filtering on Assets and Findings (requested
+      2026-09-28), all on the server so they cover every page. One column
+      sorted at a time (header click: ascending, descending, default; blanks
+      last either way). A filter row under the headers: pick-lists (several
+      values; "(blank)" for none) for type, subtype, environment,
+      criticality, severity, domain and source, their values from
+      `GET /assets/facets` and `/findings/facets`; "contains" boxes for
+      hostname, IP, tags, finding and asset. Filters combine with the
+      search box; "Clear filters". Sort, filters and page live in the page
+      address (refresh, Back, shareable). Findings gained an "Added" column
+- [x] The search box searches every shown column but the date (requested
+      2026-09-28): assets by hostname, IP, type, subtype, environment,
+      criticality, tags; findings by finding text, category, asset, source,
+      severity, domain. Type and domain match the labels on screen
+      ("network dev", "mgmt"); the server keeps a copy of those labels
+      (frontend/src/lib/domain.ts), which must change together
+- [x] Cloud resources visible in the lists (2026-09-28): Assets has a Cloud
+      ID column (sort, "contains" filter, search; long ARNs shortened with
+      the full value on hover); a finding's asset falls back to its cloud ID
+      when it has no hostname or IP, and the Findings asset search, filter
+      and sort include it. Before, a resource known only by its cloud ID
+      showed as "—" everywhere
+- [x] Large JSON files get their source detected (reported 2026-09-28:
+      cloud_assets50K.json, 8.4 MB, failed every row as a generic asset
+      list): detection skipped JSON over 5 MB, so the picker stayed on the
+      page's generic source. It now reads the first record from the file's
+      first 256 KB, at any size. And a generic import where no row had a
+      hostname, ip or cloud_id column now says so, pointing to the tool's
+      own source. 50K cloud records import in ~5 s
+- [x] Follow-up with the real file (S:\AuditMind-Scratch\TestData\
+      synthetic_assets_50K\cloud_assets50K.json, 26 MB): the retry still ran
+      with the page's old code (a hard refresh was needed), and 7,091
+      "LoadBalancer" rows would have failed under any source, as type names
+      matched "load balancer" only with a space. Type names now match
+      ignoring case, spaces, '-' and '_'; the wrong-source note also shows
+      when other errors are mixed in. The real file: 50,000 created, 0
+      failed, 6.8 s
+- [x] Progress for every stage of an import (2026-09-28; reported: 500K-row AD
+      and network scan imports sat at "100%" for a long time): the count
+      covered file rows only, then a tool export's ~430-500K findings were
+      written unshown. Now: "Reading file: n / N rows", "Waiting for another
+      import into this organization to finish…" (a second import queued
+      behind the org lock), "Writing rows", "Writing findings: n / N",
+      "Saving…". Real AD 500K file (500K assets, 427K findings): reading
+      23 s, assets 35 s, findings 54 s, saving 1 s. The repeated-row check
+      now skips assets listed once (5 s -> under 1 s at 500K rows)
+- [x] Imports load only what the file can touch (2026-09-28; reported: even a
+      10K-row file was slow): every import loaded the org's whole inventory
+      first, ~27 s and ~1.8 GB at 1.5M assets / 2.15M findings. Now a file
+      naming up to TARGETED_LOAD_MAX (2,000) identifiers loads just the
+      matching assets and their findings (1,000-row file: 0.1 s); larger
+      files load the whole org in one sequential pass, which the dev
+      database's hard disk handles far better than thousands of lookups
+      (10K-row file: ~37 s). Same results either way: old-vs-new comparison
+      identical on 823 random files for each path
+- [x] Findings list at 2.15M findings (2026-09-28; reported slow: 27-76 s a
+      page): it sorted every finding, whole rows with their raw data, to
+      show 100. Now it finds the page's ids first, then fetches just those
+      rows: the default order walks ix_findings_org_severity_created one
+      severity at a time (skipping whole severities by their counts), date
+      order walks ix_findings_org_created, other orders sort ids only; the
+      asset join is skipped unless a search, asset filter or asset sort
+      needs it. First page 0.5 s, date order 0.4 s, severity/domain filters
+      0.3-0.5 s; page 50 2.3 s, row 300,000 ~7 s
+- [x] Second code review (3 reviewers, 2026-09-28) of everything above since
+      the first; every finding reproduced first, then fixed and re-checked:
+  - Medium: large-file detection took the first "[" in the file, so a JSON
+    object with another list before its records ({"errors": [...],
+    "records": [...]}) was read from the wrong record, which could now
+    disable Import for a valid file. It now finds the records list as the
+    server does: the file's own list, else "records"/"assets"/"findings",
+    else the first top-level list (nested or quoted brackets ignored)
+  - Medium: switching org kept the previous org's sort, filters and page.
+    The address now names the org (org=); another org's view starts clean,
+    and an older link without one is stamped on opening
+  - Low: "Clear filters" was undone ~300 ms later by a filter still being
+    typed; it now also drops typing not applied yet
+  - Low: a link to a page past the end showed "Showing 201-50 of 50"; the
+    pager now moves to the last page
+  - Low: the reading stage's progress stopped short of 100%; it now reports
+    after each batch and the final count
+  - Wording: .env.example said every left-out setting has a default;
+    TEST_DATABASE_URL has none (tests are skipped)
+  - Tests: 448 backend, 110 frontend
+- Later: "contains" search over millions of rows reads everything (17 s for
+  "DEV-12" at 2.15M findings). Fix: pg_trgm text-search indexes on the
+  searched columns, weighed against their cost to imports and disk
+- [x] Dashboard at 1M assets / 925K findings (2026-09-28): 0.72 s -> ~0.5 s.
+      The top 5 findings come from one small query per severity on a new
+      index (migration 0008, ix_findings_org_severity_created) instead of
+      sorting every finding. Trade-off: that index makes writing findings
+      ~25% slower (+11 s for 427K findings). The rest is counting the org's
+      findings and assets (~0.4 s at this size); keeping running totals
+      would be the next step if it matters
+- [x] Unrecognised files are flagged (2026-09-28, after the Azure activity
+      log failed silently as a generic asset list): picking a file whose
+      columns match no source shows a note listing them, before Import; and
+      a generic import that brings in nothing, from a file with none of the
+      hostname/ip/cloud_id columns, says the file doesn't match the source
+      (whatever error the rows hit), naming its columns. A correctly shaped
+      file with bad values gets no such note
+- [x] Import is disabled when the selected source can't read the file
+      (2026-09-28): the file has none of the columns that source identifies
+      hosts by (generic: hostname/ip/cloud_id; tool sources: their own names,
+      e.g. ResourceID, DeviceName), and the source supplies no default.
+      Switching to a source that can read it re-enables Import; if none can
+      (activity logs), the note says so and Cancel is the way out. Judged per
+      selected source, not by auto-detection, so a minimal generic file
+      (type,hostname: too few columns to be detected) still imports
+- [x] `backend/scripts/split_json.py` (2026-09-28): splits a large JSON import
+      file into ~40 MB parts, reading one record at a time (a 264 MB,
+      500K-record cloud export: 5 parts in 8 s, 22 MB of memory). Stopgap
+      until imports read large files in chunks (Phase 4). Measured: a 42 MB
+      part (108K cloud records) imports in 15 s at ~450 MB peak; memory
+      follows the record count more than the file size
+- Later (Phase 3): cloud misconfiguration findings from cloud inventory
+  imports (stopped/public/unencrypted resources raise nothing today), and
+  provider/region as filterable columns rather than details
+- Known: the frontend test "edits the org's own domain mappings" failed once
+  in 5 full-suite runs (never in 12 runs alone); likely a tight wait under
+  load, to watch in CI
+- [x] Open questions answered (2026-09-28): import reports stay readable by
+      every org member through the API (the tracker still shows a report
+      only to its uploader); no duplicate cleanup needed, as there's no other
+      database with data from before the rewrite
+- [ ] Your sign-off
 - Later (Phase 4 hardening, not this part): background imports in a separate
-  worker process, and scans left "running" by a server restart
+  worker process; scans left "running" by a server restart; progress during
+  the reading phase (~20 s of "Reading file…" for 500K rows). Reading large
+  files in chunks (a 500K-row file peaks at ~1.1 GB while it's read and
+  checked whole) moved to Phase 2e, which needs it
 
 ### Part 2 — Data lifecycle: archive, restore, purge
 
@@ -294,6 +487,40 @@ slowly while it runs.
       the same org warns ("already imported on <date> by <user>") and only
       proceeds when the user confirms. Warn, never block: re-importing after a
       settings or profile change is legitimate. Archived uploads don't count
+
+## Phase 2e — Activity and audit log sources (after Phase 2d, before Phase 3)
+
+Requested 2026-09-28, after `azure_azure_activity_500000.json` failed as a
+generic asset list ("type is required" on all 500,000 rows): no import source
+reads activity/audit logs. They record events (who did what, when), not
+assets, so they should produce findings. Placed before Phase 3 so the AI
+audit can reason over these findings too. Test files:
+S:\AuditMind-Scratch\TestData\synthetic_assets\ (azure_azure_activity,
+cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
+
+- [ ] Prerequisite, moved here from Phase 4: read large files in chunks
+      (saved to disk, processed in batches), so memory stays flat at any
+      size; all-or-nothing imports get a check-first pass. Log exports are
+      routinely this large (split_json.py is the stopgap until then)
+- [ ] Sources (import profiles) for Azure Activity Log, AWS CloudTrail and
+      GCP Audit Logs, detected from their columns like the existing ones
+- [ ] Endpoint security events in the OSSEM format (Sysmon/EDR telemetry;
+      test file ossem_ossem_events_500000.csv: event_id, timestamp,
+      user.name, process.name/pid/command_line, file.path, registry.key,
+      network.src_ip/dst_ip, event_type). Signals in the sample: encoded
+      PowerShell (-enc), Run-key persistence, DLLs in Temp. It names no host
+      (no host.name column): decide what its findings attach to
+      (network.src_ip? a host column in real exports?)
+- [ ] Rules that turn events into findings, grouped rather than one per event
+      (500K events would flood the list), e.g. role/permission assignments
+      and policy changes (Identity & Access), deletions, firewall/network
+      rule changes (Network & Config), repeated failed operations,
+      logging/monitoring switched off (Monitoring & Detection)
+- Open questions for the start of the phase: which events count as risky
+  and at what thresholds; what a finding attaches to, since these records
+  name a subscription/resource group/resource type but no resource ID (the
+  subscription or resource group as an asset? the caller?); the time window
+  (a whole export, or only recent events); whether to keep the raw events
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 

@@ -199,7 +199,7 @@ async def import_with_profile(
     file: UploadFile = File(..., description="A .csv or .json export"),
     profile: str = Form(..., description="Profile key: a built-in (e.g. endpoint_agent) or one of the org's profile ids"),
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> ImportResponse:
     """Import a file with an import profile (GET /import-profiles lists them).
     Each row becomes an asset plus any findings the profile's rules raise, in
@@ -216,5 +216,6 @@ async def import_with_profile(
         org_id=org_id,
         file=file,
         kind="profile",
+        started_by=membership.user_id,
         profile=config,
     )

@@ -46,12 +46,12 @@ def _import(client, admin, filename, profile, content=None, headers=None):
 
 def _assets(client, admin):
     headers, org_id = admin
-    return {a["hostname"] or a["ip"]: a for a in client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers).json()}
+    return {a["hostname"] or a["ip"]: a for a in client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers, params={"limit": 500}).json()["items"]}
 
 
 def _findings(client, admin):
     headers, org_id = admin
-    return client.get(f"/api/v1/orgs/{org_id}/findings", headers=headers).json()
+    return client.get(f"/api/v1/orgs/{org_id}/findings", headers=headers, params={"limit": 500}).json()["items"]
 
 
 def _counts(report):

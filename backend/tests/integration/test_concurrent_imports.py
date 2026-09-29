@@ -32,24 +32,32 @@ def test_concurrent_imports_share_one_asset(db_session, monkeypatch):
     db_session.commit()
     scan_ids = [scan.id for scan in scans]
 
-    # Widen the race: pause between looking a host up and creating it, so
-    # without serialisation both imports would miss and both insert.
-    find_asset = ingestion_service._find_assets
+    # Widen the race: pause between loading the org's assets and writing, so
+    # without serialisation both imports would load none and both insert.
+    load_index = ingestion_service._load_asset_index
 
-    def slow_find_asset(*args, **kwargs):
-        match = find_asset(*args, **kwargs)
+    def slow_load_index(*args, **kwargs):
+        index = load_index(*args, **kwargs)
         time.sleep(0.5)
-        return match
+        return index
 
-    monkeypatch.setattr(ingestion_service, "_find_assets", slow_find_asset)
+    monkeypatch.setattr(ingestion_service, "_load_asset_index", slow_load_index)
 
     Session = sessionmaker(bind=db_session.get_bind(), autoflush=False)
     errors: list[BaseException] = []
+    phases: dict = {scan_id: [] for scan_id in scan_ids}
 
     def run(scan_id):
         with Session() as db:
             try:
-                ingestion_service.process_import(db, db.get(Scan, scan_id), "findings", "csv", FINDINGS)
+                ingestion_service.process_import(
+                    db,
+                    db.get(Scan, scan_id),
+                    "findings",
+                    "csv",
+                    FINDINGS,
+                    progress=lambda phase, done, total: phases[scan_id].append(phase),
+                )
             except BaseException as exc:  # surfaced below
                 errors.append(exc)
 
@@ -65,3 +73,5 @@ def test_concurrent_imports_share_one_asset(db_session, monkeypatch):
     assert db_session.query(Finding).count() == 1  # the second import saw it as a duplicate
     reports = sorted((db_session.get(Scan, s).summary["created"], db_session.get(Scan, s).summary["duplicates"]) for s in scan_ids)
     assert reports == [(0, 1), (1, 0)]
+    # The one that had to wait for the lock said so.
+    assert sorted("waiting" in p for p in phases.values()) == [False, True]

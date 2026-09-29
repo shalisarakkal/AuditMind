@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,16 @@ from app.models.enums import Domain, Severity
 
 class Finding(Base):
     __tablename__ = "findings"
+    __table_args__ = (
+        # The findings list (newest first) and an import's duplicate check,
+        # which loads the org's findings once.
+        Index("ix_findings_org_created", "org_id", "created_at"),
+        # The dashboard's most severe findings, newest first.
+        Index("ix_findings_org_severity_created", "org_id", "severity", "created_at"),
+        # Deleting an asset or scan cascades to its findings.
+        Index("ix_findings_asset", "asset_id"),
+        Index("ix_findings_scan", "scan_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     scan_id: Mapped[uuid.UUID | None] = mapped_column(

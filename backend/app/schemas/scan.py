@@ -26,3 +26,6 @@ class ScanRead(BaseModel):
     filename: str | None
     summary: dict | None
     profile: str | None
+    started_by: uuid.UUID | None
+    dismissed_at: datetime | None
+    progress: dict | None

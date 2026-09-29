@@ -3,6 +3,11 @@ Claude-driven qualitative scoring (RAG + narrative justification) layers on top 
 this in a later milestone.
 """
 
+import uuid
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.models.enums import Domain, RiskTier, Severity
 from app.models.finding import Finding
 
@@ -39,26 +44,53 @@ def tier_for_score(score: float) -> RiskTier:
     return RiskTier.critical
 
 
-def score_domain(domain: Domain, findings: list[Finding]) -> tuple[float, RiskTier, str]:
-    score = 100.0
-    counts: dict[Severity, int] = {}
-    for finding in findings:
-        if finding.domain != domain:
-            continue
-        counts[finding.severity] = counts.get(finding.severity, 0) + 1
-        score -= _DEDUCTIONS[finding.severity]
+# Findings per domain and severity: all the scoring needs, so callers with
+# many findings can have the database count them (see dashboard.py).
+SeverityCounts = dict[Domain, dict[Severity, int]]
 
-    score = max(0.0, score)
-    tier = tier_for_score(score)
+
+def count_findings(findings: list[Finding]) -> SeverityCounts:
+    counts: SeverityCounts = {}
+    for finding in findings:
+        by_severity = counts.setdefault(finding.domain, {})
+        by_severity[finding.severity] = by_severity.get(finding.severity, 0) + 1
+    return counts
+
+
+def count_org_findings(db: Session, org_id: uuid.UUID) -> SeverityCounts:
+    """The org's findings per domain and severity, counted by the database."""
+    counts: SeverityCounts = {}
+    rows = (
+        db.query(Finding.domain, Finding.severity, func.count())
+        .filter(Finding.org_id == org_id)
+        .group_by(Finding.domain, Finding.severity)
+    )
+    for domain, severity, count in rows:
+        counts.setdefault(domain, {})[severity] = count
+    return counts
+
+
+def score_from_counts(counts: dict[Severity, int]) -> tuple[float, RiskTier, str]:
+    """One domain's score from its findings per severity (most severe first
+    in the justification)."""
+    score = max(0.0, 100.0 - sum(_DEDUCTIONS[severity] * count for severity, count in counts.items()))
     justification = (
-        "; ".join(f"{count} {severity.value} finding(s)" for severity, count in counts.items())
+        "; ".join(f"{counts[severity]} {severity.value} finding(s)" for severity in Severity if counts.get(severity))
         or "No findings recorded for this domain."
     )
-    return score, tier, justification
+    return score, tier_for_score(score), justification
+
+
+def score_domain(domain: Domain, findings: list[Finding]) -> tuple[float, RiskTier, str]:
+    return score_from_counts(count_findings(findings).get(domain, {}))
 
 
 def score_all_domains(findings: list[Finding]) -> dict[Domain, tuple[float, RiskTier, str]]:
-    return {domain: score_domain(domain, findings) for domain in Domain}
+    return score_all_from_counts(count_findings(findings))
+
+
+def score_all_from_counts(counts: SeverityCounts) -> dict[Domain, tuple[float, RiskTier, str]]:
+    return {domain: score_from_counts(counts.get(domain, {})) for domain in Domain}
 
 
 def overall_score(domain_scores: dict[Domain, tuple[float, RiskTier, str]]) -> tuple[float, RiskTier]:

@@ -56,6 +56,26 @@ export type Finding = {
   created_at: string;
 };
 
+/** A finding in the org's paged list, with its asset's name. */
+export type FindingListItem = Finding & {
+  asset_hostname: string | null;
+  asset_ip: string | null;
+  /** A cloud resource may be known only by this. */
+  asset_cloud_id: string | null;
+};
+
+/** One page of a list, and how many items match across all pages. */
+export type Page<T> = { items: T[]; total: number };
+
+/** The values each pick-list filter can offer; "" stands for "no value". */
+export type AssetFacets = { type: string[]; subtype: string[]; environment: string[]; criticality: string[] };
+export type FindingFacets = { source: string[] };
+
+export type FindingPage = Page<FindingListItem> & {
+  /** Findings per domain for the same search, whatever the domain filter. */
+  domain_counts: Partial<Record<Domain, number>>;
+};
+
 export type RowError = { row: number; message: string };
 /** Imported, but worth checking (same shape as RowError). */
 export type RowWarning = RowError;
@@ -95,6 +115,19 @@ export type Scan = {
   profile: string | null;
   // An ImportReport for file imports, or {error} if the import crashed.
   summary: (Partial<ImportReport> & { error?: string }) | null;
+  /** The uploader: only they see the import's report, until they dismiss it. */
+  started_by: string | null;
+  dismissed_at: string | null;
+  progress: ImportProgress | null;
+};
+
+/** A running import's progress, stage by stage: reading (checking) the file's
+ * rows, waiting for another import into the org, writing its rows, writing a
+ * tool export's findings, saving. Counts are 0 (or absent) where there are none. */
+export type ImportProgress = {
+  phase: "reading" | "waiting" | "writing" | "findings" | "saving";
+  rows_done?: number;
+  rows_total?: number;
 };
 
 export type DomainScore = { domain: Domain; score: number; tier: RiskTier; justification: string };

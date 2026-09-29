@@ -1,28 +1,134 @@
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
+from app.api.paging import (
+    PageParams,
+    SortOrder,
+    any_of,
+    contains,
+    distinct_values,
+    labelled,
+    one_of,
+    ordered,
+    page_params,
+)
 from app.api.uploads import IMPORT_RESPONSES, start_import
 from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.enums import UserRole
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
-from app.schemas.asset import AssetCreate, AssetRead
+from app.schemas.asset import AssetCreate, AssetFacets, AssetRead
 from app.schemas.ingestion import ImportResponse
+from app.schemas.paging import Page
 from app.services.asset_types import resolve_asset_type
 from app.services.org_settings import resolve_ingestion_settings
 
 router = APIRouter(prefix="/orgs/{org_id}/assets", tags=["assets"])
 
 
-@router.get("", response_model=list[AssetRead])
+# Sortable columns (the default, "created", is the order assets were added).
+AssetSort = Literal["hostname", "ip", "cloud_id", "type", "subtype", "environment", "criticality", "created"]
+_SORT_COLUMNS = {
+    "hostname": func.lower(Asset.hostname),
+    "ip": Asset.ip,
+    "cloud_id": func.lower(Asset.cloud_id),
+    "type": Asset.type,
+    "subtype": func.lower(Asset.subtype),
+    "environment": func.lower(Asset.environment),
+    "criticality": func.lower(Asset.criticality),
+    "created": Asset.created_at,
+}
+_BLANK_HELP = 'Several allowed; "" for no value'
+# The types' labels as the app shows them (frontend/src/lib/domain.ts), so the
+# search box finds "Network device" by what's on screen.
+_TYPE_LABELS = {
+    "server": "Server",
+    "workstation": "Workstation",
+    "network_device": "Network device",
+    "database": "Database",
+    "cloud_resource": "Cloud resource",
+    "application": "Application",
+}
+
+
+@router.get("", response_model=Page[AssetRead])
 def list_assets(
+    org_id: uuid.UUID,
+    q: str | None = Query(
+        None,
+        description="Search every shown column: hostname, IP, cloud ID, type, subtype, environment, criticality "
+        "or tags contains this",
+    ),
+    hostname: str | None = Query(None, description="Hostname contains this"),
+    ip: str | None = Query(None, description="IP contains this"),
+    cloud_id: str | None = Query(None, description="Cloud ID (ARN, resource ID...) contains this"),
+    tags: str | None = Query(None, description="A tag contains this"),
+    type: list[str] | None = Query(None, description=f"Type is one of these. {_BLANK_HELP}"),
+    subtype: list[str] | None = Query(None, description=f"Subtype is one of these. {_BLANK_HELP}"),
+    environment: list[str] | None = Query(None, description=f"Environment is one of these. {_BLANK_HELP}"),
+    criticality: list[str] | None = Query(None, description=f"Criticality is one of these. {_BLANK_HELP}"),
+    sort: AssetSort = Query("created", description="Column to sort by"),
+    order: SortOrder = Query("asc"),
+    page: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    _: OrgMembership = Depends(require_org_member),
+) -> Page[AssetRead]:
+    """The org's assets, a page at a time: by default in the order they were
+    added. Filters combine (all must match); text filters match partially."""
+    tag_text = func.array_to_string(Asset.tags, " ")
+    conditions = [
+        any_of(
+            contains(
+                q,
+                Asset.hostname,
+                Asset.ip,
+                Asset.cloud_id,
+                Asset.subtype,
+                Asset.environment,
+                Asset.criticality,
+                tag_text,
+            ),
+            labelled(q, Asset.type, _TYPE_LABELS),
+        ),
+        contains(hostname, Asset.hostname),
+        contains(ip, Asset.ip),
+        contains(cloud_id, Asset.cloud_id),
+        contains(tags, tag_text),
+        one_of(Asset.type, type),
+        one_of(Asset.subtype, subtype),
+        one_of(Asset.environment, environment),
+        one_of(Asset.criticality, criticality),
+    ]
+    query = db.query(Asset).filter(Asset.org_id == org_id, *(c for c in conditions if c is not None))
+    total = query.count()
+    items = (
+        query.order_by(ordered(_SORT_COLUMNS[sort], order), Asset.created_at, Asset.id)
+        .offset(page.offset)
+        .limit(page.limit)
+        .all()
+    )
+    return Page(items=items, total=total)
+
+
+@router.get("/facets", response_model=AssetFacets)
+def asset_facets(
     org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
-) -> list[Asset]:
-    return db.query(Asset).filter(Asset.org_id == org_id).order_by(Asset.created_at).all()
+) -> AssetFacets:
+    """The values each pick-list filter can offer ("" first when some assets
+    have none)."""
+    assets = db.query(Asset).filter(Asset.org_id == org_id)
+    return AssetFacets(
+        type=distinct_values(assets, Asset.type),
+        subtype=distinct_values(assets, Asset.subtype),
+        environment=distinct_values(assets, Asset.environment),
+        criticality=distinct_values(assets, Asset.criticality),
+    )
 
 
 @router.post("", response_model=AssetRead, status_code=status.HTTP_201_CREATED)
@@ -61,7 +167,7 @@ async def import_assets(
     response: Response,
     file: UploadFile = File(..., description="Asset inventory: .csv or .json"),
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> ImportResponse:
     """Import an asset inventory. Columns: type (required; server, workstation,
     network_device, database, cloud_resource, application, or a known name for
@@ -70,7 +176,13 @@ async def import_assets(
     JSON). Existing assets are matched by hostname and category, else IP. For other column
     layouts, use POST /orgs/{org_id}/imports with an import profile."""
     return await start_import(
-        db=db, background_tasks=background_tasks, response=response, org_id=org_id, file=file, kind="assets"
+        db=db,
+        background_tasks=background_tasks,
+        response=response,
+        org_id=org_id,
+        file=file,
+        kind="assets",
+        started_by=membership.user_id,
     )
 
 

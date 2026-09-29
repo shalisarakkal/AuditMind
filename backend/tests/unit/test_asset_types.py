@@ -54,7 +54,8 @@ def test_extra_aliases_are_matched_the_same_loose_way():
 
 
 def test_normalize_type_name():
-    assert normalize_type_name("  Virtual__Machine - X ") == "virtual machine x"
+    assert normalize_type_name("  Virtual__Machine - X ") == "virtualmachinex"
+    assert normalize_type_name("LoadBalancer") == normalize_type_name("load-balancer") == normalize_type_name("Load Balancer")
 
 
 def test_every_builtin_alias_targets_a_category():

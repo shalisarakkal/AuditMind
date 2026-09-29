@@ -1,15 +1,27 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AssetsPage from "@/app/(app)/assets/page";
 import FindingsPage from "@/app/(app)/findings/page";
 import DashboardPage from "@/app/(app)/page";
 import SettingsPage from "@/app/(app)/settings/page";
-import type { Asset, DashboardSummary, Finding } from "@/lib/types";
-import { json, renderSignedIn, requestInit } from "@/test/helpers";
+import type { Asset, DashboardSummary, Finding, FindingListItem } from "@/lib/types";
+import { json, renderSignedIn, requestInit, scan } from "@/test/helpers";
 import { BUILTIN_PROFILES } from "@/test/profiles";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), usePathname: () => "/" }));
+// The page address: tests set `search` before rendering; lists write theirs
+// back through router.replace.
+const navigation = vi.hoisted(() => ({ search: "", replace: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: navigation.replace }),
+  usePathname: () => "/assets",
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
+beforeEach(() => {
+  navigation.search = "";
+  navigation.replace.mockClear();
+});
 
 const ASSETS: Asset[] = [
   {
@@ -38,16 +50,29 @@ const IMPORT_REPORT = {
   created: 1, updated: 0, skipped: 0, duplicates: 0, failed: 0, findings_created: 0, errors: [], warnings: [],
 };
 
+const page = <T,>(items: T[], total = items.length) => ({ items, total });
+
+function listItem(overrides: Partial<FindingListItem>): FindingListItem {
+  return { ...finding(overrides), asset_hostname: "web-01.acme.io", asset_ip: "10.0.1.10", asset_cloud_id: null, ...overrides };
+}
+
+/** The query of the last GET of `path` (e.g. "/orgs/org-1/assets"). */
+function lastQuery(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchMock"], path: string) {
+  const urls = fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.includes(`${path}?`));
+  return new URLSearchParams(urls.at(-1)?.split("?")[1]);
+}
+
 describe("Assets page", () => {
   it("lists the org's assets and imports a file for admins", async () => {
     let assets: Asset[] = [];
     await renderSignedIn(<AssetsPage />, "admin", {
       ...PROFILES,
-      "GET /orgs/org-1/assets": () => assets,
+      "GET /orgs/org-1/assets": () => page(assets),
       "POST /orgs/org-1/assets/import": () => {
         assets = ASSETS;
         return json({ scan_id: "s1", status: "completed", report: IMPORT_REPORT }, 201);
       },
+      "GET /orgs/org-1/scans/s1": () => scan({ summary: IMPORT_REPORT }),
     });
     expect(await screen.findByText("No assets yet.")).toBeInTheDocument();
 
@@ -68,8 +93,9 @@ describe("Assets page", () => {
     const report = { ...IMPORT_REPORT, created: 7, findings_created: 8, warnings: [{ row: 9, message: "odd value" }] };
     const { fetchMock } = await renderSignedIn(<AssetsPage />, "auditor", {
       ...PROFILES,
-      "GET /orgs/org-1/assets": () => [],
+      "GET /orgs/org-1/assets": () => page([]),
       "POST /orgs/org-1/imports": () => json({ scan_id: "s1", status: "completed", report }, 201),
+      "GET /orgs/org-1/scans/s1": () => scan({ scan_type: "endpoint_agent_import", filename: "edr.csv", summary: report }),
     });
     await screen.findByText("No assets yet.");
 
@@ -87,7 +113,7 @@ describe("Assets page", () => {
   });
 
   it("shows type, subtype and expandable details", async () => {
-    await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => [...ASSETS, ENDPOINT_ASSET] });
+    await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page([...ASSETS, ENDPOINT_ASSET]) });
 
     const row = (await screen.findByText("DEV-446")).closest("tr")!;
     expect(row).toHaveTextContent("Workstation");
@@ -107,10 +133,146 @@ describe("Assets page", () => {
 
   it("hides the import button from viewers", async () => {
     // Viewers don't load import profiles either (no route mocked for them).
-    await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => ASSETS });
+    await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
 
     expect(await screen.findByText("web-01.acme.io")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
+  });
+
+  it("searches and pages through the assets", async () => {
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", {
+      "GET /orgs/org-1/assets": () => page(ASSETS, 250),
+    });
+    expect(await screen.findByText("Showing 1–100 of 250")).toBeInTheDocument();
+    expect(screen.getByText("250 assets in Acme Corp")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("offset")).toBe("100"));
+    expect(await screen.findByText("Showing 101–200 of 250")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search assets"), { target: { value: " web " } });
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("q")).toBe("web"));
+    // A new search starts from the first page.
+    expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("offset")).toBe("0");
+  });
+
+  it("sorts by a column: ascending, descending, then the default order", async () => {
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
+    const header = () => screen.getByRole("columnheader", { name: /Hostname/ });
+    await screen.findByText("web-01.acme.io");
+    expect(header()).toHaveAttribute("aria-sort", "none");
+
+    fireEvent.click(within(header()).getByRole("button"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("sort")).toBe("hostname"));
+    expect(header()).toHaveAttribute("aria-sort", "ascending");
+    // The address also names the org the view belongs to.
+    expect(navigation.replace).toHaveBeenLastCalledWith("/assets?sort=hostname&org=org-1", { scroll: false });
+
+    fireEvent.click(within(header()).getByRole("button"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("order")).toBe("desc"));
+    expect(header()).toHaveAttribute("aria-sort", "descending");
+
+    fireEvent.click(within(header()).getByRole("button"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("sort")).toBeNull());
+    expect(navigation.replace).toHaveBeenLastCalledWith("/assets", { scroll: false });
+  });
+
+  it("filters by column: pick-lists from the org's values, contains boxes for text", async () => {
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", {
+      "GET /orgs/org-1/assets": () => page(ASSETS),
+      "GET /orgs/org-1/assets/facets": () => ({ type: ["server", "workstation"], subtype: [], environment: ["", "prod"], criticality: [] }),
+    });
+    await screen.findByText("web-01.acme.io");
+
+    const environment = within(await screen.findByRole("group", { name: "environment values" }));
+    expect(environment.getAllByRole("checkbox").map((c) => c.parentElement!.textContent)).toEqual(["(blank)", "prod"]);
+    fireEvent.click(environment.getByLabelText("prod"));
+    fireEvent.click(environment.getByLabelText("(blank)"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").getAll("environment")).toEqual(["prod", ""]));
+    expect(screen.getByLabelText("Filter environment: prod +1")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Filter hostname"), { target: { value: "web" } });
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("hostname")).toBe("web"));
+    expect(screen.queryByText(/assets in Acme Corp/)).not.toBeInTheDocument(); // the count is of all assets
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").toString()).toBe("limit=100&offset=0"));
+    expect(screen.getByLabelText("Filter hostname")).toHaveValue("");
+  });
+
+  it("opens with the sort and filters in the page address", async () => {
+    navigation.search = "sort=ip&order=desc&type=server&hostname=web&offset=100";
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS, 150) });
+    await screen.findByText("web-01.acme.io");
+
+    const query = lastQuery(fetchMock, "/orgs/org-1/assets");
+    expect(Object.fromEntries(query)).toEqual({ sort: "ip", order: "desc", type: "server", hostname: "web", offset: "100", limit: "100" });
+    expect(screen.getByLabelText("Filter hostname")).toHaveValue("web");
+    expect(screen.getByRole("columnheader", { name: /^IP/ })).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByText("Showing 101–150 of 150")).toBeInTheDocument();
+    // An address naming no org yet (an older link) gets this one's.
+    expect(navigation.replace).toHaveBeenCalledWith(
+      "/assets?sort=ip&order=desc&type=server&hostname=web&offset=100&org=org-1",
+      { scroll: false },
+    );
+  });
+
+  it("starts clean when the address holds another org's view", async () => {
+    navigation.search = "org=org-9&type=server&hostname=web&offset=100";
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
+    await screen.findByText("web-01.acme.io");
+
+    expect(lastQuery(fetchMock, "/orgs/org-1/assets").toString()).toBe("limit=100&offset=0");
+    expect(navigation.replace).toHaveBeenCalledWith("/assets", { scroll: false });
+    expect(screen.getByLabelText("Filter hostname")).toHaveValue("");
+  });
+
+  it("keeps a view that belongs to this org", async () => {
+    navigation.search = "org=org-1&type=server";
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
+    await screen.findByText("web-01.acme.io");
+
+    expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("type")).toBe("server");
+  });
+
+  it("clears typing that hasn't been applied yet along with the filters", async () => {
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
+    await screen.findByText("web-01.acme.io");
+    fireEvent.change(screen.getByLabelText("Filter hostname"), { target: { value: "web" } });
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("hostname")).toBe("web"));
+
+    // Typed, and cleared before it was applied.
+    fireEvent.change(screen.getByLabelText("Filter IP"), { target: { value: "10.0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(lastQuery(fetchMock, "/orgs/org-1/assets").toString()).toBe("limit=100&offset=0");
+    expect(screen.getByLabelText("Filter IP")).toHaveValue("");
+    expect(screen.getByLabelText("Filter hostname")).toHaveValue("");
+  });
+
+  it("moves to the last page when the page asked for no longer exists", async () => {
+    navigation.search = "org=org-1&offset=300";
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS, 150) });
+
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("offset")).toBe("100"));
+    expect(await screen.findByText("Showing 101–150 of 150")).toBeInTheDocument();
+    expect(screen.queryByText(/Showing 301/)).not.toBeInTheDocument();
+  });
+
+  it("shows a cloud resource's cloud ID, which can be sorted and filtered", async () => {
+    const lambda: Asset = {
+      ...ASSETS[0], id: "a3", type: "cloud_resource", subtype: "Lambda", hostname: null, ip: null,
+      cloud_id: "arn:aws:lambda:us-east-1:111:function:billing", tags: null,
+    };
+    const { fetchMock } = await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page([lambda]) });
+
+    const cell = await screen.findByText("arn:aws:lambda:us-east-1:111:function:billing");
+    expect(cell).toHaveAttribute("title", "arn:aws:lambda:us-east-1:111:function:billing"); // shortened on screen
+    fireEvent.click(within(screen.getByRole("columnheader", { name: /^Cloud ID/ })).getByRole("button"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("sort")).toBe("cloud_id"));
+    fireEvent.change(screen.getByLabelText("Filter cloud ID"), { target: { value: "lambda" } });
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("cloud_id")).toBe("lambda"));
   });
 
   it("shows a load error", async () => {
@@ -122,33 +284,85 @@ describe("Assets page", () => {
 });
 
 describe("Findings page", () => {
-  it("groups findings by domain, most severe first, with their asset", async () => {
+  it("lists findings as the server orders them, with their asset and domain", async () => {
     await renderSignedIn(<FindingsPage />, "auditor", {
       ...PROFILES,
-      "GET /orgs/org-1/assets": () => ASSETS,
-      "GET /orgs/org-1/findings": () => [
-        finding({ category: "LOW-ONE", description: "Minor issue", severity: "low" }),
-        finding({ category: "CRIT-ONE", description: "Remote code execution", severity: "critical" }),
-        finding({ category: "MFA", description: "MFA off", domain: "identity_access", severity: "high", asset_id: null }),
-      ],
+      "GET /orgs/org-1/findings": () => ({
+        ...page([
+          listItem({ category: "CRIT-ONE", description: "Remote code execution", severity: "critical" }),
+          listItem({ category: "MFA", description: "MFA off", domain: "identity_access", severity: "high", asset_hostname: null, asset_ip: null }),
+          listItem({ category: "LOW-ONE", description: "Minor issue", severity: "low" }),
+        ]),
+        domain_counts: { vulnerability_management: 2, identity_access: 1 },
+      }),
     });
 
-    const vuln = await screen.findByRole("region", { name: "Vulnerability Mgmt" });
-    const rows = within(vuln).getAllByRole("row").slice(1);
+    const rows = (await screen.findAllByRole("row")).slice(2); // titles, then filters
     expect(rows.map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual([
       "Remote code executionCRIT-ONE",
+      "MFA offMFA",
       "Minor issueLOW-ONE",
     ]);
     expect(rows[0]).toHaveTextContent("web-01.acme.io");
-    expect(screen.getByRole("region", { name: "Identity & Access" })).toHaveTextContent("MFA off");
-    expect(screen.queryByRole("region", { name: "Backup & Recovery" })).not.toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent("Vulnerability Mgmt");
+    expect(rows[1]).toHaveTextContent("Identity & Access");
     expect(screen.getByRole("button", { name: "Import data" })).toBeInTheDocument();
+  });
+
+  it("names a finding's cloud resource by its cloud ID when it has no hostname or IP", async () => {
+    await renderSignedIn(<FindingsPage />, "viewer", {
+      "GET /orgs/org-1/findings": () => ({
+        ...page([listItem({ category: "S3-PUBLIC", asset_hostname: null, asset_ip: null, asset_cloud_id: "arn:aws:s3:::acme-backups" })]),
+        domain_counts: { backup_recovery: 1 },
+      }),
+    });
+
+    const row = (await screen.findByText("S3-PUBLIC")).closest("tr")!;
+    expect(row).toHaveTextContent("arn:aws:s3:::acme-backups");
+  });
+
+  it("filters by domain, showing each domain's count", async () => {
+    const { fetchMock } = await renderSignedIn(<FindingsPage />, "viewer", {
+      "GET /orgs/org-1/findings": () => ({
+        ...page([listItem({ category: "C1" })], 4210),
+        domain_counts: { vulnerability_management: 4210, identity_access: 12 },
+      }),
+    });
+
+    const domains = await screen.findByRole("group", { name: "Domain" });
+    expect(within(domains).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "All (4,222)",
+      "Identity & Access (12)",
+      "Vulnerability Mgmt (4,210)",
+    ]);
+
+    fireEvent.click(within(domains).getByRole("button", { name: "Identity & Access (12)" }));
+
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/findings").get("domain")).toBe("identity_access"));
+    expect(within(domains).getByRole("button", { name: "Identity & Access (12)" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("sorts most severe first by default, and by any column on request", async () => {
+    const { fetchMock } = await renderSignedIn(<FindingsPage />, "viewer", {
+      "GET /orgs/org-1/findings": () => ({ ...page([listItem({ category: "C1" })]), domain_counts: { vulnerability_management: 1 } }),
+    });
+    const severity = await screen.findByRole("columnheader", { name: /Severity/ });
+    expect(severity).toHaveAttribute("aria-sort", "ascending"); // the default order
+    expect(lastQuery(fetchMock, "/orgs/org-1/findings").get("sort")).toBeNull();
+
+    fireEvent.click(within(screen.getByRole("columnheader", { name: /Asset/ })).getByRole("button"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/findings").get("sort")).toBe("asset"));
+    expect(screen.getByRole("columnheader", { name: /Severity/ })).toHaveAttribute("aria-sort", "none");
+
+    fireEvent.click(within(screen.getByRole("group", { name: "severity values" })).getByLabelText("Critical"));
+    await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/findings").getAll("severity")).toEqual(["critical"]));
+    // Filtering keeps the sort.
+    expect(lastQuery(fetchMock, "/orgs/org-1/findings").get("sort")).toBe("asset");
   });
 
   it("hides the upload button from viewers", async () => {
     await renderSignedIn(<FindingsPage />, "viewer", {
-      "GET /orgs/org-1/assets": () => [],
-      "GET /orgs/org-1/findings": () => [],
+      "GET /orgs/org-1/findings": () => ({ ...page([]), domain_counts: {} }),
     });
     expect(await screen.findByText("No findings yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
@@ -164,13 +378,7 @@ describe("Dashboard page", () => {
       { domain: "identity_access", score: 55, tier: "high", justification: "2 critical finding(s)" },
     ],
     top_findings: [finding({ category: "CVE-1", description: "Unpatched RCE", severity: "critical" })],
-    recent_scans: [
-      {
-        id: "s1", org_id: "org-1", scan_type: "nessus", scope: null, status: "completed",
-        started_at: "2026-09-27T10:00:00Z", completed_at: "2026-09-27T10:01:00Z", source: "upload",
-        filename: "weekly.nessus", summary: IMPORT_REPORT, profile: null,
-      },
-    ],
+    recent_scans: [scan({ scan_type: "nessus", filename: "weekly.nessus", summary: IMPORT_REPORT })],
     asset_count: 12,
     findings_by_severity: { critical: 1, high: 0, medium: 3, low: 5 },
   };

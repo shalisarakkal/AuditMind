@@ -36,3 +36,13 @@ class AssetRead(BaseModel):
     tags: list[str] | None
     details: dict
     created_at: datetime
+
+
+class AssetFacets(BaseModel):
+    """The values each pick-list filter of the assets list can offer; ""
+    stands for "no value"."""
+
+    type: list[str]
+    subtype: list[str]
+    environment: list[str]
+    criticality: list[str]

@@ -1,9 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { fileExtension, humanize, importTarget, readColumns, suggestProfile } from "@/lib/importProfiles";
+import { fileExtension, firstJsonRecord, humanize, importTarget, readColumns, suggestProfile } from "@/lib/importProfiles";
 import { BUILTIN_PROFILES, CUSTOM_EDR_PROFILE, ENDPOINT_PROFILE, GENERIC_FINDINGS_PROFILE, NETWORK_PROFILE } from "@/test/profiles";
 
 describe("readColumns", () => {
+  it("reads a large JSON file's columns from its start (e.g. a 50K-record cloud export)", async () => {
+    const record = '{"Provider": "Azure", "ResourceID": "res-00001", "Type": "Lambda", "Region": "us-east-1", "Tags": {"env": "prod"}}';
+    const big = new File(["[" + Array(60000).fill(record).join(",") + "]"], "cloud_assets50K.json");
+    expect(big.size).toBeGreaterThan(5 * 1024 * 1024);
+
+    expect(await readColumns(big)).toEqual(["Provider", "ResourceID", "Type", "Region", "Tags"]);
+  });
+
+  it("finds the first record whatever its values contain", () => {
+    expect(firstJsonRecord('{"records": [{"Name": "a } { \\"b\\" [", "Tags": {"x": [1, {"y": 2}]}}, {"other": 1}]}')).toEqual({
+      Name: 'a } { "b" [',
+      Tags: { x: [1, { y: 2 }] },
+    });
+    expect(firstJsonRecord('[{"a": 1')).toBeNull(); // cut off: not complete yet
+    expect(firstJsonRecord("[1, 2]")).toBeNull();
+  });
+
+  it("finds the records list, not a list that comes before it", () => {
+    // An errors list first: the records are under "records".
+    expect(firstJsonRecord('{"errors": [{"code": "E1"}], "records": [{"ResourceID": "r-1"}]}')).toEqual({ ResourceID: "r-1" });
+    // Lists nested in another value, and brackets inside strings, don't count.
+    expect(
+      firstJsonRecord('{"meta": {"tags": [{"x": 1}], "note": "a [ { b"}, "value": [{"Hostname": "h"}]}'),
+    ).toEqual({ Hostname: "h" });
+    // No known key: the first list.
+    expect(firstJsonRecord('{"count": 2, "value": [{"Hostname": "h"}]}')).toEqual({ Hostname: "h" });
+    expect(firstJsonRecord('﻿  [ {"a": 1}]')).toEqual({ a: 1 });
+  });
+
+  it("reads the columns of a small file the same way", async () => {
+    const file = new File(['{"errors": [{"code": "E1"}], "findings": [{"hostname": "h"}]}'], "f.json");
+    expect(await readColumns(file)).toEqual(["hostname"]);
+  });
+
+  it("falls back to parsing a small file whose first record is cut off in the part read", async () => {
+    const long = "x".repeat(300 * 1024);
+    expect(await readColumns(new File([`[{"ResourceID": "r1", "Note": "${long}"}]`], "c.json"))).toEqual(["ResourceID", "Note"]);
+  });
+
   it("reads a CSV header row, with a BOM, quotes and CRLF", async () => {
     const file = new File(['﻿EndPointID,"Device, Name",LastHeartbeat\r\nEP-1,a,b\r\n'], "e.csv");
     expect(await readColumns(file)).toEqual(["EndPointID", "Device, Name", "LastHeartbeat"]);

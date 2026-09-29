@@ -10,6 +10,7 @@ additions, then the org's own (see org_settings.py), then a profile's own.
 """
 
 import re
+from functools import lru_cache
 
 ASSET_TYPES = ("server", "workstation", "network_device", "database", "cloud_resource", "application")
 
@@ -35,9 +36,12 @@ BUILTIN_TYPE_ALIASES: dict[str, str] = {
 }
 
 
+@lru_cache(maxsize=4096)
 def normalize_type_name(name: str) -> str:
-    """Case, spacing, '-' and '_' don't matter: "Virtual_Machine" == "virtual machine"."""
-    return re.sub(r"[\s_-]+", " ", name).strip().lower()
+    """The key type names are matched on: case, spaces, '-' and '_' don't
+    matter, so "Virtual_Machine" == "virtual machine" and "LoadBalancer" ==
+    "load balancer"."""
+    return re.sub(r"[\s_-]+", "", name).lower()
 
 
 _CANONICAL = {normalize_type_name(t): t for t in ASSET_TYPES}

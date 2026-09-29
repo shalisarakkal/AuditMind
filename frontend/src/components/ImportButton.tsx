@@ -2,17 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { ImportResult } from "@/components/ImportReportPanel";
+import { useImports } from "@/context/ImportsContext";
 import { api } from "@/lib/apiClient";
 import {
   GENERIC_ASSETS,
   GENERIC_FINDINGS,
+  canRead,
   fileExtension,
   importTarget,
   readColumns,
   suggestProfile,
 } from "@/lib/importProfiles";
-import type { ImportProfile, ImportReport, ImportResponse, Scan } from "@/lib/types";
+import type { ImportProfile, ImportResponse } from "@/lib/types";
 
 type ImportButtonProps = {
   orgId: string;
@@ -21,30 +22,24 @@ type ImportButtonProps = {
   kind: "assets" | "findings";
   accept: string;
   label: string;
-  onComplete(result: ImportResult): void;
   /** Import profiles to choose from. Without them, a picked file is uploaded
    * straight away with the page's generic source. */
   profiles?: ImportProfile[] | null;
-  pollIntervalMs?: number;
 };
 
-type Pending = { file: File; detected: string | null };
+/** A picked file awaiting its source: the source its columns matched, if any,
+ * and the columns read (for the "no source recognises this file" note). */
+type Pending = { file: File; detected: string | null; columns: string[] };
 
 /** Uploads a file. With profiles, the user confirms the file's source first
- * (pre-selected when the file's columns match a profile). Small files come back
- * with their report at once; large ones are imported in the background, so the
- * scan is polled until it finishes. */
-export default function ImportButton({
-  orgId,
-  kind,
-  accept,
-  label,
-  onComplete,
-  profiles,
-  pollIntervalMs = 1500,
-}: ImportButtonProps) {
+ * (pre-selected when the file's columns match a profile). The import is then
+ * followed app-wide (ImportsContext): its progress and report show on the
+ * page (ImportStatus), whichever page the user is on when it finishes. */
+export default function ImportButton({ orgId, kind, accept, label, profiles }: ImportButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [phase, setPhase] = useState<"idle" | "uploading" | "processing">("idle");
+  const imports = useImports();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [source, setSource] = useState(kind === "assets" ? GENERIC_ASSETS : GENERIC_FINDINGS);
   const mounted = useRef(true);
@@ -58,66 +53,57 @@ export default function ImportButton({
     };
   }, []);
 
-  async function waitForScan(scanId: string): Promise<Scan> {
-    while (mounted.current) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      const scan = await api.get<Scan>(`/orgs/${orgId}/scans/${scanId}`);
-      if (scan.status === "completed" || scan.status === "failed") return scan;
-    }
-    throw new Error("cancelled");
-  }
-
   async function upload(file: File, profileKey: string) {
     // A second click that lands before the re-render hides the confirm
     // button must not upload the file again.
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(null);
-    setPhase("uploading");
+    setError(null);
+    setUploading(true);
+    let response: ImportResponse;
     try {
       const { path, fields } = importTarget(orgId, profileKey);
-      const response = await api.upload<ImportResponse>(path, file, fields);
-      if (response.report) {
-        onComplete({ status: response.status, report: response.report, filename: file.name });
-        return;
-      }
-      setPhase("processing");
-      const scan = await waitForScan(response.scan_id);
-      const { error, ...report } = scan.summary ?? {};
-      onComplete({
-        status: scan.status,
-        report: error ? null : (report as ImportReport),
-        error,
-        filename: file.name,
-      });
+      response = await api.upload<ImportResponse>(path, file, fields);
     } catch (err) {
-      if (mounted.current) onComplete({ status: "failed", report: null, error: (err as Error).message, filename: file.name });
+      // The upload itself failed (e.g. an unsupported file): nothing to track.
+      if (mounted.current) setError(`${file.name}: ${(err as Error).message}`);
+      return;
     } finally {
       inFlight.current = false;
-      if (mounted.current) setPhase("idle");
+      if (mounted.current) setUploading(false);
     }
+    // Accepted: the import is followed from here on, wherever the user goes.
+    await imports.track(response.scan_id, kind);
   }
 
   async function handleFile(file: File) {
     if (inputRef.current) inputRef.current.value = "";
+    setError(null); // a new file: the last one's error no longer applies
     if (!profiles?.length) {
       await upload(file, pageDefault);
       return;
     }
     if (fileExtension(file.name) === ".nessus") {
       setSource(GENERIC_FINDINGS);
-      setPending({ file, detected: null });
+      setPending({ file, detected: null, columns: [] });
       return;
     }
-    const detected = suggestProfile(await readColumns(file), profiles);
+    const columns = await readColumns(file);
+    const detected = suggestProfile(columns, profiles);
     if (!mounted.current) return;
     setSource(detected?.key ?? pageDefault);
-    setPending({ file, detected: detected?.key ?? null });
+    setPending({ file, detected: detected?.key ?? null, columns });
   }
 
-  const busy = phase !== "idle";
+  const busy = uploading;
   const nessus = pending !== null && fileExtension(pending.file.name) === ".nessus";
   const choices = nessus ? (profiles ?? []).filter((p) => p.key === GENERIC_FINDINGS) : sortedChoices(profiles ?? [], pageDefault);
+  // Import only with a source that can identify the file's rows.
+  const selected = choices.find((p) => p.key === source);
+  const columns = pending?.columns ?? [];
+  const readable = !selected || canRead(selected, columns);
+  const noSourceReads = !readable && choices.every((p) => !canRead(p, columns));
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -133,10 +119,7 @@ export default function ImportButton({
             if (file) void handleFile(file);
           }}
         />
-        {phase === "uploading" && <span className="text-sm text-white/60">Uploading…</span>}
-        {phase === "processing" && (
-          <span className="text-sm text-white/60">Large file — importing in the background…</span>
-        )}
+        {uploading && <span className="text-sm text-white/60">Uploading…</span>}
         <button
           type="button"
           disabled={busy || pending !== null}
@@ -146,6 +129,12 @@ export default function ImportButton({
           {label}
         </button>
       </div>
+
+      {error && (
+        <p role="alert" className="max-w-md text-right text-sm text-red-300">
+          {error}
+        </p>
+      )}
 
       {pending && (
         <div
@@ -174,21 +163,47 @@ export default function ImportButton({
           {pending.detected && source === pending.detected && (
             <span className="text-xs text-emerald-300">Detected from the file&apos;s columns</span>
           )}
+          {!readable && (
+            <p role="note" className="basis-full text-right text-xs text-amber-300">
+              {noSourceReads ? (
+                <>
+                  No source can read this file: none of its columns ({shortList(columns)}) identifies a host. Event
+                  logs (cloud activity, audit or endpoint security events) can&apos;t be imported yet; press Cancel.
+                </>
+              ) : (
+                <>
+                  {selected!.name} can&apos;t read this file: none of its columns ({shortList(columns)}) is one that
+                  source identifies hosts by. Pick another source.
+                </>
+              )}
+            </p>
+          )}
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !readable}
             onClick={() => void upload(pending.file, source)}
             className="rounded-md bg-cyan px-3 py-1 text-sm font-medium text-navy hover:opacity-90 disabled:opacity-60"
           >
             Import
           </button>
-          <button type="button" onClick={() => setPending(null)} className="px-1 text-xs text-white/60 hover:text-white">
+          <button
+            type="button"
+            onClick={() => {
+              setPending(null);
+              setError(null);
+            }}
+            className="px-1 text-xs text-white/60 hover:text-white">
             Cancel
           </button>
         </div>
       )}
     </div>
   );
+}
+
+/** "a, b, c, d, e, f, …": the first few names of a list. */
+function shortList(names: string[], shown = 6): string {
+  return names.slice(0, shown).join(", ") + (names.length > shown ? ", …" : "");
 }
 
 /** The page's generic source first, then the other built-ins, then the org's own. */

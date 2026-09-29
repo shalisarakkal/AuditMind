@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import OrgPicker from "@/components/OrgPicker";
 import { useApp } from "@/context/AppContext";
+import { importHome, isRunning, useImports } from "@/context/ImportsContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
@@ -18,6 +19,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useApp();
+  const running = useImports().scans.filter(isRunning);
 
   return (
     <nav className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-navy/60 p-4">
@@ -45,6 +47,22 @@ export default function Sidebar() {
           );
         })}
       </ul>
+      {running.length > 0 && (
+        <ul aria-label="Imports in progress" className="mt-6 space-y-1">
+          {running.map((scan) => (
+            <li key={scan.id}>
+              <Link
+                href={`/${importHome(scan)}`}
+                title={scan.filename ?? undefined}
+                className="block truncate rounded-md px-3 py-2 text-xs text-cyan hover:bg-cyan/10"
+              >
+                <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
+                Importing {scan.filename ?? "a file"}…
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       <button
         type="button"
         onClick={() => {

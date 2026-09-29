@@ -3,19 +3,21 @@ import { vi } from "vitest";
 
 import OrgGate from "@/components/OrgGate";
 import { AppProvider } from "@/context/AppContext";
-import type { MyOrganization, UserRole } from "@/lib/types";
+import { ImportsProvider } from "@/context/ImportsContext";
+import type { MyOrganization, Scan, UserRole } from "@/lib/types";
 
 export const API = "http://localhost:8000/api/v1";
 
 type Handler = (init: RequestInit) => unknown | Response | Promise<unknown | Response>;
 
 /** Replaces fetch with handlers keyed by "METHOD /path" (path after /api/v1).
- * A handler returns a body (sent as 200 JSON) or a full Response. Returns the
- * mock so tests can inspect calls. */
+ * A key with a query string matches only that query; one without matches the
+ * path with any query. A handler returns a body (sent as 200 JSON) or a full
+ * Response. Returns the mock so tests can inspect calls. */
 export function mockApi(routes: Record<string, Handler>) {
   const fetchMock = vi.fn(async (url: string, init: RequestInit = {}) => {
     const key = `${init.method ?? "GET"} ${url.replace(API, "")}`;
-    const handler = routes[key];
+    const handler = routes[key] ?? routes[key.split("?")[0]];
     if (!handler) throw new Error(`Unexpected request: ${key}`);
     const result = await handler(init);
     return result instanceof Response ? result : json(result);
@@ -50,17 +52,53 @@ export function org(overrides: Partial<MyOrganization> = {}): MyOrganization {
   };
 }
 
-/** Render inside a signed-in AppProvider whose selected org has `role`,
- * and wait until the org has loaded. */
-export async function renderSignedIn(ui: React.ReactElement, role: UserRole = "admin", routes: Record<string, Handler> = {}) {
+/** A scan (an import), completed by default. */
+export function scan(overrides: Partial<Scan> = {}): Scan {
+  return {
+    id: "s1",
+    org_id: "org-1",
+    scan_type: "asset_import",
+    scope: null,
+    status: "completed",
+    started_at: "2026-09-27T10:00:00Z",
+    completed_at: "2026-09-27T10:01:00Z",
+    source: "upload",
+    filename: "assets.csv",
+    summary: null,
+    profile: null,
+    started_by: "user-1",
+    dismissed_at: null,
+    progress: null,
+    ...overrides,
+  };
+}
+
+/** Render inside a signed-in AppProvider whose selected org has `role`, with
+ * the app's import tracker (no imports unless routes say otherwise), and wait
+ * until the org has loaded. */
+export async function renderSignedIn(
+  ui: React.ReactElement,
+  role: UserRole = "admin",
+  routes: Record<string, Handler> = {},
+  pollIntervalMs = 10,
+) {
   window.localStorage.setItem("auditmind_token", "test-token");
-  const fetchMock = mockApi({ "GET /orgs": () => [org({ role })], ...routes });
+  const fetchMock = mockApi({
+    "GET /orgs": () => [org({ role })],
+    "GET /orgs/org-1/scans?tracked=true": () => [],
+    "GET /orgs/org-1/scans?active=true": () => [],
+    "GET /orgs/org-1/assets/facets": () => ({ type: [], subtype: [], environment: [], criticality: [] }),
+    "GET /orgs/org-1/findings/facets": () => ({ source: [] }),
+    ...routes,
+  });
   const result = render(
     <AppProvider>
-      <OrgGate>
-        <span data-testid="org-ready" />
-        {ui}
-      </OrgGate>
+      <ImportsProvider pollIntervalMs={pollIntervalMs}>
+        <OrgGate>
+          <span data-testid="org-ready" />
+          {ui}
+        </OrgGate>
+      </ImportsProvider>
     </AppProvider>,
   );
   await screen.findByTestId("org-ready");

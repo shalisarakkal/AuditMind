@@ -37,11 +37,13 @@ async def start_import(
     org_id: uuid.UUID,
     file: UploadFile,
     kind: ImportKind,
+    started_by: uuid.UUID,
     profile: ProfileConfig | None = None,
 ) -> ImportResponse:
     """Record the upload as a scan, then import it now (201 + report) or, for
     files over IMPORT_SYNC_MAX_BYTES, in the background (202, report later on
-    the scan). kind "profile" reads each row with `profile`."""
+    the scan). kind "profile" reads each row with `profile`. `started_by` (the
+    uploader) is the one who sees the scan's report until they dismiss it."""
     try:
         fmt = detect_format(file.filename, kind)
     except IngestionError as exc:
@@ -56,6 +58,7 @@ async def start_import(
         filename=(file.filename or "")[:255] or None,
         status=ScanStatus.pending,
         started_at=datetime.now(timezone.utc),
+        started_by=started_by,
     )
     db.add(scan)
     db.commit()

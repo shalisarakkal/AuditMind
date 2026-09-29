@@ -12,6 +12,7 @@ it resolves the org's effective settings and records the outcome on the scan.
 """
 
 import csv
+import enum
 import io
 import ipaddress
 import json
@@ -19,10 +20,12 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
-from sqlalchemy import func, or_, select
+from psycopg.types.json import Jsonb
+from sqlalchemy import bindparam, func, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
@@ -32,6 +35,7 @@ from app.models.organization import Organization
 from app.models.scan import Scan
 from app.schemas.ingestion import ImportReport, RowError, RowWarning
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
+from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, finding_key
 from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity, parse_nessus
 from app.services.org_settings import IngestionSettings, resolve_ingestion_settings
 
@@ -45,6 +49,18 @@ FINDING_CLOUD_ASSET_TYPE = "cloud_resource"
 # The report lists at most this many row errors (and warnings); `failed`
 # still counts every error.
 MAX_REPORTED_ERRORS = 1000
+IDENTITY_REQUIRED = "hostname, ip or cloud_id is required"
+# The columns a generic file identifies each row's host by. A generic import
+# whose file has none of them is almost certainly the wrong source for it.
+_IDENTITY_COLUMNS = {"hostname", "ip", "cloud_id"}
+_EXPECTED_COLUMNS = {
+    "assets": "type, hostname and/or ip or cloud_id, and optionally subtype, environment, criticality, tags",
+    "findings": "hostname and/or ip or cloud_id, domain, severity, and optionally category, description, source",
+}
+# New rows sent to the database per batch, and file rows per progress report.
+WRITE_BATCH = 2000
+# Assets whose updates are gathered before they're sent (see _PendingWrites).
+UPDATE_BATCH = 20000
 
 _FORMATS: dict[ImportKind, dict[str, str]] = {
     "assets": {".csv": "csv", ".json": "json"},
@@ -92,6 +108,13 @@ class FindingRow:
     source: str
     raw_data: dict = field(default_factory=dict)
     cloud_id: str | None = None
+
+
+# Told how a large import goes: (phase, done, total). Phases, in order:
+# "reading" (file rows checked), "waiting" (for another import into the org),
+# "writing" (file rows written), "findings" (a tool export's findings
+# written), "saving" (committing). done/total are 0 when there's no count.
+ProgressCallback = Callable[[str, int, int], None]
 
 
 class RowReader(Protocol):
@@ -241,19 +264,27 @@ def nessus_finding(
 
 
 def process_import(
-    db: Session, scan: Scan, kind: ImportKind, fmt: str, content: bytes, profile: RowReader | None = None
+    db: Session,
+    scan: Scan,
+    kind: ImportKind,
+    fmt: str,
+    content: bytes,
+    profile: RowReader | None = None,
+    progress: ProgressCallback | None = None,
 ) -> ImportReport:
     """Import `content` into the scan's org and record the outcome on the scan
     (status, summary, completed_at). kind "profile" reads each row with
-    `profile`. Unexpected errors mark the scan failed and are re-raised."""
+    `profile`; `progress` is told how the writing goes. Unexpected errors mark
+    the scan failed and are re-raised."""
     scan_id = scan.id
     org = db.get(Organization, scan.org_id)
     ingestion = resolve_ingestion_settings(org)
     scan.status = ScanStatus.running
+    scan.progress = {"phase": "reading"}
     db.commit()
 
     try:
-        report = _import(db, scan, kind, fmt, content, ingestion, profile)
+        report = _import(db, scan, kind, fmt, content, ingestion, profile, progress)
         # Failed if all-or-nothing rejected the file, or no row was usable.
         usable = report.created + report.updated + report.skipped + report.duplicates
         rejected = report.failed > 0 and (not ingestion.import_partial_success or usable == 0)
@@ -286,11 +317,13 @@ def _import(
     content: bytes,
     ingestion: IngestionSettings,
     profile: RowReader | None,
+    progress: ProgressCallback | None = None,
 ) -> ImportReport:
     report = ImportReport()
     errors: list[RowError] = []
     warnings: list[RowWarning] = []
     asset_rows: list[AssetRow] = []
+    columns: list[str] = []  # the file's (first record's) column names
     finding_rows: list[FindingRow] = []
 
     def read(row: int, reader: Callable[[list[str]], tuple[AssetRow | None, list[FindingRow]]]) -> None:
@@ -314,7 +347,7 @@ def _import(
             raise IngestionError(str(exc))
         if not items:
             raise IngestionError("The .nessus file contains no findings")
-        for item in items:
+        for position, item in enumerate(items, start=1):
             def read_nessus(row_warnings: list[str], item: NessusItem = item):
                 finding = nessus_finding(item, ingestion, row_warnings)
                 if finding is None:
@@ -323,6 +356,7 @@ def _import(
                 return None, [finding]
 
             read(item.row, read_nessus)
+            _report_reading(progress, position, len(items))
     else:
         if profile is not None:
             list_key = profile.json_list_key
@@ -331,7 +365,9 @@ def _import(
         records = parse_csv(content) if fmt == "csv" else parse_json(content, list_key)
         if not records:
             raise IngestionError("The file contains no rows")
-        for row, record in records:
+        first = records[0][1]
+        columns = list(first) if isinstance(first, dict) else []
+        for position, (row, record) in enumerate(records, start=1):
             def read_record(row_warnings: list[str], row: int = row, record: Any = record):
                 if profile is not None:
                     return profile.read_row(row, record, ingestion, row_warnings)
@@ -340,27 +376,61 @@ def _import(
                 return None, [validate_finding(row, record, row_warnings)]
 
             read(row, read_record)
+            _report_reading(progress, position, len(records))
+        del records, record  # read into rows; free them before writing
 
     if ingestion.asset_existing_strategy != "duplicate":
         warnings += _repeated_asset_warnings(asset_rows)
     report.failed = len(errors)
+    if profile is None and not asset_rows and not finding_rows:
+        if hint := _wrong_source_hint(kind, columns):
+            warnings.append(RowWarning(row=0, message=hint))
     report.errors = errors[:MAX_REPORTED_ERRORS]
     # All-or-nothing with a bad row: nothing is written.
     if not errors or ingestion.import_partial_success:
-        _lock_org_imports(db, scan.org_id)
-        asset_by_row = _write_assets(db, scan.org_id, asset_rows, ingestion, report, warnings)
+        _lock_org_imports(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
+        index = _load_asset_index(db, scan.org_id, asset_rows, finding_rows)
+        rows_total = len({r.row for r in asset_rows} | {r.row for r in finding_rows})
+        writes = _PendingWrites(db, progress, rows_total)
+        asset_by_row = _write_assets(db, scan.org_id, asset_rows, ingestion, report, warnings, index, writes)
         # When a file creates assets too, `created` counts those, so its
         # findings are counted separately.
         count_findings_as = "findings_created" if profile is not None and profile.creates_assets else "created"
-        _write_findings(db, scan.org_id, scan.id, finding_rows, report, warnings, asset_by_row, count_findings_as)
+        _write_findings(
+            db, scan.org_id, scan.id, finding_rows, report, warnings, index, writes, asset_by_row, count_findings_as
+        )
+        if progress is not None:
+            progress("saving", 0, 0)
+        writes.flush()
     warnings.sort(key=lambda w: w.row)
     report.warnings = warnings[:MAX_REPORTED_ERRORS]
     report.warnings_total = len(warnings)
     return report
 
 
+def _report_reading(progress: ProgressCallback | None, rows_read: int, rows_total: int) -> None:
+    """Every WRITE_BATCH rows read, and once all are."""
+    if progress is not None and (rows_read % WRITE_BATCH == 0 or rows_read == rows_total):
+        progress("reading", rows_read, rows_total)
+
+
+def _wrong_source_hint(kind: ImportKind, columns: list[str]) -> str | None:
+    """For a generic import that imported nothing: if the file has none of the
+    columns that identify a host, it's most likely another tool's export (a
+    cloud inventory, an activity log...), so say so and name its columns."""
+    if not columns or _IDENTITY_COLUMNS & set(columns):
+        return None
+    shown = ", ".join(columns[:8]) + (", ..." if len(columns) > 8 else "")
+    return (
+        f"Nothing was imported: this file's columns ({shown}) don't match this source, which needs a "
+        f"hostname, ip or cloud_id column and expects {_EXPECTED_COLUMNS[kind]}. If the file is a tool's "
+        "export, import it with that tool's source; event logs (cloud activity, audit or endpoint security "
+        "events) can't be imported yet."
+    )
+
+
 def _asset_key(row: AssetRow) -> tuple[str, ...]:
-    """Which rows of one file are the same asset (see _find_assets)."""
+    """Which rows of one file are the same asset (see import_matching.py)."""
     if row.cloud_id:
         return "cloud_id", row.cloud_id
     category = row.type if row.type_known else ""
@@ -377,6 +447,8 @@ def _repeated_asset_warnings(rows: list[AssetRow]) -> list[RowWarning]:
         by_asset.setdefault(_asset_key(row), []).append(row)
     warnings = []
     for repeats in by_asset.values():
+        if len(repeats) == 1:  # most assets: nothing to compare
+            continue
         values = {repr({k: v for k, v in vars(r).items() if k != "row"}) for r in repeats}
         if len(values) > 1:
             last = repeats[-1]
@@ -391,6 +463,111 @@ def _repeated_asset_warnings(rows: list[AssetRow]) -> list[RowWarning]:
     return warnings
 
 
+class _PendingWrites:
+    """What an import has decided to write, sent to the database in bulk.
+    Matching doesn't need it there: the in-memory indexes already have it.
+
+    New rows are sent (with COPY) every WRITE_BATCH of them. Updates are
+    gathered per asset until UPDATE_BATCH assets have some, since a file
+    often lists the same host many times. Progress, in file rows, is reported
+    every WRITE_BATCH rows."""
+
+    def __init__(self, db: Session, progress: "ProgressCallback | None", rows_total: int):
+        self.db = db
+        self.progress = progress
+        self.rows_total = rows_total
+        self.rows_done = 0
+        self.new_assets: dict[uuid.UUID, dict] = {}
+        self.asset_updates: dict[uuid.UUID, dict] = {}
+        self.details: dict[uuid.UUID, dict] = {}
+        self.findings: list[dict] = []
+        self._last_created: datetime | None = None
+
+    def created_at(self) -> datetime:
+        """Now, but always after the previous row's: "oldest first" follows the
+        file's order even when the clock hasn't moved on between rows."""
+        now = datetime.now(timezone.utc)
+        if self._last_created is not None and now <= self._last_created:
+            now = self._last_created + timedelta(microseconds=1)
+        self._last_created = now
+        return now
+
+    def create_asset(self, values: dict) -> None:
+        self.new_assets[values["id"]] = values
+        self._created()
+
+    def update_asset(self, asset_id: uuid.UUID, values: dict, details: dict | None = None) -> None:
+        """Set columns, and merge `details` into the asset's (later keys win)."""
+        if asset_id in self.new_assets:  # not inserted yet: fold it in
+            new = self.new_assets[asset_id]
+            new.update(values)
+            if details:
+                new["details"] = {**new["details"], **details}
+        else:
+            self.asset_updates.setdefault(asset_id, {}).update(values)
+            if details:
+                self.details[asset_id] = {**self.details.get(asset_id, {}), **details}
+            if max(len(self.asset_updates), len(self.details)) >= UPDATE_BATCH:
+                self.flush()
+
+    def create_finding(self, values: dict) -> None:
+        self.findings.append(values)
+        self._created()
+
+    phase = "writing"
+
+    def start_phase(self, phase: str, rows_total: int) -> None:
+        """Count progress afresh, e.g. a tool export's findings after its rows."""
+        self.phase, self.rows_done, self.rows_total = phase, 0, rows_total
+        if self.progress is not None:
+            self.progress(phase, 0, rows_total)
+
+    def row_done(self) -> None:
+        self.rows_done += 1
+        if self.progress is not None and (self.rows_done % WRITE_BATCH == 0 or self.rows_done == self.rows_total):
+            self.progress(self.phase, self.rows_done, self.rows_total)
+
+    def _created(self) -> None:
+        if len(self.new_assets) + len(self.findings) >= WRITE_BATCH:
+            self.flush()
+
+    def flush(self) -> None:
+        """Write everything pending. Assets first: findings may refer to them."""
+        if self.new_assets:
+            _copy_rows(self.db, Asset.__tablename__, list(self.new_assets.values()))
+        if self.asset_updates:
+            self.db.execute(update(Asset), [{"id": id_, **values} for id_, values in self.asset_updates.items()])
+        if self.details:
+            table = Asset.__table__
+            self.db.execute(
+                update(table)
+                .where(table.c.id == bindparam("asset_id"))
+                .values(details=table.c.details.op("||")(bindparam("new_details", type_=JSONB))),
+                [{"asset_id": id_, "new_details": details} for id_, details in self.details.items()],
+            )
+        if self.findings:
+            _copy_rows(self.db, Finding.__tablename__, self.findings)
+        self.new_assets, self.asset_updates, self.details, self.findings = {}, {}, {}, []
+
+
+def _copy_rows(db: Session, table: str, rows: list[dict]) -> None:
+    """Insert rows (all with the same keys) with COPY, inside the session's
+    transaction: much faster than INSERTs for thousands of rows."""
+    columns = list(rows[0])
+    with db.connection().connection.cursor() as cursor:
+        with cursor.copy(f"COPY {table} ({', '.join(columns)}) FROM STDIN") as copy:
+            for row in rows:
+                copy.write_row([_copy_value(row[column]) for column in columns])
+
+
+def _copy_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return Jsonb(value)
+    if isinstance(value, enum.Enum):
+        return value.value
+    return value
+
+
 def _write_assets(
     db: Session,
     org_id,
@@ -398,23 +575,25 @@ def _write_assets(
     ingestion: IngestionSettings,
     report: ImportReport,
     warnings: list[RowWarning],
-) -> dict[int, Asset]:
+    index: AssetIndex,
+    writes: _PendingWrites,
+) -> dict[int, IndexedAsset]:
     """Create or update each row's asset per the org's strategy. Returns the
     asset each row ended up as (created, updated, or matched and skipped), so
     findings from the same row attach to it."""
     strategy = ingestion.asset_existing_strategy
-    asset_by_row: dict[int, Asset] = {}
+    asset_by_row: dict[int, IndexedAsset] = {}
     for row in rows:
         existing = None
         if strategy != "duplicate":
             category = row.type if row.type_known else None
-            matches = _find_assets(db, org_id, row.hostname, row.ip, row.cloud_id, category)
+            matches = index.find(row.hostname, row.ip, row.cloud_id, category)
             existing = matches[0] if matches else None
             if len(matches) > 1 and category is None:
                 warnings.append(_several_matches_warning(row, matches, "updated"))
         if existing is None:
             if strategy != "duplicate" and row.type_known and row.hostname:
-                others = _other_categories(db, org_id, row.hostname, row.type)
+                others = index.other_categories(row.hostname, row.type)
                 if others:
                     warnings.append(
                         RowWarning(
@@ -423,8 +602,10 @@ def _write_assets(
                             f"this {row.type} was added as a separate asset",
                         )
                     )
-            existing = Asset(
-                org_id=org_id,
+            existing = _new_asset(
+                index,
+                writes,
+                org_id,
                 type=row.type,
                 subtype=row.subtype,
                 type_known=row.type_known,
@@ -436,27 +617,29 @@ def _write_assets(
                 tags=row.tags,
                 details=row.details,
             )
-            db.add(existing)
-            db.flush()  # later rows in the same file can match it
             report.created += 1
         elif strategy == "skip":
             report.skipped += 1
         else:
-            for name in ("hostname", "ip", "cloud_id", "environment", "criticality", "tags"):
-                value = getattr(row, name)
-                if value is not None:
-                    setattr(existing, name, value)
+            values = {
+                name: value
+                for name in ("hostname", "ip", "cloud_id", "environment", "criticality", "tags")
+                if (value := getattr(row, name)) is not None
+            }
             # A guessed type never replaces a known one. The subtype describes
             # the type, so they change together: a row saying just "server"
             # clears an earlier "laptop".
             if row.type_known or not existing.type_known:
-                existing.type, existing.subtype = row.type, row.subtype
-                existing.type_known = row.type_known
-            if row.details:
-                # Merged, so facts from different sources accumulate.
-                existing.details = {**(existing.details or {}), **row.details}
+                values.update(type=row.type, subtype=row.subtype, type_known=row.type_known)
+            index.update(
+                existing,
+                **{k: v for k, v in values.items() if k in ("hostname", "ip", "cloud_id", "type", "type_known")},
+            )
+            # Details are merged, so facts from different sources accumulate.
+            writes.update_asset(existing.id, values, row.details or None)
             report.updated += 1
         asset_by_row[row.row] = existing
+        writes.row_done()
     return asset_by_row
 
 
@@ -467,58 +650,107 @@ def _write_findings(
     rows: list[FindingRow],
     report: ImportReport,
     warnings: list[RowWarning],
-    asset_by_row: dict[int, Asset] | None = None,
+    index: AssetIndex,
+    writes: _PendingWrites,
+    asset_by_row: dict[int, IndexedAsset] | None = None,
     count_as: Literal["created", "findings_created"] = "created",
 ) -> None:
     """Record each finding against its row's asset (from asset_by_row), else
     the matching inventory asset of any category, else a new one whose type
     is a guess."""
+    asset_by_row = asset_by_row or {}
+    findings = _load_finding_index(db, org_id, index.existing_ids)
+    # A tool export's rows were counted with their assets: count its
+    # findings as a phase of their own. A findings file counts file rows (a
+    # .nessus item or CSV row may give several findings).
+    own_phase = bool(asset_by_row) and bool(rows)
+    if own_phase:
+        writes.start_phase("findings", len(rows))
+    previous_row = None
     for row in rows:
-        asset = (asset_by_row or {}).get(row.row)
+        if own_phase or (row.row not in asset_by_row and row.row != previous_row):
+            writes.row_done()
+        previous_row = row.row
+
+        asset = asset_by_row.get(row.row)
         if asset is None:
-            matches = _find_assets(db, org_id, row.hostname, row.ip, row.cloud_id)
+            matches = index.find(row.hostname, row.ip, row.cloud_id)
             if not matches:
                 only_cloud = not row.hostname and not row.ip
-                asset = Asset(
-                    org_id=org_id,
+                asset = _new_asset(
+                    index,
+                    writes,
+                    org_id,
                     type=FINDING_CLOUD_ASSET_TYPE if only_cloud else FINDING_ASSET_TYPE,
                     type_known=False,
                     hostname=row.hostname,
                     ip=row.ip,
                     cloud_id=row.cloud_id,
                 )
-                db.add(asset)
             else:
                 asset = matches[0]
                 if len(matches) > 1:
                     warnings.append(_several_matches_warning(row, matches, "recorded the finding on"))
                 # Fill in whichever identifier the inventory didn't have yet.
-                asset.hostname = asset.hostname or row.hostname
-                asset.ip = asset.ip or row.ip
-                asset.cloud_id = asset.cloud_id or row.cloud_id
-            db.flush()
+                filled = {
+                    name: getattr(row, name)
+                    for name in ("hostname", "ip", "cloud_id")
+                    if getattr(asset, name) is None and getattr(row, name) is not None
+                }
+                if filled:
+                    index.update(asset, **filled)
+                    writes.update_asset(asset.id, filled)
 
-        if _is_duplicate(db, org_id, asset.id, row):
+        key = finding_key(asset.id, row.source, row.category, row.description)
+        if key in findings:
             report.duplicates += 1
             continue
-        db.add(
-            Finding(
-                org_id=org_id,
-                scan_id=scan_id,
-                asset_id=asset.id,
-                category=row.category,
-                domain=row.domain,
-                severity=row.severity,
-                description=row.description,
-                source=row.source,
-                raw_data=row.raw_data,
-            )
+        findings.add(key)  # later rows in the same file dedup against it
+        writes.create_finding(
+            {
+                "id": uuid.uuid4(),
+                "org_id": org_id,
+                "scan_id": scan_id,
+                "asset_id": asset.id,
+                "category": row.category,
+                "domain": row.domain,
+                "severity": row.severity,
+                "description": row.description,
+                "source": row.source,
+                "raw_data": row.raw_data,
+                "created_at": writes.created_at(),
+            }
         )
-        db.flush()  # later rows in the same file dedup against it
         setattr(report, count_as, getattr(report, count_as) + 1)
 
 
-def _several_matches_warning(row: AssetRow | FindingRow, matches: list[Asset], action: str) -> RowWarning:
+def _new_asset(index: AssetIndex, writes: _PendingWrites, org_id, **values) -> IndexedAsset:
+    """Queue a new asset for insertion and index it, so later rows match it."""
+    values = {
+        "id": uuid.uuid4(),
+        "org_id": org_id,
+        "subtype": None,
+        "environment": None,
+        "criticality": None,
+        "tags": None,
+        "details": {},
+        "created_at": writes.created_at(),
+        **values,
+    }
+    writes.create_asset(values)
+    asset = IndexedAsset(
+        id=values["id"],
+        type=values["type"],
+        type_known=values["type_known"],
+        hostname=values["hostname"],
+        ip=values["ip"],
+        cloud_id=values["cloud_id"],
+    )
+    index.add(asset)
+    return asset
+
+
+def _several_matches_warning(row: AssetRow | FindingRow, matches: list[IndexedAsset], action: str) -> RowWarning:
     """A row whose category isn't known matched several assets sharing its
     name (or IP); it went to the first, the oldest."""
     categories = ", ".join(sorted({asset.type for asset in matches}))
@@ -529,76 +761,38 @@ def _several_matches_warning(row: AssetRow | FindingRow, matches: list[Asset], a
     )
 
 
-def _other_categories(db: Session, org_id, hostname: str, category: str) -> list[str]:
-    """Categories of the other assets named `hostname`, for a new asset that
-    shares its name with a different kind of device."""
-    rows = (
-        db.query(Asset.type)
-        .filter(Asset.org_id == org_id, func.lower(Asset.hostname) == hostname.lower(), Asset.type != category)
-        .distinct()
-        .all()
-    )
-    return sorted(type_ for (type_,) in rows)
-
-
-def _lock_org_imports(db: Session, org_id: uuid.UUID) -> None:
+def _lock_org_imports(db: Session, org_id: uuid.UUID, on_wait: Callable[[], object] | None = None) -> None:
     """Serialise imports into one org until this transaction ends. Matching is
     look-up-then-insert, so two overlapping imports (say, a background one and
     an upload) could otherwise both create the same host. A lock rather than a
-    unique index, because the "duplicate" asset strategy allows repeats."""
+    unique index, because the "duplicate" asset strategy allows repeats.
+    `on_wait` is called first if another import holds the lock."""
     key = int.from_bytes(org_id.bytes[:8], "big", signed=True)
+    if db.execute(select(func.pg_try_advisory_xact_lock(key))).scalar():
+        return
+    if on_wait is not None:
+        on_wait()
     db.execute(select(func.pg_advisory_xact_lock(key)))
 
 
-def _find_assets(
-    db: Session,
-    org_id,
-    hostname: str | None,
-    ip: str | None,
-    cloud_id: str | None = None,
-    category: str | None = None,
-) -> list[Asset]:
-    """The assets a row could be, best first; the row goes to the first.
-
-    By cloud ID (exact), else hostname (case-insensitive), else IP but only
-    against assets with no hostname, so two differently named hosts that
-    happen to share an IP are never merged. A row with a cloud ID only matches
-    by name or IP an asset with no cloud ID of its own.
-
-    By name or IP, a row whose category is known matches only an asset of that
-    category or one whose type is a guess (a same-category asset first), so a
-    server and a printer sharing a name stay two assets. A row with no known
-    category (category None) matches any, the oldest first."""
-    assets = db.query(Asset).filter(Asset.org_id == org_id)
-    if cloud_id:
-        match = assets.filter(Asset.cloud_id == cloud_id).order_by(Asset.created_at).first()
-        if match or (not hostname and not ip):
-            return [match] if match else []
-        assets = assets.filter(Asset.cloud_id.is_(None))
-    if category:
-        assets = assets.filter(or_(Asset.type == category, Asset.type_known.is_(False)))
-        assets = assets.order_by(Asset.type != category, Asset.created_at)
-    else:
-        assets = assets.order_by(Asset.created_at)
-    if hostname:
-        matches = assets.filter(func.lower(Asset.hostname) == hostname.lower()).all()
-        if matches or not ip:
-            return matches
-        return assets.filter(Asset.ip == ip, Asset.hostname.is_(None)).all()
-    return assets.filter(Asset.ip == ip).all()
-
-
-def _is_duplicate(db: Session, org_id, asset_id, row: FindingRow) -> bool:
-    """Same asset + source + category. Without a category, the description
-    stands in for it, so unrelated uncategorised findings aren't collapsed."""
-    query = db.query(Finding.id).filter(
-        Finding.org_id == org_id, Finding.asset_id == asset_id, Finding.source == row.source
+def _load_asset_index(
+    db: Session, org_id: uuid.UUID, asset_rows: list[AssetRow], finding_rows: list[FindingRow]
+) -> AssetIndex:
+    """The org's assets the file can touch (see import_matching.py), loaded
+    once per import, after taking the lock so a concurrent import's assets
+    are committed and included."""
+    rows = [*asset_rows, *finding_rows]
+    return AssetIndex.load(
+        db,
+        org_id,
+        hostnames=(r.hostname for r in rows if r.hostname),
+        ips=(r.ip for r in rows if r.ip),
+        cloud_ids=(r.cloud_id for r in rows if r.cloud_id),
     )
-    if row.category is None:
-        query = query.filter(Finding.category.is_(None), Finding.description.is_not_distinct_from(row.description))
-    else:
-        query = query.filter(Finding.category == row.category)
-    return db.query(query.exists()).scalar()
+
+
+def _load_finding_index(db: Session, org_id: uuid.UUID, asset_ids: list[uuid.UUID]) -> FindingIndex:
+    return FindingIndex.load(db, org_id, asset_ids)
 
 
 # --- Field helpers -------------------------------------------------------------
@@ -651,7 +845,7 @@ def _identity(record: dict, warnings: list[str] | None = None) -> tuple[str | No
             article = "an" if unusual[0] in "aeiou" else "a"
             warnings.append(f"ip {ip} is {article} {unusual} address; imported anyway")
     if not hostname and not ip and not cloud_id:
-        raise ValueError("hostname, ip or cloud_id is required")
+        raise ValueError(IDENTITY_REQUIRED)
     return hostname, ip, cloud_id
 
 

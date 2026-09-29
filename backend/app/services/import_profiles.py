@@ -19,6 +19,7 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -222,9 +223,11 @@ def validate_profile_parts(family: Family, column_map: dict, params: dict) -> tu
     return cleaned, parsed
 
 
-def column_names(header: str) -> list[str]:
-    """A mapped column's names as records key them (trimmed, lower case)."""
-    return [name.strip().lower() for name in header.split("|") if name.strip()]
+@lru_cache(maxsize=1024)
+def column_names(header: str) -> tuple[str, ...]:
+    """A mapped column's names as records key them (trimmed, lower case).
+    Cached: it's asked for every field of every row."""
+    return tuple(name.strip().lower() for name in header.split("|") if name.strip())
 
 
 def _names(family: Family) -> str:

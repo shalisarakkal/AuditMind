@@ -210,7 +210,7 @@ def test_manual_asset_create_rejects_unknown_types(client, admin):
 
     assert resp.status_code == 422
     assert resp.json()["detail"].startswith("type 'Hologram' must be one of")
-    assert client.get(_assets_url(admin), headers=admin[0]).json() == []
+    assert client.get(_assets_url(admin), headers=admin[0]).json()["total"] == 0
 
 
 def test_org_type_names_apply_to_manual_create_and_generic_import(client, admin):

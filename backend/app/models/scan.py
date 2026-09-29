@@ -28,6 +28,16 @@ class Scan(Base):
     summary: Mapped[dict | None] = mapped_column(JSONB)
     # The import profile the file was read with (built-in key or custom id).
     profile: Mapped[str | None] = mapped_column(String(100))
+    # Who uploaded the file (null for scans from before this was recorded).
+    # Only they see its import report, until they dismiss it (dismissed_at).
+    started_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A running import's progress: {"phase": "reading"} while the file is
+    # read, then {"phase": "writing", "rows_done": n, "rows_total": n}.
+    # Written outside the import's transaction (see ingestion_background.py).
+    progress: Mapped[dict | None] = mapped_column(JSONB)
 
     organization: Mapped["Organization"] = relationship(back_populates="scans")
     findings: Mapped[list["Finding"]] = relationship(back_populates="scan", cascade="all, delete-orphan")

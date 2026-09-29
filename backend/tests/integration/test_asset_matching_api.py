@@ -37,7 +37,7 @@ def _profile_import(client, admin, profile, content):
 
 def _assets(client, admin):
     headers, org_id = admin
-    return client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers).json()
+    return client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers).json()["items"]
 
 
 def test_a_name_shared_by_two_kinds_of_device_stays_two_assets(client, admin):
@@ -109,6 +109,6 @@ def test_a_finding_for_a_shared_name_goes_to_the_oldest_asset_with_a_warning(cli
         }
     ]
     headers, org_id = admin
-    [finding] = client.get(f"/api/v1/orgs/{org_id}/findings", headers=headers).json()
+    [finding] = client.get(f"/api/v1/orgs/{org_id}/findings", headers=headers).json()["items"]
     server = next(a for a in _assets(client, admin) if a["type"] == "server")
     assert finding["asset_id"] == server["id"]

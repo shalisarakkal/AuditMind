@@ -68,5 +68,5 @@ def test_viewer_write_attempt_changes_nothing(client, org):
 
     client.post(f"/api/v1/orgs/{org_id}/assets/import", headers=headers["viewer"], files=CSV_FILE)
 
-    assert client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers["admin"]).json() == []
+    assert client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers["admin"]).json() == {"items": [], "total": 0}
     assert client.get(f"/api/v1/orgs/{org_id}/scans", headers=headers["admin"]).json() == []

@@ -3,6 +3,7 @@ from contextlib import nullcontext
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
@@ -11,7 +12,14 @@ from app.db.session import get_db
 from app.main import app
 from app.services import ingestion_background
 
-TEST_DB_URL = settings.TEST_DATABASE_URL or settings.DATABASE_URL
+# The DB fixture creates and drops every table, so tests only ever use a
+# database named *_test (TEST_DATABASE_URL), never the app's own: falling back
+# to DATABASE_URL once wiped the dev database when .env wasn't found.
+TEST_DB_URL = settings.TEST_DATABASE_URL
+
+
+def _is_test_db(url: str | None) -> bool:
+    return bool(url) and (make_url(url).database or "").endswith("_test")
 
 
 def _db_available(url: str) -> bool:
@@ -25,16 +33,22 @@ def _db_available(url: str) -> bool:
         return False
 
 
-DB_AVAILABLE = _db_available(TEST_DB_URL)
+DB_AVAILABLE = _is_test_db(TEST_DB_URL) and _db_available(TEST_DB_URL)
 
 requires_db = pytest.mark.skipif(
     not DB_AVAILABLE,
-    reason=f"Postgres is not reachable at {TEST_DB_URL!r}; skipping DB-backed test.",
+    reason=(
+        f"Postgres test database {make_url(TEST_DB_URL).render_as_string(hide_password=True)} is not reachable"
+        if _is_test_db(TEST_DB_URL)
+        else "TEST_DATABASE_URL must name a database ending in _test (see backend/.env.example)"
+    )
+    + "; skipping DB-backed test.",
 )
 
 
 @pytest.fixture
 def db_session():
+    assert _is_test_db(TEST_DB_URL), "refusing to create and drop tables outside a *_test database"
     engine = create_engine(TEST_DB_URL)
     # `documents` needs the pgvector extension enabled in the test DB
     # (see scripts/create_databases.sql).
@@ -56,6 +70,8 @@ def client(db_session, monkeypatch):
     session. (TestClient runs background tasks before the request returns.)"""
     app.dependency_overrides[get_db] = lambda: db_session
     monkeypatch.setattr(ingestion_background, "open_session", lambda: nullcontext(db_session))
+    progress_sessions = sessionmaker(bind=db_session.get_bind())
+    monkeypatch.setattr(ingestion_background, "open_progress_session", progress_sessions)
     try:
         yield TestClient(app)
     finally:

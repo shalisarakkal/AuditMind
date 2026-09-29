@@ -6,11 +6,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_org_role
 from app.db.session import get_db
 from app.models.enums import UserRole
-from app.models.finding import Finding
 from app.models.membership import OrgMembership
 from app.models.risk_score import RiskScore
 from app.schemas.risk_score import RiskAssessmentResult, RiskScoreRead
-from app.services.scoring_service import score_all_domains, overall_score
+from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
 
 router = APIRouter(prefix="/orgs/{org_id}/risk", tags=["risk"])
 
@@ -23,8 +22,7 @@ def run_risk_assessment(
 ) -> RiskAssessmentResult:
     """Rule-based v1 scoring (RISL_SCORING.md). Claude-driven qualitative scoring
     with RAG-backed standards citations lands in a later milestone (PROMPTS_CLAUDE.md)."""
-    findings = db.query(Finding).filter(Finding.org_id == org_id).all()
-    domain_scores = score_all_domains(findings)
+    domain_scores = score_all_from_counts(count_org_findings(db, org_id))
     overall, tier = overall_score(domain_scores)
 
     saved: list[RiskScore] = []
