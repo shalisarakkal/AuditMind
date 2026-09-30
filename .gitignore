@@ -36,3 +36,6 @@ Thumbs.db
 
 # Local scratch files (sample imports live in backend/tests/fixtures)
 temp/
+
+# Uploaded files waiting for the background worker (real data, large)
+backend/uploads/

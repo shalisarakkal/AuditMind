@@ -19,7 +19,8 @@ from app.models.enums import ArchiveAction, ArchiveItemType, ArchiveState, ScanS
 from app.models.scan import Scan
 from app.services import archive_service
 from tests.conftest import requires_db
-from tests.helpers import first_org_id, member, register, upload
+from app.worker.runner import reap_stale
+from tests.helpers import first_org_id, member, register, run_worker, upload
 
 pytestmark = requires_db
 
@@ -68,7 +69,11 @@ def _findings(client, admin, **params):
 
 
 def _archived(client, admin, item_type):
-    return _get(client, admin, "/archive", item_type=item_type)["items"]
+    return _get(client, admin, "/archive", type=item_type)["items"]
+
+
+def _events(client, admin, type):
+    return _get(client, admin, "/events", type=type)["items"]
 
 
 def _setup(client, admin):
@@ -175,8 +180,8 @@ def test_a_restored_finding_that_duplicates_an_active_one_is_purged(client, admi
     assert job["summary"]["duplicates_purged"] == 2
     assert job["summary"]["findings"] == 1
     assert _findings(client, admin) == ["BKP", "CVE-1", "MFA", "MFA", "SMB"]
-    [entry] = _get(client, admin, "/purge-log")["items"]
-    assert entry["reason"] == "duplicate" and entry["counts"] == {"findings": 2}
+    [event] = _events(client, admin, "restore")
+    assert event["criticality"] == "warning" and event["counts"]["duplicates_purged"] == 2
 
 
 def test_archiving_an_asset_takes_all_its_findings(client, admin):
@@ -207,6 +212,21 @@ def test_only_manual_findings_are_archived_one_by_one(client, admin):
     assert [i["label"] for i in _archived(client, admin, "finding")] == ["IR-plan"]
 
 
+def test_the_archived_list_shows_every_type_with_counts(client, admin):
+    _, findings, _ = _setup(client, admin)
+    _post(client, admin, f"/scans/{findings}/archive")
+    own_02 = next(a for a in _get(client, admin, "/assets")["items"] if a["hostname"] == "own-02")
+    _post(client, admin, f"/assets/{own_02['id']}/archive")
+
+    everything = _get(client, admin, "/archive", sort="type", order="asc")
+    assert [(i["item_type"], i["label"]) for i in everything["items"]] == [("upload", "findings.csv"), ("asset", "own-02")]
+    assert everything["total"] == 2
+    assert everything["type_counts"] == {"upload": 1, "asset": 1}
+    # The counts ignore the type filter, so every chip keeps its number.
+    assets = _get(client, admin, "/archive", type="asset")
+    assert (assets["total"], assets["type_counts"]) == (1, {"upload": 1, "asset": 1})
+
+
 def test_purge_deletes_for_good_and_is_logged(client, admin, db_session):
     _, findings, _ = _setup(client, admin)
     _post(client, admin, f"/scans/{findings}/archive")
@@ -216,9 +236,9 @@ def test_purge_deletes_for_good_and_is_logged(client, admin, db_session):
     assert job["summary"] == {"uploads": 1, "assets": 1, "findings": 3}
     assert _archived(client, admin, "upload") == []
     assert client.get(_url(admin, f"/scans/{findings}"), headers=admin[0]).status_code == 404
-    [entry] = _get(client, admin, "/purge-log")["items"]
-    assert entry["label"] == "findings.csv" and entry["reason"] == "manual"
-    assert entry["purged_by"] == "owner@acmecorp.io" and entry["counts"] == job["summary"]
+    [event] = _events(client, admin, "purge")
+    assert (event["item"], event["actor_label"], event["criticality"]) == ("findings.csv", "owner@acmecorp.io", "critical")
+    assert event["counts"] == job["summary"] and event["outcome"] == "completed"
     # Purged: it can't be restored.
     assert _post(client, admin, f"/archive/{item['id']}/restore").status_code == 409
 
@@ -231,9 +251,9 @@ def test_roles(client, admin):
     assert _post(client, admin, f"/scans/{findings}/archive", headers=viewer).status_code == 403
     assert _post(client, admin, f"/scans/{findings}/archive", headers=auditor).status_code == 200
     [item] = _archived(client, admin, "upload")
-    assert client.get(_url(admin, "/archive"), headers=viewer, params={"item_type": "upload"}).status_code == 200
+    assert client.get(_url(admin, "/archive"), headers=viewer, params={"type": "upload"}).status_code == 200
     assert _post(client, admin, f"/archive/{item['id']}/purge", headers=auditor).status_code == 403
-    assert client.get(_url(admin, "/purge-log"), headers=auditor).status_code == 403
+    assert client.get(_url(admin, "/events"), headers=viewer).status_code == 200
     assert _post(client, admin, f"/archive/{item['id']}/restore", headers=viewer).status_code == 403
     assert _post(client, admin, f"/archive/{item['id']}/restore", headers=auditor).status_code == 200
     other_org = register(client, "someone@else.io", org_name="Else")
@@ -255,8 +275,8 @@ def test_auto_purge_after_the_orgs_retention(client, admin, db_session):
     assert archive_service.purge_expired(db_session, now + timedelta(days=366)) == 1
 
     assert _archived(client, admin, "upload") == []
-    [entry] = _get(client, admin, "/purge-log")["items"]
-    assert entry["reason"] == "auto" and entry["purged_by"] is None
+    [event] = _events(client, admin, "purge")
+    assert event["actor_label"] == "System" and event["actor_id"] is None
 
 
 def test_large_jobs_run_in_the_background_a_chunk_at_a_time(client, admin, monkeypatch):
@@ -265,8 +285,8 @@ def test_large_jobs_run_in_the_background_a_chunk_at_a_time(client, admin, monke
     monkeypatch.setattr(archive_service, "CHUNK", 1)
 
     resp = _post(client, admin, f"/scans/{findings}/archive")
-    assert resp.status_code == 202
-    # (TestClient has run the background task by now.)
+    assert resp.status_code == 202 and resp.json()["status"] == "pending"
+    assert run_worker() == 1
     [job] = _get(client, admin, "/archive-jobs", tracked="true")
     assert job["status"] == "completed" and job["summary"]["findings"] == 3
     assert _findings(client, admin) == ["BKP"]
@@ -303,15 +323,45 @@ def test_a_job_that_stopped_half_way_carries_on_when_started_again(client, admin
     assert job["summary"] == {"uploads": 1, "assets": 1, "findings": 3}
 
 
-def test_jobs_cut_off_by_a_restart_are_marked_failed(client, admin, db_session):
+def test_a_job_the_worker_was_cut_off_from_carries_on(client, admin, db_session):
     _, findings, _ = _setup(client, admin)
     job = archive_service.start_archive(
         db_session, uuid.UUID(admin[1]), ArchiveItemType.upload, uuid.UUID(findings), None
     )
-    assert archive_service.fail_interrupted_jobs(db_session) == 1
+    # Taken by a worker that then stopped checking in.
+    job.status, job.heartbeat_at = ScanStatus.running, datetime.now(timezone.utc) - timedelta(minutes=10)
+    db_session.commit()
+    reap_stale(db_session)
+    assert (job.status, job.retry_count) == (ScanStatus.pending, 1)
+    assert run_worker() == 1
+    assert db_session.get(ArchiveJob, job.id).status == ScanStatus.completed
+
+
+def test_a_job_a_request_never_finished_is_failed(client, admin, db_session):
+    _, findings, _ = _setup(client, admin)
+    job = archive_service.start_archive(
+        db_session, uuid.UUID(admin[1]), ArchiveItemType.upload, uuid.UUID(findings), None
+    )
+    # Run by a request (no worker check-ins) when the web server stopped.
+    job.status, job.started_at = ScanStatus.running, datetime.now(timezone.utc) - timedelta(hours=1)
+    db_session.commit()
+    reap_stale(db_session)
     assert db_session.get(ArchiveJob, job.id).status == ScanStatus.failed
+    [event] = _events(client, admin, "archive")
+    assert event["outcome"] == "failed" and event["criticality"] == "warning"
     # ...so it can be started again.
     assert _post(client, admin, f"/scans/{findings}/archive").json()["status"] == "completed"
+
+
+def test_a_job_running_now_is_left_alone(client, admin, db_session):
+    _, findings, _ = _setup(client, admin)
+    job = archive_service.start_archive(
+        db_session, uuid.UUID(admin[1]), ArchiveItemType.upload, uuid.UUID(findings), None
+    )
+    job.status, job.heartbeat_at = ScanStatus.running, datetime.now(timezone.utc)
+    db_session.commit()
+    reap_stale(db_session)
+    assert (job.status, job.retry_count) == (ScanStatus.running, 0)
 
 
 def test_an_upload_still_importing_cant_be_archived(client, admin, db_session):
@@ -319,7 +369,7 @@ def test_an_upload_still_importing_cant_be_archived(client, admin, db_session):
     db_session.get(Scan, uuid.UUID(findings)).status = ScanStatus.running
     db_session.commit()
     resp = _post(client, admin, f"/scans/{findings}/archive")
-    assert resp.status_code == 409 and "still importing" in resp.json()["detail"]
+    assert resp.status_code == 409 and "still being processed" in resp.json()["detail"]
 
 
 def test_the_same_file_again_warns_until_confirmed(client, admin):
@@ -332,7 +382,7 @@ def test_the_same_file_again_warns_until_confirmed(client, admin):
     assert abs(datetime.now(timezone.utc) - imported_at) < timedelta(minutes=1)
     assert detail["imported_by"] == "owner@acmecorp.io"
     assert detail["message"] == (
-        f"This exact file was already imported on {imported_at:%d %b %Y %H:%M} UTC by owner@acmecorp.io."
+        f"This exact file was already uploaded on {imported_at:%d %b %Y %H:%M} UTC by owner@acmecorp.io."
     )
     assert len(_get(client, admin, "/uploads")["items"]) == 1
 
@@ -379,7 +429,8 @@ def test_lists_say_which_rows_are_being_archived(client, admin, db_session):
     assert {u["id"]: u["archiving"] for u in _get(client, admin, "/uploads")["items"]}[findings] == "running"
     assert {a["id"]: a["archiving"] for a in _get(client, admin, "/assets")["items"]}[own_02["id"]] == "running"
     assert {f["id"]: f["archiving"] for f in _get(client, admin, "/findings")["items"]}[manual["id"]] == "running"
-    archive_service.fail_interrupted_jobs(db_session)
+    asset_job = db_session.scalars(select(ArchiveJob).join(ArchiveBatch).where(ArchiveBatch.item_id == uuid.UUID(own_02["id"]))).one()
+    archive_service.fail_job(db_session, asset_job, "stopped")
     assert {a["id"]: a["archiving"] for a in _get(client, admin, "/assets")["items"]}[own_02["id"]] == "stopped"
     others = [a["archiving"] for a in _get(client, admin, "/assets")["items"] if a["id"] != own_02["id"]]
     assert set(others) == {None}
@@ -533,10 +584,71 @@ def test_undo_of_a_large_stopped_archive_runs_in_the_background(client, admin, d
         return in_chunks(self, phase, ids, sql)
 
     monkeypatch.setattr(archive_service._Runner, "_in_chunks", stop_after_first_step)
-    _post(client, admin, f"/scans/{findings}/archive")  # 1 row: runs in the request, then stops
+    _post(client, admin, f"/scans/{findings}/archive")
+    run_worker()  # stops part-way
     monkeypatch.setattr(archive_service._Runner, "_in_chunks", in_chunks)
     [row] = [u for u in _get(client, admin, "/uploads")["items"] if u["id"] == findings]
 
     # 3 findings archived before it stopped: more than the 2 run in the request.
     resp = _post(client, admin, f"/archive/{row['archiving_batch_id']}/restore")
     assert resp.status_code == 202
+    assert run_worker() == 1
+    assert _findings(client, admin) == ["BKP", "CVE-1", "MFA", "SMB"]
+
+
+# --- Several at once ----------------------------------------------------------
+
+
+def _bulk(client, admin, headers=None, **body):
+    body["ids"] = [str(i) for i in body["ids"]]
+    return client.post(_url(admin, "/archive-jobs/bulk"), headers=headers or admin[0], json=body)
+
+
+def test_bulk_archive_queues_a_job_per_item_and_says_which_it_couldnt(client, admin):
+    _setup(client, admin)
+    hosts = {a["hostname"]: a["id"] for a in _get(client, admin, "/assets")["items"]}
+    _post(client, admin, f"/assets/{hosts['inv-02']}/archive")
+
+    resp = _bulk(client, admin, action="archive", item_type="asset", ids=[hosts["own-01"], hosts["inv-02"], hosts["own-02"]])
+    assert resp.status_code == 202, resp.text
+    result = resp.json()
+    assert [(j["label"], j["status"]) for j in result["jobs"]] == [("own-01", "pending"), ("own-02", "pending")]
+    assert [r["id"] for r in result["refused"]] == [hosts["inv-02"]]
+    assert "already archived" in result["refused"][0]["detail"]
+
+    assert run_worker() == 2
+    assert _hosts(client, admin) == ["shared-01"]
+    # One archived entry and one Activity event per item, as if done by hand.
+    assert sorted(i["label"] for i in _archived(client, admin, "asset")) == ["inv-02", "own-01", "own-02"]
+    assert len(_events(client, admin, "archive")) == 3
+
+
+def test_bulk_restore_and_purge_by_archived_entry(client, admin):
+    _setup(client, admin)
+    hosts = {a["hostname"]: a["id"] for a in _get(client, admin, "/assets")["items"]}
+    _bulk(client, admin, action="archive", item_type="asset", ids=[hosts["own-01"], hosts["own-02"]])
+    run_worker()
+    entries = {i["label"]: i["id"] for i in _archived(client, admin, "asset")}
+
+    assert _bulk(client, admin, action="restore", ids=[entries["own-01"]]).status_code == 202
+    assert _bulk(client, admin, action="purge", ids=[entries["own-02"]]).status_code == 202
+    run_worker()
+    assert "own-01" in _hosts(client, admin)
+    assert _archived(client, admin, "asset") == []
+    assert len(_events(client, admin, "purge")) == 1
+
+
+def test_bulk_roles_and_limits(client, admin):
+    _setup(client, admin)
+    viewer = member(client, admin[0], admin[1], "viewer")
+    auditor = member(client, admin[0], admin[1], "auditor")
+    some = [uuid.uuid4()]
+    assert _bulk(client, admin, viewer, action="archive", item_type="asset", ids=some).status_code == 403
+    assert _bulk(client, admin, auditor, action="purge", ids=some).status_code == 403
+    assert _bulk(client, admin, auditor, action="restore", ids=some).json()["refused"][0]["detail"] == "Archived item not found"
+    assert _bulk(client, admin, action="archive", ids=some).status_code == 422  # which type?
+    assert _bulk(client, admin, action="archive", item_type="asset", ids=[]).status_code == 422
+    too_many = [uuid.uuid4() for _ in range(501)]
+    assert _bulk(client, admin, action="archive", item_type="asset", ids=too_many).status_code == 422
+    other_org = register(client, "someone@else.io", org_name="Else")
+    assert _bulk(client, admin, other_org, action="archive", item_type="asset", ids=some).status_code == 403

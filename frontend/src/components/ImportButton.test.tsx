@@ -65,7 +65,7 @@ describe("ImportButton with import profiles", () => {
         orgId="org-1"
         kind={kind}
         accept=".csv,.json,.nessus"
-        label="Import data"
+        label="Upload file"
         profiles={[...BUILTIN_PROFILES, CUSTOM_EDR_PROFILE]}
       />,
       "admin",
@@ -87,20 +87,20 @@ describe("ImportButton with import profiles", () => {
 
     pick("assets", "EndPointID,DeviceName,LastHeartbeat,ThreatsDetected,ComplianceStatus\nEP-1,a,b,0,ok\n", "edr.csv");
 
-    const options = await screen.findByRole("group", { name: "Import options" });
+    const options = await screen.findByRole("group", { name: "Upload options" });
     expect(within(options).getByLabelText("Source")).toHaveValue("endpoint_agent");
     expect(options).toHaveTextContent("edr.csv");
     expect(options).toHaveTextContent("Detected from the file's columns");
     expect(uploaded(fetchMock)).toBe(-1);
-    expect(screen.getByRole("button", { name: "Import data" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
 
-    fireEvent.click(within(options).getByRole("button", { name: "Import" }));
+    fireEvent.click(within(options).getByRole("button", { name: "Upload" }));
 
     await waitFor(() => expect(calls(fetchMock)).toContain("GET /orgs/org-1/scans/s1"));
     const body = requestInit(fetchMock, uploaded(fetchMock)).body as FormData;
     expect(body.get("profile")).toBe("endpoint_agent");
     expect((body.get("file") as File).name).toBe("edr.csv");
-    expect(screen.queryByRole("group", { name: "Import options" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Upload options" })).not.toBeInTheDocument();
   });
 
   it("defaults to the page's generic source and lists the page's first", async () => {
@@ -124,7 +124,7 @@ describe("ImportButton with import profiles", () => {
     ]);
     expect(screen.queryByText(/Detected from/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     await waitFor(() => expect(uploaded(fetchMock)).not.toBe(-1));
     expect((requestInit(fetchMock, uploaded(fetchMock)).body as FormData).get("profile")).toBeNull();
   });
@@ -136,7 +136,7 @@ describe("ImportButton with import profiles", () => {
 
     pick("assets", "Device_Name\nPC-1\n", "edr.csv");
     fireEvent.change(await screen.findByLabelText("Source"), { target: { value: CUSTOM_EDR_PROFILE.key } });
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
 
     await waitFor(() => expect(uploaded(fetchMock)).not.toBe(-1));
     expect((requestInit(fetchMock, uploaded(fetchMock)).body as FormData).get("profile")).toBe(CUSTOM_EDR_PROFILE.key);
@@ -154,7 +154,7 @@ describe("ImportButton with import profiles", () => {
     expect(note).toHaveTextContent(
       "No source can read this file: none of its columns (operation_id, time, operation_name, subscription_id, resource_group, resource_type, …) identifies a host",
     );
-    const importButton = screen.getByRole("button", { name: "Import" });
+    const importButton = screen.getByRole("button", { name: "Upload" });
     expect(importButton).toBeDisabled();
     // No other source helps either.
     fireEvent.change(screen.getByLabelText("Source"), { target: { value: "endpoint_agent" } });
@@ -163,7 +163,7 @@ describe("ImportButton with import profiles", () => {
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("group", { name: "Import options" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Upload options" })).not.toBeInTheDocument();
   });
 
   it("imports a minimal generic file, even though no source is detected from so few columns", async () => {
@@ -173,7 +173,7 @@ describe("ImportButton with import profiles", () => {
 
     expect(await screen.findByLabelText("Source")).toHaveValue("generic_assets");
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   });
 
   it("asks for another source when the one chosen can't read the file", async () => {
@@ -183,10 +183,10 @@ describe("ImportButton with import profiles", () => {
     fireEvent.change(await screen.findByLabelText("Source"), { target: { value: "cloud_inventory" } });
 
     expect(screen.getByRole("note")).toHaveTextContent("Cloud inventory export can't read this file");
-    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Source"), { target: { value: "generic_assets" } });
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   });
 
   it("has no such note for a recognised file", async () => {
@@ -214,8 +214,8 @@ describe("ImportButton with import profiles", () => {
     pick("assets", "type,hostname\nserver,a\n", "a.csv");
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByRole("group", { name: "Import options" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Import data" })).toBeEnabled();
+    expect(screen.queryByRole("group", { name: "Upload options" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload file" })).toBeEnabled();
     expect(uploaded(fetchMock)).toBe(-1);
   });
 
@@ -225,14 +225,14 @@ describe("ImportButton with import profiles", () => {
     });
 
     pick("assets", "type,hostname\nserver,a\n", "first.csv");
-    fireEvent.click(await screen.findByRole("button", { name: "Import" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Upload" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("first.csv: Unsupported file type");
 
     pick("assets", "type,hostname\nserver,a\n", "second.csv");
-    await screen.findByRole("group", { name: "Import options" });
+    await screen.findByRole("group", { name: "Upload options" });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("second.csv: Unsupported file type");
     pick("assets", "type,hostname\nserver,a\n", "third.csv");
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
@@ -246,13 +246,13 @@ describe("ImportButton with import profiles", () => {
     });
 
     pick("assets", "type,hostname\nserver,a\n", "a.csv");
-    const importButton = await screen.findByRole("button", { name: "Import" });
+    const importButton = await screen.findByRole("button", { name: "Upload" });
     fireEvent.click(importButton);
     fireEvent.click(importButton);
 
     expect(await screen.findByText("Uploading…")).toBeInTheDocument();
     finish(json({ scan_id: "s1", status: "completed", report: null }, 201));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Import data" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Upload file" })).toBeEnabled());
     expect(calls(fetchMock).filter((c) => c.startsWith("POST"))).toHaveLength(1);
   });
 });

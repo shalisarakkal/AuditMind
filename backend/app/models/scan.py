@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, ForeignKey, Index, SmallInteger, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,14 @@ class Scan(Base):
     progress: Mapped[dict | None] = mapped_column(JSONB)
     # SHA-256 of the uploaded file, to warn when the same file is uploaded again.
     content_hash: Mapped[str | None] = mapped_column(String(64))
+    # Set by the background worker while it runs this job (every ~15 s): a
+    # running job without a recent one was cut off (see app/worker).
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Times the worker has started it again after it was cut off.
+    # When it actually started running (started_at is when it was asked for;
+    # a large upload can wait its turn for the background worker).
+    run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retry_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default=text("0"))
     # Archived (Phase 2d part 2): hidden everywhere until restored or purged;
     # archive_batch_id is the archive action that took it (see models/archive.py).
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

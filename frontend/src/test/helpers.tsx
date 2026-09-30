@@ -6,7 +6,7 @@ import { AppProvider } from "@/context/AppContext";
 import { ImportsProvider } from "@/context/ImportsContext";
 import type { MyOrganization, Scan, UserRole } from "@/lib/types";
 
-export const API = "http://localhost:8000/api/v1";
+export const API = "http://127.0.0.1:8000/api/v1";
 
 type Handler = (init: RequestInit) => unknown | Response | Promise<unknown | Response>;
 
@@ -88,6 +88,9 @@ export async function renderSignedIn(
     "GET /orgs/org-1/scans?tracked=true": () => [],
     "GET /orgs/org-1/scans?active=true": () => [],
     "GET /orgs/org-1/archive-jobs?tracked=true": () => [],
+    "GET /orgs/org-1/events": () => ({ items: [], total: 0 }),
+    "GET /orgs/org-1/events/facets": () => ({ type: [], actor: [] }),
+    "GET /worker-status": () => ({ running: true, last_seen: "2026-09-29T10:00:00Z" }),
     "GET /orgs/org-1/assets/facets": () => ({ type: [], subtype: [], environment: [], criticality: [] }),
     "GET /orgs/org-1/findings/facets": () => ({ source: [] }),
     ...routes,

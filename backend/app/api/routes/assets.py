@@ -1,7 +1,7 @@
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,7 @@ from app.schemas.ingestion import ImportResponse
 from app.schemas.paging import Page
 from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.asset_types import resolve_asset_type
+from app.services.events import record_event
 from app.services.org_settings import resolve_ingestion_settings
 
 router = APIRouter(prefix="/orgs/{org_id}/assets", tags=["assets"])
@@ -146,7 +147,7 @@ def create_asset(
     org_id: uuid.UUID,
     payload: AssetCreate,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> Asset:
     aliases = resolve_ingestion_settings(db.get(Organization, org_id)).asset_type_aliases
     try:
@@ -160,6 +161,14 @@ def create_asset(
         subtype=payload.subtype or alias_subtype,
     )
     db.add(asset)
+    record_event(
+        db,
+        "asset_added",
+        org_id=org_id,
+        actor=membership.user,
+        item=asset.hostname or asset.ip or asset.cloud_id,
+        details={"type": asset_type},
+    )
     db.commit()
     db.refresh(asset)
     return asset
@@ -173,7 +182,6 @@ def create_asset(
 )
 async def import_assets(
     org_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     response: Response,
     file: UploadFile = File(..., description="Asset inventory: .csv or .json"),
     confirm: bool = confirm_form(),
@@ -188,7 +196,6 @@ async def import_assets(
     layouts, use POST /orgs/{org_id}/imports with an import profile."""
     return await start_import(
         db=db,
-        background_tasks=background_tasks,
         response=response,
         org_id=org_id,
         file=file,

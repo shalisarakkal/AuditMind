@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.enums import ArchiveAction, ArchiveItemType, ArchiveProgress, ArchiveState, ScanStatus
+from app.schemas.paging import Page
 from app.schemas.scan import ScanRead
 
 
@@ -49,6 +50,12 @@ class ArchivedItemRead(BaseModel):
     counts: dict[str, int]
 
 
+class ArchivedPage(Page[ArchivedItemRead]):
+    """The Archived list, plus how many of each type match the other filters."""
+
+    type_counts: dict[ArchiveItemType, int]
+
+
 class UploadRead(ScanRead):
     """An upload on the Imports page: the scan, without its report's row
     lists, and who uploaded it."""
@@ -58,16 +65,3 @@ class UploadRead(ScanRead):
     # archive (restore it to undo what it archived).
     archiving: ArchiveProgress | None = None
     archiving_batch_id: uuid.UUID | None = None
-
-
-class PurgeLogRead(BaseModel):
-    id: uuid.UUID
-    item_type: ArchiveItemType
-    label: str
-    archived_at: datetime
-    purged_at: datetime
-    # Null for auto-purge.
-    purged_by: str | None
-    # "manual", "auto" (past retention) or "duplicate" (on restore).
-    reason: str
-    counts: dict[str, int]

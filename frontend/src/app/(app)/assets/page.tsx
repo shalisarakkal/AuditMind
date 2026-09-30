@@ -4,18 +4,34 @@ import { Fragment, Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
+import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
 import { ArchiveButtons } from "@/components/JobButton";
 import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
 import JobStatus from "@/components/JobStatus";
+import {
+  ACTIONS_CELL,
+  EmptyRow,
+  ListTable,
+  ListToolbar,
+  PageHeader,
+  ROW_ACTION,
+  SELECT_CELL,
+  SelectBox,
+  SelectionAction,
+  SelectionBar,
+  SelectPageBox,
+  THEAD,
+} from "@/components/ListPage";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { ASSET_TYPE_LABELS, SEARCH_BOX, canWrite } from "@/lib/domain";
+import { ASSET_TYPE_LABELS, canWrite } from "@/lib/domain";
 import { humanize } from "@/lib/importProfiles";
 import type { Asset, AssetFacets, AssetType, ImportProfile, Page } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
+import { useSelection } from "@/lib/useSelection";
 import { useReloadOnImport } from "@/lib/useReloadOnImport";
 
 const PAGE_SIZE = 100;
@@ -39,6 +55,8 @@ function Assets() {
   const profiles = useApi<ImportProfile[]>(writer ? `/orgs/${org.id}/import-profiles` : null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
+  const selection = useSelection(list, org.id);
+  const [bulk, setBulk] = useState<BulkRequest | null>(null);
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
 
@@ -50,13 +68,28 @@ function Assets() {
       label: `Archive ${name}`,
       message: (
         <>
-          Archive <strong>{name}</strong> and all its findings? They leave every list and score, and imports stop matching
+          Archive <strong>{name}</strong> and all its findings? They leave every list and score, and new uploads stop matching
           it. You can restore them from Archived until they&apos;re purged.
         </>
       ),
       confirmLabel: "Archive",
     });
   };
+  const nameOf = (a: Asset) => a.hostname ?? a.ip ?? a.cloud_id ?? "asset";
+  const archiveSelected = () =>
+    setBulk({
+      action: "archive",
+      itemType: "asset",
+      label: "Archive selected assets",
+      message: (
+        <>
+          Archive <strong>{selectedText(selection.count, "asset")}</strong> and all their findings? They leave every list and
+          score, and new uploads stop matching them. Each can be restored from Archived until it&apos;s purged.
+        </>
+      ),
+      confirmLabel: "Archive",
+    });
+  const columns = writer ? 10 : 9;
   const toggle = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current);
@@ -67,51 +100,45 @@ function Assets() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Assets</h1>
-          <p className="mt-1 text-sm text-white/60">
-            {page && !list.hasFilters ? `${page.total.toLocaleString("en-US")} assets in ${org.name}` : org.name}
-          </p>
-        </div>
-        {writer && (
-          <ImportButton orgId={org.id} kind="assets" accept=".csv,.json" label="Import data" profiles={profiles.data} />
-        )}
-      </div>
-
-      {writer && (
-        <p className="text-xs text-white/50">
-          CSV or JSON. Pick the file, then its source: a generic asset list (type, hostname and/or ip, environment,
-          criticality, tags, cloud_id) or a tool export such as an endpoint agent, network scan or cloud inventory, which
-          also records findings. The source is picked for you when the file&apos;s columns match a profile.
-        </p>
-      )}
+      <PageHeader
+        title="Assets"
+        total={page?.total}
+        noun="assets"
+        orgName={org.name}
+        filtered={list.hasFilters}
+        note={
+          writer &&
+          "CSV or JSON. Pick the file, then its source: a generic asset list (type, hostname and/or ip, environment, criticality, tags, cloud_id) or a tool export such as an endpoint agent, network scan or cloud inventory, which also records findings. The source is picked for you when the file's columns match a profile."
+        }
+        action={
+          writer && <ImportButton orgId={org.id} kind="assets" accept=".csv,.json" label="Upload file" profiles={profiles.data} />
+        }
+      />
       <ImportStatus page="assets" />
       <JobStatus />
       {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <TextFilter
-          name="q"
-          label="search"
-          list={list}
-          ariaLabel="Search assets"
-          placeholder="Search all columns"
-          className={SEARCH_BOX}
-        />
-        {list.hasFilters && (
-          <button type="button" onClick={list.clearFilters} className="text-sm text-cyan hover:underline">
-            Clear filters
-          </button>
-        )}
-      </div>
+      <ListToolbar list={list} label="assets" />
+      {writer && (
+        <SelectionBar selection={selection}>
+          <SelectionAction onClick={archiveSelected}>Archive selected</SelectionAction>
+        </SelectionBar>
+      )}
+      {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/50">
+        <ListTable>
+            <thead className={THEAD}>
               <tr>
+                {writer && (
+                  <th className={SELECT_CELL}>
+                    <SelectPageBox
+                      selection={selection}
+                      rows={assets!.filter((a) => a.archiving !== "running").map((a) => ({ id: a.id, name: nameOf(a) }))}
+                    />
+                  </th>
+                )}
                 <SortHeader label="Hostname" column="hostname" list={list} />
                 <SortHeader label="IP" column="ip" list={list} />
                 <SortHeader label="Cloud ID" column="cloud_id" list={list} />
@@ -125,6 +152,7 @@ function Assets() {
                 </th>
               </tr>
               <tr>
+                {writer && <th />}
                 <th className="px-4 pb-2">
                   <TextFilter name="hostname" label="hostname" list={list} />
                 </th>
@@ -154,11 +182,7 @@ function Assets() {
             </thead>
             <tbody>
               {assets!.length === 0 && (
-                <tr className="border-t border-white/10">
-                  <td colSpan={9} className="px-4 py-6 text-center text-white/60">
-                    {list.hasFilters ? "No assets match." : "No assets yet."}
-                  </td>
-                </tr>
+                <EmptyRow colSpan={columns} noun="assets" filtered={list.hasFilters} />
               )}
               {assets!.map((a) => {
                 const details = Object.entries(a.details ?? {});
@@ -166,6 +190,11 @@ function Assets() {
                 return (
                   <Fragment key={a.id}>
                     <tr className="border-t border-white/10 text-white/80">
+                      {writer && (
+                        <td className={SELECT_CELL}>
+                          <SelectBox selection={selection} id={a.id} name={nameOf(a)} disabled={a.archiving === "running"} />
+                        </td>
+                      )}
                       <td className="px-4 py-2 text-white">{a.hostname ?? "—"}</td>
                       <td className="px-4 py-2">{a.ip ?? "—"}</td>
                       <td className="max-w-56 truncate px-4 py-2" title={a.cloud_id ?? undefined}>
@@ -182,14 +211,14 @@ function Assets() {
                           </span>
                         ))}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-right">
+                      <td className={ACTIONS_CELL}>
                         {details.length > 0 && (
                           <button
                             type="button"
                             aria-expanded={open}
                             aria-label={`${open ? "Hide" : "Show"} details for ${a.hostname ?? a.ip ?? a.cloud_id}`}
                             onClick={() => toggle(a.id)}
-                            className="text-xs text-cyan hover:underline"
+                            className={ROW_ACTION}
                           >
                             {open ? "Hide details" : "Details"}
                           </button>
@@ -202,14 +231,13 @@ function Assets() {
                             batchId={a.archiving_batch_id}
                             onArchive={() => archive(a)}
                             onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, a.hostname ?? a.ip ?? a.cloud_id ?? "asset"))}
-                            className="ml-3 text-xs text-cyan hover:underline"
                           />
                         )}
                       </td>
                     </tr>
                     {open && (
                       <tr className="bg-white/[0.03] text-white/80">
-                        <td colSpan={9} className="px-4 py-3">
+                        <td colSpan={columns} className="px-4 py-3">
                           <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
                             {details.map(([key, value]) => (
                               <div key={key} className="flex gap-2">
@@ -225,8 +253,7 @@ function Assets() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+        </ListTable>
       )}
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
     </div>

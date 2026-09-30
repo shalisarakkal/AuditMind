@@ -14,7 +14,7 @@ from app.models.import_profile import ImportProfile
 from app.models.scan import Scan
 from app.services import import_profiles
 from tests.conftest import requires_db
-from tests.helpers import FIXTURES, first_org_id, member, register
+from tests.helpers import run_worker, FIXTURES, first_org_id, member, register
 
 pytestmark = requires_db
 
@@ -223,6 +223,7 @@ def test_large_files_are_imported_in_the_background(client, admin, monkeypatch):
     resp = _import(client, admin, "network_scan.csv", "network_scan")
 
     assert resp.status_code == 202
+    run_worker()
     scan = client.get(f"/api/v1/orgs/{org_id}/scans/{resp.json()['scan_id']}", headers=headers).json()
     assert (scan["status"], scan["profile"], scan["scan_type"]) == ("completed", "network_scan", "network_scan_import")
     assert (scan["summary"]["created"], scan["summary"]["findings_created"]) == (7, 12)

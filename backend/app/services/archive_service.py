@@ -33,16 +33,18 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, func, select, text, update
 from sqlalchemy.orm import Session
 
-from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan, PurgeLogEntry
+from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
 from app.models.asset import Asset
-from app.models.enums import ArchiveAction, ArchiveItemType, ArchiveProgress, ArchiveState, ScanStatus
+from app.models.enums import ArchiveAction, ArchiveItemType, ArchiveProgress, ArchiveState, Criticality, ScanStatus
 from app.models.finding import Finding
 from app.models.organization import Organization
 from app.models.scan import Scan
-from app.services.org_lock import lock_org, lock_org_jobs
+from app.models.user import User
+from app.services.events import record_event
+from app.services.org_lock import ARCHIVE_JOB, job_running, lock_org, lock_org_jobs
 from app.services.org_settings import resolve_ingestion_settings
 
 logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ def start_archive(
         if item.source != "upload":
             raise ArchiveError("Only uploads can be archived this way", 422)
         if item.status in _ACTIVE_JOB:
-            raise ArchiveError("This upload is still importing; archive it once it's finished")
+            raise ArchiveError("This upload is still being processed; archive it once it's finished")
     if item_type == ArchiveItemType.finding and item.scan_id is not None:
         raise ArchiveError(
             "Imported findings are archived with their upload or their asset, not one by one "
@@ -251,57 +253,102 @@ def _past(action: ArchiveAction) -> str:
 Progress = Callable[[str, int, int], None]
 
 
+def claim_job(db: Session, job_id: uuid.UUID) -> bool:
+    """Take a pending job to run it here: True if this caller got it. The
+    background worker and a request that runs a small job itself both claim
+    first, so a job never runs twice."""
+    claimed = db.execute(
+        update(ArchiveJob)
+        .where(ArchiveJob.id == job_id, ArchiveJob.status == ScanStatus.pending)
+        .values(status=ScanStatus.running)
+    ).rowcount
+    db.commit()
+    return claimed == 1
+
+
 def run_job(db: Session, job_id: uuid.UUID) -> ArchiveJob:
-    """Carry out the job, committing a chunk at a time. On an unexpected
-    error the job is marked failed and the batch stays mid-way, to be
-    resumed by starting the same action again."""
+    """Carry out a claimed job (claim_job), committing a chunk at a time. On
+    an unexpected error the job is marked failed and the batch stays
+    mid-way, to be resumed by starting the same action again. Either way
+    one Activity event records it, saved with the job's outcome."""
     job = db.get(ArchiveJob, job_id)
     batch = db.get(ArchiveBatch, job.batch_id)
     running, done = _STATES[job.action]
+    # Restoring an archive that never finished is its Undo.
+    undo = job.action == ArchiveAction.restore and batch.state == ArchiveState.archiving
     job.status = ScanStatus.running
+    job.run_started_at = _now()
     batch.state = running
     db.commit()
-    runner = _Runner(db, job, batch)
-    try:
-        summary = {
-            ArchiveAction.archive: runner.archive,
-            ArchiveAction.restore: runner.restore,
-            ArchiveAction.purge: runner.purge,
-        }[job.action]()
-    except Exception:
-        db.rollback()
-        logger.exception("Archive job %s (%s) failed", job_id, job.action.value)
-        job = db.get(ArchiveJob, job_id)
-        job.status = ScanStatus.failed
-        job.summary = {"error": "Couldn't finish: start it again to carry on from where it stopped"}
+    # Held while it runs: the background worker then knows it isn't dead
+    # (see org_lock.job_running).
+    with job_running(db, ARCHIVE_JOB, job_id):
+        runner = _Runner(db, job, batch)
+        try:
+            summary = {
+                ArchiveAction.archive: runner.archive,
+                ArchiveAction.restore: runner.restore,
+                ArchiveAction.purge: runner.purge,
+            }[job.action]()
+        except Exception:
+            db.rollback()
+            logger.exception("Archive job %s (%s) failed", job_id, job.action.value)
+            job = db.get(ArchiveJob, job_id)
+            job.status = ScanStatus.failed
+            job.summary = {"error": "Couldn't finish: start it again to carry on from where it stopped"}
+            job.completed_at = _now()
+            job.progress = None
+            _record(db, job, db.get(ArchiveBatch, job.batch_id), undo, details={"error": job.summary["error"]})
+            db.commit()
+            return job
+        batch.state = done
+        job.status = ScanStatus.completed
+        job.summary = summary
         job.completed_at = _now()
         job.progress = None
+        _record(db, job, batch, undo)
         db.commit()
+        if sum(v for v in summary.values() if isinstance(v, int)) > CHUNK:
+            # Lists, the dashboard and imports get good plans straight away.
+            runner.analyze()
+        db.refresh(job)
         return job
-    batch.state = done
-    job.status = ScanStatus.completed
-    job.summary = summary
+
+
+def fail_job(db: Session, job: ArchiveJob, message: str) -> None:
+    """Mark a job that can't carry on failed, with its Activity event. Its
+    batch stays mid-way: starting the same action again resumes it."""
+    batch = db.get(ArchiveBatch, job.batch_id)
+    undo = job.action == ArchiveAction.restore and batch.state == ArchiveState.archiving
+    job.status = ScanStatus.failed
+    job.summary = {"error": message}
     job.completed_at = _now()
     job.progress = None
+    _record(db, job, batch, undo, details={"error": message})
     db.commit()
-    if sum(v for v in summary.values() if isinstance(v, int)) > CHUNK:
-        # Lists, the dashboard and imports get good plans straight away.
-        runner.analyze()
-    db.refresh(job)
-    return job
 
 
-def fail_interrupted_jobs(db: Session) -> int:
-    """At startup: jobs still pending or running were cut off by a restart.
-    Marking them failed lets them be started again (and resume)."""
-    jobs = db.scalars(select(ArchiveJob).where(ArchiveJob.status.in_(_ACTIVE_JOB))).all()
-    for job in jobs:
-        job.status = ScanStatus.failed
-        job.summary = {"error": "Stopped when the server restarted: start it again to carry on"}
-        job.completed_at = _now()
-        job.progress = None
-    db.commit()
-    return len(jobs)
+def _record(db: Session, job: ArchiveJob, batch: ArchiveBatch, undo: bool, details: dict | None = None) -> None:
+    """The job's Activity event. Criticality: purge Critical; a restore
+    that purged duplicates, and any failure, Warning; else Info."""
+    summary = job.summary or {}
+    counts = {k: v for k, v in summary.items() if isinstance(v, int) and v}
+    extra = {"item_type": batch.item_type.value, **({"undo": True} if undo else {}), **(details or {})}
+    if job.run_started_at and (waited := job.run_started_at - job.started_at).total_seconds() >= 1:
+        extra["waited_seconds"] = round(waited.total_seconds())
+    record_event(
+        db,
+        job.action.value,
+        org_id=job.org_id,
+        actor=db.get(User, job.started_by) if job.started_by else None,
+        item=batch.label,
+        started_at=job.run_started_at or job.started_at,
+        ended_at=job.completed_at,
+        outcome="completed" if job.status == ScanStatus.completed else "failed",
+        criticality=Criticality.warning if summary.get("duplicates_purged") else None,
+        counts=counts,
+        details=extra,
+    )
 
 
 class _Runner:
@@ -449,18 +496,6 @@ class _Runner:
             self.job.progress = {"phase": "findings", "rows_done": min(start + CHUNK, len(ids)), "rows_total": len(ids)}
             self.db.commit()
         self._finish(f"UPDATE scans SET archived_at = NULL WHERE {in_batch}")
-        if duplicates:
-            self.db.add(
-                PurgeLogEntry(
-                    org_id=self.org_id,
-                    item_type=ArchiveItemType.finding,
-                    label=f"Duplicates when restoring {self.batch.label}"[:255],
-                    archived_at=self.batch.created_at,
-                    purged_by=self.job.started_by,
-                    reason="duplicate",
-                    counts={"findings": duplicates},
-                )
-            )
         return {
             "uploads": counts["uploads"],
             "assets": counts["assets"],
@@ -505,17 +540,6 @@ class _Runner:
         uploads = self._count(f"SELECT count(*) FROM scans WHERE {in_batch}")
         self._finish(f"DELETE FROM scans WHERE {in_batch}")
         purged = {"uploads": uploads, "assets": assets, "findings": findings}
-        self.db.add(
-            PurgeLogEntry(
-                org_id=self.org_id,
-                item_type=self.batch.item_type,
-                label=self.batch.label,
-                archived_at=self.batch.created_at,
-                purged_by=self.job.started_by,
-                reason="auto" if self.job.started_by is None else "manual",
-                counts=purged,
-            )
-        )
         return purged
 
 
@@ -529,7 +553,8 @@ def purge_at(org: Organization, archived_at: datetime) -> datetime:
 
 def purge_expired(db: Session, now: datetime | None = None) -> int:
     """Purge every archived item past its org's retention; returns how many.
-    Run daily by the app (main.py) or scripts/purge_expired.py."""
+    Run daily by the background worker (app/worker) or
+    scripts/purge_expired.py. Each purge is an Activity event by "System"."""
     now = now or _now()
     purged = 0
     for org in db.scalars(select(Organization)).all():
@@ -548,6 +573,6 @@ def purge_expired(db: Session, now: datetime | None = None) -> int:
                 db.rollback()
                 logger.info("Auto-purge skipped batch %s: %s", batch_id, exc)
                 continue
-            if run_job(db, job.id).status == ScanStatus.completed:
+            if claim_job(db, job.id) and run_job(db, job.id).status == ScanStatus.completed:
                 purged += 1
     return purged

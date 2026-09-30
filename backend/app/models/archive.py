@@ -1,6 +1,7 @@
 """Archiving (Phase 2d part 2). Archived rows stay in their tables with
 archived_at set (see Asset, Finding, Scan); these tables record the archive
-actions, the jobs that carry them out, and what was purged.
+actions and the jobs that carry them out. What was purged is in Activity
+(models/event.py).
 
 An archive action is a batch: one upload, asset or manual finding, and
 everything archived with it (archive_batch_id on each row). Restore and
@@ -10,7 +11,7 @@ purge act on a whole batch.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, SmallInteger, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -95,26 +96,11 @@ class ArchiveJob(Base):
     progress: Mapped[dict | None] = mapped_column(JSONB)
     # The outcome: rows per table, duplicates purged on restore, or "error".
     summary: Mapped[dict | None] = mapped_column(JSONB)
-
-
-class PurgeLogEntry(Base):
-    """What was permanently deleted, by whom (null: auto-purge) and when."""
-
-    __tablename__ = "purge_log"
-    __table_args__ = (Index("ix_purge_log_org_purged", "org_id", "purged_at"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
-    )
-    item_type: Mapped[ArchiveItemType] = mapped_column(str_enum(ArchiveItemType), nullable=False)
-    label: Mapped[str] = mapped_column(String(255), nullable=False)
-    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    purged_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
-    )
-    purged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
-    # "manual", "auto" (retention), or "duplicate" (findings purged on restore
-    # because an active finding already covers them).
-    reason: Mapped[str] = mapped_column(String(20), nullable=False)
-    counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # Set by the background worker while it runs this job (every ~15 s): a
+    # running job without a recent one was cut off (see app/worker).
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Times the worker has started it again after it was cut off.
+    # When it actually started running (started_at is when it was asked for;
+    # a large upload can wait its turn for the background worker).
+    run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retry_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default=text("0"))

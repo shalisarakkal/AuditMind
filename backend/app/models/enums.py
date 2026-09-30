@@ -71,3 +71,11 @@ class ArchiveAction(str, enum.Enum):
     archive = "archive"
     restore = "restore"
     purge = "purge"
+
+
+class Criticality(str, enum.Enum):
+    """How much an Activity event matters (PLAN.md, Phase 2d part 3)."""
+
+    info = "info"
+    warning = "warning"
+    critical = "critical"

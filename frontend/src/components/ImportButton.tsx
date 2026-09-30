@@ -152,15 +152,15 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
 
       {repeat && (
         <ConfirmPanel
-          label="Already imported"
+          label="Already uploaded"
           message={
             <>
-              <strong>{repeat.file.name}</strong>: this exact file was already imported
+              <strong>{repeat.file.name}</strong>: this exact file was already uploaded
               {repeat.previous.imported_at ? ` on ${formatDateTime(repeat.previous.imported_at)}` : ""} by{" "}
-              {repeat.previous.imported_by}. Import it again?
+              {repeat.previous.imported_by}. Upload it again?
             </>
           }
-          confirmLabel="Import anyway"
+          confirmLabel="Upload anyway"
           onConfirm={() => void upload(repeat.file, repeat.profileKey, true)}
           onCancel={() => setRepeat(null)}
           busy={busy}
@@ -170,7 +170,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
       {pending && (
         <div
           role="group"
-          aria-label="Import options"
+          aria-label="Upload options"
           className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
         >
           <span className="max-w-56 truncate font-medium text-white" title={pending.file.name}>
@@ -199,7 +199,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
               {noSourceReads ? (
                 <>
                   No source can read this file: none of its columns ({shortList(columns)}) identifies a host. Event
-                  logs (cloud activity, audit or endpoint security events) can&apos;t be imported yet; press Cancel.
+                  logs (cloud activity, audit or endpoint security events) can&apos;t be read yet; press Cancel.
                 </>
               ) : (
                 <>
@@ -215,7 +215,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
             onClick={() => void upload(pending.file, source)}
             className="rounded-md bg-cyan px-3 py-1 text-sm font-medium text-navy hover:opacity-90 disabled:opacity-60"
           >
-            Import
+            Upload
           </button>
           <button
             type="button"

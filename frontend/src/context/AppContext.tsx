@@ -99,6 +99,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    if (getToken()) api.post("/auth/logout").catch(() => undefined);
     clearToken();
     window.localStorage.removeItem(ORG_KEY);
     setTokenState(null);

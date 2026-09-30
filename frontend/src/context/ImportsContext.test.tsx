@@ -53,17 +53,17 @@ describe("Import tracking", () => {
       server(() => [states[step]]),
     );
 
-    const running = await screen.findByRole("region", { name: "Importing big.csv" });
+    const running = await screen.findByRole("region", { name: "Processing big.csv" });
     expect(running).toHaveTextContent("Reading file…");
     step = 1;
     expect(await screen.findByText("Writing rows: 120,000 / 500,000 (24%)")).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
     step = 2;
 
-    const report = await screen.findByRole("region", { name: "Import result" });
+    const report = await screen.findByRole("region", { name: "Upload result" });
     expect(report).toHaveTextContent("big.csv");
-    expect(report).toHaveTextContent("Created 3");
-    expect(screen.queryByRole("region", { name: "Importing big.csv" })).not.toBeInTheDocument();
+    expect(report).toHaveTextContent("Assets created 3");
+    expect(screen.queryByRole("region", { name: "Processing big.csv" })).not.toBeInTheDocument();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
@@ -105,7 +105,7 @@ describe("Import tracking", () => {
     const reload = vi.fn();
     await renderSignedIn(
       <>
-        <ImportButton orgId="org-1" kind="assets" accept=".csv" label="Import data" />
+        <ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" />
         <ImportStatus page="assets" />
         <ListReloads onReload={reload} />
       </>,
@@ -120,12 +120,12 @@ describe("Import tracking", () => {
     fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["x"], "big.csv")] } });
     await waitFor(() => expect(releaseTrack).not.toBeNull());
     finished = true;
-    await screen.findByRole("region", { name: "Import result" });
+    await screen.findByRole("region", { name: "Upload result" });
     await act(async () => releaseTrack!());
 
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByText("Reading file…")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Import result" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Upload result" })).toBeInTheDocument();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
@@ -133,7 +133,7 @@ describe("Import tracking", () => {
     let fetched = 0;
     await renderSignedIn(
       <>
-        <ImportButton orgId="org-1" kind="assets" accept=".csv" label="Import data" />
+        <ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" />
         <ImportStatus page="assets" />
       </>,
       "admin",
@@ -146,7 +146,7 @@ describe("Import tracking", () => {
 
     fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["x"], "big.csv")] } });
 
-    expect(await screen.findByRole("region", { name: "Import result" })).toHaveTextContent("big.csv");
+    expect(await screen.findByRole("region", { name: "Upload result" })).toHaveTextContent("big.csv");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -158,7 +158,7 @@ describe("Import tracking", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Import result" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument());
     expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/scans/s1/dismiss") && init?.method === "POST")).toBe(true);
   });
 
@@ -175,9 +175,9 @@ describe("Import tracking", () => {
     });
 
     fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Import result" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument());
     await waitFor(() => expect(started).toBeGreaterThanOrEqual(3));
-    expect(screen.queryByRole("region", { name: "Import result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument();
   });
 
   it("keeps the report if dismissing fails", async () => {
@@ -189,7 +189,7 @@ describe("Import tracking", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Only the uploader can dismiss this report");
-    expect(screen.getByRole("region", { name: "Import result" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Upload result" })).toBeInTheDocument();
   });
 
   it("shows an import only on the pages it affects", async () => {
@@ -216,9 +216,9 @@ describe("Import tracking", () => {
       ]),
     );
 
-    const list = await screen.findByRole("list", { name: "Imports in progress" });
+    const list = await screen.findByRole("list", { name: "Uploads in progress" });
     const link = within(list).getByRole("link");
-    expect(link).toHaveTextContent("Importing endpoint_agents500K.csv…");
+    expect(link).toHaveTextContent("Processing endpoint_agents500K.csv…");
     expect(link).toHaveAttribute("href", "/assets");
     expect(list).not.toHaveTextContent("done.csv");
   });
@@ -228,7 +228,7 @@ describe("Import tracking", () => {
     await renderSignedIn(
       <>
         <Sidebar />
-        <ImportButton orgId="org-1" kind="findings" accept=".csv" label="Import data" />
+        <ImportButton orgId="org-1" kind="findings" accept=".csv" label="Upload file" />
       </>,
       "admin",
       {
@@ -241,14 +241,14 @@ describe("Import tracking", () => {
     fireEvent.change(screen.getByTestId("findings-file-input"), { target: { files: [new File(["x"], "scan.csv")] } });
 
     await waitFor(() =>
-      expect(within(screen.getByRole("list", { name: "Imports in progress" })).getByRole("link")).toHaveAttribute("href", "/findings"),
+      expect(within(screen.getByRole("list", { name: "Uploads in progress" })).getByRole("link")).toHaveAttribute("href", "/findings"),
     );
   });
 });
 
 describe("import helpers", () => {
   it("describes progress", () => {
-    expect(progressText(scan({ status: "pending" }))).toBe("Waiting to start…");
+    expect(progressText(scan({ status: "pending" }))).toBe("Waiting for the background worker…");
     expect(progressText(scan({ status: "running", progress: null }))).toBe("Reading file…");
     expect(progressText(scan({ status: "running", progress: { phase: "writing", rows_done: 120000, rows_total: 500000 } }))).toBe(
       "Writing rows: 120,000 / 500,000 (24%)",
@@ -257,7 +257,7 @@ describe("import helpers", () => {
       "Reading file: 250,000 / 500,000 rows (50%)",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "waiting", rows_done: 0, rows_total: 0 } }))).toBe(
-      "Waiting for another import into this organization to finish…",
+      "Waiting for another upload into this organization to finish processing…",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "findings", rows_done: 120000, rows_total: 426700 } }))).toBe(
       "Writing findings: 120,000 / 426,700 (28%)",

@@ -17,6 +17,7 @@ function settings(overrides: Partial<IngestionSettings> = {}): IngestionSettings
     asset_type_aliases: { laptop: "workstation", lambda: "cloud_resource" },
     asset_type_aliases_override: {},
     archive_retention_days: 180,
+    event_retention_days: 365,
     ...overrides,
   };
 }
@@ -52,7 +53,8 @@ describe("IngestionSettingsPanel", () => {
     expect(await screen.findByLabelText("Asset already in inventory")).toHaveValue("skip");
     expect(screen.getByLabelText("Files with bad rows")).toHaveValue("true");
     expect(screen.getAllByText("Override")).toHaveLength(1);
-    expect(screen.getAllByText("Default")).toHaveLength(4);
+    expect(screen.getAllByText("Default")).toHaveLength(5);
+    expect(screen.getByLabelText("Keep Activity events for")).toHaveValue(365);
     expect(screen.getByLabelText("Keep archived items for")).toHaveValue(180);
     expect(screen.getByText("Firewalls → Network & Config")).toBeInTheDocument();
   });
@@ -105,7 +107,8 @@ describe("IngestionSettingsPanel", () => {
     const patches = setup(settings());
 
     fireEvent.click(await screen.findByRole("button", { name: "+ Add mapping" }));
-    fireEvent.change(screen.getByLabelText("Plugin family 1"), { target: { value: " Databases " } });
+    // The new row is drawn after the click: wait for it.
+    fireEvent.change(await screen.findByLabelText("Plugin family 1"), { target: { value: " Databases " } });
     fireEvent.change(screen.getByLabelText("Domain for plugin family 1"), { target: { value: "backup_recovery" } });
     fireEvent.click(screen.getByRole("button", { name: "Save mappings" }));
 
@@ -117,7 +120,7 @@ describe("IngestionSettingsPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "+ Add mapping" }));
 
-    expect(screen.getByLabelText("Domain for plugin family 1")).toHaveValue("compliance_alignment");
+    expect(await screen.findByLabelText("Domain for plugin family 1")).toHaveValue("compliance_alignment");
   });
 
   it("removing every custom mapping clears the override", async () => {

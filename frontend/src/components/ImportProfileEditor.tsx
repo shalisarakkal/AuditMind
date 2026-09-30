@@ -272,12 +272,12 @@ export default function ImportProfileEditor({ orgId, profile, onSaved, onCancel 
         </Block>
       )}
 
-      <Block title="Type names" help="This profile's own names for asset types, on top of the organization's list.">
+      <Block title="Type names" help="This format's own names for asset types, on top of the organization's list.">
         <PairRows
           rows={aliases}
           onChange={setAliases}
-          keyLabel="Profile type name"
-          valueLabel="Category for profile type name"
+          keyLabel="Format type name"
+          valueLabel="Category for format type name"
           keyPlaceholder="e.g. Hypervisor"
           valueChoices={TYPE_CHOICES}
           newValue="server"

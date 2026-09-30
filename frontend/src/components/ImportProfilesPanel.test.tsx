@@ -48,7 +48,7 @@ describe("ImportProfilesPanel", () => {
     const fetchMock = setup(true, { [`POST ${URL}`]: () => json(created, 201) });
 
     fireEvent.click(await screen.findByRole("button", { name: "Copy Endpoint agent export" }));
-    const name = screen.getByLabelText("New profile name");
+    const name = screen.getByLabelText("New format name");
     expect(name).toHaveValue("Endpoint agent export (copy)");
     fireEvent.change(name, { target: { value: "Scanner B" } });
     fireEvent.click(screen.getByRole("button", { name: "Create copy" }));
@@ -62,7 +62,7 @@ describe("ImportProfilesPanel", () => {
     setup(true, { [`POST ${URL}`]: () => json({ detail: "A profile named 'Our EDR' already exists" }, 409) });
 
     fireEvent.click(await screen.findByRole("button", { name: "Copy Our EDR" }));
-    fireEvent.change(screen.getByLabelText("New profile name"), { target: { value: "Our EDR" } });
+    fireEvent.change(screen.getByLabelText("New format name"), { target: { value: "Our EDR" } });
     fireEvent.click(screen.getByRole("button", { name: "Create copy" }));
 
     expect(await screen.findByText("A profile named 'Our EDR' already exists")).toBeInTheDocument();
@@ -164,9 +164,9 @@ describe("ImportProfilesPanel", () => {
     const fetchMock = setup();
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete Our EDR" }));
-    const confirm = screen.getByRole("group", { name: "Delete profile" });
-    expect(confirm).toHaveTextContent("Delete Our EDR? Past imports keep their reports.");
-    fireEvent.click(within(confirm).getByRole("button", { name: "Delete profile" }));
+    const confirm = screen.getByRole("group", { name: "Delete format" });
+    expect(confirm).toHaveTextContent("Delete Our EDR? Past uploads keep their reports.");
+    fireEvent.click(within(confirm).getByRole("button", { name: "Delete format" }));
 
     await waitFor(() => expect(screen.queryByText("Our EDR")).not.toBeInTheDocument());
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
@@ -175,7 +175,7 @@ describe("ImportProfilesPanel", () => {
   it("is read-only for non-admins", async () => {
     setup(false);
 
-    expect(await screen.findByText("Only organization admins can change import profiles.")).toBeInTheDocument();
+    expect(await screen.findByText("Only organization admins can change file formats.")).toBeInTheDocument();
     expect(screen.getByText("Our EDR")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

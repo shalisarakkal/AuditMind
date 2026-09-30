@@ -68,9 +68,11 @@ def db_session():
 
 
 @pytest.fixture
-def client(db_session, monkeypatch):
-    """API client whose requests, and background imports, all use the test
-    session. (TestClient runs background tasks before the request returns.)"""
+def client(db_session, monkeypatch, tmp_path):
+    """API client whose requests, and the background worker (run it with
+    tests.helpers.run_worker), all use the test session; uploads waiting for
+    the worker go to a temporary folder."""
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path / "uploads"))
     app.dependency_overrides[get_db] = lambda: db_session
     monkeypatch.setattr(ingestion_background, "open_session", lambda: nullcontext(db_session))
     progress_sessions = sessionmaker(bind=db_session.get_bind())

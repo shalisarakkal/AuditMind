@@ -28,8 +28,10 @@ export function clearToken(): void {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
+// 127.0.0.1, not localhost: on Windows localhost tries IPv6 first, where
+// the backend doesn't listen, costing ~2 s per new connection.
 function baseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

@@ -2,29 +2,54 @@
 
 import { Suspense, useState } from "react";
 
+import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
 import JobButton from "@/components/JobButton";
 import JobConfirm, { type JobRequest } from "@/components/JobConfirm";
 import JobStatus from "@/components/JobStatus";
-import { TextFilter } from "@/components/ListControls";
+import { PickFilter, SortHeader, TextFilter } from "@/components/ListControls";
+import {
+  ACTIONS_CELL,
+  DateRangeFilter,
+  EmptyRow,
+  FILTER_CELL,
+  FilterChips,
+  ListTable,
+  ListToolbar,
+  PageHeader,
+  ROW,
+  ROW_ACTION_DANGER,
+  SELECT_CELL,
+  SelectBox,
+  SelectionAction,
+  SelectionBar,
+  SelectPageBox,
+  TD,
+  TH,
+  THEAD,
+} from "@/components/ListPage";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
 import { isRunning, useImports } from "@/context/ImportsContext";
-import { SEARCH_BOX, canWrite, countsText, formatDateTime, purgeCountdown } from "@/lib/domain";
-import type { ArchivedItem, ArchiveItemType, Page } from "@/lib/types";
+import { canWrite, countsText, formatDateTime, purgeCountdown } from "@/lib/domain";
+import type { ArchivedItem, ArchivedPage, ArchiveItemType } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
+import { useSelection } from "@/lib/useSelection";
 import { useReloadOnImport } from "@/lib/useReloadOnImport";
 
 const PAGE_SIZE = 100;
+const COLUMNS = 7; // plus the checkboxes, for writers
 
-const TABS: { type: ArchiveItemType; label: string; empty: string }[] = [
-  { type: "upload", label: "Uploads", empty: "No archived uploads." },
-  { type: "asset", label: "Assets", empty: "No archived assets." },
-  { type: "finding", label: "Findings", empty: "No archived findings." },
+const TYPE_LABELS: Record<ArchiveItemType, string> = { upload: "Upload", asset: "Asset", finding: "Finding" };
+const TYPE_OPTIONS: { value: ArchiveItemType; label: string }[] = [
+  { value: "upload", label: "Uploads" },
+  { value: "asset", label: "Assets" },
+  { value: "finding", label: "Findings" },
 ];
 
-// The search reads from the page address; the tab is kept on the page.
+// The list reads its sort and filters (the type chips too) from the page
+// address.
 export default function ArchivedPage() {
   return (
     <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
@@ -38,15 +63,39 @@ function Archived() {
   const org = selectedOrg!;
   const writer = canWrite(org.role);
   const admin = org.role === "admin";
-  const [tab, setTab] = useState<ArchiveItemType>("upload");
   const list = useListState(PAGE_SIZE, org.id);
-  const { data: page, error, loading, reload } = useApi<Page<ArchivedItem>>(
-    `/orgs/${org.id}/archive?item_type=${tab}&${list.apiQuery}`,
-  );
+  const { data: page, error, loading, reload } = useApi<ArchivedPage>(`/orgs/${org.id}/archive?${list.apiQuery}`);
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
   const { jobs } = useImports();
+  const selection = useSelection(list, org.id);
+  const [bulk, setBulk] = useState<BulkRequest | null>(null);
+  const busy = (item: ArchivedItem) => item.running !== null || jobs.some((j) => isRunning(j) && j.batch_id === item.id);
+  const restoreSelected = () =>
+    setBulk({
+      action: "restore",
+      label: "Restore selected",
+      message: (
+        <>
+          Restore <strong>{selectedText(selection.count, "archived item")}</strong>? Findings recorded again since they were
+          archived are kept, and their archived copies purged.
+        </>
+      ),
+      confirmLabel: "Restore",
+    });
+  const purgeSelected = () =>
+    setBulk({
+      action: "purge",
+      label: "Purge selected",
+      message: (
+        <>
+          Permanently delete <strong>{selectedText(selection.count, "archived item")}</strong> and everything archived with
+          them? This can&apos;t be undone.
+        </>
+      ),
+      confirmLabel: "Purge for good",
+      danger: true,
+    });
   useReloadOnImport(reload);
-  const current = TABS.find((t) => t.type === tab)!;
 
   const restore = (item: ArchivedItem) =>
     setConfirming({
@@ -75,89 +124,105 @@ function Archived() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Archived</h1>
-        <p className="mt-1 text-sm text-white/60">
-          Archived items are hidden from every list and score, and purged automatically after the retention period set in
-          Settings. {admin ? "Restore or purge them here." : writer ? "Restore them here." : ""}
-        </p>
-      </div>
+      <PageHeader
+        title="Archived"
+        total={page?.total}
+        noun="archived items"
+        orgName={org.name}
+        filtered={list.hasFilters}
+        note="Archived items are hidden from every list and score, and purged automatically after the retention period set in Settings."
+      />
       <JobStatus />
       {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
 
-      <div role="tablist" aria-label="Archived items" className="flex gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.type}
-            type="button"
-            role="tab"
-            aria-selected={t.type === tab}
-            onClick={() => {
-              setTab(t.type);
-              setConfirming(null);
-              list.setOffset(0);
-            }}
-            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-              t.type === tab ? "border-cyan bg-cyan/10 text-cyan" : "border-white/15 text-white/70 hover:border-cyan hover:text-cyan"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="space-y-3">
+        <ListToolbar list={list} label="archived items">
+          <DateRangeFilter list={list} label="Archived" />
+        </ListToolbar>
+        {page && <FilterChips list={list} name="type" label="Type" options={TYPE_OPTIONS} counts={page.type_counts} />}
       </div>
-
-      <TextFilter name="q" label="search" list={list} ariaLabel="Search archived items" placeholder="Name" className={SEARCH_BOX} />
+      {writer && (
+        <SelectionBar selection={selection}>
+          <SelectionAction onClick={restoreSelected}>Restore selected</SelectionAction>
+          {admin && (
+            <SelectionAction onClick={purgeSelected} danger>
+              Purge selected
+            </SelectionAction>
+          )}
+        </SelectionBar>
+      )}
+      {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/50">
-              <tr>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Archived with it</th>
-                <th className="px-4 py-2">Archived</th>
-                <th className="px-4 py-2">Purge</th>
-                {writer && (
-                  <th className="px-4 py-2">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {page.items.length === 0 && (
-                <tr className="border-t border-white/10">
-                  <td colSpan={writer ? 5 : 4} className="px-4 py-6 text-center text-white/60">
-                    {list.hasFilters ? "Nothing matches." : current.empty}
-                  </td>
-                </tr>
+        <ListTable>
+          <thead className={THEAD}>
+            <tr>
+              {writer && (
+                <th className={SELECT_CELL}>
+                  <SelectPageBox
+                    selection={selection}
+                    rows={page.items.filter((item) => !busy(item)).map((item) => ({ id: item.id, name: item.label }))}
+                  />
+                </th>
               )}
-              {page.items.map((item) => (
-                <tr key={item.id} className="border-t border-white/10 text-white/80">
-                  <td className="px-4 py-2 text-white">{item.label}</td>
-                  <td className="px-4 py-2">{countsText(item.counts)}</td>
-                  <td className="px-4 py-2 text-xs text-white/60">
-                    {formatDateTime(item.archived_at)}
-                    {item.archived_by && <p>by {item.archived_by}</p>}
+              <SortHeader label="Name" column="name" list={list} />
+              <SortHeader label="Type" column="type" list={list} />
+              <th className={TH}>Archived with it</th>
+              <SortHeader label="Archived by" column="archived_by" list={list} />
+              <SortHeader label="Archived" column="archived" list={list} defaultSort="archived" defaultOrder="desc" />
+              <SortHeader label="Purge" column="purge" list={list} />
+              <th className={TH}>
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+            <tr>
+              {writer && <th />}
+              <th className={FILTER_CELL}>
+                <TextFilter name="name" label="name" list={list} />
+              </th>
+              <th className={FILTER_CELL}>
+                <PickFilter name="type" label="type" list={list} options={TYPE_OPTIONS} />
+              </th>
+              <th />
+              <th className={FILTER_CELL}>
+                <TextFilter name="archived_by" label="archived by" list={list} />
+              </th>
+              <th />
+              <th />
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {page.items.length === 0 && <EmptyRow colSpan={COLUMNS + (writer ? 1 : 0)} noun="archived items" filtered={list.hasFilters} />}
+            {page.items.map((item) => (
+              <tr key={item.id} className={ROW}>
+                {writer && (
+                  <td className={SELECT_CELL}>
+                    <SelectBox selection={selection} id={item.id} name={item.label} disabled={busy(item)} />
                   </td>
-                  <td className="px-4 py-2 text-xs text-white/60">{purgeCountdown(item.purge_at)}</td>
+                )}
+                <td className={`${TD} text-white`}>{item.label}</td>
+                <td className={TD}>{TYPE_LABELS[item.item_type]}</td>
+                <td className={TD}>{countsText(item.counts)}</td>
+                <td className={TD}>{item.archived_by ?? "—"}</td>
+                <td className={`${TD} text-xs text-white/60`}>{formatDateTime(item.archived_at)}</td>
+                <td className={`${TD} text-xs text-white/60`}>{purgeCountdown(item.purge_at)}</td>
+                <td className={ACTIONS_CELL}>
                   {writer && (
-                    <td className="whitespace-nowrap px-4 py-2 text-right">
-                      <RowActions
-                        item={item}
-                        busy={item.running !== null || jobs.some((j) => isRunning(j) && j.batch_id === item.id)}
-                        canPurge={admin}
-                        onRestore={() => restore(item)}
-                        onPurge={() => purge(item)}
-                      />
-                    </td>
+                    <RowActions
+                      item={item}
+                      busy={busy(item)}
+                      canPurge={admin}
+                      onRestore={() => restore(item)}
+                      onPurge={() => purge(item)}
+                    />
                   )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </ListTable>
       )}
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
     </div>
@@ -202,7 +267,7 @@ function RowActions({
           progress={progress("purge")}
           onClick={onPurge}
           disabled={busy}
-          className="ml-3 text-xs text-red-300 hover:underline"
+          className={ROW_ACTION_DANGER}
         />
       )}
     </>

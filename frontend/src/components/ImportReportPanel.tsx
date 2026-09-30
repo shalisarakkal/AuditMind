@@ -1,3 +1,4 @@
+import { importCounts } from "@/lib/importCounts";
 import type { ImportReport, RowError, ScanStatus } from "@/lib/types";
 
 export type ImportResult = {
@@ -6,39 +7,36 @@ export type ImportResult = {
   /** Set when the import crashed (no report), or the upload itself failed. */
   error?: string;
   filename: string;
+  /** The scan's type: says what the counts count (assets, findings or both). */
+  scanType?: string;
 };
 
-type CountKey = "created" | "updated" | "skipped" | "findings_created" | "duplicates" | "failed";
-
-// When a file created findings alongside assets (a profile import), the first
-// three counts are assets.
-function counts(report: ImportReport): { key: CountKey; label: string }[] {
-  const both = (report.findings_created ?? 0) > 0;
-  return [
-    { key: "created", label: both ? "Assets created" : "Created" },
-    { key: "updated", label: both ? "Assets updated" : "Updated" },
-    { key: "skipped", label: both ? "Assets skipped" : "Skipped" },
-    { key: "findings_created", label: "Findings created" },
-    { key: "duplicates", label: both ? "Duplicate findings" : "Duplicates" },
-    { key: "failed", label: "Failed" },
-  ];
+/** The report's counts, each saying what it counts ("Assets created"), and
+ * always how many were created, even none. */
+function counts(scanType: string | undefined, report: ImportReport) {
+  const shown = importCounts(scanType, report);
+  if (!shown.some((c) => c.key === "created")) {
+    const [created] = importCounts(scanType, { created: 1 });
+    shown.unshift({ ...created, count: 0 });
+  }
+  return shown.map((c) => ({ ...c, label: c.label[0].toUpperCase() + c.label.slice(1) }));
 }
 
 export default function ImportReportPanel({ result, onDismiss }: { result: ImportResult; onDismiss?: () => void }) {
-  const { status, report, error, filename } = result;
+  const { status, report, error, filename, scanType } = result;
   const failed = status === "failed";
   const warnings = report?.warnings ?? [];
   const warningsTotal = Math.max(report?.warnings_total ?? 0, warnings.length);
 
   return (
     <section
-      aria-label="Import result"
+      aria-label="Upload result"
       className={`rounded-xl border p-4 ${failed ? "border-red-400/40 bg-red-400/5" : "border-emerald-400/30 bg-emerald-400/5"}`}
     >
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm text-white">
           <span className="font-medium">{filename}</span>{" "}
-          {failed ? <span className="text-red-300">— import failed</span> : <span className="text-emerald-300">— imported</span>}
+          {failed ? <span className="text-red-300">— processing failed</span> : <span className="text-emerald-300">— processed</span>}
         </p>
         {onDismiss && (
           <button type="button" onClick={onDismiss} className="text-xs text-white/60 hover:text-white">
@@ -52,14 +50,12 @@ export default function ImportReportPanel({ result, onDismiss }: { result: Impor
       {report && (
         <>
           <dl className="mt-3 flex flex-wrap gap-2">
-            {counts(report).map(({ key, label }) =>
-              (report[key] ?? 0) > 0 || key === "created" ? (
-                <div key={key} className="rounded-md bg-white/5 px-3 py-1.5 text-sm">
-                  <dt className="inline text-white/60">{label} </dt>
-                  <dd className="inline font-semibold text-white">{report[key]}</dd>
-                </div>
-              ) : null,
-            )}
+            {counts(scanType, report).map(({ key, label, count }) => (
+              <div key={key} className="rounded-md bg-white/5 px-3 py-1.5 text-sm">
+                <dt className="inline text-white/60">{label} </dt>
+                <dd className="inline font-semibold text-white">{count.toLocaleString("en-US")}</dd>
+              </div>
+            ))}
             {warnings.length > 0 && (
               <div className="rounded-md bg-amber-400/10 px-3 py-1.5 text-sm">
                 <dt className="inline text-amber-200/80">Warnings </dt>
@@ -77,7 +73,7 @@ export default function ImportReportPanel({ result, onDismiss }: { result: Impor
             </RowTable>
           )}
           {warnings.length > 0 && (
-            <RowTable title="Warnings — imported, but worth checking" rows={warnings} tone="warning">
+            <RowTable title="Warnings — recorded, but worth checking" rows={warnings} tone="warning">
               {warningsTotal > warnings.length && (
                 <p className="mt-2 text-xs text-white/50">
                   Showing the first {warnings.length} of {warningsTotal} warnings.

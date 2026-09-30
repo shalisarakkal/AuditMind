@@ -8,7 +8,7 @@ from app.models.finding import Finding
 from app.models.scan import Scan
 from app.services import ingestion_service
 from tests.conftest import requires_db
-from tests.helpers import FIXTURES, first_org_id, register, upload
+from tests.helpers import run_worker, FIXTURES, first_org_id, register, upload
 
 pytestmark = requires_db
 
@@ -34,7 +34,7 @@ def test_file_over_sync_limit_is_imported_in_background(client, admin, monkeypat
     assert resp.json()["status"] == "pending"
     assert resp.json()["report"] is None
 
-    # TestClient runs background tasks before returning, so the scan is done.
+    assert run_worker() == 1
     scan = _scan(client, admin, resp.json()["scan_id"]).json()
     assert scan["status"] == "completed"
     assert scan["filename"] == "assets_valid.csv"
@@ -55,6 +55,7 @@ def test_real_file_just_over_ten_megabytes_goes_to_background(client, admin, db_
     resp = upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, "big.json", content)
 
     assert resp.status_code == 202
+    run_worker()
     scan = _scan(client, admin, resp.json()["scan_id"]).json()
     assert (scan["status"], scan["summary"]["created"]) == ("completed", 1)
 
@@ -76,6 +77,7 @@ def test_org_overrides_apply_to_background_imports(client, admin, monkeypatch, d
     monkeypatch.setattr(settings, "IMPORT_SYNC_MAX_BYTES", 10)
 
     resp = upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, "sample.nessus")
+    run_worker()
 
     scan = _scan(client, admin, resp.json()["scan_id"]).json()
     assert (scan["status"], scan["summary"]["created"], scan["summary"]["skipped"]) == ("completed", 8, 0)
@@ -88,6 +90,7 @@ def test_background_import_of_bad_file_fails_the_scan(client, admin, monkeypatch
     resp = upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, "bad.json", b"{not json at all")
 
     assert resp.status_code == 202
+    run_worker()
     scan = _scan(client, admin, resp.json()["scan_id"]).json()
     assert scan["status"] == "failed"
     assert scan["summary"]["errors"][0]["row"] == 0
@@ -106,6 +109,7 @@ def test_unexpected_error_in_background_marks_scan_failed(client, admin, monkeyp
     resp = upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, "assets_valid.csv")
 
     assert resp.status_code == 202
+    run_worker()
     scan = _scan(client, admin, resp.json()["scan_id"]).json()
     assert scan["status"] == "failed"
     assert scan["summary"] == {"error": "Unexpected error during import"}

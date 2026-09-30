@@ -2,6 +2,7 @@
 one-column sorting, "contains" filters and pick-list filters."""
 
 from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 
 from fastapi import Query
@@ -90,3 +91,27 @@ def any_of(*conditions: ColumnElement[bool] | None) -> ColumnElement[bool] | Non
     """OR of the conditions given (None ones ignored); None if none are."""
     present = [c for c in conditions if c is not None]
     return or_(*present) if present else None
+
+
+@dataclass
+class DateRange:
+    since: date | None
+    until: date | None
+
+    def conditions(self, column) -> list[ColumnElement[bool]]:
+        """`column` (a timestamp) on or after `since` and on or before
+        `until`, whole days in UTC."""
+        found = []
+        if self.since:
+            found.append(column >= datetime.combine(self.since, time.min, timezone.utc))
+        if self.until:
+            found.append(column < datetime.combine(self.until + timedelta(days=1), time.min, timezone.utc))
+        return found
+
+
+def date_range(
+    since: date | None = Query(None, description="On or after this day (UTC)"),
+    until: date | None = Query(None, description="On or before this day (UTC)"),
+) -> DateRange:
+    """A list's From/To filter on its date column."""
+    return DateRange(since=since, until=until)

@@ -6,9 +6,13 @@ import type { ImportResult } from "@/components/ImportReportPanel";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/apiClient";
 import { countsText } from "@/lib/domain";
-import type { ArchiveJob, ImportReport, Scan } from "@/lib/types";
+import type { ArchiveAction, ArchiveItemType, ArchiveJob, BulkResult, ImportReport, Scan, WorkerStatus } from "@/lib/types";
 
 const POLL_MS = 2000;
+const WORKER_CHECK_MS = 15000;
+// How long a row's button says "Archived" (or "Restored", "Purged") after a
+// small job, while its list reloads.
+const DONE_MS = 60000;
 const ORIGIN_KEY = "auditmind_import_pages";
 
 export type ImportPage = "assets" | "findings";
@@ -31,6 +35,17 @@ type ImportsContextValue = {
    * starts. Throws if the server refuses. */
   startJob(path: string): Promise<ArchiveJob>;
   dismissJob(jobId: string): Promise<void>;
+  /** Archive (`itemType` items), restore or purge (archived entries) several
+   * at once: a job each, queued for the background worker, followed like
+   * the others. Throws if the server refuses the whole request. */
+  startBulk(action: ArchiveAction, ids: string[], itemType?: ArchiveItemType): Promise<BulkResult>;
+  /** Jobs this browser just asked for, by endpoint path: "starting" while
+   * the request runs (small jobs run during it), then "done" for a short
+   * while if it finished then, until the lists have reloaded. */
+  requested: Record<string, "starting" | "done">;
+  /** True while something waits for the background worker and the worker
+   * hasn't checked in lately (it isn't running). */
+  workerDown: boolean;
 };
 
 const ImportsContext = createContext<ImportsContextValue | null>(null);
@@ -148,11 +163,14 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
   );
 
   const onJobsFinished = useCallback((count: number) => setFinishedCount((c) => c + count), []);
-  const { jobs, startJob, dismissJob } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
+  const { jobs, startJob, startBulk, dismissJob, requested } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
+
+  const waiting = scans.some((s) => s.status === "pending") || jobs.some((j) => j.status === "pending");
+  const workerDown = useWorkerDown(waiting, WORKER_CHECK_MS);
 
   const value = useMemo(
-    () => ({ scans, finishedCount, track, dismiss, jobs, startJob, dismissJob }),
-    [scans, finishedCount, track, dismiss, jobs, startJob, dismissJob],
+    () => ({ scans, finishedCount, track, dismiss, jobs, startJob, startBulk, dismissJob, requested, workerDown }),
+    [scans, finishedCount, track, dismiss, jobs, startJob, startBulk, dismissJob, requested, workerDown],
   );
   return <ImportsContext.Provider value={value}>{children}</ImportsContext.Provider>;
 }
@@ -163,6 +181,7 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
  * finished (including one that finished during its own request). */
 function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished: (count: number) => void) {
   const [jobs, setJobs] = useState<ArchiveJob[]>([]);
+  const [requested, setRequested] = useState<Record<string, "starting" | "done">>({});
   const current = useRef({ orgId, jobs, requested: 0, applied: 0 });
 
   const apply = useCallback(
@@ -190,6 +209,7 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
   useEffect(() => {
     current.current = { ...current.current, orgId, jobs: [] };
     setJobs([]);
+    setRequested({});
     void load();
   }, [orgId, load]);
 
@@ -198,7 +218,28 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
   const startJob = useCallback(
     async (path: string) => {
       if (!orgId) throw new Error("No organization selected");
-      const job = await api.post<ArchiveJob>(path);
+      const mark = (state: "starting" | "done" | null) =>
+        setRequested((before) => {
+          const next = { ...before };
+          if (state) next[path] = state;
+          else delete next[path];
+          return next;
+        });
+      mark("starting");
+      let job: ArchiveJob;
+      try {
+        job = await api.post<ArchiveJob>(path);
+      } catch (err) {
+        mark(null);
+        throw err;
+      }
+      // A large job is followed from the jobs list; a small one is done, and
+      // its row goes when the list reloads.
+      if (isRunning(job)) mark(null);
+      else {
+        mark("done");
+        setTimeout(() => mark(null), DONE_MS);
+      }
       // Numbered once the answer is in, unlike the imports' track(): it's the
       // newest word on this job, and polling may not run to pick it up later
       // (nothing else running). Applied at once, so still in order.
@@ -207,6 +248,18 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
       // Small jobs finish during the request: lists reload straight away.
       apply(orgId, request, [job, ...others], isRunning(job) ? 0 : 1);
       return job;
+    },
+    [orgId, apply],
+  );
+
+  const startBulk = useCallback(
+    async (action: ArchiveAction, ids: string[], itemType?: ArchiveItemType) => {
+      if (!orgId) throw new Error("No organization selected");
+      const result = await api.post<BulkResult>(`/orgs/${orgId}/archive-jobs/bulk`, { action, item_type: itemType ?? null, ids });
+      const request = ++current.current.requested;
+      const started = new Set(result.jobs.map((j) => j.id));
+      apply(orgId, request, [...result.jobs, ...current.current.jobs.filter((j) => !started.has(j.id))]);
+      return result;
     },
     [orgId, apply],
   );
@@ -221,7 +274,25 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
     [orgId, apply],
   );
 
-  return { jobs, startJob, dismissJob };
+  return { jobs, startJob, startBulk, dismissJob, requested };
+}
+
+/** While `waiting` (something waits for the background worker): whether the
+ * worker hasn't checked in lately (GET /worker-status, every `intervalMs`). */
+function useWorkerDown(waiting: boolean, intervalMs: number): boolean {
+  const [running, setRunning] = useState<boolean | null>(null);
+  const check = useCallback(async () => {
+    try {
+      setRunning((await api.get<WorkerStatus>("/worker-status")).running);
+    } catch {
+      // Unknown: keep the last answer.
+    }
+  }, []);
+  useEffect(() => {
+    if (waiting) void check();
+  }, [waiting, check]);
+  usePolling(waiting, check, intervalMs);
+  return waiting && running === false;
 }
 
 /** Call `poll` every `intervalMs` while `active`, one call at a time: the
@@ -264,7 +335,7 @@ export function jobTitle(job: ArchiveJob): string {
 
 /** Where a running job is, e.g. "Findings: 120,000 / 500,000 (24%)". */
 export function jobProgressText(job: ArchiveJob): string {
-  if (job.status === "pending") return "Waiting to start…";
+  if (job.status === "pending") return WAITING;
   const phase = job.progress?.phase ?? "";
   const label = JOB_PHASES[phase] ?? "Working";
   return counted(label, job.progress?.rows_done, job.progress?.rows_total) ?? `${label}…`;
@@ -322,13 +393,16 @@ function rememberOrigin(scanId: string, page: ImportPage) {
   }
 }
 
+// A large import or archive job not yet taken by the background worker.
+const WAITING = "Waiting for the background worker…";
+
 /** Where a running import is, e.g. "Writing rows: 120,000 / 500,000 (24%)". */
 export function progressText(scan: Scan): string {
   const progress = scan.progress;
-  if (scan.status === "pending") return "Waiting to start…";
+  if (scan.status === "pending") return WAITING;
   switch (progress?.phase) {
     case "waiting":
-      return "Waiting for another import into this organization to finish…";
+      return "Waiting for another upload into this organization to finish processing…";
     case "writing":
       return counted("Writing rows", progress.rows_done, progress.rows_total) ?? "Writing rows…";
     case "findings":
@@ -353,6 +427,7 @@ export function scanResult(scan: Scan): ImportResult {
     status: scan.status,
     report: error || !scan.summary ? null : (report as ImportReport),
     error,
-    filename: scan.filename ?? "Import",
+    filename: scan.filename ?? "Upload",
+    scanType: scan.scan_type,
   };
 }

@@ -19,14 +19,15 @@ const report = {
 
 describe("ImportReportPanel", () => {
   it("shows the non-zero counts and each row problem", () => {
-    render(<ImportReportPanel result={{ status: "completed", report, filename: "assets.csv" }} />);
+    render(<ImportReportPanel result={{ status: "completed", report, filename: "scan.csv", scanType: "network_scan_import" }} />);
 
-    const panel = screen.getByRole("region", { name: "Import result" });
-    expect(panel).toHaveTextContent("assets.csv — imported");
-    expect(panel).toHaveTextContent("Created 4");
-    expect(panel).toHaveTextContent("Updated 1");
-    expect(panel).toHaveTextContent("Duplicates 2");
-    expect(panel).not.toHaveTextContent("Skipped");
+    const panel = screen.getByRole("region", { name: "Upload result" });
+    expect(panel).toHaveTextContent("scan.csv — processed");
+    // Each count says what it counts: a tool export makes assets and findings.
+    expect(panel).toHaveTextContent("Assets created 4");
+    expect(panel).toHaveTextContent("Assets updated 1");
+    expect(panel).toHaveTextContent("Duplicate findings skipped 2");
+    expect(panel).not.toHaveTextContent("left unchanged");
     expect(panel).not.toHaveTextContent("Warnings");
     expect(panel).not.toHaveTextContent("Findings created");
 
@@ -44,7 +45,7 @@ describe("ImportReportPanel", () => {
       <ImportReportPanel result={{ status: "failed", report: null, error: "Upload limit exceeded", filename: "big.csv" }} onDismiss={onDismiss} />,
     );
 
-    expect(screen.getByText(/import failed/)).toBeInTheDocument();
+    expect(screen.getByText(/processing failed/)).toBeInTheDocument();
     expect(screen.getByText("Upload limit exceeded")).toBeInTheDocument();
     screen.getByRole("button", { name: "Dismiss" }).click();
     expect(onDismiss).toHaveBeenCalled();
@@ -62,19 +63,21 @@ describe("ImportReportPanel", () => {
         { row: 9, message: "RiskScore is 'eleven', not a score from 0 to 10; recorded as medium" },
       ],
     };
-    render(<ImportReportPanel result={{ status: "completed", report: profileReport, filename: "scan.csv" }} />);
+    render(
+      <ImportReportPanel result={{ status: "completed", report: profileReport, filename: "scan.csv", scanType: "endpoint_agent_import" }} />,
+    );
 
-    const panel = screen.getByRole("region", { name: "Import result" });
-    expect(panel).toHaveTextContent("scan.csv — imported");
+    const panel = screen.getByRole("region", { name: "Upload result" });
+    expect(panel).toHaveTextContent("scan.csv — processed");
     expect(panel).toHaveTextContent("Assets created 4");
     expect(panel).toHaveTextContent("Assets updated 1");
     expect(panel).toHaveTextContent("Findings created 8");
-    expect(panel).toHaveTextContent("Duplicate findings 1");
+    expect(panel).toHaveTextContent("Duplicate findings skipped 1");
     expect(panel).toHaveTextContent("Warnings 2");
 
     const problems = within(panel).getByRole("region", { name: "Problems" });
     expect(within(problems).getAllByRole("row")).toHaveLength(2);
-    const warnings = within(panel).getByRole("region", { name: "Warnings — imported, but worth checking" });
+    const warnings = within(panel).getByRole("region", { name: "Warnings — recorded, but worth checking" });
     expect(within(warnings).getAllByRole("row").slice(1).map((r) => r.textContent)).toEqual([
       "2ip 251.88.70.177 is a reserved address; imported anyway",
       "9RiskScore is 'eleven', not a score from 0 to 10; recorded as medium",
@@ -83,15 +86,15 @@ describe("ImportReportPanel", () => {
 
   it("reads a report saved before warnings existed", () => {
     const old = { created: 1, updated: 0, skipped: 0, duplicates: 0, failed: 0, errors: [] } as unknown as typeof report;
-    render(<ImportReportPanel result={{ status: "completed", report: old, filename: "old.csv" }} />);
-    expect(screen.getByRole("region", { name: "Import result" })).toHaveTextContent("Created 1");
+    render(<ImportReportPanel result={{ status: "completed", report: old, filename: "old.csv", scanType: "asset_import" }} />);
+    expect(screen.getByRole("region", { name: "Upload result" })).toHaveTextContent("Assets created 1");
   });
 
   it("counts all warnings when the list is cut short", () => {
     const many = { ...report, errors: [], failed: 0, warnings: [{ row: 2, message: "odd" }], warnings_total: 1500 };
     render(<ImportReportPanel result={{ status: "completed", report: many, filename: "big.csv" }} />);
 
-    const panel = screen.getByRole("region", { name: "Import result" });
+    const panel = screen.getByRole("region", { name: "Upload result" });
     expect(panel).toHaveTextContent("Warnings 1500");
     expect(panel).toHaveTextContent("Showing the first 1 of 1500 warnings.");
   });

@@ -163,7 +163,32 @@ export type IngestionSettings = {
   asset_type_aliases_override: Record<string, AssetType>;
   /** Days an archived item is kept before it's purged automatically. */
   archive_retention_days: number;
+  /** Days Activity events are kept. */
+  event_retention_days: number;
 };
+
+export type Criticality = "info" | "warning" | "critical";
+
+/** One entry in Activity: what happened, to what, by whom, when. */
+export type ActivityEvent = {
+  id: string;
+  type: string;
+  item: string | null;
+  /** Null: the system (or an unknown person, for a failed sign-in). */
+  actor_id: string | null;
+  actor_label: string;
+  started_at: string;
+  ended_at: string;
+  outcome: "completed" | "failed" | "stopped";
+  criticality: Criticality;
+  counts: Record<string, number> | null;
+  details: Record<string, unknown> | null;
+};
+
+/** The choices Activity's pick-lists offer. */
+export type EventFacets = { type: string[]; result: string[] };
+
+export type WorkerStatus = { running: boolean; last_seen: string | null };
 
 export type AssetType = "server" | "workstation" | "network_device" | "database" | "cloud_resource" | "application";
 
@@ -217,6 +242,13 @@ export type ArchiveJob = {
 };
 
 /** One archive action on the Archived page. */
+/** Several items archived, restored or purged at once: a job each (queued),
+ * and those that couldn't start, with why. */
+export type BulkResult = { jobs: ArchiveJob[]; refused: { id: string; detail: string }[] };
+
+/** The Archived list, with how many of each type match the other filters. */
+export type ArchivedPage = Page<ArchivedItem> & { type_counts: Partial<Record<ArchiveItemType, number>> };
+
 export type ArchivedItem = {
   id: string;
   item_type: ArchiveItemType;
@@ -238,18 +270,6 @@ export type Upload = Scan & {
   /** Its archive hasn't finished, and that archive. */
   archiving?: ArchiveProgress | null;
   archiving_batch_id?: string | null;
-};
-
-export type PurgeLogEntry = {
-  id: string;
-  item_type: ArchiveItemType;
-  label: string;
-  archived_at: string;
-  purged_at: string;
-  /** Null: purged automatically. */
-  purged_by: string | null;
-  reason: "manual" | "auto" | "duplicate";
-  counts: ArchiveCounts;
 };
 
 /** The body of a 409 for a file already imported into the org. */

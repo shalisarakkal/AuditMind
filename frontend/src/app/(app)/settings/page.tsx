@@ -1,8 +1,9 @@
 "use client";
 
 import ImportProfilesPanel from "@/components/ImportProfilesPanel";
+import Link from "next/link";
+
 import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
-import PurgeLogPanel from "@/components/PurgeLogPanel";
 import { useApp } from "@/context/AppContext";
 
 export default function SettingsPage() {
@@ -20,7 +21,8 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-lg font-medium text-white">Ingestion</h2>
           <p className="text-sm text-white/60">
-            How asset imports and findings uploads are handled for this organization, and how long archived items are kept.
+            How asset imports and findings uploads are handled for this organization, and how long archived items and
+            Activity events are kept.
             Settings marked Default follow the server-wide configuration.
           </p>
         </div>
@@ -29,27 +31,25 @@ export default function SettingsPage() {
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-medium text-white">Import profiles</h2>
+          <h2 className="text-lg font-medium text-white">File formats</h2>
           <p className="text-sm text-white/60">
             How each kind of export is read: the column for each field and the rules that raise findings. To read your own
-            tool&apos;s export, copy the closest profile and adjust its columns and settings.
+            tool&apos;s export, copy the closest format and adjust its columns and settings.
           </p>
         </div>
         <ImportProfilesPanel orgId={org.id} isAdmin={org.role === "admin"} />
       </section>
 
-      {org.role === "admin" && (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-medium text-white">Purge log</h2>
-            <p className="text-sm text-white/60">
-              Archived items deleted for good: purged by an admin, at the end of the retention period, or duplicates
-              dropped when restoring.
-            </p>
-          </div>
-          <PurgeLogPanel orgId={org.id} />
-        </section>
-      )}
+      <section className="space-y-1">
+        <h2 className="text-lg font-medium text-white">Purge log</h2>
+        <p className="text-sm text-white/60">
+          What was deleted for good (by an admin, or at the end of the retention period) is in Activity:{" "}
+          <Link href="/activity?type=purge" className="text-cyan hover:underline">
+            see purges
+          </Link>
+          .
+        </p>
+      </section>
 
       <section>
         <h2 className="text-lg font-medium text-white">Connectors &amp; AI</h2>

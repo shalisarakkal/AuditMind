@@ -12,6 +12,7 @@ from app.models.user import User
 from app.schemas.org_settings import IngestionSettingsRead, IngestionSettingsUpdate
 from app.schemas.organization import MemberAdd, MyOrganizationRead, OrganizationCreate, OrganizationRead
 from app.schemas.user import MemberRead, UserRead
+from app.services.events import record_event
 from app.services.org_settings import apply_overrides, resolve_ingestion_settings
 
 router = APIRouter(prefix="/orgs", tags=["orgs"])
@@ -40,6 +41,7 @@ def _ingestion_settings(org: Organization) -> IngestionSettingsRead:
         asset_type_aliases=effective.asset_type_aliases,
         asset_type_aliases_override=org.ingestion_overrides.get("asset_type_aliases", {}),
         archive_retention_days=effective.archive_retention_days,
+        event_retention_days=effective.event_retention_days,
     )
 
 
@@ -92,7 +94,7 @@ def add_member(
     org_id: uuid.UUID,
     payload: MemberAdd,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+    admin: OrgMembership = Depends(require_org_role(UserRole.admin)),
 ) -> MemberRead:
     """Give an existing user access to this org. Admins only."""
     user = db.query(User).filter(User.email == payload.email).first()
@@ -103,6 +105,9 @@ def add_member(
 
     membership = OrgMembership(user_id=user.id, org_id=org_id, role=payload.role)
     db.add(membership)
+    record_event(
+        db, "member_added", org_id=org_id, actor=admin.user, item=user.email, details={"role": payload.role.value}
+    )
     db.commit()
     db.refresh(membership)
     return _member(membership)
@@ -122,12 +127,18 @@ def update_ingestion_settings(
     org_id: uuid.UUID,
     payload: IngestionSettingsUpdate,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+    admin: OrgMembership = Depends(require_org_role(UserRole.admin)),
 ) -> IngestionSettingsRead:
     """Admins only. Send a value to override a setting, null to clear the
-    override; omitted fields are unchanged."""
+    override; omitted fields are unchanged. Recorded in Activity (the old
+    and new values; null = back to the default)."""
     org = db.get(Organization, org_id)
-    apply_overrides(org, payload.model_dump(mode="json", exclude_unset=True))
+    changes = payload.model_dump(mode="json", exclude_unset=True)
+    before = dict(org.ingestion_overrides or {})
+    apply_overrides(org, changes)
+    changed = {key: {"from": before.get(key), "to": value} for key, value in changes.items() if before.get(key) != value}
+    if changed:
+        record_event(db, "settings_changed", org_id=org_id, actor=admin.user, item=", ".join(changed), details=changed)
     db.commit()
     db.refresh(org)
     return _ingestion_settings(org)

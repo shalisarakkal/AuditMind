@@ -1,16 +1,18 @@
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
 from app.api.paging import (
+    DateRange,
     PageParams,
     SortOrder,
     any_of,
     contains,
+    date_range,
     distinct_values,
     labelled,
     one_of,
@@ -27,6 +29,7 @@ from app.models.scan import Scan
 from app.schemas.finding import FindingCreate, FindingFacets, FindingListItem, FindingPage, FindingRead
 from app.schemas.ingestion import ImportResponse
 from app.services.archive_service import archiving_fields, unfinished_archives
+from app.services.events import record_event
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
 
@@ -74,6 +77,7 @@ def list_findings(
     domain: list[Domain] | None = Query(None, description="Domain is one of these"),
     severity: list[Severity] | None = Query(None, description="Severity is one of these"),
     source: list[str] | None = Query(None, description='Source is one of these ("" for none)'),
+    dates: DateRange = Depends(date_range),
     sort: FindingSort = Query("severity", description="Column to sort by"),
     order: SortOrder = Query("asc"),
     page: PageParams = Depends(page_params),
@@ -101,7 +105,12 @@ def list_findings(
         one_of(Finding.source, source),
     ]
     # archived_at IS NULL also lets the paging below use the partial indexes.
-    filters = [Finding.org_id == org_id, Finding.archived_at.is_(None), *(c for c in conditions if c is not None)]
+    filters = [
+        Finding.org_id == org_id,
+        Finding.archived_at.is_(None),
+        *(c for c in conditions if c is not None),
+        *dates.conditions(Finding.created_at),
+    ]
     # The asset is only needed to search or sort by it; joining it into a
     # query over every finding is costly.
     needs_asset = bool(q or asset) or sort == "asset"
@@ -203,7 +212,7 @@ def create_finding(
     org_id: uuid.UUID,
     payload: FindingCreate,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> Finding:
     """The asset and scan, if given, must belong to the org and not be archived."""
     for model, ref_id, name in ((Asset, payload.asset_id, "asset_id"), (Scan, payload.scan_id, "scan_id")):
@@ -216,6 +225,14 @@ def create_finding(
                 )
     finding = Finding(org_id=org_id, **payload.model_dump())
     db.add(finding)
+    record_event(
+        db,
+        "finding_added",
+        org_id=org_id,
+        actor=membership.user,
+        item=finding.description or finding.category,
+        details={"severity": finding.severity.value, "domain": finding.domain.value},
+    )
     db.commit()
     db.refresh(finding)
     return finding
@@ -229,7 +246,6 @@ def create_finding(
 )
 async def import_findings(
     org_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     response: Response,
     file: UploadFile = File(..., description="Findings: .csv, .json, or a native .nessus export"),
     confirm: bool = confirm_form(),
@@ -243,7 +259,6 @@ async def import_findings(
     duplicate."""
     return await start_import(
         db=db,
-        background_tasks=background_tasks,
         response=response,
         org_id=org_id,
         file=file,

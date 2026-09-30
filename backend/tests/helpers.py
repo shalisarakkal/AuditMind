@@ -48,3 +48,14 @@ def upload(
         content = (FIXTURES / filename).read_bytes()
     data = {"confirm": "true"} if confirm else None
     return client.post(url, headers=headers, files={"file": (filename, content)}, data=data)
+
+
+def run_worker() -> int:
+    """Run the background worker's waiting jobs (large imports, archive
+    jobs) until there are none; returns how many it ran. It uses the test's
+    session, like the requests (see the client fixture)."""
+    from app.services import ingestion_background
+    from app.worker.runner import drain
+
+    with ingestion_background.open_session() as db:
+        return drain(db)

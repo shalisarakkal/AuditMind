@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.enums import UserRole
@@ -10,6 +13,9 @@ from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, Token
+from app.services.events import record_event, record_for_user_orgs
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,6 +37,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Token:
     db.add(user)
     db.flush()
     db.add(OrgMembership(user_id=user.id, org_id=org.id, role=UserRole.admin))
+    record_event(db, "registered", org_id=org.id, actor=user, item=user.email)
     db.commit()
 
     token = create_access_token(subject=str(user.id))
@@ -76,7 +83,25 @@ async def login(request: Request, db: Session = Depends(get_db)) -> Token:
 
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
+        if user is not None:
+            # In each of the account's orgs, so its admins see attempts on
+            # their people. An unknown email belongs to no org: showing it
+            # anywhere would tell one org about another's traffic.
+            record_for_user_orgs(db, "login_failed", user, by_user=False, item=user.email)
+            db.commit()
+        else:
+            logger.warning("Failed login for an unknown email")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
+    record_for_user_orgs(db, "login", user, item=user.email)
+    db.commit()
     token = create_access_token(subject=str(user.id))
     return Token(access_token=token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+    """Record the sign-out in Activity. (Tokens aren't stored server-side:
+    the app forgets its own.)"""
+    record_for_user_orgs(db, "logout", user, item=user.email)
+    db.commit()

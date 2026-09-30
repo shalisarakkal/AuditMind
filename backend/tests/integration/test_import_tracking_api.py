@@ -12,7 +12,7 @@ from app.models.scan import Scan
 from app.models.user import User
 from app.services import ingestion_background, ingestion_service
 from tests.conftest import requires_db
-from tests.helpers import first_org_id, member, register, upload
+from tests.helpers import run_worker, first_org_id, member, register, upload
 
 pytestmark = requires_db
 
@@ -29,6 +29,8 @@ def _import(client, admin, headers=None):
     _, org_id = admin
     resp = upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers or admin[0], "a.csv", ASSETS)
     assert resp.status_code in (201, 202), resp.text
+    if resp.status_code == 202:
+        run_worker()
     return resp.json()["scan_id"]
 
 
@@ -88,7 +90,7 @@ def test_a_background_import_reports_each_stage(client, admin, monkeypatch):
     [scan] = _scans(client, admin)
     assert scan["id"] == scan_id
     assert scan["status"] == "completed"
-    assert scan["progress"] == {"phase": "saving", "rows_done": 0, "rows_total": 0}
+    assert scan["progress"] is None  # cleared once it's finished
 
 
 def test_a_tool_exports_findings_are_counted_as_a_stage_of_their_own(client, admin, monkeypatch):
@@ -102,6 +104,7 @@ def test_a_tool_exports_findings_are_counted_as_a_stage_of_their_own(client, adm
     )
 
     assert resp.status_code == 202, resp.text
+    run_worker()
     assert reports == [
         ("reading", 2, 3),
         ("reading", 3, 3),

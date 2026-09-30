@@ -30,15 +30,17 @@ from sqlalchemy.orm import Session
 
 from app.models.archive import AssetScan
 from app.models.asset import Asset
-from app.models.enums import Domain, ScanStatus, Severity
+from app.models.enums import Criticality, Domain, ScanStatus, Severity
 from app.models.finding import Finding
 from app.models.organization import Organization
 from app.models.scan import Scan
+from app.models.user import User
 from app.schemas.ingestion import ImportReport, RowError, RowWarning
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
+from app.services.events import record_event
 from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, finding_key
 from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity, parse_nessus
-from app.services.org_lock import lock_org
+from app.services.org_lock import IMPORT_JOB, job_running, lock_org
 from app.services.org_settings import IngestionSettings, resolve_ingestion_settings
 
 ImportKind = Literal["assets", "findings", "profile"]
@@ -282,32 +284,97 @@ def process_import(
     org = db.get(Organization, scan.org_id)
     ingestion = resolve_ingestion_settings(org)
     scan.status = ScanStatus.running
+    scan.run_started_at = datetime.now(timezone.utc)
     scan.progress = {"phase": "reading"}
     db.commit()
 
-    try:
-        report = _import(db, scan, kind, fmt, content, ingestion, profile, progress)
-        # Failed if all-or-nothing rejected the file, or no row was usable.
-        usable = report.created + report.updated + report.skipped + report.duplicates
-        rejected = report.failed > 0 and (not ingestion.import_partial_success or usable == 0)
-        status = ScanStatus.failed if rejected else ScanStatus.completed
-    except IngestionError as exc:
-        db.rollback()
-        report = ImportReport(errors=[RowError(row=0, message=str(exc))])
-        status = ScanStatus.failed
-    except Exception:
-        db.rollback()
-        _finish(db, db.get(Scan, scan_id), ScanStatus.failed, {"error": "Unexpected error during import"})
-        raise
+    # Held until the outcome is saved: the background worker then knows it
+    # runs (see org_lock.job_running).
+    with job_running(db, IMPORT_JOB, scan_id):
+        try:
+            report = _import(db, scan, kind, fmt, content, ingestion, profile, progress)
+            # Failed if all-or-nothing rejected the file, or no row was usable.
+            usable = report.created + report.updated + report.skipped + report.duplicates
+            rejected = report.failed > 0 and (not ingestion.import_partial_success or usable == 0)
+            status = ScanStatus.failed if rejected else ScanStatus.completed
+        except IngestionError as exc:
+            db.rollback()
+            report = ImportReport(errors=[RowError(row=0, message=str(exc))])
+            status = ScanStatus.failed
+        except Exception:
+            db.rollback()
+            _finish(db, db.get(Scan, scan_id), ScanStatus.failed, {"error": "Unexpected error during import"})
+            raise
 
-    _finish(db, db.get(Scan, scan_id), status, report.model_dump(mode="json"))
-    return report
+        _finish(db, db.get(Scan, scan_id), status, report.model_dump(mode="json"))
+        return report
+
+
+# What an import report's counts are counts of, by kind of import (see
+# ImportReport): an asset list counts assets; a findings file, findings; a
+# tool export (import profile), assets and then findings. Activity events
+# record them under these names, so "900 created" says what was created.
+_EVENT_COUNTS = {
+    "assets": {"created": "assets_created", "updated": "assets_updated", "skipped": "assets_skipped",
+               "failed": "rows_failed"},
+    "findings": {"created": "findings_created", "duplicates": "duplicate_findings", "skipped": "items_skipped",
+                 "failed": "rows_failed"},
+    "profile": {"created": "assets_created", "updated": "assets_updated", "skipped": "assets_skipped",
+                "findings_created": "findings_created", "duplicates": "duplicate_findings", "failed": "rows_failed"},
+}
+
+
+# Import profiles that record findings only: their "created" counts findings.
+FINDINGS_ONLY_SCAN_TYPES = ("findings_csv", "findings_json", "nessus", "generic_findings_import")
+
+
+def import_kind(scan_type: str) -> str:
+    """assets, findings or profile (a tool export), from the scan's type."""
+    if scan_type == "asset_import":
+        return "assets"
+    return "findings" if scan_type in FINDINGS_ONLY_SCAN_TYPES else "profile"
+
+
+def event_counts(scan_type: str, summary: dict) -> dict:
+    """An import report's non-zero counts under names saying what they count."""
+    names = _EVENT_COUNTS[import_kind(scan_type)]
+    return {names[key]: n for key, n in summary.items() if key in names and isinstance(n, int) and n}
+
+
+def fail_import(db: Session, scan: Scan, message: str) -> None:
+    """Mark an import that can't run (or be run again) failed, with its
+    Activity event."""
+    _finish(db, scan, ScanStatus.failed, {"error": message})
 
 
 def _finish(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
+    """Record the outcome on the scan and its Activity event, together."""
     scan.status = status
     scan.summary = summary
     scan.completed_at = datetime.now(timezone.utc)
+    scan.progress = None
+    counts = event_counts(scan.scan_type, summary)
+    details = {}
+    if error := summary.get("error") or next((e["message"] for e in summary.get("errors", []) if e["row"] == 0), None):
+        details["error"] = error
+    if scan.retry_count:
+        details["retried"] = "Cut off (the worker stopped) and started again from the saved file"
+    if scan.run_started_at and scan.started_at and (waited := scan.run_started_at - scan.started_at).total_seconds() >= 1:
+        details["waited_seconds"] = round(waited.total_seconds())
+    record_event(
+        db,
+        "import",
+        org_id=scan.org_id,
+        actor=db.get(User, scan.started_by) if scan.started_by else None,
+        item=scan.filename or scan.scan_type,
+        started_at=scan.run_started_at or scan.started_at,
+        ended_at=scan.completed_at,
+        outcome=status.value,
+        # Rows that failed: worth a look, though the file imported.
+        criticality=Criticality.warning if summary.get("failed") else None,
+        counts=counts,
+        details=details,
+    )
     db.commit()
 
 

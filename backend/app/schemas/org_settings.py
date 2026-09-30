@@ -22,6 +22,7 @@ class IngestionSettingsRead(BaseModel):
     asset_type_aliases: dict[str, str]
     asset_type_aliases_override: dict[str, str]
     archive_retention_days: int
+    event_retention_days: int
 
 
 class IngestionSettingsUpdate(BaseModel):
@@ -38,6 +39,7 @@ class IngestionSettingsUpdate(BaseModel):
     nessus_default_domain: Domain | None = None
     asset_type_aliases: dict[str, str] | None = None
     archive_retention_days: int | None = Field(None, ge=1, le=3650)
+    event_retention_days: int | None = Field(None, ge=30, le=3650)
 
     @field_validator("asset_type_aliases")
     @classmethod

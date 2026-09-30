@@ -1,8 +1,10 @@
 """One lock per organization for everything that changes its assets and
-findings in bulk: imports, and archiving, restoring or purging."""
+findings in bulk: imports, and archiving, restoring or purging. Plus one per
+running job, so the background worker can tell running from dead."""
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -35,3 +37,37 @@ def lock_org_jobs(db: Session, org_id: uuid.UUID) -> None:
     a job never waits for an import."""
     org_key = int.from_bytes(org_id.bytes[:4], "big", signed=True)
     db.execute(select(func.pg_advisory_xact_lock(1, org_key)))
+
+
+# Job kinds for job_running (the first key of the lock).
+IMPORT_JOB = 2
+ARCHIVE_JOB = 3
+
+
+def _job_key(job_id: uuid.UUID) -> int:
+    return int.from_bytes(job_id.bytes[:4], "big", signed=True)
+
+
+@contextmanager
+def job_running(db: Session, kind: int, job_id: uuid.UUID) -> Iterator[None]:
+    """Say "this job is being run" for as long as it runs: a lock held on a
+    connection of its own. If the process running it dies, the connection
+    closes and the lock goes with it, so the background worker can tell a
+    job that's only waiting (for the org's lock, say) from one nothing runs
+    any more (job_is_running)."""
+    conn = db.get_bind().connect()
+    try:
+        conn.execute(select(func.pg_advisory_lock(kind, _job_key(job_id))))
+        conn.commit()
+        yield
+    finally:
+        try:
+            conn.execute(select(func.pg_advisory_unlock(kind, _job_key(job_id))))
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def job_is_running(db: Session, kind: int, job_id: uuid.UUID) -> bool:
+    """Whether some process holds the job's job_running lock."""
+    return not db.execute(select(func.pg_try_advisory_xact_lock(kind, _job_key(job_id)))).scalar()

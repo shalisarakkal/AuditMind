@@ -51,20 +51,20 @@ export default function ImportProfilesPanel({ orgId, isAdmin }: Props) {
       reload();
     });
 
-  if (loading && !profiles) return <p className="text-sm text-white/60">Loading import profiles…</p>;
+  if (loading && !profiles) return <p className="text-sm text-white/60">Loading file formats…</p>;
   if (error) return <p className="text-sm text-red-300">{error}</p>;
   if (!profiles) return null;
 
   return (
     <div className="space-y-4">
-      {!isAdmin && <p className="text-sm text-white/60">Only organization admins can change import profiles.</p>}
+      {!isAdmin && <p className="text-sm text-white/60">Only organization admins can change file formats.</p>}
       {actionError && <p className="text-sm text-red-300">{actionError}</p>}
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left text-sm">
           <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/50">
             <tr>
-              <th className="px-4 py-2">Profile</th>
+              <th className="px-4 py-2">Format</th>
               <th className="px-4 py-2">Reads</th>
               <th className="px-4 py-2">Columns</th>
               {isAdmin && <th className="px-4 py-2" />}
@@ -103,10 +103,10 @@ export default function ImportProfilesPanel({ orgId, isAdmin }: Props) {
       </div>
 
       {copying && (
-        <div role="group" aria-label="Copy profile" className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+        <div role="group" aria-label="Copy format" className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
           <span className="text-white/60">Copy {copying.from.name} as</span>
           <input
-            aria-label="New profile name"
+            aria-label="New format name"
             value={copying.name}
             onChange={(e) => setCopying({ ...copying, name: e.target.value })}
             className={`w-64 ${inputClass}`}
@@ -126,15 +126,15 @@ export default function ImportProfilesPanel({ orgId, isAdmin }: Props) {
       )}
 
       {deleting && (
-        <div role="group" aria-label="Delete profile" className="flex flex-wrap items-center gap-2 rounded-lg border border-red-400/30 bg-red-400/5 p-3 text-sm">
-          <span className="text-white">Delete {deleting.name}? Past imports keep their reports.</span>
+        <div role="group" aria-label="Delete format" className="flex flex-wrap items-center gap-2 rounded-lg border border-red-400/30 bg-red-400/5 p-3 text-sm">
+          <span className="text-white">Delete {deleting.name}? Past uploads keep their reports.</span>
           <button
             type="button"
             disabled={busy}
             onClick={() => void remove()}
             className="rounded-md bg-red-400/80 px-3 py-1 font-medium text-navy disabled:opacity-60"
           >
-            Delete profile
+            Delete format
           </button>
           <button type="button" onClick={() => setDeleting(null)} className="text-xs text-white/60 hover:text-white">
             Cancel

@@ -2,30 +2,35 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { ListState } from "@/lib/useListState";
+import type { ListState, SortOrder } from "@/lib/useListState";
 import { useDebounced } from "@/lib/useDebounced";
 
 /** A column header that sorts: ascending, then descending, then back to the
  * list's default order. `defaultSort` is the column the default order sorts
- * by (ascending), if it's a shown column. */
+ * by, if it's a shown column, and `defaultOrder` its direction (a list of
+ * newest first: "desc"). */
 export function SortHeader({
   label,
   column,
   list,
   defaultSort,
+  defaultOrder = "asc",
   className = "",
 }: {
   label: string;
   column: string;
   list: ListState;
   defaultSort?: string;
+  defaultOrder?: SortOrder;
   className?: string;
 }) {
   const sort = list.sort ?? defaultSort;
-  const order = list.sort ? list.order : "asc";
+  const order = list.sort ? list.order : defaultOrder;
   const active = sort === column;
   const next = () => {
     if (!active) list.setSort(column, "asc");
+    // The default order's column: the other way round.
+    else if (!list.sort) list.setSort(column, order === "asc" ? "desc" : "asc");
     else if (order === "asc") list.setSort(column, "desc");
     else list.setSort(null);
   };

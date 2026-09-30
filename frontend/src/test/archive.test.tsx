@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ArchivedPage from "@/app/(app)/archived/page";
 import FindingsPage from "@/app/(app)/findings/page";
-import ImportsPage from "@/app/(app)/imports/page";
+import UploadsPage from "@/app/(app)/uploads/page";
 import ImportButton from "@/components/ImportButton";
-import PurgeLogPanel from "@/components/PurgeLogPanel";
 import Sidebar from "@/components/Sidebar";
 import { countsText, purgeCountdown } from "@/lib/domain";
 import type { ArchivedItem, ArchiveJob, FindingListItem, Upload } from "@/lib/types";
@@ -14,7 +13,7 @@ import { json, renderSignedIn, requestInit, scan } from "@/test/helpers";
 const navigation = vi.hoisted(() => ({ search: "", replace: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: navigation.replace }),
-  usePathname: () => "/imports",
+  usePathname: () => "/uploads",
   useSearchParams: () => new URLSearchParams(navigation.search),
 }));
 
@@ -67,13 +66,20 @@ function archived(overrides: Partial<ArchivedItem> = {}): ArchivedItem {
   };
 }
 
+/** The Archived list: the items, and how many of each type. */
+function archivedPage(items: ArchivedItem[]) {
+  const type_counts: Partial<Record<ArchivedItem["item_type"], number>> = {};
+  for (const item of items) type_counts[item.item_type] = (type_counts[item.item_type] ?? 0) + 1;
+  return { ...page(items), type_counts };
+}
+
 function gets(fetchMock: FetchMock, path: string): number {
   return fetchMock.mock.calls.filter(([url, init]) => (init?.method ?? "GET") === "GET" && String(url).includes(path)).length;
 }
 
-describe("Imports page", () => {
+describe("Uploads page", () => {
   it("lists uploads and archives one after confirming, then reloads the list", async () => {
-    const { fetchMock } = await renderSignedIn(<ImportsPage />, "auditor", {
+    const { fetchMock } = await renderSignedIn(<UploadsPage />, "auditor", {
       "GET /orgs/org-1/uploads": () => page([upload()]),
       "POST /orgs/org-1/scans/s1/archive": () => job(),
     });
@@ -81,7 +87,7 @@ describe("Imports page", () => {
     const row = (await screen.findByText("findings.csv")).closest("tr")!;
     expect(within(row).getByText("Findings (CSV)")).toBeInTheDocument();
     expect(within(row).getByText("Ann")).toBeInTheDocument();
-    expect(within(row).getByText("3 created")).toBeInTheDocument();
+    expect(within(row).getByText("3 findings created")).toBeInTheDocument();
 
     fireEvent.click(within(row).getByRole("button", { name: "Archive findings.csv" }));
     const confirm = screen.getByRole("group", { name: "Archive findings.csv" });
@@ -95,7 +101,7 @@ describe("Imports page", () => {
   });
 
   it("shows Archiving… while an upload's archive runs, and Retry if it stopped", async () => {
-    await renderSignedIn(<ImportsPage />, "admin", {
+    await renderSignedIn(<UploadsPage />, "admin", {
       "GET /orgs/org-1/uploads": () =>
         page([upload(), upload({ id: "s2", filename: "big.csv", archiving: "running" }), upload({ id: "s3", filename: "half.csv", archiving: "stopped" })]),
     });
@@ -106,7 +112,7 @@ describe("Imports page", () => {
 
   it("undoes an archive that stopped part-way", async () => {
     let undone = false;
-    await renderSignedIn(<ImportsPage />, "auditor", {
+    await renderSignedIn(<UploadsPage />, "auditor", {
       "GET /orgs/org-1/uploads": () =>
         page([upload({ archiving: undone ? null : "stopped", archiving_batch_id: undone ? null : "b9" })]),
       "POST /orgs/org-1/archive/b9/restore": () => {
@@ -129,7 +135,7 @@ describe("Imports page", () => {
   });
 
   it("shows only Undoing… while Undo runs", async () => {
-    await renderSignedIn(<ImportsPage />, "admin", {
+    await renderSignedIn(<UploadsPage />, "admin", {
       "GET /orgs/org-1/uploads": () => page([upload({ archiving: "stopped", archiving_batch_id: "b9" })]),
       "GET /orgs/org-1/archive-jobs?tracked=true": () => [
         job({ action: "restore", batch_id: "b9", status: "running", summary: null, completed_at: null }),
@@ -142,7 +148,7 @@ describe("Imports page", () => {
   it("shows only Archiving… while Retry archive runs", async () => {
     let retried = false;
     const running = job({ status: "running", summary: null, completed_at: null });
-    await renderSignedIn(<ImportsPage />, "admin", {
+    await renderSignedIn(<UploadsPage />, "admin", {
       // The list still says "stopped" until it reloads when the job finishes.
       "GET /orgs/org-1/uploads": () => page([upload({ archiving: "stopped", archiving_batch_id: "b1" })]),
       "POST /orgs/org-1/scans/s1/archive": () => {
@@ -158,27 +164,67 @@ describe("Imports page", () => {
   });
 
   it("can't archive an upload still importing", async () => {
-    await renderSignedIn(<ImportsPage />, "admin", {
+    await renderSignedIn(<UploadsPage />, "admin", {
       "GET /orgs/org-1/uploads": () => page([upload({ status: "running" })]),
     });
     expect(await screen.findByRole("button", { name: "Archive findings.csv" })).toBeDisabled();
   });
 
+  it("filters every column its own way, newest first by default", async () => {
+    const { fetchMock } = await renderSignedIn(<UploadsPage />, "viewer", {
+      "GET /orgs/org-1/uploads": () => page([upload()]),
+      "GET /orgs/org-1/uploads/facets": () => ({ type: ["findings_csv", "network_scan_import"], status: ["completed", "failed"] }),
+    });
+    await screen.findByText("findings.csv");
+    const uploaded = screen.getByRole("columnheader", { name: "Uploaded" });
+    expect(uploaded).toHaveAttribute("aria-sort", "descending");
+
+    fireEvent.change(screen.getByLabelText("Filter file"), { target: { value: "cloud" } });
+    fireEvent.change(screen.getByLabelText("Filter uploaded by"), { target: { value: "ann" } });
+    fireEvent.click(screen.getByLabelText("Filter type: All"));
+    fireEvent.click(within(screen.getByRole("group", { name: "type values" })).getByLabelText("Network scan export"));
+    fireEvent.click(screen.getByLabelText("Filter status: All"));
+    fireEvent.click(within(screen.getByRole("group", { name: "status values" })).getByLabelText("Failed"));
+    await waitFor(() => {
+      const url = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("/uploads?")).at(-1)!;
+      const query = new URLSearchParams(url.split("?")[1]);
+      expect([query.get("filename"), query.get("uploaded_by"), query.get("type"), query.get("status")]).toEqual([
+        "cloud", "ann", "network_scan_import", "failed",
+      ]);
+    });
+    expect(screen.getByText("1 upload matches")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Uploaded from"), { target: { value: "2026-09-01" } });
+    await waitFor(() => {
+      const url = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("/uploads?")).at(-1)!;
+      expect(new URLSearchParams(url.split("?")[1]).get("since")).toBe("2026-09-01");
+    });
+  });
+
+  it("asks for the order an old link shows (a sort with no order)", async () => {
+    navigation.search = "sort=filename";
+    const { fetchMock } = await renderSignedIn(<UploadsPage />, "viewer", { "GET /orgs/org-1/uploads": () => page([upload()]) });
+    await screen.findByText("findings.csv");
+    expect(screen.getByRole("columnheader", { name: "File" })).toHaveAttribute("aria-sort", "ascending");
+    const url = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("/uploads?")).at(-1)!;
+    expect(new URLSearchParams(url.split("?")[1]).get("order")).toBe("asc");
+  });
+
   it("has no Archive button for viewers", async () => {
-    await renderSignedIn(<ImportsPage />, "viewer", { "GET /orgs/org-1/uploads": () => page([upload()]) });
+    await renderSignedIn(<UploadsPage />, "viewer", { "GET /orgs/org-1/uploads": () => page([upload()]) });
     await screen.findByText("findings.csv");
     expect(screen.queryByRole("button", { name: /Archive/ })).not.toBeInTheDocument();
   });
 
   it("spans the empty list over the columns shown, for viewers too", async () => {
-    await renderSignedIn(<ImportsPage />, "viewer", { "GET /orgs/org-1/uploads": () => page([]) });
+    await renderSignedIn(<UploadsPage />, "viewer", { "GET /orgs/org-1/uploads": () => page([]) });
     const empty = await screen.findByText("No uploads yet.");
     const columns = empty.closest("table")!.querySelectorAll("thead tr:first-child th").length;
     expect(empty).toHaveAttribute("colspan", String(columns));
   });
 
   it("shows why the server refused", async () => {
-    await renderSignedIn(<ImportsPage />, "admin", {
+    await renderSignedIn(<UploadsPage />, "admin", {
       "GET /orgs/org-1/uploads": () => page([upload()]),
       "POST /orgs/org-1/scans/s1/archive": () => json({ detail: "This upload is already archived" }, 409),
     });
@@ -197,7 +243,7 @@ describe("Imports page", () => {
     const { fetchMock } = await renderSignedIn(
       <>
         <Sidebar />
-        <ImportsPage />
+        <UploadsPage />
       </>,
       "admin",
       {
@@ -228,14 +274,14 @@ describe("Imports page", () => {
 describe("Archived page", () => {
   it("shows each archived item with its countdown, and restores one", async () => {
     const { fetchMock } = await renderSignedIn(<ArchivedPage />, "auditor", {
-      "GET /orgs/org-1/archive": () => page([archived()]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
       "POST /orgs/org-1/archive/b1/restore": () => job({ action: "restore", summary: { uploads: 1, assets: 2, findings: 2, duplicates_purged: 1 } }),
     });
 
     const row = (await screen.findByText("findings.csv")).closest("tr")!;
     expect(within(row).getByText("1 upload, 2 assets, 3 findings")).toBeInTheDocument();
     expect(within(row).getByText("Deleted in 173 days")).toBeInTheDocument();
-    expect(within(row).getByText("by Ann")).toBeInTheDocument();
+    expect(within(row).getByText("Ann")).toBeInTheDocument();
     // Auditors restore; only admins purge.
     expect(within(row).queryByRole("button", { name: "Purge findings.csv" })).not.toBeInTheDocument();
 
@@ -251,7 +297,7 @@ describe("Archived page", () => {
 
   it("says how many findings stayed archived with their asset", async () => {
     await renderSignedIn(<ArchivedPage />, "admin", {
-      "GET /orgs/org-1/archive": () => page([archived()]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
       "POST /orgs/org-1/archive/b1/restore": () =>
         job({ action: "restore", summary: { uploads: 1, findings: 40, findings_kept_with_asset: 2 } }),
     });
@@ -266,7 +312,7 @@ describe("Archived page", () => {
 
   it("purges for admins after a warning that it can't be undone", async () => {
     const { fetchMock } = await renderSignedIn(<ArchivedPage />, "admin", {
-      "GET /orgs/org-1/archive": () => page([archived()]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
       "POST /orgs/org-1/archive/b1/purge": () => job({ action: "purge" }),
     });
     fireEvent.click(await screen.findByRole("button", { name: "Purge findings.csv" }));
@@ -277,19 +323,35 @@ describe("Archived page", () => {
     expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/archive/b1/purge"))).toBe(true);
   });
 
-  it("switches tabs by item type; viewers only look", async () => {
+  it("lists every type under All, with a chip per type; viewers only look", async () => {
     const { fetchMock } = await renderSignedIn(<ArchivedPage />, "viewer", {
-      "GET /orgs/org-1/archive": () => page([]),
+      "GET /orgs/org-1/archive": () =>
+        archivedPage([archived(), archived({ id: "b2", item_type: "asset", item_id: "a1", label: "web-01" })]),
     });
-    expect(await screen.findByText("No archived uploads.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Assets" }));
-    expect(await screen.findByText("No archived assets.")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/archive?item_type=asset"))).toBe(true);
+    const row = (await screen.findByText("web-01")).closest("tr")!;
+    expect(within(row).getByText("Asset")).toBeInTheDocument();
+    expect(within(screen.getByText("findings.csv").closest("tr")!).getByText("Upload")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Restore/ })).not.toBeInTheDocument();
+
+    const chips = screen.getByRole("group", { name: "Type" });
+    expect(within(chips).getByRole("button", { name: "All (2)" })).toHaveAttribute("aria-pressed", "true");
+    // Only the types there are.
+    expect(within(chips).queryByRole("button", { name: /Findings/ })).not.toBeInTheDocument();
+    fireEvent.click(within(chips).getByRole("button", { name: "Assets (1)" }));
+    await waitFor(() => {
+      const url = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("/archive?")).at(-1)!;
+      expect(new URLSearchParams(url.split("?")[1]).getAll("type")).toEqual(["asset"]);
+    });
+  });
+
+  it("says what's archived when there's nothing", async () => {
+    await renderSignedIn(<ArchivedPage />, "viewer", { "GET /orgs/org-1/archive": () => archivedPage([]) });
+    expect(await screen.findByText("No archived items yet.")).toBeInTheDocument();
   });
 
   it("labels the buttons with the job running on an item", async () => {
     await renderSignedIn(<ArchivedPage />, "admin", {
-      "GET /orgs/org-1/archive": () => page([archived({ state: "purging", running: "purge" })]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived({ state: "purging", running: "purge" })]),
     });
     expect(await screen.findByRole("button", { name: "Purging findings.csv" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /Restor/ })).not.toBeInTheDocument();
@@ -297,12 +359,12 @@ describe("Archived page", () => {
 
   it("offers Retry when a restore stopped part-way, and nothing else", async () => {
     await renderSignedIn(<ArchivedPage />, "admin", {
-      "GET /orgs/org-1/archive": () => page([archived({ state: "restoring" })]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived({ state: "restoring" })]),
     });
     const retry = await screen.findByRole("button", { name: "Retry restore findings.csv" });
     expect(retry).toBeEnabled();
     expect(retry).toHaveAttribute("title", "Stopped part-way. Click to finish from where it stopped.");
-    expect(screen.queryByRole("button", { name: /Purge/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Purge findings/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Being restored/)).not.toBeInTheDocument();
   });
 
@@ -310,7 +372,7 @@ describe("Archived page", () => {
     let started = false;
     const restoring = job({ action: "restore", status: "running", summary: null, completed_at: null });
     await renderSignedIn(<ArchivedPage />, "admin", {
-      "GET /orgs/org-1/archive": () => page([archived()]),
+      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
       "POST /orgs/org-1/archive/b1/restore": () => {
         started = true;
         return json(restoring, 202);
@@ -340,7 +402,7 @@ describe("Archiving a manual finding", () => {
   });
 });
 
-describe("Importing a file already imported", () => {
+describe("Uploading a file already uploaded", () => {
   it("asks first, then imports it anyway", async () => {
     let attempts = 0;
     const { fetchMock } = await renderSignedIn(
@@ -352,7 +414,7 @@ describe("Importing a file already imported", () => {
             ? json(
                 {
                   detail: {
-                    message: "This exact file was already imported on 28 Sep 2026 10:00 UTC by Ann.",
+                    message: "This exact file was already uploaded on 28 Sep 2026 10:00 UTC by Ann.",
                     imported_at: "2026-09-28T10:00:00+00:00",
                     imported_by: "Ann",
                   },
@@ -365,48 +427,30 @@ describe("Importing a file already imported", () => {
     );
     fireEvent.change(screen.getByTestId("findings-file-input"), { target: { files: [new File(["x"], "f.csv")] } });
 
-    const ask = await screen.findByRole("group", { name: "Already imported" });
-    expect(ask).toHaveTextContent("f.csv: this exact file was already imported on");
-    expect(ask).toHaveTextContent("by Ann. Import it again?");
+    const ask = await screen.findByRole("group", { name: "Already uploaded" });
+    expect(ask).toHaveTextContent("f.csv: this exact file was already uploaded on");
+    expect(ask).toHaveTextContent("by Ann. Upload it again?");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload findings" })).toBeDisabled();
 
-    fireEvent.click(within(ask).getByRole("button", { name: "Import anyway" }));
+    fireEvent.click(within(ask).getByRole("button", { name: "Upload anyway" }));
     await waitFor(() => expect(attempts).toBe(2));
     const second = fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/findings/import"))[1][1]!;
     expect((second.body as FormData).get("confirm")).toBe("true");
-    await waitFor(() => expect(screen.queryByRole("group", { name: "Already imported" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Already uploaded" })).not.toBeInTheDocument());
   });
 
   it("drops the file on Cancel", async () => {
     await renderSignedIn(<ImportButton orgId="org-1" kind="findings" accept=".csv" label="Upload findings" />, "admin", {
       "POST /orgs/org-1/findings/import": () =>
-        json({ detail: { message: "Already imported.", imported_at: null, imported_by: "Ann" } }, 409),
+        json({ detail: { message: "Already uploaded.", imported_at: null, imported_by: "Ann" } }, 409),
     });
     fireEvent.change(screen.getByTestId("findings-file-input"), { target: { files: [new File(["x"], "f.csv")] } });
-    const ask = await screen.findByRole("group", { name: "Already imported" });
-    expect(ask).toHaveTextContent("f.csv: this exact file was already imported by Ann.");
+    const ask = await screen.findByRole("group", { name: "Already uploaded" });
+    expect(ask).toHaveTextContent("f.csv: this exact file was already uploaded by Ann.");
     fireEvent.click(within(ask).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("group", { name: "Already imported" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Already uploaded" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload findings" })).toBeEnabled();
-  });
-});
-
-describe("Purge log", () => {
-  it("lists what was purged, by whom and why", async () => {
-    await renderSignedIn(<PurgeLogPanel orgId="org-1" />, "admin", {
-      "GET /orgs/org-1/purge-log": () =>
-        page([
-          {
-            id: "p1", item_type: "upload", label: "old.csv", archived_at: "2026-03-01T10:00:00Z",
-            purged_at: "2026-09-28T02:00:00Z", purged_by: null, reason: "auto", counts: { uploads: 1, findings: 40 },
-          },
-        ]),
-    });
-    const row = (await screen.findByText("old.csv")).closest("tr")!;
-    expect(within(row).getByText("by the daily auto-purge")).toBeInTheDocument();
-    expect(within(row).getByText("1 upload, 40 findings")).toBeInTheDocument();
-    expect(within(row).getByText("Retention period over")).toBeInTheDocument();
   });
 });
 
@@ -421,5 +465,80 @@ describe("helpers", () => {
     expect(purgeCountdown("2027-03-27T10:00:00Z", now)).toBe("Deleted in 180 days");
     expect(purgeCountdown("2026-09-29T09:00:00Z", now)).toBe("Deleted tomorrow");
     expect(purgeCountdown("2026-09-27T09:00:00Z", now)).toBe("Deleted at the next daily purge");
+  });
+});
+
+describe("Several at once", () => {
+  const uploads = (from: number, count: number) =>
+    Array.from({ length: count }, (_, i) => upload({ id: `s${from + i}`, filename: `f${from + i}.csv` }));
+
+  it("keeps what's selected across pages, then queues a job for each", async () => {
+    let second = false;
+    let queued: ArchiveJob[] = [];
+    const { fetchMock } = await renderSignedIn(<UploadsPage />, "auditor", {
+      "GET /orgs/org-1/uploads": () => ({ items: second ? uploads(101, 2) : uploads(1, 100), total: 102 }),
+      "POST /orgs/org-1/archive-jobs/bulk": () => {
+        queued = ["s1", "s2", "s101"].map((id, i) =>
+          job({ id: `j${i}`, item_id: id, label: `f${id.slice(1)}.csv`, status: i ? "pending" : "running", summary: null, completed_at: null }),
+        );
+        return json({ jobs: queued, refused: [{ id: "s102", detail: "This upload is already archived" }] }, 202);
+      },
+      "GET /orgs/org-1/archive-jobs?tracked=true": () => queued,
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select f1.csv" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select f2.csv" }));
+    expect(screen.getByRole("group", { name: "Selected" })).toHaveTextContent("2 selected");
+
+    second = true;
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("f101.csv");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all on this page" }));
+    expect(screen.getByRole("group", { name: "Selected" })).toHaveTextContent("4 selected");
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive selected" }));
+    const confirm = screen.getByRole("group", { name: "Archive selected uploads" });
+    expect(confirm).toHaveTextContent("Archive 4 uploads?");
+    fireEvent.click(within(confirm).getByRole("button", { name: "Archive" }));
+
+    // Each row says where its own job stands; the one that couldn't start says why.
+    expect(await screen.findByRole("alert")).toHaveTextContent("f102.csv: This upload is already archived");
+    expect(screen.getByRole("button", { name: "Queued f101.csv" })).toBeDisabled();
+    expect(screen.queryByRole("group", { name: "Selected" })).not.toBeInTheDocument();
+    const body = JSON.parse(String(fetchMock.mock.calls.find(([u]) => String(u).endsWith("/bulk"))![1]!.body));
+    expect(body).toEqual({ action: "archive", item_type: "upload", ids: ["s1", "s2", "s101", "s102"] });
+  });
+
+  it("starts over when the filters change", async () => {
+    await renderSignedIn(<UploadsPage />, "auditor", { "GET /orgs/org-1/uploads": () => page(uploads(1, 3)) });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select f1.csv" }));
+    expect(screen.getByRole("group", { name: "Selected" })).toHaveTextContent("1 selected");
+    fireEvent.change(screen.getByLabelText("Filter file"), { target: { value: "f2" } });
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Selected" })).not.toBeInTheDocument());
+  });
+
+  it("sums up many jobs: the one running, how many queued, then one result", async () => {
+    let done = false;
+    const many = () =>
+      ["a", "b", "c", "d", "e"].map((id, i) =>
+        done
+          ? job({ id, label: id, action: "restore", status: i === 4 ? "failed" : "completed", summary: i === 4 ? { error: "gone" } : { assets: 1 } })
+          : job({ id, label: id, action: "restore", status: i ? "pending" : "running", summary: null, completed_at: null }),
+      );
+    await renderSignedIn(<ArchivedPage />, "admin", {
+      "GET /orgs/org-1/archive": () => archivedPage([]),
+      "GET /orgs/org-1/archive-jobs?tracked=true": () => many(),
+    });
+    expect(await screen.findByRole("region", { name: "Restoring a" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Queued jobs" })).toHaveTextContent("4 more jobs queued");
+    done = true;
+    const results = await screen.findByRole("region", { name: "Job results" }, { timeout: 5000 });
+    expect(results).toHaveTextContent("Restored 4 items; 1 stopped:");
+    expect(results).toHaveTextContent("Restoring e stopped: gone");
+  });
+
+  it("has no checkboxes for viewers", async () => {
+    await renderSignedIn(<ArchivedPage />, "viewer", { "GET /orgs/org-1/archive": () => archivedPage([archived()]) });
+    await screen.findByText("findings.csv");
+    expect(screen.queryByRole("checkbox", { name: /^Select/ })).not.toBeInTheDocument();
   });
 });

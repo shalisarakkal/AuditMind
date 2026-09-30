@@ -9,7 +9,8 @@ from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.document import Document
 from app.models.import_profile import ImportProfile
-from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan, PurgeLogEntry
+from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
+from app.models.event import Event, WorkerStatus
 
 __all__ = [
     "Base",
@@ -26,5 +27,6 @@ __all__ = [
     "ArchiveBatch",
     "ArchiveJob",
     "AssetScan",
-    "PurgeLogEntry",
+    "Event",
+    "WorkerStatus",
 ]

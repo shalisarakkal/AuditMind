@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import PairRows, { type Choice, type Pair, rowsToMap, selectClass } from "@/components/PairRows";
 import { api } from "@/lib/apiClient";
@@ -24,7 +24,7 @@ const FIELDS: {
     label: "Files with bad rows",
     help: "Whether one bad row rejects the whole file.",
     choices: [
-      { value: "true", label: "Import the valid rows, report the rest" },
+      { value: "true", label: "Record the valid rows, report the rest" },
       { value: "false", label: "Reject the whole file" },
     ],
   },
@@ -135,11 +135,26 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
           );
         })}
         <RetentionField
+          id="archive_retention_days"
+          label="Keep archived items for"
+          help="Days before an archived upload, asset or finding is purged for good."
+          min={1}
           days={settings.archive_retention_days}
           overridden={settings.overridden.includes("archive_retention_days")}
           isAdmin={isAdmin}
           saving={saving}
           onSave={(days) => save({ archive_retention_days: days })}
+        />
+        <RetentionField
+          id="event_retention_days"
+          label="Keep Activity events for"
+          help="Days before an event in Activity is deleted. Audits usually expect a year."
+          min={30}
+          days={settings.event_retention_days}
+          overridden={settings.overridden.includes("event_retention_days")}
+          isAdmin={isAdmin}
+          saving={saving}
+          onSave={(days) => save({ event_retention_days: days })}
         />
       </div>
 
@@ -162,7 +177,7 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
       />
       <MapEditor
         title="Asset type names"
-        help="Names that imports and new assets may use for a type, e.g. laptop → Workstation. The name is kept as the asset's subtype."
+        help="Names that uploads and new assets may use for a type, e.g. laptop → Workstation. The name is kept as the asset's subtype."
         own={settings.asset_type_aliases_override}
         effective={settings.asset_type_aliases}
         choices={TYPE_CHOICES}
@@ -181,14 +196,22 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
   );
 }
 
-/** How long archived items are kept: a number of days, saved on demand. */
+/** How long something is kept: a number of days, saved on demand. */
 function RetentionField({
+  id,
+  label,
+  help,
+  min,
   days,
   overridden,
   isAdmin,
   saving,
   onSave,
 }: {
+  id: string;
+  label: string;
+  help: string;
+  min: number;
   days: number;
   overridden: boolean;
   isAdmin: boolean;
@@ -197,26 +220,32 @@ function RetentionField({
   onSave(days: number | null): void;
 }) {
   const [value, setValue] = useState(String(days));
-  useEffect(() => setValue(String(days)), [days]);
+  // Back to the saved value when it changes (a save), not on first show.
+  const shownDays = useRef(days);
+  useEffect(() => {
+    if (days === shownDays.current) return;
+    shownDays.current = days;
+    setValue(String(days));
+  }, [days]);
   const parsed = Number(value);
-  const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 3650;
+  const valid = Number.isInteger(parsed) && parsed >= min && parsed <= 3650;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 p-4">
       <div>
-        <label htmlFor="archive_retention_days" className="text-sm font-medium text-white">
-          Keep archived items for
+        <label htmlFor={id} className="text-sm font-medium text-white">
+          {label}
         </label>
-        <p className="text-xs text-white/50">Days before an archived upload, asset or finding is purged for good.</p>
+        <p className="text-xs text-white/50">{help}</p>
       </div>
       <div className="flex items-center gap-3">
         <span className={`rounded px-2 py-0.5 text-xs ${overridden ? "bg-cyan/15 text-cyan" : "bg-white/10 text-white/60"}`}>
           {overridden ? "Override" : "Default"}
         </span>
         <input
-          id="archive_retention_days"
+          id={id}
           type="number"
-          min={1}
+          min={min}
           max={3650}
           value={value}
           disabled={!isAdmin || saving}
@@ -269,8 +298,16 @@ type MapEditorProps = {
  * are editable, the rest are listed as inherited. */
 function MapEditor(props: MapEditorProps) {
   const { own, effective, choices, isAdmin, saving } = props;
-  const [rows, setRows] = useState<Pair[]>([]);
-  useEffect(() => setRows(Object.entries(own)), [own]);
+  // Starts from the saved entries, and goes back to them only when they
+  // change (a save): resetting on first show too would drop a row added
+  // straight away.
+  const [rows, setRows] = useState<Pair[]>(() => Object.entries(own));
+  const shown = useRef(own);
+  useEffect(() => {
+    if (own === shown.current) return;
+    shown.current = own;
+    setRows(Object.entries(own));
+  }, [own]);
 
   const label = (value: string) => choices.find((c) => c.value === value)?.label ?? value;
   const inherited = Object.entries(effective).filter(([key]) => !(key in own));

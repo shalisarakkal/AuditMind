@@ -18,12 +18,12 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
       {mine.filter(isRunning).map((scan) => (
         <section
           key={scan.id}
-          aria-label={`Importing ${scan.filename ?? "a file"}`}
+          aria-label={`Processing ${scan.filename ?? "a file"}`}
           className="rounded-xl border border-cyan/30 bg-cyan/5 p-4 text-sm"
         >
           <p className="text-white">
-            <span className="font-medium">{scan.filename ?? "Import"}</span>{" "}
-            <span className="text-white/60">— importing in the background</span>
+            <span className="font-medium">{scan.filename ?? "Upload"}</span>{" "}
+            <span className="text-white/60">— processing in the background</span>
           </p>
           <p className="mt-1 text-cyan">{progressText(scan)}</p>
         </section>

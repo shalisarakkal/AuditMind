@@ -68,6 +68,9 @@ export function useListState(pageSize: number, orgId: string) {
     own.delete(ORG_KEY);
     const offset = Math.max(0, Number(own.get("offset")) || 0);
     const apiQuery = new URLSearchParams(own);
+    // A sort without an order (an old link) is shown ascending: ask for it
+    // (some lists' own default is newest first).
+    if (own.get("sort") && !own.get("order")) apiQuery.set("order", "asc");
     apiQuery.set("limit", String(pageSize));
     apiQuery.set("offset", String(offset));
     const filterKeys = [...new Set(own.keys())].filter((k) => !["sort", "order", "offset"].includes(k));
@@ -81,6 +84,11 @@ export function useListState(pageSize: number, orgId: string) {
       /** A pick-list filter's chosen values. */
       values: (key: string) => own.getAll(key),
       hasFilters: filterKeys.length > 0,
+      /** The filters as one string: changes whenever any filter does. */
+      filterKey: [...filterKeys]
+        .sort()
+        .flatMap((k) => own.getAll(k).map((v) => `${k}=${v}`))
+        .join("&"),
       clearCount,
       setText: (key: string, value: string) =>
         update((next) => (value.trim() ? next.set(key, value.trim()) : next.delete(key))),
@@ -89,14 +97,15 @@ export function useListState(pageSize: number, orgId: string) {
           next.delete(key);
           values.forEach((value) => next.append(key, value));
         }),
-      /** Sort by `column`, or back to the list's default order (null). */
+      /** Sort by `column` (the order always written: some lists default to
+       * newest first), or back to the list's default order (null). */
       setSort: (column: string | null, order: SortOrder = "asc") =>
         update((next) => {
           next.delete("sort");
           next.delete("order");
           if (column) {
             next.set("sort", column);
-            if (order === "desc") next.set("order", "desc");
+            next.set("order", order);
           }
         }),
       setOffset: (value: number) =>

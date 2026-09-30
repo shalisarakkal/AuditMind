@@ -57,12 +57,12 @@ export const SCAN_STATUS_BADGES: Record<ScanStatus, string> = {
 };
 
 export const SCAN_TYPE_LABELS: Record<string, string> = {
-  asset_import: "Asset import",
+  asset_import: "Asset list",
   findings_csv: "Findings (CSV)",
   findings_json: "Findings (JSON)",
   nessus: "Nessus scan",
-  generic_assets_import: "Asset import",
-  generic_findings_import: "Findings import",
+  generic_assets_import: "Asset list",
+  generic_findings_import: "Findings list",
   endpoint_agent_import: "Endpoint agent export",
   network_scan_import: "Network scan export",
   cloud_inventory_import: "Cloud inventory export",
@@ -98,10 +98,6 @@ export function purgeCountdown(purgeAt: string, now = Date.now()): string {
   if (days <= 0) return "Deleted at the next daily purge";
   return days === 1 ? "Deleted tomorrow" : `Deleted in ${days.toLocaleString("en-US")} days`;
 }
-
-/** A list page's search box. */
-export const SEARCH_BOX =
-  "w-full max-w-sm rounded-md border border-white/15 bg-navy px-3 py-1.5 text-sm text-white placeholder:text-white/40 focus:border-cyan focus:outline-none";
 
 /** Admins and auditors can import and upload; viewers are read-only. */
 export function canWrite(role: UserRole | undefined): boolean {

@@ -80,10 +80,10 @@ describe("Assets page", () => {
       target: { files: [new File(["type,hostname\nserver,web-01\n"], "assets.csv")] },
     });
     expect(await screen.findByLabelText("Source")).toHaveValue("generic_assets");
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
 
     expect(await screen.findByText("web-01.acme.io")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Import result" })).toHaveTextContent("Created 1");
+    expect(screen.getByRole("region", { name: "Upload result" })).toHaveTextContent("Assets created 1");
     const row = screen.getByText("web-01.acme.io").closest("tr")!;
     expect(row).toHaveTextContent("10.0.1.10");
     expect(row).toHaveTextContent("webdmz");
@@ -102,14 +102,34 @@ describe("Assets page", () => {
     const csv = "EndPointID,DeviceName,LastHeartbeat,ThreatsDetected,ComplianceStatus\nEP-1,DEV-1,x,0,ok\n";
     fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File([csv], "edr.csv")] } });
     expect(await screen.findByLabelText("Source")).toHaveValue("endpoint_agent");
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
 
-    const panel = await screen.findByRole("region", { name: "Import result" });
+    const panel = await screen.findByRole("region", { name: "Upload result" });
     expect(panel).toHaveTextContent("Assets created 7");
     expect(panel).toHaveTextContent("Findings created 8");
     expect(panel).toHaveTextContent("Warnings 1");
     const upload = fetchMock.mock.calls.findIndex(([url]) => String(url).endsWith("/imports"));
     expect((requestInit(fetchMock, upload).body as FormData).get("profile")).toBe("endpoint_agent");
+  });
+
+  it("says Archiving… while a small archive runs in its request, then Archived", async () => {
+    let finish: (value: unknown) => void = () => {};
+    await renderSignedIn(<AssetsPage />, "auditor", {
+      ...PROFILES,
+      "GET /orgs/org-1/assets": () => page(ASSETS),
+      "POST /orgs/org-1/assets/a1/archive": () => new Promise((resolve) => (finish = resolve)),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Archive web-01.acme.io" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Archive web-01.acme.io" })).getByRole("button", { name: "Archive" }));
+    expect(await screen.findByRole("button", { name: "Archiving web-01.acme.io" })).toBeDisabled();
+
+    finish({
+      id: "j1", org_id: "org-1", batch_id: "b1", action: "archive", status: "completed", item_type: "asset", item_id: "a1",
+      label: "web-01.acme.io", started_by: "user-1", started_at: "2026-09-28T10:00:00Z", completed_at: "2026-09-28T10:00:01Z",
+      dismissed_at: null, progress: null, summary: { uploads: 0, assets: 1, findings: 4 },
+    });
+    // Until the list reloads without it.
+    expect(await screen.findByRole("button", { name: "Archived web-01.acme.io" })).toBeDisabled();
   });
 
   it("shows type, subtype and expandable details", async () => {
@@ -136,7 +156,7 @@ describe("Assets page", () => {
     await renderSignedIn(<AssetsPage />, "viewer", { "GET /orgs/org-1/assets": () => page(ASSETS) });
 
     expect(await screen.findByText("web-01.acme.io")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload file" })).not.toBeInTheDocument();
   });
 
   it("searches and pages through the assets", async () => {
@@ -166,7 +186,7 @@ describe("Assets page", () => {
     await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("sort")).toBe("hostname"));
     expect(header()).toHaveAttribute("aria-sort", "ascending");
     // The address also names the org the view belongs to.
-    expect(navigation.replace).toHaveBeenLastCalledWith("/assets?sort=hostname&org=org-1", { scroll: false });
+    expect(navigation.replace).toHaveBeenLastCalledWith("/assets?sort=hostname&order=asc&org=org-1", { scroll: false });
 
     fireEvent.click(within(header()).getByRole("button"));
     await waitFor(() => expect(lastQuery(fetchMock, "/orgs/org-1/assets").get("order")).toBe("desc"));
@@ -298,7 +318,8 @@ describe("Findings page", () => {
     });
 
     const rows = (await screen.findAllByRole("row")).slice(2); // titles, then filters
-    expect(rows.map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual([
+    // Cells: the checkbox (writers), severity, finding...
+    expect(rows.map((r) => within(r).getAllByRole("cell")[2].textContent)).toEqual([
       "Remote code executionCRIT-ONE",
       "MFA offMFA",
       "Minor issueLOW-ONE",
@@ -306,7 +327,7 @@ describe("Findings page", () => {
     expect(rows[0]).toHaveTextContent("web-01.acme.io");
     expect(rows[0]).toHaveTextContent("Vulnerability Mgmt");
     expect(rows[1]).toHaveTextContent("Identity & Access");
-    expect(screen.getByRole("button", { name: "Import data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload file" })).toBeInTheDocument();
   });
 
   it("names a finding's cloud resource by its cloud ID when it has no hostname or IP", async () => {
@@ -365,7 +386,7 @@ describe("Findings page", () => {
       "GET /orgs/org-1/findings": () => ({ ...page([]), domain_counts: {} }),
     });
     expect(await screen.findByText("No findings yet.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Import data" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload file" })).not.toBeInTheDocument();
   });
 });
 
@@ -402,7 +423,7 @@ describe("Dashboard page", () => {
       "GET /orgs/org-1/dashboard": () => ({ ...summary, top_findings: [], recent_scans: [] }),
     });
     expect(await screen.findByRole("link", { name: "Upload findings" })).toHaveAttribute("href", "/findings");
-    expect(screen.getByText("Nothing imported yet.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing uploaded yet.")).toBeInTheDocument();
   });
 });
 
@@ -421,7 +442,7 @@ describe("Settings page", () => {
     expect(screen.getByText("Only organization admins can change these settings.")).toBeInTheDocument();
     expect(screen.getByText("laptop → Workstation")).toBeInTheDocument();
     expect(await screen.findByText("Endpoint agent export")).toBeInTheDocument();
-    expect(screen.getByText("Only organization admins can change import profiles.")).toBeInTheDocument();
+    expect(screen.getByText("Only organization admins can change file formats.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^(Copy|Edit|Delete) / })).not.toBeInTheDocument();
   });
 });

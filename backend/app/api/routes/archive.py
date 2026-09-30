@@ -1,29 +1,40 @@
 """Archive, restore and purge (Phase 2d part 2), the Imports page's list of
-uploads, the Archived page and the purge log. The work itself is in
-app/services/archive_service.py."""
+uploads and the Archived page. The work itself is in
+app/services/archive_service.py; what was purged is in Activity."""
 
 import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import and_, func, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
-from app.api.paging import PageParams, SortOrder, contains, ordered, page_params
+from app.api.paging import (
+    DateRange,
+    PageParams,
+    SortOrder,
+    contains,
+    date_range,
+    distinct_values,
+    one_of,
+    ordered,
+    page_params,
+)
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.archive import ArchiveBatch, ArchiveJob, PurgeLogEntry
+from app.models.archive import ArchiveBatch, ArchiveJob
 from app.models.enums import ArchiveAction, ArchiveItemType, ArchiveState, ScanStatus, UserRole
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.scan import Scan
 from app.models.user import User
-from app.schemas.archive import ArchivedItemRead, ArchiveJobRead, PurgeLogRead, UploadRead
+from app.schemas.archive import ArchivedItemRead, ArchivedPage, ArchiveJobRead, UploadRead
 from app.schemas.paging import Page
 from app.schemas.scan import brief_scan
-from app.services import archive_service, ingestion_background
+from app.services import archive_service
 from app.services.archive_service import ArchiveError
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["archive"])
@@ -32,7 +43,7 @@ _WRITERS = require_org_role(UserRole.admin, UserRole.auditor)
 _ADMINS = require_org_role(UserRole.admin)
 _ACTIVE = (ScanStatus.pending, ScanStatus.running)
 
-JOB_RESPONSES = {202: {"model": ArchiveJobRead, "description": "Large job accepted; it runs in the background"}}
+JOB_RESPONSES = {202: {"model": ArchiveJobRead, "description": "Large job accepted; the background worker runs it"}}
 
 
 def _who(user: User | None) -> str | None:
@@ -58,19 +69,22 @@ def _job_read(job: ArchiveJob, batch: ArchiveBatch) -> ArchiveJobRead:
     )
 
 
-def _start(db: Session, background_tasks: BackgroundTasks, response: Response, start) -> ArchiveJobRead:
-    """Start a job (`start` creates it) and run it now (200, finished) or,
-    above ARCHIVE_SYNC_MAX_ROWS rows, in the background (202)."""
+def _start(db: Session, response: Response, start) -> ArchiveJobRead:
+    """Start a job (`start` creates it, pending) and run it now (200,
+    finished) or, above ARCHIVE_SYNC_MAX_ROWS rows, leave it for the
+    background worker (202)."""
     try:
         job = start()
     except ArchiveError as exc:
         db.rollback()
         raise HTTPException(status_code=exc.status, detail=str(exc))
-    if archive_service.estimated_rows(db, job) <= settings.ARCHIVE_SYNC_MAX_ROWS:
+    small = archive_service.estimated_rows(db, job) <= settings.ARCHIVE_SYNC_MAX_ROWS
+    # Claimed first: the worker may be looking at it too.
+    if small and archive_service.claim_job(db, job.id):
         job = archive_service.run_job(db, job.id)
         response.status_code = status.HTTP_200_OK
     else:
-        background_tasks.add_task(ingestion_background.run_archive_job, job.id)
+        db.refresh(job)
         response.status_code = status.HTTP_202_ACCEPTED
     return _job_read(job, db.get(ArchiveBatch, job.batch_id))
 
@@ -80,14 +94,12 @@ def _archive_route(item_type: ArchiveItemType, path: str, summary: str):
     def archive_item(
         org_id: uuid.UUID,
         item_id: uuid.UUID,
-        background_tasks: BackgroundTasks,
         response: Response,
         db: Session = Depends(get_db),
         membership: OrgMembership = Depends(_WRITERS),
     ) -> ArchiveJobRead:
         return _start(
             db,
-            background_tasks,
             response,
             lambda: archive_service.start_archive(db, org_id, item_type, item_id, membership.user_id),
         )
@@ -111,7 +123,6 @@ _archive_route(
 def restore(
     org_id: uuid.UUID,
     batch_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     response: Response,
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(_WRITERS),
@@ -121,7 +132,6 @@ def restore(
     Also undoes an archive that stopped part-way (what it had archived)."""
     return _start(
         db,
-        background_tasks,
         response,
         lambda: archive_service.start_batch_job(db, org_id, batch_id, ArchiveAction.restore, membership.user_id),
     )
@@ -131,51 +141,128 @@ def restore(
 def purge(
     org_id: uuid.UUID,
     batch_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     response: Response,
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(_ADMINS),
 ) -> ArchiveJobRead:
-    """Delete an archived item for good. Admins only; recorded in the purge log."""
+    """Delete an archived item for good. Admins only; a Critical event in Activity."""
     return _start(
         db,
-        background_tasks,
         response,
         lambda: archive_service.start_batch_job(db, org_id, batch_id, ArchiveAction.purge, membership.user_id),
     )
 
 
-@router.get("/archive", response_model=Page[ArchivedItemRead])
+BULK_MAX = 500
+
+
+class BulkRequest(BaseModel):
+    """Several items at once: archive uploads, assets or (manually added)
+    findings by their ids, or restore or purge archived items by theirs (the
+    Archived list's ids)."""
+
+    action: ArchiveAction
+    item_type: ArchiveItemType | None = Field(None, description="What `ids` are, for archive")
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=BULK_MAX)
+
+
+class BulkRefused(BaseModel):
+    id: uuid.UUID
+    detail: str
+
+
+class BulkResult(BaseModel):
+    """A job per item, queued for the background worker in the order given;
+    items that couldn't start (already archived, a job running on them...)
+    are listed with why."""
+
+    jobs: list[ArchiveJobRead]
+    refused: list[BulkRefused]
+
+
+@router.post("/archive-jobs/bulk", response_model=BulkResult, status_code=status.HTTP_202_ACCEPTED)
+def start_bulk(
+    org_id: uuid.UUID,
+    body: BulkRequest,
+    db: Session = Depends(get_db),
+    membership: OrgMembership = Depends(require_org_member),
+) -> BulkResult:
+    """Archive, restore or purge the selected items: one job, one archived
+    entry and one Activity event per item, as if each were done by hand.
+    Archive and restore: admins and auditors; purge: admins only."""
+    allowed = (UserRole.admin,) if body.action == ArchiveAction.purge else (UserRole.admin, UserRole.auditor)
+    if membership.role not in allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    if body.action == ArchiveAction.archive and body.item_type is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Say which item_type the ids are")
+    jobs, refused = [], []
+    for item_id in dict.fromkeys(body.ids):  # each once, in order
+        try:
+            if body.action == ArchiveAction.archive:
+                job = archive_service.start_archive(db, org_id, body.item_type, item_id, membership.user_id)
+            else:
+                job = archive_service.start_batch_job(db, org_id, item_id, body.action, membership.user_id)
+        except ArchiveError as exc:
+            db.rollback()
+            refused.append(BulkRefused(id=item_id, detail=str(exc)))
+            continue
+        jobs.append(_job_read(job, db.get(ArchiveBatch, job.batch_id)))
+    return BulkResult(jobs=jobs, refused=refused)
+
+
+ArchivedSort = Literal["name", "type", "archived", "archived_by", "purge"]
+# Uploads, then assets, then findings, as the page's chips.
+_TYPE_ORDER = case({t: i for i, t in enumerate(ArchiveItemType)}, value=ArchiveBatch.item_type)
+
+
+@router.get("/archive", response_model=ArchivedPage)
 def list_archived(
     org_id: uuid.UUID,
-    item_type: ArchiveItemType = Query(..., description="Which tab: archived uploads, assets or findings"),
-    q: str | None = Query(None, description="Name contains this"),
+    type: list[ArchiveItemType] | None = Query(None, description="Uploads, assets or findings: one of these (all if left out)"),
+    q: str | None = Query(None, description="Search the shown columns: name or who archived it contains this"),
+    name: str | None = Query(None, description="Name contains this"),
+    archived_by: str | None = Query(None, description="Who archived it contains this"),
+    dates: DateRange = Depends(date_range),
+    sort: ArchivedSort = Query("archived", description="Column to sort by (purge follows archived)"),
+    order: SortOrder = Query("desc"),
     page: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_member),
-) -> Page[ArchivedItemRead]:
+) -> ArchivedPage:
     """What's archived (not restored or purged), newest first, with when
     each will be purged automatically. An item still being archived is
-    listed once its archive has finished."""
+    listed once its archive has finished. type_counts counts each type
+    under every filter but the type one (the page's chips)."""
     conditions = [
         ArchiveBatch.org_id == org_id,
-        ArchiveBatch.item_type == item_type,
         ArchiveBatch.state.not_in((ArchiveState.archiving, ArchiveState.restored, ArchiveState.purged)),
     ]
-    if (match := contains(q, ArchiveBatch.label)) is not None:
-        conditions.append(match)
-    total = db.scalar(select(func.count()).select_from(ArchiveBatch).where(*conditions))
+    who = func.coalesce(User.name, User.email)
+    for match in (contains(q, ArchiveBatch.label, who), contains(name, ArchiveBatch.label), contains(archived_by, who)):
+        if match is not None:
+            conditions.append(match)
+    conditions += dates.conditions(ArchiveBatch.created_at)
+    with_user = select(ArchiveBatch.item_type, func.count()).outerjoin(User, User.id == ArchiveBatch.created_by)
+    type_counts = dict(db.execute(with_user.where(*conditions).group_by(ArchiveBatch.item_type)).all())
+    if type:
+        conditions.append(ArchiveBatch.item_type.in_(type))
+    base = select(ArchiveBatch, User).outerjoin(User, User.id == ArchiveBatch.created_by).where(*conditions)
+    total = sum(n for t, n in type_counts.items() if not type or t in type)
+    sort_column = {
+        "name": func.lower(ArchiveBatch.label),
+        "type": _TYPE_ORDER,
+        "archived": ArchiveBatch.created_at,
+        "archived_by": func.lower(who),
+    }["archived" if sort == "purge" else sort]
     rows = db.execute(
-        select(ArchiveBatch, User)
-        .outerjoin(User, User.id == ArchiveBatch.created_by)
-        .where(*conditions)
-        .order_by(ArchiveBatch.created_at.desc(), ArchiveBatch.id)
+        base.order_by(ordered(sort_column, order), ArchiveBatch.created_at.desc(), ArchiveBatch.id)
         .offset(page.offset)
         .limit(page.limit)
     ).all()
     org = db.get(Organization, org_id)
     running = archive_service.running_actions(db, [batch.id for batch, _ in rows])
-    return Page(
+    return ArchivedPage(
+        type_counts=type_counts,
         items=[
             ArchivedItemRead(
                 id=batch.id,
@@ -255,10 +342,34 @@ _UPLOAD_SORT = {
 }
 
 
+def _upload_conditions(org_id: uuid.UUID) -> list:
+    return [Scan.org_id == org_id, Scan.source == "upload", Scan.archived_at.is_(None)]
+
+
+class UploadFacets(BaseModel):
+    """The values the Imports pick-lists can offer."""
+
+    type: list[str]
+    status: list[str]
+
+
+@router.get("/uploads/facets", response_model=UploadFacets)
+def upload_facets(
+    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
+) -> UploadFacets:
+    uploads = db.query(Scan).filter(*_upload_conditions(org_id))
+    return UploadFacets(type=distinct_values(uploads, Scan.scan_type), status=distinct_values(uploads, Scan.status))
+
+
 @router.get("/uploads", response_model=Page[UploadRead])
 def list_uploads(
     org_id: uuid.UUID,
-    q: str | None = Query(None, description="File name, type or uploader contains this"),
+    q: str | None = Query(None, description="Search the shown columns: file name, type or uploader contains this"),
+    filename: str | None = Query(None, description="File name contains this"),
+    type: list[str] | None = Query(None, description="Type (scan_type) is one of these"),
+    uploaded_by: str | None = Query(None, description="Uploader contains this"),
+    status: list[ScanStatus] | None = Query(None, description="Status is one of these"),
+    dates: DateRange = Depends(date_range),
     sort: UploadSort = Query("started", description="Column to sort by"),
     order: SortOrder = Query("desc"),
     page: PageParams = Depends(page_params),
@@ -267,9 +378,17 @@ def list_uploads(
 ) -> Page[UploadRead]:
     """Every file uploaded to the org that isn't archived, newest first by
     default, without its report's row lists."""
-    conditions = [Scan.org_id == org_id, Scan.source == "upload", Scan.archived_at.is_(None)]
-    if (match := contains(q, Scan.filename, Scan.scan_type, User.name, User.email)) is not None:
-        conditions.append(match)
+    conditions = _upload_conditions(org_id)
+    for match in (
+        contains(q, Scan.filename, Scan.scan_type, User.name, User.email),
+        contains(filename, Scan.filename),
+        contains(uploaded_by, User.name, User.email),
+        one_of(Scan.scan_type, type),
+        one_of(Scan.status, [s.value for s in status] if status else None),
+    ):
+        if match is not None:
+            conditions.append(match)
+    conditions += dates.conditions(Scan.started_at)
     base = select(Scan, User).outerjoin(User, User.id == Scan.started_by).where(*conditions)
     total = db.scalar(select(func.count()).select_from(base.subquery()))
     rows = db.execute(
@@ -287,38 +406,3 @@ def list_uploads(
         for scan, user in rows
     ]
     return Page(items=items, total=total)
-
-
-@router.get("/purge-log", response_model=Page[PurgeLogRead])
-def list_purge_log(
-    org_id: uuid.UUID,
-    page: PageParams = Depends(page_params),
-    db: Session = Depends(get_db),
-    _: OrgMembership = Depends(_ADMINS),
-) -> Page[PurgeLogRead]:
-    """What was purged, newest first. Admins only."""
-    total = db.scalar(select(func.count()).select_from(PurgeLogEntry).where(PurgeLogEntry.org_id == org_id))
-    rows = db.execute(
-        select(PurgeLogEntry, User)
-        .outerjoin(User, User.id == PurgeLogEntry.purged_by)
-        .where(PurgeLogEntry.org_id == org_id)
-        .order_by(PurgeLogEntry.purged_at.desc(), PurgeLogEntry.id)
-        .offset(page.offset)
-        .limit(page.limit)
-    ).all()
-    return Page(
-        items=[
-            PurgeLogRead(
-                id=entry.id,
-                item_type=entry.item_type,
-                label=entry.label,
-                archived_at=entry.archived_at,
-                purged_at=entry.purged_at,
-                purged_by=_who(user),
-                reason=entry.reason,
-                counts=entry.counts,
-            )
-            for entry, user in rows
-        ],
-        total=total,
-    )

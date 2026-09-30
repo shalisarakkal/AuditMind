@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ from app.services.import_profiles import (
     resolve_profile,
     validate_profile_parts,
 )
+from app.services.events import record_event
 from app.services.ingestion_service import IngestionError
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["imports"])
@@ -122,7 +123,7 @@ def create_import_profile(
     org_id: uuid.UUID,
     payload: ImportProfileCreate,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin)),
 ) -> ImportProfileRead:
     """Admins only. Copies `copy_from` (a built-in key or one of the org's
     profile ids) under a new name; column_map/params, when given, replace the
@@ -141,6 +142,14 @@ def create_import_profile(
         org_id=org_id, name=payload.name, family=source.family.key, column_map=column_map, params=params
     )
     db.add(profile)
+    record_event(
+        db,
+        "profile_created",
+        org_id=org_id,
+        actor=membership.user,
+        item=profile.name,
+        details={"copied_from": source.name},
+    )
     db.commit()
     db.refresh(profile)
     return _read_row(profile)
@@ -152,7 +161,7 @@ def update_import_profile(
     key: str,
     payload: ImportProfileUpdate,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin)),
 ) -> ImportProfileRead:
     """Admins only. Omitted parts are unchanged; column_map and params are
     replaced wholesale."""
@@ -168,6 +177,10 @@ def update_import_profile(
         )
         profile.column_map = column_map
         profile.params = params
+    changed = [name for name in ("name", "column_map", "params") if getattr(payload, name) is not None]
+    record_event(
+        db, "profile_updated", org_id=org_id, actor=membership.user, item=profile.name, details={"changed": changed}
+    )
     db.commit()
     db.refresh(profile)
     return _read_row(profile)
@@ -178,10 +191,12 @@ def delete_import_profile(
     org_id: uuid.UUID,
     key: str,
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_role(UserRole.admin)),
+    membership: OrgMembership = Depends(require_org_role(UserRole.admin)),
 ) -> Response:
     """Admins only. Past imports keep their reports."""
-    db.delete(_own_profile(db, org_id, key))
+    profile = _own_profile(db, org_id, key)
+    db.delete(profile)
+    record_event(db, "profile_deleted", org_id=org_id, actor=membership.user, item=profile.name)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -194,7 +209,6 @@ def delete_import_profile(
 )
 async def import_with_profile(
     org_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     response: Response,
     file: UploadFile = File(..., description="A .csv or .json export"),
     profile: str = Form(..., description="Profile key: a built-in (e.g. endpoint_agent) or one of the org's profile ids"),
@@ -212,7 +226,6 @@ async def import_with_profile(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return await start_import(
         db=db,
-        background_tasks=background_tasks,
         response=response,
         org_id=org_id,
         file=file,

@@ -553,6 +553,7 @@ Review (3 reviewers, every finding reproduced; 2026-09-29):
       the empty-list row spans the viewer's columns; one polling helper for
       both trackers; retention field edit/save/reset tested
 - 474 backend + 135 frontend tests pass
+- [x] Your sign-off (2026-09-29): committed as e748b25, CI green (CI #7)
 
 ### Part 3 — Background worker (after Part 2 sign-off, before Phase 2e)
 
@@ -561,26 +562,168 @@ imports run ~15x faster (~1,500 findings/s, was ~100), and the web server
 became the bottleneck: background imports and archive jobs run inside the
 API's own Python process, so while one runs every request waits for it
 (measured: 2-3 s per request, even ones returning nothing; pages take
-several seconds to switch). Proposed, to be confirmed when it starts:
+several seconds to switch). Started 2026-09-29; decisions 1-7 as
+recommended:
 
-- [ ] A separate worker process runs imports, and archive/restore/purge
+- [x] A separate worker process runs imports, and archive/restore/purge
       jobs; the web server only records the job and answers requests
-- [ ] The queue is the database itself (the scans and archive_jobs rows,
+- [x] The queue is the database itself (the scans and archive_jobs rows,
       claimed with `FOR UPDATE SKIP LOCKED`): no Redis or other new service
-- [ ] Uploaded files are stored for the worker (a folder, or the database)
-      instead of held in the web server's memory until their turn
-- [ ] Started next to the backend (one command, and a Windows window like
-      the backend's); the web server keeps working if the worker is down,
-      and jobs wait until it's back
-- [ ] An import cut off by a restart is marked failed with "import it
-      again" (today it stays "running"); archive jobs already resume
-- [ ] Only jobs that are really dead are marked failed at startup (review of
+- [x] Uploaded files waiting for the worker are saved in `backend/uploads/`
+      (configurable; excluded from git) and deleted once imported, instead
+      of held in the web server's memory (4 GB for six queued files)
+- [x] Files up to IMPORT_SYNC_MAX_BYTES (10 MB) still import during the
+      request (instant report); larger ones go to the worker
+- [x] One worker, oldest job first (imports into one org already take
+      turns); a setting for more later
+- [x] Its own window ("AuditMind worker"), plus `start-dev.ps1` opening the
+      backend, worker and frontend windows; the web server keeps working if
+      the worker is down: jobs show "Waiting for the background worker…",
+      and the app warns when the worker hasn't checked in for a minute
+- [x] An import cut off by a restart is started again automatically from its
+      saved file, once (imports are all-or-nothing, so nothing half-saved
+      exists), then marked failed; archive jobs resume as today
+- [x] The daily auto-purge runs in the worker
+
+Activity: AuditMind's own event log (requested 2026-09-29; not Phase 2f,
+which imports other tools' logs). All as recommended:
+
+- [x] Recorded (every action that changes something or matters for
+      security; not page views): sign-in (login, failed login, logout,
+      registration); data (imports started/completed/failed with counts,
+      archive, restore, Undo, purge incl. auto-purge, repeat upload imported
+      anyway, asset or finding added by hand); settings (ingestion and
+      retention changes, import profiles created/edited/deleted); people
+      (member added; Phase 2e adds user created, role changed, removed,
+      deactivated, password changed/reset); system (auto-purge, worker
+      started/stopped, event clean-up). Reports and AI runs in Phase 3
+- [x] Each event: what, the item, who ("System" for automatic ones), start
+      and end time, duration, outcome (completed/failed/stopped), counts,
+      criticality
+- [x] Criticality: Info (clean import, archive, restore, Undo, sign-in);
+      Warning (import with failed rows, job failed or stopped, duplicates
+      purged on restore, repeat upload imported anyway, failed login);
+      Critical (any purge; in 2e admin role changes, password resets, users
+      removed)
+- [x] An Activity page (sidebar): newest first, paged, filters by type,
+      user, criticality and date; a "Recent activity" list on the Dashboard
+- [x] Every member of the org sees it, read-only; no one edits or deletes
+      events
+- [x] Kept EVENT_RETENTION_DAYS (default 365; per-org override), then
+      deleted by the worker's daily job, which records how many it deleted.
+      Safety net instead of a hard cap (a flood of events must not push
+      real history out): past ~1M events in an org, admins are warned and
+      the oldest Info events go first; Warning and Critical kept for the
+      full period
+- [x] The purge log becomes part of Activity (Settings' purge log replaced
+      by Activity filtered to purges; its entries carried over); existing
+      uploads, archives and purges get events from their records, so
+      Activity isn't empty on day one
+
+Design (2026-09-29, "combined" of three proposals, approved):
+- Queue = today's scans (uploads waiting for the worker) and archive_jobs
+  rows; `python -m app.worker` claims the oldest with FOR UPDATE SKIP
+  LOCKED. A request that runs a small job itself claims it the same way,
+  so the worker never runs it twice
+- A thread in the worker updates worker_status and the running job's
+  heartbeat every ~15 s (the main loop is busy inside a long import); a job
+  with no heartbeat for WORKER_STALE_SECONDS is dead: an import is retried
+  once from its saved file, an archive job carries on (up to 3 times)
+- Large uploads are streamed to backend/uploads/ and hashed as they stream;
+  the import's kind and format come from its scan type and file name
+- One event per action, written when it ends (start and end time), in the
+  same transaction as the change; never updated. Failed logins go to each
+  org the account belongs to (an unknown email only to the server log);
+  worker start/stop events are shown to every org
+- Migration 0011: heartbeat and retry columns, worker_status, events (with
+  a backfill from scans, archive jobs and the purge log), purge_log dropped
+
+Consistent list pages (requested 2026-09-30, for every page from now on):
+- [x] One layout for Assets, Findings, Imports, Archived and Activity: header
+      with the count and main action, toolbar with "Search all columns",
+      every column sortable, a filter row under the headers (contains boxes
+      for text, pick-lists for fixed values), who and when as separate
+      columns, status and criticality badges, row actions right-aligned (red
+      for purge), the same empty/loading messages. Shared pieces in
+      frontend/src/components/ListPage.tsx; the rules, and a checklist for new
+      pages, in docs/UI_CONVENTIONS.md (read by every session through
+      frontend/CLAUDE.md)
+- [x] Activity shows how long an action waited for the worker and how long
+      it ran ("waited 15 min, took 1 min 24 s"): scans and archive_jobs
+      record run_started_at (migration 0012, which also drops the zero
+      counts of the events carried over)
+- [x] Import counts say what they count ("900 assets created, 2,792
+      findings created, 4,990 duplicate findings skipped"), in Activity, the
+      Imports page and the import report (migration 0013)
+
+Review (3 reviewers, every finding reproduced; 2026-09-30). Security: no
+Critical or High (no cross-org leak in Activity, no injection, upload paths
+never from file names).
+- [x] Medium: an import run by a request, waiting over 30 min for the org's
+      lock, was taken for dead (a false failure, then completed: two events).
+      Fixed: whoever runs a job holds its own lock (org_lock.job_running);
+      the worker reaps only jobs nobody holds (also covers auto-purge jobs)
+- [x] Medium: an interrupted import (second Ctrl+C, database down) deleted
+      its saved file, so it couldn't be started again. Fixed: the file goes
+      only once the outcome is saved; a lost file has its own message
+- [x] Medium: any error outside a job (database restarting, a folder in
+      uploads/) stopped the worker for good. Fixed: each loop step carries
+      on after a pause (up to a minute); the sweep deletes files only
+- [x] Medium: the generic findings profile's imports were counted as assets
+      created. Fixed in the backend, frontend and history (migration 0014)
+- [x] Medium: migration 0013 run again wiped counts. Fixed: names it doesn't
+      map are kept
+- [x] Medium: an old link with a sort but no order showed ascending while the
+      list came newest first. Fixed: the order shown is the order asked for
+- [x] Medium: UI_CONVENTIONS promised date filters that Findings, Imports and
+      Archived lacked. Added (DateRangeFilter; since/until in paging.py)
+- [x] Low: the safety net couldn't trim a flood of failed sign-ins (Warning).
+      Now: oldest Info events, then oldest failed sign-ins; other Warnings
+      and all Criticals kept for the full period
+- [x] Low: failed imports carried over lost their error message; duplicate
+      purges carried over twice. Fixed in migration 0014
+- [x] Low: notes on closing the worker's window; a leftover type removed
+- [x] Intermittent frontend tests: a real race (the map editor and the
+      retention field reset themselves just after first showing, dropping a
+      row added at once) fixed; test waits raised to 3 s for busy machines
+- [ ] Low, Phase 4 hardening: uploads folder permissions (inherited from the
+      user's folder on Windows)
+
+After the review (requested 2026-09-30):
+- [x] Archived page in the Findings style: one list, "All" by default, chips
+      Uploads / Assets / Findings with counts (FilterChips, shared with
+      Findings), a Type column (sortable, pick-list); API `type` (any of)
+      and `type_counts`
+- [x] Words: Upload (a file sent in) vs Import (collected by a connector,
+      later); the Imports page is now Uploads (/uploads; /imports
+      redirects), "Upload file", "Processing big.csv…", Settings' Import
+      profiles are File formats, Activity's "Import" reads "Upload". Rules in
+      docs/UI_CONVENTIONS.md; code and API names unchanged
+- [x] A small archive, restore or purge (done during the request) now shows
+      "Archiving…" (disabled) from the moment it's confirmed, then
+      "Archived" until the list reloads; before, the button didn't change
+- [x] Several at once (option a, 2026-09-30): checkboxes on Uploads, Assets,
+      Findings (hand-added ones) and Archived, "select all on this page",
+      kept across pages (cleared when a filter changes; at most 500);
+      Archive selected / Restore selected / Purge selected (admins), each
+      confirmed. POST /archive-jobs/bulk queues one job per item (one
+      archived entry and one Activity event each, as by hand) and lists the
+      ones it couldn't start. Each row shows "Queued…", then its own
+      progress; past 3 jobs the job panel sums up (the one running, how many
+      queued, one result with Dismiss all), and the sidebar lists 3 and
+      "N more"
+- [x] Pages slow to switch (e.g. Archived to Activity): every API call
+      waited ~2 s, because `localhost` is tried over IPv6 first on Windows
+      and the backend listens on IPv4 only. The frontend now calls
+      127.0.0.1 (default and .env.example): 2.0 s per call became 0.02-0.06 s
+- 509 backend + 144 frontend tests pass; lint, typecheck and build pass
+- [x] Only jobs that are really dead are marked failed at startup (review of
       Part 2, finding 4): today every starting process fails every running
       archive job, correct with one process but wrong once the worker and
       web server (or several workers) run side by side. A heartbeat per job
       (updated with each chunk's progress) and "no heartbeat for N minutes"
       instead
-- [ ] The import tracker and pages unchanged: same status, progress and
+- [x] The import tracker and pages unchanged: same status, progress and
       reports
 - [ ] Measured: page requests while a 500K-row import runs (target: as fast
       as with nothing running)
@@ -681,6 +824,9 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       Decide once hosting is chosen; confirm what the Claude API supports at
       that point. Likely shape: a `CLAUDE_AUTH_MODE` setting read by
       `claude_service.py`, with local dev staying on the API key.
+- [ ] Uploads folder permissions (from the Phase 2d part 3 review): the
+      folder holding uploaded files should be readable only by the app's
+      service account, not inherit the user's folder permissions
 - [ ] Production database (decided 2026-09-29): a managed Linux Postgres,
       not a self-run or Windows one: Azure Database for PostgreSQL (Flexible
       Server), AWS RDS/Aurora or Google Cloud SQL, with pgvector enabled
