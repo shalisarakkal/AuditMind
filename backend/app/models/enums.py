@@ -42,3 +42,32 @@ class ReportStatus(str, enum.Enum):
     pending = "pending"
     generated = "generated"
     failed = "failed"
+
+
+class ArchiveItemType(str, enum.Enum):
+    upload = "upload"
+    asset = "asset"
+    finding = "finding"
+
+
+class ArchiveState(str, enum.Enum):
+    archiving = "archiving"
+    archived = "archived"
+    restoring = "restoring"
+    restored = "restored"
+    purging = "purging"
+    purged = "purged"
+
+
+class ArchiveProgress(str, enum.Enum):
+    """An item's archive that hasn't finished: a job is working on it now, or
+    one stopped part-way (archive it again to finish)."""
+
+    running = "running"
+    stopped = "stopped"
+
+
+class ArchiveAction(str, enum.Enum):
+    archive = "archive"
+    restore = "restore"
+    purge = "purge"

@@ -1,6 +1,6 @@
-"""Runs large file imports after the response has been sent (FastAPI
-BackgroundTasks, in-process). The request's DB session is closed by then, so
-the job opens its own.
+"""Runs large file imports, and large archive, restore and purge jobs, after
+the response has been sent (FastAPI BackgroundTasks, in-process). The
+request's DB session is closed by then, so the job opens its own.
 
 If the server restarts mid-import, that scan stays "running": fine for the MVP;
 a real task queue is a later hardening step.
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.scan import Scan
+from app.services import archive_service
 from app.services.ingestion_service import ImportKind, RowReader, process_import
 
 logger = logging.getLogger(__name__)
@@ -70,3 +71,10 @@ def run_import_job(
         except Exception:
             # process_import has already marked the scan failed.
             logger.exception("Background import failed (scan %s)", scan_id)
+
+
+def run_archive_job(job_id: uuid.UUID) -> None:
+    """A large archive, restore or purge (see archive_service.run_job, which
+    records its own failures)."""
+    with open_session() as db:
+        archive_service.run_job(db, job_id)

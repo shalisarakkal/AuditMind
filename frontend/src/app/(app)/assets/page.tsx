@@ -4,11 +4,14 @@ import { Fragment, Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
+import { ArchiveButtons } from "@/components/JobButton";
+import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
+import JobStatus from "@/components/JobStatus";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { ASSET_TYPE_LABELS, canWrite } from "@/lib/domain";
+import { ASSET_TYPE_LABELS, SEARCH_BOX, canWrite } from "@/lib/domain";
 import { humanize } from "@/lib/importProfiles";
 import type { Asset, AssetFacets, AssetType, ImportProfile, Page } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
@@ -16,8 +19,6 @@ import { useListState } from "@/lib/useListState";
 import { useReloadOnImport } from "@/lib/useReloadOnImport";
 
 const PAGE_SIZE = 100;
-const SEARCH =
-  "w-full max-w-sm rounded-md border border-white/15 bg-navy px-3 py-1.5 text-sm text-white placeholder:text-white/40 focus:border-cyan focus:outline-none";
 
 // The list reads its sort and filters from the page address.
 export default function AssetsPage() {
@@ -37,10 +38,25 @@ function Assets() {
   const facets = useApi<AssetFacets>(`/orgs/${org.id}/assets/facets`);
   const profiles = useApi<ImportProfile[]>(writer ? `/orgs/${org.id}/import-profiles` : null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<JobRequest | null>(null);
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
 
   const assets = page?.items;
+  const archive = (a: Asset) => {
+    const name = a.hostname ?? a.ip ?? a.cloud_id ?? "this asset";
+    setConfirming({
+      path: `/orgs/${org.id}/assets/${a.id}/archive`,
+      label: `Archive ${name}`,
+      message: (
+        <>
+          Archive <strong>{name}</strong> and all its findings? They leave every list and score, and imports stop matching
+          it. You can restore them from Archived until they&apos;re purged.
+        </>
+      ),
+      confirmLabel: "Archive",
+    });
+  };
   const toggle = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current);
@@ -71,6 +87,8 @@ function Assets() {
         </p>
       )}
       <ImportStatus page="assets" />
+      <JobStatus />
+      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
 
       <div className="flex flex-wrap items-center gap-3">
         <TextFilter
@@ -79,7 +97,7 @@ function Assets() {
           list={list}
           ariaLabel="Search assets"
           placeholder="Search all columns"
-          className={SEARCH}
+          className={SEARCH_BOX}
         />
         {list.hasFilters && (
           <button type="button" onClick={list.clearFilters} className="text-sm text-cyan hover:underline">
@@ -103,7 +121,7 @@ function Assets() {
                 <SortHeader label="Criticality" column="criticality" list={list} />
                 <th className="px-4 py-2">Tags</th>
                 <th className="px-4 py-2">
-                  <span className="sr-only">Details</span>
+                  <span className="sr-only">Details and actions</span>
                 </th>
               </tr>
               <tr>
@@ -164,7 +182,7 @@ function Assets() {
                           </span>
                         ))}
                       </td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="whitespace-nowrap px-4 py-2 text-right">
                         {details.length > 0 && (
                           <button
                             type="button"
@@ -175,6 +193,17 @@ function Assets() {
                           >
                             {open ? "Hide details" : "Details"}
                           </button>
+                        )}
+                        {writer && (
+                          <ArchiveButtons
+                            itemId={a.id}
+                            name={a.hostname ?? a.ip ?? a.cloud_id ?? "asset"}
+                            archiving={a.archiving}
+                            batchId={a.archiving_batch_id}
+                            onArchive={() => archive(a)}
+                            onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, a.hostname ?? a.ip ?? a.cloud_id ?? "asset"))}
+                            className="ml-3 text-xs text-cyan hover:underline"
+                          />
                         )}
                       </td>
                     </tr>

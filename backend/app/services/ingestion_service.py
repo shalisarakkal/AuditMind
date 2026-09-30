@@ -24,10 +24,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
 from psycopg.types.json import Jsonb
-from sqlalchemy import bindparam, func, select, update
+from sqlalchemy import bindparam, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
+from app.models.archive import AssetScan
 from app.models.asset import Asset
 from app.models.enums import Domain, ScanStatus, Severity
 from app.models.finding import Finding
@@ -37,6 +38,7 @@ from app.schemas.ingestion import ImportReport, RowError, RowWarning
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
 from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, finding_key
 from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity, parse_nessus
+from app.services.org_lock import lock_org
 from app.services.org_settings import IngestionSettings, resolve_ingestion_settings
 
 ImportKind = Literal["assets", "findings", "profile"]
@@ -388,10 +390,10 @@ def _import(
     report.errors = errors[:MAX_REPORTED_ERRORS]
     # All-or-nothing with a bad row: nothing is written.
     if not errors or ingestion.import_partial_success:
-        _lock_org_imports(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
+        lock_org(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
         index = _load_asset_index(db, scan.org_id, asset_rows, finding_rows)
         rows_total = len({r.row for r in asset_rows} | {r.row for r in finding_rows})
-        writes = _PendingWrites(db, progress, rows_total)
+        writes = _PendingWrites(db, scan.id, progress, rows_total)
         asset_by_row = _write_assets(db, scan.org_id, asset_rows, ingestion, report, warnings, index, writes)
         # When a file creates assets too, `created` counts those, so its
         # findings are counted separately.
@@ -470,10 +472,16 @@ class _PendingWrites:
     New rows are sent (with COPY) every WRITE_BATCH of them. Updates are
     gathered per asset until UPDATE_BATCH assets have some, since a file
     often lists the same host many times. Progress, in file rows, is reported
-    every WRITE_BATCH rows."""
+    every WRITE_BATCH rows.
 
-    def __init__(self, db: Session, progress: "ProgressCallback | None", rows_total: int):
+    It also records which assets the upload touched (asset_scans), so
+    archiving another upload leaves them be."""
+
+    def __init__(self, db: Session, scan_id: uuid.UUID, progress: "ProgressCallback | None", rows_total: int):
         self.db = db
+        self.scan_id = scan_id
+        self.linked: set[uuid.UUID] = set()
+        self.links: list[dict] = []
         self.progress = progress
         self.rows_total = rows_total
         self.rows_done = 0
@@ -510,6 +518,14 @@ class _PendingWrites:
             if max(len(self.asset_updates), len(self.details)) >= UPDATE_BATCH:
                 self.flush()
 
+    def link(self, asset_id: uuid.UUID, created: bool = False) -> None:
+        """The upload touched this asset: created it, or updated or matched
+        it. A new asset is linked (as created) as it's queued, so later
+        links to it from the same file change nothing."""
+        if asset_id not in self.linked:
+            self.linked.add(asset_id)
+            self.links.append({"scan_id": self.scan_id, "asset_id": asset_id, "created": created})
+
     def create_finding(self, values: dict) -> None:
         self.findings.append(values)
         self._created()
@@ -545,9 +561,11 @@ class _PendingWrites:
                 .values(details=table.c.details.op("||")(bindparam("new_details", type_=JSONB))),
                 [{"asset_id": id_, "new_details": details} for id_, details in self.details.items()],
             )
+        if self.links:
+            _copy_rows(self.db, AssetScan.__tablename__, self.links)
         if self.findings:
             _copy_rows(self.db, Finding.__tablename__, self.findings)
-        self.new_assets, self.asset_updates, self.details, self.findings = {}, {}, {}, []
+        self.new_assets, self.asset_updates, self.details, self.findings, self.links = {}, {}, {}, [], []
 
 
 def _copy_rows(db: Session, table: str, rows: list[dict]) -> None:
@@ -639,6 +657,7 @@ def _write_assets(
             writes.update_asset(existing.id, values, row.details or None)
             report.updated += 1
         asset_by_row[row.row] = existing
+        writes.link(existing.id)
         writes.row_done()
     return asset_by_row
 
@@ -701,6 +720,7 @@ def _write_findings(
                     index.update(asset, **filled)
                     writes.update_asset(asset.id, filled)
 
+        writes.link(asset.id)
         key = finding_key(asset.id, row.source, row.category, row.description)
         if key in findings:
             report.duplicates += 1
@@ -738,6 +758,7 @@ def _new_asset(index: AssetIndex, writes: _PendingWrites, org_id, **values) -> I
         **values,
     }
     writes.create_asset(values)
+    writes.link(values["id"], created=True)
     asset = IndexedAsset(
         id=values["id"],
         type=values["type"],
@@ -759,20 +780,6 @@ def _several_matches_warning(row: AssetRow | FindingRow, matches: list[IndexedAs
         message=f"{row.hostname or row.ip} matches {len(matches)} assets ({categories}) and this row "
         f"doesn't say which; {action} the {matches[0].type} (the oldest)",
     )
-
-
-def _lock_org_imports(db: Session, org_id: uuid.UUID, on_wait: Callable[[], object] | None = None) -> None:
-    """Serialise imports into one org until this transaction ends. Matching is
-    look-up-then-insert, so two overlapping imports (say, a background one and
-    an upload) could otherwise both create the same host. A lock rather than a
-    unique index, because the "duplicate" asset strategy allows repeats.
-    `on_wait` is called first if another import holds the lock."""
-    key = int.from_bytes(org_id.bytes[:8], "big", signed=True)
-    if db.execute(select(func.pg_try_advisory_xact_lock(key))).scalar():
-        return
-    if on_wait is not None:
-        on_wait()
-    db.execute(select(func.pg_advisory_xact_lock(key)))
 
 
 def _load_asset_index(

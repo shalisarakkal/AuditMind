@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.enums import Domain, Severity
+from app.models.enums import ArchiveProgress, Domain, Severity
 from app.schemas.paging import Page
 
 
@@ -40,6 +40,10 @@ class FindingListItem(FindingRead):
     asset_hostname: str | None = None
     asset_ip: str | None = None
     asset_cloud_id: str | None = None
+    # A manual finding whose archive hasn't finished: running now, or stopped
+    # part-way; and that archive (restore it to undo what it archived).
+    archiving: ArchiveProgress | None = None
+    archiving_batch_id: uuid.UUID | None = None
 
 
 class FindingPage(Page[FindingListItem]):

@@ -33,6 +33,10 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   reads cost ~5-10 ms each: slow counts, slow large imports. Moving the data
   directory to the SSD (C:, 299 GB free) and raising `shared_buffers` to
   ~2 GB would fix it; left as is for now (your call, 2026-09-28).
+  2026-09-29: archiving and re-imports at ~5M rows ran at ~100-200 rows/s
+  (one disk seek per row). What to change at each data size, the
+  measurements, and step-by-step instructions for this machine:
+  [docs/DATABASE_PERFORMANCE.md](docs/DATABASE_PERFORMANCE.md).
 
 ## Phase 1 — Foundations (Week 1 of the roadmap)
 
@@ -456,39 +460,163 @@ the report only to its uploader, until they dismiss it (for good).
       every org member through the API (the tracker still shows a report
       only to its uploader); no duplicate cleanup needed, as there's no other
       database with data from before the rewrite
-- [ ] Your sign-off
-- Later (Phase 4 hardening, not this part): background imports in a separate
-  worker process; scans left "running" by a server restart; progress during
+- [x] Your sign-off (2026-09-28): committed as a586bb1, CI green, Part 2
+      started
+- Later: background imports in a separate worker process and scans left
+  "running" by a server restart (now Phase 2d part 3); progress during
   the reading phase (~20 s of "Reading file…" for 500K rows). Reading large
   files in chunks (a 500K-row file peaks at ~1.1 GB while it's read and
-  checked whole) moved to Phase 2e, which needs it
+  checked whole) moved to Phase 2f, which needs it
 
-### Part 2 — Data lifecycle: archive, restore, purge
+### Part 2 — Data lifecycle: archive, restore, purge (uploads, assets, findings)
+
+Decisions (2026-09-28; all as recommended). Organization archive and purge
+moved to Phase 2e, since only the Sysadmin will create and remove orgs.
 
 - [ ] Archive manually (never automatically): an upload (its scan, report and
-      findings), a manually added asset or finding, or a whole organization.
-      Archived data leaves the dashboard, scores and lists, and shows in an
-      Archived view
-- [ ] Shared assets, the safe approach: record which uploads touched each
-      asset; archiving an upload archives only assets no other active upload
-      uses, and its facts on the others
-- [ ] Restore any archived item until it's purged. Archived findings don't
-      count for duplicate checks; on restore, one that now duplicates an active
+      findings, and the assets only it uses), an asset (with all its
+      findings), or a manually added finding. Imported findings aren't
+      archived one by one (a re-import would re-create them). Archived data
+      leaves every list, count, score, search and import match
+- [ ] Record which uploads touched each asset, from now on (an asset-upload
+      link written by every import). Existing data is linked backwards through
+      findings where possible; assets from earlier asset-only imports stay
+      unlinked (archive them individually, or with the org)
+- [ ] Changes an upload made to assets it shares with other uploads (e.g. an
+      environment or details) stay when it's archived: they can't be reliably
+      undone
+- [ ] Each archive action is a batch: restoring brings back exactly what it
+      archived. Restore any time until purged. Archived findings don't count
+      for duplicate checks; on restore, one that now duplicates an active
       finding is purged instead (the restore report says how many)
-- [ ] Purge: only from the archive, admins only; an organization purge asks
-      for its name. A purge log keeps what, who, when and how many rows
+- [ ] Purge (permanent) only from the archive, admins only; a purge log keeps
+      what, who, when and how many rows
 - [ ] Auto-purge `ARCHIVE_RETENTION_DAYS` (default 180) after archiving, set
       in `.env` and overridable per organization; each archived item shows a
       countdown ("Deleted in 173 days"). Runs daily in the app, plus a
       command for Task Scheduler/cron
-- [ ] Organization archive: frozen for members; admins can restore or purge
-- [ ] Repeat-upload warning (decided 2026-09-28): store each upload's SHA-256
-      content hash; uploading a file whose hash matches an active upload in
-      the same org warns ("already imported on <date> by <user>") and only
-      proceeds when the user confirms. Warn, never block: re-importing after a
-      settings or profile change is legitimate. Archived uploads don't count
+- [ ] Large archives, restores and purges run in the background with progress
+      in the import tracker ("Archiving… 120,000 / 500,000"); set-based SQL
+      throughout (1.5M assets / 2.15M findings on the dev HDD)
+- [ ] Who: archive and restore, admins and auditors; purge, retention and the
+      purge log, admins; everyone sees the Imports and Archived pages
+- [ ] Pages: a new Imports page (every upload, with Archive); Archive on asset
+      and manual-finding rows; a new Archived page (tabs: Uploads, Assets,
+      Findings) with the countdown, Restore and (admins) Purge; retention and
+      the purge log under Settings
+- [ ] Repeat-upload warning: store each upload's SHA-256 content hash;
+      uploading a byte-identical file (from anyone in the org; failed and
+      archived uploads don't count) warns "already imported on <date> by
+      <user>" and only proceeds when the user confirms. Warn, never block
 
-## Phase 2e — Activity and audit log sources (after Phase 2d, before Phase 3)
+Design (2026-09-28, option C "balanced" of three proposals, approved):
+- Rows stay in place with `archived_at` + `archive_batch_id`; new tables
+  `archive_batches` (one per archive action, with a finished flag so an
+  interrupted archive resumes), `asset_scans` (upload-asset links, written by
+  every import, backfilled from findings), `archive_jobs` (background
+  archive/restore/purge, same progress shape as scans, shown in the import
+  tracker) and `purge_log`; `scans.content_hash`
+- Hot indexes become partial (`WHERE archived_at IS NULL`) so lists, the
+  dashboard and import matching cost the same however much is archived
+- Every read path filters `archived_at IS NULL` explicitly next to its org
+  filter; one test per read path proves an archived row never shows
+- Large jobs run in chunks of 20,000 rows, each its own short transaction
+  under the org import lock, so an import waits seconds, not minutes
+- Restore: a restored finding that duplicates an active one (finding_key) is
+  the one purged; the active finding is never touched
+- One-time migration cost on the dev HDD (backfill + index rebuild) is
+  measured on a copy before it runs on the dev data
+
+Built and measured (2026-09-29): migrations 0009 (99 s on the dev data, on
+the hard disk) and 0010 (219 s, SSD). On the SSD, archiving a 1.23M-finding
+upload takes 3-4 min, restoring ~3 min, purging ~2 min. Speed fixes found on
+the way: a restore statement that made Postgres recheck the whole batch for
+every chunk, and stale statistics after bulk changes (ANALYZE now runs before
+a restore's findings and after large jobs). Buttons show the job's state
+(Archiving…, Retry archive, Undo) instead of notes.
+
+Review (3 reviewers, every finding reproduced; 2026-09-29):
+- [x] High: archiving an upload took an asset it only matched, when the
+      asset was newer than the upload (e.g. added by hand while the upload
+      waited). Fixed: asset_scans.created, recorded by imports (migration
+      0010; existing links keep the time-based guess)
+- [x] Medium: two requests at once (double click, manual purge during the
+      daily purge) could start two jobs on one item, and a purge could
+      delete findings a restore had just brought back. Fixed: a job-start
+      lock per org (separate from the import lock), and purge deletes only
+      rows still archived
+- [x] Medium: Undo of a large stopped archive was sized at 1 row and ran in
+      the request. Fixed: sized by counting its archived rows
+- [ ] Low: startup marks every running archive job failed, wrong once
+      several processes run: moved to Part 3 (a per-job heartbeat)
+- [x] Low: a restore's "findings kept with their asset" count is now shown;
+      the empty-list row spans the viewer's columns; one polling helper for
+      both trackers; retention field edit/save/reset tested
+- 474 backend + 135 frontend tests pass
+
+### Part 3 — Background worker (after Part 2 sign-off, before Phase 2e)
+
+Brought forward from Phase 4 (2026-09-29). With the database on the SSD,
+imports run ~15x faster (~1,500 findings/s, was ~100), and the web server
+became the bottleneck: background imports and archive jobs run inside the
+API's own Python process, so while one runs every request waits for it
+(measured: 2-3 s per request, even ones returning nothing; pages take
+several seconds to switch). Proposed, to be confirmed when it starts:
+
+- [ ] A separate worker process runs imports, and archive/restore/purge
+      jobs; the web server only records the job and answers requests
+- [ ] The queue is the database itself (the scans and archive_jobs rows,
+      claimed with `FOR UPDATE SKIP LOCKED`): no Redis or other new service
+- [ ] Uploaded files are stored for the worker (a folder, or the database)
+      instead of held in the web server's memory until their turn
+- [ ] Started next to the backend (one command, and a Windows window like
+      the backend's); the web server keeps working if the worker is down,
+      and jobs wait until it's back
+- [ ] An import cut off by a restart is marked failed with "import it
+      again" (today it stays "running"); archive jobs already resume
+- [ ] Only jobs that are really dead are marked failed at startup (review of
+      Part 2, finding 4): today every starting process fails every running
+      archive job, correct with one process but wrong once the worker and
+      web server (or several workers) run side by side. A heartbeat per job
+      (updated with each chunk's progress) and "no heartbeat for N minutes"
+      instead
+- [ ] The import tracker and pages unchanged: same status, progress and
+      reports
+- [ ] Measured: page requests while a 500K-row import runs (target: as fast
+      as with nothing running)
+
+## Phase 2e — Users and organizations (after Phase 2d, before Phase 2f)
+
+Requested 2026-09-28: a platform Sysadmin creates organizations and their
+admins; each org's admins create its users. Decisions (all as recommended,
+plus self-service password change):
+
+- [ ] Roles: Sysadmin (platform-wide) above the per-org Admin, Auditor and
+      Viewer. A user can belong to several orgs, with a role in each
+- [ ] Public sign-up turned off: only the Sysadmin creates organizations
+      (and their first admin); only an org's admins create its users
+- [ ] Creating a user: the admin enters email, name and role; the app
+      generates a one-time temporary password, shown once, which the user
+      must change at first login (no email server yet; email invitations
+      later). An email that already has an account gets a new membership
+- [ ] Every user can change their own password (knowing the current one).
+      A forgotten password is reset by their org's admin or the Sysadmin (a
+      temporary one again) until email is set up; then self-service reset by
+      emailed link
+- [ ] Admins manage their org's people: change a role, remove a member,
+      reset a password. The Sysadmin can also deactivate a user entirely
+- [ ] The Sysadmin manages organizations and their admins, and can see every
+      organization and its details (members, uploads, assets, findings,
+      dashboard) read-only; changing an org's data stays with its members. It
+      can act in an emergency (e.g. reset an org's admin)
+- [ ] The first Sysadmin is created by a command on the server
+      (scripts/create_sysadmin.py), never through the website
+- [ ] Organization archive and purge (moved from Phase 2d Part 2): by the
+      Sysadmin. An archived org is read-only for its members and shown as
+      "Archived" in the picker; the Sysadmin can restore it, or purge it after
+      typing its name; the purge log records it
+
+## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 
 Requested 2026-09-28, after `azure_azure_activity_500000.json` failed as a
 generic asset list ("type is required" on all 500,000 rows): no import source
@@ -553,6 +681,17 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       Decide once hosting is chosen; confirm what the Claude API supports at
       that point. Likely shape: a `CLAUDE_AUTH_MODE` setting read by
       `claude_service.py`, with local dev staying on the API key.
+- [ ] Production database (decided 2026-09-29): a managed Linux Postgres,
+      not a self-run or Windows one: Azure Database for PostgreSQL (Flexible
+      Server), AWS RDS/Aurora or Google Cloud SQL, with pgvector enabled
+      (all three support it), on SSD storage, sized per
+      [docs/DATABASE_PERFORMANCE.md](docs/DATABASE_PERFORMANCE.md). Why:
+      backups, patching, failover and monitoring built in (it holds
+      customers' vulnerability data); Postgres is developed and tuned on
+      Linux. Pick it with the hosting platform (same cloud as the app and the
+      keyless Claude auth above). Dev stays on Windows Postgres, moved to the
+      C: SSD (2026-09-29); Postgres in Docker (WSL2) is an option later for
+      parity with CI's `pgvector/pgvector` image.
 
 ## Test policy
 

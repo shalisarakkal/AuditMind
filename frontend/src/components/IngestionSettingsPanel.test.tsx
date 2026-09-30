@@ -16,6 +16,7 @@ function settings(overrides: Partial<IngestionSettings> = {}): IngestionSettings
     nessus_domain_map_override: {},
     asset_type_aliases: { laptop: "workstation", lambda: "cloud_resource" },
     asset_type_aliases_override: {},
+    archive_retention_days: 180,
     ...overrides,
   };
 }
@@ -51,8 +52,34 @@ describe("IngestionSettingsPanel", () => {
     expect(await screen.findByLabelText("Asset already in inventory")).toHaveValue("skip");
     expect(screen.getByLabelText("Files with bad rows")).toHaveValue("true");
     expect(screen.getAllByText("Override")).toHaveLength(1);
-    expect(screen.getAllByText("Default")).toHaveLength(3);
+    expect(screen.getAllByText("Default")).toHaveLength(4);
+    expect(screen.getByLabelText("Keep archived items for")).toHaveValue(180);
     expect(screen.getByText("Firewalls → Network & Config")).toBeInTheDocument();
+  });
+
+  it("saves the retention days only when changed and valid, and resets them", async () => {
+    const patches = setup(settings());
+    const days = await screen.findByLabelText("Keep archived items for");
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+
+    fireEvent.change(days, { target: { value: "0" } });
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    fireEvent.change(days, { target: { value: "365" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patches).toEqual([{ archive_retention_days: 365 }]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
+    expect(days).toHaveValue(365);
+
+    // Its own Reset (the only override): back to the server default.
+    fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    await waitFor(() => expect(patches).toEqual([{ archive_retention_days: 365 }, { archive_retention_days: null }]));
+    await waitFor(() => expect(days).toHaveValue(180));
+  });
+
+  it("viewers see the retention days but can't change them", async () => {
+    setup(settings(), false);
+    expect(await screen.findByLabelText("Keep archived items for")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
   it("admin changes send only that setting", async () => {

@@ -5,7 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ImportResult } from "@/components/ImportReportPanel";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/apiClient";
-import type { ImportReport, Scan } from "@/lib/types";
+import { countsText } from "@/lib/domain";
+import type { ArchiveJob, ImportReport, Scan } from "@/lib/types";
 
 const POLL_MS = 2000;
 const ORIGIN_KEY = "auditmind_import_pages";
@@ -23,6 +24,13 @@ type ImportsContextValue = {
   track(scanId: string, page: ImportPage): Promise<void>;
   /** Hide a finished import's report for good. */
   dismiss(scanId: string): Promise<void>;
+  /** Archive, restore and purge jobs, tracked the same way: the org's running
+   * ones, and the user's finished ones not yet dismissed. */
+  jobs: ArchiveJob[];
+  /** POST `path` (an archive, restore or purge endpoint) and follow the job it
+   * starts. Throws if the server refuses. */
+  startJob(path: string): Promise<ArchiveJob>;
+  dismissJob(jobId: string): Promise<void>;
 };
 
 const ImportsContext = createContext<ImportsContextValue | null>(null);
@@ -104,22 +112,7 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     void loadAll();
   }, [orgId, loadAll]);
 
-  // One poll at a time: the next is scheduled when the previous is done.
-  const shouldPoll = scans.some(isRunning) || awaiting.length > 0;
-  useEffect(() => {
-    if (!shouldPoll) return;
-    let stopped = false;
-    let timer = 0;
-    const tick = async () => {
-      await pollOnce();
-      if (!stopped) timer = window.setTimeout(tick, pollIntervalMs);
-    };
-    timer = window.setTimeout(tick, pollIntervalMs);
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-    };
-  }, [shouldPoll, pollOnce, pollIntervalMs]);
+  usePolling(scans.some(isRunning) || awaiting.length > 0, pollOnce, pollIntervalMs);
 
   const track = useCallback(
     async (scanId: string, page: ImportPage) => {
@@ -154,8 +147,100 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     [orgId, apply],
   );
 
-  const value = useMemo(() => ({ scans, finishedCount, track, dismiss }), [scans, finishedCount, track, dismiss]);
+  const onJobsFinished = useCallback((count: number) => setFinishedCount((c) => c + count), []);
+  const { jobs, startJob, dismissJob } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
+
+  const value = useMemo(
+    () => ({ scans, finishedCount, track, dismiss, jobs, startJob, dismissJob }),
+    [scans, finishedCount, track, dismiss, jobs, startJob, dismissJob],
+  );
   return <ImportsContext.Provider value={value}>{children}</ImportsContext.Provider>;
+}
+
+/** The org's tracked archive jobs (GET /archive-jobs?tracked=true), polled
+ * one request at a time while any runs; a response for another org, or older
+ * than one already applied, is dropped. `onFinished` is told how many jobs
+ * finished (including one that finished during its own request). */
+function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished: (count: number) => void) {
+  const [jobs, setJobs] = useState<ArchiveJob[]>([]);
+  const current = useRef({ orgId, jobs, requested: 0, applied: 0 });
+
+  const apply = useCallback(
+    (forOrg: string, request: number, next: ArchiveJob[], alsoFinished = 0) => {
+      const now = current.current;
+      if (now.orgId !== forOrg || request < now.applied) return;
+      const finished = now.jobs.filter((j) => isRunning(j) && !next.some((n) => n.id === j.id && isRunning(n))).length;
+      current.current = { ...now, jobs: next, applied: request };
+      setJobs(next);
+      if (finished + alsoFinished) onFinished(finished + alsoFinished);
+    },
+    [onFinished],
+  );
+
+  const load = useCallback(async () => {
+    if (!orgId) return;
+    const request = ++current.current.requested;
+    try {
+      apply(orgId, request, await api.get<ArchiveJob[]>(`/orgs/${orgId}/archive-jobs?tracked=true`));
+    } catch {
+      // Keep what we have; the next poll tries again.
+    }
+  }, [orgId, apply]);
+
+  useEffect(() => {
+    current.current = { ...current.current, orgId, jobs: [] };
+    setJobs([]);
+    void load();
+  }, [orgId, load]);
+
+  usePolling(jobs.some(isRunning), load, pollIntervalMs);
+
+  const startJob = useCallback(
+    async (path: string) => {
+      if (!orgId) throw new Error("No organization selected");
+      const job = await api.post<ArchiveJob>(path);
+      // Numbered once the answer is in, unlike the imports' track(): it's the
+      // newest word on this job, and polling may not run to pick it up later
+      // (nothing else running). Applied at once, so still in order.
+      const request = ++current.current.requested;
+      const others = current.current.jobs.filter((j) => j.id !== job.id);
+      // Small jobs finish during the request: lists reload straight away.
+      apply(orgId, request, [job, ...others], isRunning(job) ? 0 : 1);
+      return job;
+    },
+    [orgId, apply],
+  );
+
+  const dismissJob = useCallback(
+    async (jobId: string) => {
+      if (!orgId) return;
+      await api.post<ArchiveJob>(`/orgs/${orgId}/archive-jobs/${jobId}/dismiss`);
+      const request = ++current.current.requested;
+      apply(orgId, request, current.current.jobs.filter((j) => j.id !== jobId));
+    },
+    [orgId, apply],
+  );
+
+  return { jobs, startJob, dismissJob };
+}
+
+/** Call `poll` every `intervalMs` while `active`, one call at a time: the
+ * next is scheduled when the previous is done. */
+function usePolling(active: boolean, poll: () => Promise<void>, intervalMs: number) {
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    let timer = 0;
+    const tick = async () => {
+      await poll();
+      if (!stopped) timer = window.setTimeout(tick, intervalMs);
+    };
+    timer = window.setTimeout(tick, intervalMs);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [active, poll, intervalMs]);
 }
 
 export function useImports(): ImportsContextValue {
@@ -164,8 +249,42 @@ export function useImports(): ImportsContextValue {
   return ctx;
 }
 
-export function isRunning(scan: Scan): boolean {
-  return scan.status === "pending" || scan.status === "running";
+export function isRunning(item: Scan | ArchiveJob): boolean {
+  return item.status === "pending" || item.status === "running";
+}
+
+const JOB_VERBS = { archive: "Archiving", restore: "Restoring", purge: "Purging" } as const;
+const JOB_DONE = { archive: "Archived", restore: "Restored", purge: "Purged" } as const;
+const JOB_PHASES: Record<string, string> = { findings: "Findings", assets: "Assets", saving: "Saving" };
+
+/** What a job is doing, e.g. "Archiving findings.csv". */
+export function jobTitle(job: ArchiveJob): string {
+  return `${JOB_VERBS[job.action]} ${job.label}`;
+}
+
+/** Where a running job is, e.g. "Findings: 120,000 / 500,000 (24%)". */
+export function jobProgressText(job: ArchiveJob): string {
+  if (job.status === "pending") return "Waiting to start…";
+  const phase = job.progress?.phase ?? "";
+  const label = JOB_PHASES[phase] ?? "Working";
+  return counted(label, job.progress?.rows_done, job.progress?.rows_total) ?? `${label}…`;
+}
+
+/** A finished job's outcome, e.g. "Archived findings.csv: 1 upload, 3 assets,
+ * 1,200 findings." */
+export function jobResultText(job: ArchiveJob): string {
+  const summary = job.summary ?? {};
+  if (job.status === "failed") return `${jobTitle(job)} stopped: ${summary.error ?? "unexpected error"}`;
+  let text = `${JOB_DONE[job.action]} ${job.label}: ${countsText(summary)}.`;
+  if (summary.findings_kept_with_asset) {
+    const n = summary.findings_kept_with_asset;
+    text += ` ${n.toLocaleString("en-US")} finding${n === 1 ? "" : "s"} stayed archived with ${n === 1 ? "its" : "their"} asset, archived separately: restore the asset to bring ${n === 1 ? "it" : "them"} back.`;
+  }
+  if (summary.duplicates_purged) {
+    const n = summary.duplicates_purged;
+    text += ` ${n.toLocaleString("en-US")} finding${n === 1 ? "" : "s"} already recorded again since ${n === 1 ? "was" : "were"} purged instead.`;
+  }
+  return text;
 }
 
 const FINDINGS_SCAN_TYPES = new Set(["findings_csv", "findings_json", "nessus"]);

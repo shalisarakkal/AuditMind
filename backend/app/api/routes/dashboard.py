@@ -13,7 +13,7 @@ from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.schemas.dashboard import DashboardSummary, DomainScore
 from app.schemas.finding import FindingRead
-from app.schemas.scan import ScanRead
+from app.schemas.scan import brief_scan
 from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
 
 router = APIRouter(prefix="/orgs/{org_id}/dashboard", tags=["dashboard"])
@@ -44,14 +44,14 @@ def get_dashboard(
         top += (
             db.query(Finding)
             .options(defer(Finding.raw_data))
-            .filter(Finding.org_id == org_id, Finding.severity == severity)
+            .filter(Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.severity == severity)
             .order_by(Finding.created_at.desc(), Finding.id)
             .limit(TOP_FINDINGS - len(top))
             .all()
         )
     recent_scans = (
         db.query(Scan)
-        .filter(Scan.org_id == org_id)
+        .filter(Scan.org_id == org_id, Scan.archived_at.is_(None))
         .order_by(Scan.started_at.desc().nulls_last())
         .limit(RECENT_SCANS)
         .all()
@@ -69,16 +69,8 @@ def get_dashboard(
             for domain, (score, tier, justification) in domain_scores.items()
         ],
         top_findings=[FindingRead.model_validate(f) for f in top],
-        recent_scans=[_brief(s) for s in recent_scans],
-        asset_count=db.query(func.count(Asset.id)).filter(Asset.org_id == org_id).scalar(),
+        recent_scans=[brief_scan(s) for s in recent_scans],
+        asset_count=db.query(func.count(Asset.id)).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar(),
         findings_by_severity=by_severity,
     )
 
-
-def _brief(scan: Scan) -> ScanRead:
-    """A recent scan without its report's row lists (up to 1,000 errors and
-    warnings each): the dashboard shows only names, status and counts."""
-    brief = ScanRead.model_validate(scan)
-    if brief.summary:
-        brief.summary = {k: v for k, v in brief.summary.items() if k not in ("errors", "warnings")}
-    return brief

@@ -41,6 +41,9 @@ export type Asset = {
   /** Extra facts from profile imports (OS, open ports, agent version...). */
   details: Record<string, unknown>;
   created_at: string;
+  /** In the assets list: its archive hasn't finished, and that archive. */
+  archiving?: ArchiveProgress | null;
+  archiving_batch_id?: string | null;
 };
 
 export type Finding = {
@@ -62,6 +65,9 @@ export type FindingListItem = Finding & {
   asset_ip: string | null;
   /** A cloud resource may be known only by this. */
   asset_cloud_id: string | null;
+  /** A manual finding whose archive hasn't finished, and that archive. */
+  archiving?: ArchiveProgress | null;
+  archiving_batch_id?: string | null;
 };
 
 /** One page of a list, and how many items match across all pages. */
@@ -155,6 +161,8 @@ export type IngestionSettings = {
   nessus_domain_map_override: Record<string, Domain>;
   asset_type_aliases: Record<string, AssetType>;
   asset_type_aliases_override: Record<string, AssetType>;
+  /** Days an archived item is kept before it's purged automatically. */
+  archive_retention_days: number;
 };
 
 export type AssetType = "server" | "workstation" | "network_device" | "database" | "cloud_resource" | "application";
@@ -178,6 +186,74 @@ export type ImportProfile = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+export type ArchiveItemType = "upload" | "asset" | "finding";
+export type ArchiveState = "archiving" | "archived" | "restoring" | "restored" | "purging" | "purged";
+export type ArchiveAction = "archive" | "restore" | "purge";
+/** An archive that hasn't finished: a job runs now, or one stopped part-way. */
+export type ArchiveProgress = "running" | "stopped";
+
+/** Rows per table: archived, restored or purged. */
+export type ArchiveCounts = { uploads?: number; assets?: number; findings?: number };
+
+/** Archiving, restoring or purging one item; followed like an import. */
+export type ArchiveJob = {
+  id: string;
+  org_id: string;
+  batch_id: string;
+  action: ArchiveAction;
+  status: ScanStatus;
+  item_type: ArchiveItemType;
+  item_id: string;
+  label: string;
+  started_by: string | null;
+  started_at: string;
+  completed_at: string | null;
+  dismissed_at: string | null;
+  progress: { phase: string; rows_done?: number; rows_total?: number } | null;
+  /** The rows done; on restore also duplicates_purged and
+   * findings_kept_with_asset (their asset is archived separately); or {error}. */
+  summary: (ArchiveCounts & { duplicates_purged?: number; findings_kept_with_asset?: number; error?: string }) | null;
+};
+
+/** One archive action on the Archived page. */
+export type ArchivedItem = {
+  id: string;
+  item_type: ArchiveItemType;
+  item_id: string;
+  label: string;
+  /** restoring / purging: a job runs now (`running`) or one stopped part-way. */
+  state: ArchiveState;
+  /** What a job is doing to it right now. */
+  running: ArchiveAction | null;
+  archived_at: string;
+  archived_by: string | null;
+  purge_at: string;
+  counts: ArchiveCounts;
+};
+
+/** An upload on the Imports page (its report without the row lists). */
+export type Upload = Scan & {
+  uploaded_by: string | null;
+  /** Its archive hasn't finished, and that archive. */
+  archiving?: ArchiveProgress | null;
+  archiving_batch_id?: string | null;
+};
+
+export type PurgeLogEntry = {
+  id: string;
+  item_type: ArchiveItemType;
+  label: string;
+  archived_at: string;
+  purged_at: string;
+  /** Null: purged automatically. */
+  purged_by: string | null;
+  reason: "manual" | "auto" | "duplicate";
+  counts: ArchiveCounts;
+};
+
+/** The body of a 409 for a file already imported into the org. */
+export type RepeatUpload = { message: string; imported_at: string | null; imported_by: string };
 
 export type RiskyPort = { label: string; severity: Severity };
 

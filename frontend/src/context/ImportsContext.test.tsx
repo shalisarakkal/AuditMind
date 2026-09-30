@@ -75,8 +75,8 @@ describe("Import tracking", () => {
     );
     await screen.findByText("Reading file…");
 
-    await waitFor(() => expect(requests(fetchMock, "?active=true")).toBeGreaterThanOrEqual(3));
-    expect(requests(fetchMock, "?tracked=true")).toBe(1); // the first load only
+    await waitFor(() => expect(requests(fetchMock, "/scans?active=true")).toBeGreaterThanOrEqual(3));
+    expect(requests(fetchMock, "/scans?tracked=true")).toBe(1); // the first load only
   });
 
   it("waits for each poll to answer before sending the next", async () => {
@@ -86,13 +86,13 @@ describe("Import tracking", () => {
       "GET /orgs/org-1/scans?tracked=true": () => [running],
       "GET /orgs/org-1/scans?active=true": () => new Promise((resolve) => (release = () => resolve(json([running])))),
     });
-    await waitFor(() => expect(requests(fetchMock, "?active=true")).toBe(1));
+    await waitFor(() => expect(requests(fetchMock, "/scans?active=true")).toBe(1));
 
     await new Promise((resolve) => setTimeout(resolve, 100)); // ten poll intervals
-    expect(requests(fetchMock, "?active=true")).toBe(1);
+    expect(requests(fetchMock, "/scans?active=true")).toBe(1);
 
     await act(async () => release());
-    await waitFor(() => expect(requests(fetchMock, "?active=true")).toBe(2));
+    await waitFor(() => expect(requests(fetchMock, "/scans?active=true")).toBe(2));
   });
 
   it("ignores an older response that arrives after a newer one", async () => {

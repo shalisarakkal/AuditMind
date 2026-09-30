@@ -8,6 +8,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** The error body's detail, when it's more than a message. */
+    public detail?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -57,15 +59,19 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new ApiError(res.status, errorMessage(data, res.statusText));
+    const detail = (data as { detail?: unknown } | null)?.detail;
+    throw new ApiError(res.status, errorMessage(data, res.statusText), detail);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
-// FastAPI errors: {detail: "text"} or, for validation, {detail: [{msg, loc}]}.
+// FastAPI errors: {detail: "text"}, {detail: {message, ...}} or, for
+// validation, {detail: [{msg, loc}]}.
 function errorMessage(data: unknown, fallback: string): string {
   const detail = (data as { detail?: unknown } | null)?.detail;
   if (typeof detail === "string") return detail;
+  const message = (detail as { message?: unknown } | null)?.message;
+  if (typeof message === "string") return message;
   if (Array.isArray(detail) && detail.length > 0) {
     return detail
       .map((d: { msg?: string; loc?: unknown[] }) => {

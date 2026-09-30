@@ -40,7 +40,7 @@ def _import(client, admin, filename, profile, content=None, headers=None):
         f"/api/v1/orgs/{org_id}/imports",
         headers=headers or admin_headers,
         files={"file": (filename, content)},
-        data={"profile": profile},
+        data={"profile": profile, "confirm": "true"},
     )
 
 

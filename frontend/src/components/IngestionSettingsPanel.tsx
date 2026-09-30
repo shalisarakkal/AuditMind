@@ -134,6 +134,13 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
             </div>
           );
         })}
+        <RetentionField
+          days={settings.archive_retention_days}
+          overridden={settings.overridden.includes("archive_retention_days")}
+          isAdmin={isAdmin}
+          saving={saving}
+          onSave={(days) => save({ archive_retention_days: days })}
+        />
       </div>
 
       <MapEditor
@@ -170,6 +177,69 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
         isAdmin={isAdmin}
         saving={saving}
       />
+    </div>
+  );
+}
+
+/** How long archived items are kept: a number of days, saved on demand. */
+function RetentionField({
+  days,
+  overridden,
+  isAdmin,
+  saving,
+  onSave,
+}: {
+  days: number;
+  overridden: boolean;
+  isAdmin: boolean;
+  saving: boolean;
+  /** null: back to the server default. */
+  onSave(days: number | null): void;
+}) {
+  const [value, setValue] = useState(String(days));
+  useEffect(() => setValue(String(days)), [days]);
+  const parsed = Number(value);
+  const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 3650;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div>
+        <label htmlFor="archive_retention_days" className="text-sm font-medium text-white">
+          Keep archived items for
+        </label>
+        <p className="text-xs text-white/50">Days before an archived upload, asset or finding is purged for good.</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className={`rounded px-2 py-0.5 text-xs ${overridden ? "bg-cyan/15 text-cyan" : "bg-white/10 text-white/60"}`}>
+          {overridden ? "Override" : "Default"}
+        </span>
+        <input
+          id="archive_retention_days"
+          type="number"
+          min={1}
+          max={3650}
+          value={value}
+          disabled={!isAdmin || saving}
+          onChange={(e) => setValue(e.target.value)}
+          className={`w-24 ${selectClass}`}
+        />
+        <span className="text-sm text-white/60">days</span>
+        {isAdmin && value !== String(days) && (
+          <button
+            type="button"
+            disabled={saving || !valid}
+            onClick={() => onSave(parsed)}
+            className="rounded-md bg-cyan px-3 py-1 text-sm font-medium text-navy disabled:opacity-60"
+          >
+            Save
+          </button>
+        )}
+        {isAdmin && overridden && (
+          <button type="button" disabled={saving} onClick={() => onSave(null)} className="text-xs text-white/60 hover:text-white">
+            Reset to default
+          </button>
+        )}
+      </div>
     </div>
   );
 }

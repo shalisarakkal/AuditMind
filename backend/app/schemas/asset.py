@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.enums import ArchiveProgress
+
 
 class AssetCreate(BaseModel):
     """`type` is a category or a known name for one ("laptop" -> workstation);
@@ -36,6 +38,13 @@ class AssetRead(BaseModel):
     tags: list[str] | None
     details: dict
     created_at: datetime
+
+
+class AssetListItem(AssetRead):
+    # Its archive hasn't finished: running now, or stopped part-way; and that
+    # archive (restore it to undo what it archived).
+    archiving: ArchiveProgress | None = None
+    archiving_batch_id: uuid.UUID | None = None
 
 
 class AssetFacets(BaseModel):

@@ -29,3 +29,12 @@ class ScanRead(BaseModel):
     started_by: uuid.UUID | None
     dismissed_at: datetime | None
     progress: dict | None
+
+
+def brief_scan(scan) -> ScanRead:
+    """A scan without its report's row lists (up to 1,000 errors and
+    warnings each), for lists that show only names, status and counts."""
+    brief = ScanRead.model_validate(scan)
+    if brief.summary:
+        brief.summary = {k: v for k, v in brief.summary.items() if k not in ("errors", "warnings")}
+    return brief

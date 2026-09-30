@@ -27,6 +27,9 @@ The matching rules are exactly those of the queries they replace:
 - By IP: when the row has a hostname that matched nothing, only assets with
   no hostname are candidates, so two differently named hosts sharing an IP
   are never merged. A row with no hostname matches any asset with its IP.
+
+Archived assets and findings are left out: an import never matches them, and
+a finding that only an archived one duplicates is recorded afresh.
 """
 
 import uuid
@@ -97,7 +100,7 @@ class AssetIndex:
         details). Each lookup uses its (org_id, ...) index."""
         columns = select(
             Asset.id, Asset.type, Asset.type_known, Asset.hostname, Asset.ip, Asset.cloud_id, Asset.created_at
-        ).where(Asset.org_id == org_id)
+        ).where(Asset.org_id == org_id, Asset.archived_at.is_(None))
         lookups = (
             (func.lower(Asset.hostname), {h.lower() for h in hostnames}),
             (Asset.ip, set(ips)),
@@ -205,7 +208,7 @@ class FindingIndex:
         # Descriptions only matter for uncategorised findings.
         description = case((Finding.category.is_(None), Finding.description))
         query = select(Finding.asset_id, Finding.source, Finding.category, description).where(
-            Finding.org_id == org_id, Finding.source.is_not(None)
+            Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.source.is_not(None)
         )
         asset_ids = list(asset_ids)
         if len(asset_ids) > TARGETED_LOAD_MAX:  # the whole org: one pass

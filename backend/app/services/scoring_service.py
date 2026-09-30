@@ -58,11 +58,12 @@ def count_findings(findings: list[Finding]) -> SeverityCounts:
 
 
 def count_org_findings(db: Session, org_id: uuid.UUID) -> SeverityCounts:
-    """The org's findings per domain and severity, counted by the database."""
+    """The org's active (not archived) findings per domain and severity,
+    counted by the database."""
     counts: SeverityCounts = {}
     rows = (
         db.query(Finding.domain, Finding.severity, func.count())
-        .filter(Finding.org_id == org_id)
+        .filter(Finding.org_id == org_id, Finding.archived_at.is_(None))
         .group_by(Finding.domain, Finding.severity)
     )
     for domain, severity, count in rows:

@@ -33,8 +33,18 @@ def member(client: TestClient, admin_headers: dict[str, str], org_id: str, role:
     return headers
 
 
-def upload(client: TestClient, url: str, headers: dict[str, str], filename: str, content: bytes | None = None):
-    """POST a file; content defaults to the fixture with that name."""
+def upload(
+    client: TestClient,
+    url: str,
+    headers: dict[str, str],
+    filename: str,
+    content: bytes | None = None,
+    confirm: bool = True,
+):
+    """POST a file; content defaults to the fixture with that name. Tests
+    upload the same files many times, so the repeat-upload warning is
+    confirmed unless `confirm` is False."""
     if content is None:
         content = (FIXTURES / filename).read_bytes()
-    return client.post(url, headers=headers, files={"file": (filename, content)})
+    data = {"confirm": "true"} if confirm else None
+    return client.post(url, headers=headers, files={"file": (filename, content)}, data=data)

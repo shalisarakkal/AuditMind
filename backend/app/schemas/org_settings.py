@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import AssetExistingStrategy, NessusInfoSeverity
 from app.models.enums import Domain
@@ -21,6 +21,7 @@ class IngestionSettingsRead(BaseModel):
     # Asset type name -> category: built-in, .env, then the org's own names.
     asset_type_aliases: dict[str, str]
     asset_type_aliases_override: dict[str, str]
+    archive_retention_days: int
 
 
 class IngestionSettingsUpdate(BaseModel):
@@ -36,6 +37,7 @@ class IngestionSettingsUpdate(BaseModel):
     nessus_domain_map: dict[str, Domain] | None = None
     nessus_default_domain: Domain | None = None
     asset_type_aliases: dict[str, str] | None = None
+    archive_retention_days: int | None = Field(None, ge=1, le=3650)
 
     @field_validator("asset_type_aliases")
     @classmethod

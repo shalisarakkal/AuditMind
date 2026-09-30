@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 
 import OrgPicker from "@/components/OrgPicker";
 import { useApp } from "@/context/AppContext";
-import { importHome, isRunning, useImports } from "@/context/ImportsContext";
+import { importHome, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
   { href: "/assets", label: "Assets" },
   { href: "/findings", label: "Findings" },
+  { href: "/imports", label: "Imports" },
+  { href: "/archived", label: "Archived" },
   { href: "/reports", label: "Reports" },
   { href: "/settings", label: "Settings" },
 ];
@@ -19,7 +21,9 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useApp();
-  const running = useImports().scans.filter(isRunning);
+  const imports = useImports();
+  const running = imports.scans.filter(isRunning);
+  const runningJobs = imports.jobs.filter(isRunning);
 
   return (
     <nav className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-navy/60 p-4">
@@ -58,6 +62,22 @@ export default function Sidebar() {
               >
                 <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
                 Importing {scan.filename ?? "a file"}…
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {runningJobs.length > 0 && (
+        <ul aria-label="Archive jobs in progress" className="mt-6 space-y-1">
+          {runningJobs.map((job) => (
+            <li key={job.id}>
+              <Link
+                href={job.action === "archive" ? "/imports" : "/archived"}
+                title={job.label}
+                className="block truncate rounded-md px-3 py-2 text-xs text-cyan hover:bg-cyan/10"
+              >
+                <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
+                {jobTitle(job)}…
               </Link>
             </li>
           ))}

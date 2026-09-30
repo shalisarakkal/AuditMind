@@ -1,4 +1,4 @@
-import type { AssetType, Domain, RiskTier, ScanStatus, Severity, UserRole } from "@/lib/types";
+import type { ArchiveCounts, AssetType, Domain, RiskTier, ScanStatus, Severity, UserRole } from "@/lib/types";
 
 // Display order matches the backend Domain enum.
 export const DOMAIN_ORDER: Domain[] = [
@@ -67,6 +67,41 @@ export const SCAN_TYPE_LABELS: Record<string, string> = {
   network_scan_import: "Network scan export",
   cloud_inventory_import: "Cloud inventory export",
 };
+
+/** An upload's kind; a tool export not listed is named after its profile
+ * family ("directory_import" -> "Directory export"). */
+export function scanTypeLabel(scanType: string): string {
+  const family = scanType.replace(/_import$/, "").replace(/_/g, " ");
+  return SCAN_TYPE_LABELS[scanType] ?? `${family.charAt(0).toUpperCase()}${family.slice(1)} export`;
+}
+
+/** "1 upload, 3 assets, 1,200 findings" (or "nothing"): rows archived,
+ * restored or purged together. */
+export function countsText(counts: ArchiveCounts): string {
+  const parts = (
+    [
+      ["upload", counts.uploads],
+      ["asset", counts.assets],
+      ["finding", counts.findings],
+    ] as const
+  )
+    .filter(([, n]) => n)
+    .map(([noun, n]) => `${n!.toLocaleString("en-US")} ${noun}${n === 1 ? "" : "s"}`);
+  return parts.join(", ") || "nothing";
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "Deleted in 173 days": when an archived item is purged, from now. */
+export function purgeCountdown(purgeAt: string, now = Date.now()): string {
+  const days = Math.ceil((new Date(purgeAt).getTime() - now) / DAY_MS);
+  if (days <= 0) return "Deleted at the next daily purge";
+  return days === 1 ? "Deleted tomorrow" : `Deleted in ${days.toLocaleString("en-US")} days`;
+}
+
+/** A list page's search box. */
+export const SEARCH_BOX =
+  "w-full max-w-sm rounded-md border border-white/15 bg-navy px-3 py-1.5 text-sm text-white placeholder:text-white/40 focus:border-cyan focus:outline-none";
 
 /** Admins and auditors can import and upload; viewers are read-only. */
 export function canWrite(role: UserRole | undefined): boolean {

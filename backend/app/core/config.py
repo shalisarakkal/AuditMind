@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.models.enums import Domain
@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     # Files over this size are rejected outright (413).
     IMPORT_MAX_BYTES: int = 100 * 1024 * 1024
 
+    # --- Archiving. ---
+    # Archive, restore and purge jobs up to this many rows run during the
+    # request; larger ones run in the background, shown in the import tracker.
+    ARCHIVE_SYNC_MAX_ROWS: int = 20_000
+    # True: the app purges archived items past their retention once a day
+    # (and shortly after it starts). False: run scripts/purge_expired.py from
+    # Task Scheduler or cron instead.
+    ARCHIVE_AUTO_PURGE: bool = True
+
     # --- Ingestion behaviour. Global defaults; each org can override them
     # (see app/services/org_settings.py). ---
     # True: import the valid rows and report the bad ones.
@@ -54,6 +63,9 @@ class Settings(BaseSettings):
     # app/services/asset_types.py). In .env as JSON,
     # e.g. ASSET_TYPE_ALIASES={"hypervisor": "server"}
     ASSET_TYPE_ALIASES: dict[str, str] = {}
+    # Days an archived item is kept before it's purged for good. Each org can
+    # override it (Settings page).
+    ARCHIVE_RETENTION_DAYS: int = Field(180, ge=1)
 
     @field_validator("ASSET_TYPE_ALIASES")
     @classmethod

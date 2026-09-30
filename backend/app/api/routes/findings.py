@@ -17,7 +17,7 @@ from app.api.paging import (
     ordered,
     page_params,
 )
-from app.api.uploads import IMPORT_RESPONSES, start_import
+from app.api.uploads import IMPORT_RESPONSES, confirm_form, start_import
 from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.enums import Domain, Severity, UserRole
@@ -26,6 +26,7 @@ from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.schemas.finding import FindingCreate, FindingFacets, FindingListItem, FindingPage, FindingRead
 from app.schemas.ingestion import ImportResponse
+from app.services.archive_service import archiving_fields, unfinished_archives
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
 
@@ -99,7 +100,8 @@ def list_findings(
         one_of(Finding.severity, severity),
         one_of(Finding.source, source),
     ]
-    filters = [Finding.org_id == org_id, *(c for c in conditions if c is not None)]
+    # archived_at IS NULL also lets the paging below use the partial indexes.
+    filters = [Finding.org_id == org_id, Finding.archived_at.is_(None), *(c for c in conditions if c is not None)]
     # The asset is only needed to search or sort by it; joining it into a
     # query over every finding is costly.
     needs_asset = bool(q or asset) or sort == "asset"
@@ -133,12 +135,14 @@ def list_findings(
     )
     position = {id_: i for i, id_ in enumerate(ids)}
     rows.sort(key=lambda row: position[row[0].id])
+    unfinished = unfinished_archives(db, org_id, [f.id for f, *_ in rows if f.scan_id is None])
     items = [
         FindingListItem(
             **FindingRead.model_validate(finding).model_dump(),
             asset_hostname=hostname,
             asset_ip=ip,
             asset_cloud_id=cloud_id,
+            **archiving_fields(unfinished, finding.id),
         )
         for finding, hostname, ip, cloud_id in rows
     ]
@@ -190,7 +194,8 @@ def finding_facets(
 ) -> FindingFacets:
     """The values the source pick-list can offer ("" first when some
     findings have none). Severity and domain are fixed lists."""
-    return FindingFacets(source=distinct_values(db.query(Finding).filter(Finding.org_id == org_id), Finding.source))
+    findings = db.query(Finding).filter(Finding.org_id == org_id, Finding.archived_at.is_(None))
+    return FindingFacets(source=distinct_values(findings, Finding.source))
 
 
 @router.post("/findings", response_model=FindingRead, status_code=status.HTTP_201_CREATED)
@@ -200,11 +205,11 @@ def create_finding(
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> Finding:
-    """The asset and scan, if given, must belong to the org."""
+    """The asset and scan, if given, must belong to the org and not be archived."""
     for model, ref_id, name in ((Asset, payload.asset_id, "asset_id"), (Scan, payload.scan_id, "scan_id")):
         if ref_id is not None:
             ref = db.get(model, ref_id)
-            if ref is None or ref.org_id != org_id:
+            if ref is None or ref.org_id != org_id or ref.archived_at is not None:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"{name} {ref_id} is not in this organization",
@@ -227,6 +232,7 @@ async def import_findings(
     background_tasks: BackgroundTasks,
     response: Response,
     file: UploadFile = File(..., description="Findings: .csv, .json, or a native .nessus export"),
+    confirm: bool = confirm_form(),
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> ImportResponse:
@@ -243,6 +249,7 @@ async def import_findings(
         file=file,
         kind="findings",
         started_by=membership.user_id,
+        confirm=confirm,
     )
 
 
@@ -255,7 +262,7 @@ def list_asset_findings(
 ) -> list[Finding]:
     return (
         db.query(Finding)
-        .filter(Finding.org_id == org_id, Finding.asset_id == asset_id)
+        .filter(Finding.org_id == org_id, Finding.asset_id == asset_id, Finding.archived_at.is_(None))
         .order_by(Finding.created_at.desc())
         .all()
     )

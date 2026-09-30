@@ -32,7 +32,7 @@ def list_scans(
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(require_org_member),
 ) -> list[Scan]:
-    query = db.query(Scan).filter(Scan.org_id == org_id)
+    query = db.query(Scan).filter(Scan.org_id == org_id, Scan.archived_at.is_(None))
     if active:
         query = query.filter(Scan.status.in_(_ACTIVE))
     if tracked:

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
-from app.api.uploads import IMPORT_RESPONSES, start_import
+from app.api.uploads import IMPORT_RESPONSES, confirm_form, start_import
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.import_profile import ImportProfile
@@ -198,6 +198,7 @@ async def import_with_profile(
     response: Response,
     file: UploadFile = File(..., description="A .csv or .json export"),
     profile: str = Form(..., description="Profile key: a built-in (e.g. endpoint_agent) or one of the org's profile ids"),
+    confirm: bool = confirm_form(),
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> ImportResponse:
@@ -218,4 +219,5 @@ async def import_with_profile(
         kind="profile",
         started_by=membership.user_id,
         profile=config,
+        confirm=confirm,
     )

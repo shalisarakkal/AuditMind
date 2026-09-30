@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,7 @@ from app.models.enums import ScanStatus
 
 class Scan(Base):
     __tablename__ = "scans"
+    __table_args__ = (Index("ix_scans_org_content_hash", "org_id", "content_hash"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(
@@ -38,6 +39,14 @@ class Scan(Base):
     # read, then {"phase": "writing", "rows_done": n, "rows_total": n}.
     # Written outside the import's transaction (see ingestion_background.py).
     progress: Mapped[dict | None] = mapped_column(JSONB)
+    # SHA-256 of the uploaded file, to warn when the same file is uploaded again.
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    # Archived (Phase 2d part 2): hidden everywhere until restored or purged;
+    # archive_batch_id is the archive action that took it (see models/archive.py).
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archive_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("archive_batches.id", ondelete="SET NULL")
+    )
 
     organization: Mapped["Organization"] = relationship(back_populates="scans")
     findings: Mapped[list["Finding"]] = relationship(back_populates="scan", cascade="all, delete-orphan")

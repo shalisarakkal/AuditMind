@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import ConfirmPanel from "@/components/ConfirmPanel";
 import { useImports } from "@/context/ImportsContext";
-import { api } from "@/lib/apiClient";
+import { ApiError, api } from "@/lib/apiClient";
+import { formatDateTime } from "@/lib/domain";
 import {
   GENERIC_ASSETS,
   GENERIC_FINDINGS,
@@ -13,7 +15,7 @@ import {
   readColumns,
   suggestProfile,
 } from "@/lib/importProfiles";
-import type { ImportProfile, ImportResponse } from "@/lib/types";
+import type { ImportProfile, ImportResponse, RepeatUpload } from "@/lib/types";
 
 type ImportButtonProps = {
   orgId: string;
@@ -31,6 +33,9 @@ type ImportButtonProps = {
  * and the columns read (for the "no source recognises this file" note). */
 type Pending = { file: File; detected: string | null; columns: string[] };
 
+/** A file the server says was already imported, awaiting "Import anyway". */
+type Repeat = { file: File; profileKey: string; previous: RepeatUpload };
+
 /** Uploads a file. With profiles, the user confirms the file's source first
  * (pre-selected when the file's columns match a profile). The import is then
  * followed app-wide (ImportsContext): its progress and report show on the
@@ -41,6 +46,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [repeat, setRepeat] = useState<Repeat | null>(null);
   const [source, setSource] = useState(kind === "assets" ? GENERIC_ASSETS : GENERIC_FINDINGS);
   const mounted = useRef(true);
   const inFlight = useRef(false);
@@ -53,21 +59,29 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
     };
   }, []);
 
-  async function upload(file: File, profileKey: string) {
+  /** `confirm`: import even if this exact file was imported before. */
+  async function upload(file: File, profileKey: string, confirm = false) {
     // A second click that lands before the re-render hides the confirm
     // button must not upload the file again.
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(null);
+    setRepeat(null);
     setError(null);
     setUploading(true);
     let response: ImportResponse;
     try {
       const { path, fields } = importTarget(orgId, profileKey);
-      response = await api.upload<ImportResponse>(path, file, fields);
+      response = await api.upload<ImportResponse>(path, file, confirm ? { ...fields, confirm: "true" } : fields);
     } catch (err) {
+      if (!mounted.current) return;
+      if (err instanceof ApiError && err.status === 409 && isRepeatUpload(err.detail)) {
+        // Already imported: a warning, the user decides.
+        setRepeat({ file, profileKey, previous: err.detail });
+        return;
+      }
       // The upload itself failed (e.g. an unsupported file): nothing to track.
-      if (mounted.current) setError(`${file.name}: ${(err as Error).message}`);
+      setError(`${file.name}: ${(err as Error).message}`);
       return;
     } finally {
       inFlight.current = false;
@@ -122,7 +136,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
         {uploading && <span className="text-sm text-white/60">Uploading…</span>}
         <button
           type="button"
-          disabled={busy || pending !== null}
+          disabled={busy || pending !== null || repeat !== null}
           onClick={() => inputRef.current?.click()}
           className="rounded-md bg-cyan px-4 py-2 text-sm font-medium text-navy transition-opacity hover:opacity-90 disabled:opacity-60"
         >
@@ -134,6 +148,23 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
         <p role="alert" className="max-w-md text-right text-sm text-red-300">
           {error}
         </p>
+      )}
+
+      {repeat && (
+        <ConfirmPanel
+          label="Already imported"
+          message={
+            <>
+              <strong>{repeat.file.name}</strong>: this exact file was already imported
+              {repeat.previous.imported_at ? ` on ${formatDateTime(repeat.previous.imported_at)}` : ""} by{" "}
+              {repeat.previous.imported_by}. Import it again?
+            </>
+          }
+          confirmLabel="Import anyway"
+          onConfirm={() => void upload(repeat.file, repeat.profileKey, true)}
+          onCancel={() => setRepeat(null)}
+          busy={busy}
+        />
       )}
 
       {pending && (
@@ -199,6 +230,10 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
       )}
     </div>
   );
+}
+
+function isRepeatUpload(detail: unknown): detail is RepeatUpload {
+  return typeof detail === "object" && detail !== null && "imported_by" in detail;
 }
 
 /** "a, b, c, d, e, f, …": the first few names of a list. */

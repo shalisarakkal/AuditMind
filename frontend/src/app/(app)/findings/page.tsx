@@ -1,22 +1,31 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
+import { ArchiveButtons } from "@/components/JobButton";
+import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
+import JobStatus from "@/components/JobStatus";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { DOMAIN_LABELS, DOMAIN_ORDER, SEVERITY_BADGES, SEVERITY_ORDER, canWrite, formatDateTime } from "@/lib/domain";
-import type { Domain, FindingFacets, FindingPage, ImportProfile } from "@/lib/types";
+import {
+  DOMAIN_LABELS,
+  DOMAIN_ORDER,
+  SEARCH_BOX,
+  SEVERITY_BADGES,
+  SEVERITY_ORDER,
+  canWrite,
+  formatDateTime,
+} from "@/lib/domain";
+import type { Domain, FindingFacets, FindingListItem, FindingPage, ImportProfile } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useReloadOnImport } from "@/lib/useReloadOnImport";
 
 const PAGE_SIZE = 100;
-const SEARCH =
-  "w-full max-w-sm rounded-md border border-white/15 bg-navy px-3 py-1.5 text-sm text-white placeholder:text-white/40 focus:border-cyan focus:outline-none";
 const SEVERITY_OPTIONS = SEVERITY_ORDER.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
 const DOMAIN_OPTIONS = DOMAIN_ORDER.map((d) => ({ value: d, label: DOMAIN_LABELS[d] }));
 
@@ -39,6 +48,23 @@ function Findings() {
   const profiles = useApi<ImportProfile[]>(writer ? `/orgs/${org.id}/import-profiles` : null);
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
+  const [confirming, setConfirming] = useState<JobRequest | null>(null);
+  // Only findings added by hand are archived one by one; imported ones go
+  // with their upload or asset (a re-import would bring them back).
+  const archive = (f: FindingListItem) => {
+    const name = f.description ?? f.category ?? "this finding";
+    setConfirming({
+      path: `/orgs/${org.id}/findings/${f.id}/archive`,
+      label: `Archive ${name}`,
+      message: (
+        <>
+          Archive <strong>{name}</strong>? It leaves every list and score. You can restore it from Archived until it&apos;s
+          purged.
+        </>
+      ),
+      confirmLabel: "Archive",
+    });
+  };
 
   const counts = page?.domain_counts ?? {};
   const allCount = Object.values(counts).reduce((sum, n) => sum + (n ?? 0), 0);
@@ -72,6 +98,8 @@ function Findings() {
         </p>
       )}
       <ImportStatus page="findings" />
+      <JobStatus />
+      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -81,7 +109,7 @@ function Findings() {
             list={list}
             ariaLabel="Search findings"
             placeholder="Search all columns"
-            className={SEARCH}
+            className={SEARCH_BOX}
           />
           {list.hasFilters && (
             <button type="button" onClick={list.clearFilters} className="text-sm text-cyan hover:underline">
@@ -117,6 +145,11 @@ function Findings() {
                 <SortHeader label="Asset" column="asset" list={list} className="w-44" />
                 <SortHeader label="Source" column="source" list={list} className="w-36" />
                 <SortHeader label="Added" column="created" list={list} className="w-40" />
+                {writer && (
+                  <th className="w-24 px-4 py-2">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                )}
               </tr>
               <tr>
                 <th className="px-4 pb-2">
@@ -135,12 +168,13 @@ function Findings() {
                   <PickFilter name="source" label="source" list={list} options={facetOptions(facets.data?.source)} />
                 </th>
                 <th />
+                {writer && <th />}
               </tr>
             </thead>
             <tbody>
               {page.items.length === 0 && (
                 <tr className="border-t border-white/10">
-                  <td colSpan={6} className="px-4 py-6 text-center text-white/60">
+                  <td colSpan={writer ? 7 : 6} className="px-4 py-6 text-center text-white/60">
                     {list.hasFilters ? "No findings match." : "No findings yet."}
                   </td>
                 </tr>
@@ -162,6 +196,20 @@ function Findings() {
                   </td>
                   <td className="truncate px-4 py-2">{f.source ?? "—"}</td>
                   <td className="px-4 py-2 text-xs text-white/60">{formatDateTime(f.created_at)}</td>
+                  {writer && (
+                    <td className="px-4 py-2 text-right">
+                      {f.scan_id === null && (
+                        <ArchiveButtons
+                          itemId={f.id}
+                          name={f.description ?? f.category ?? "finding"}
+                          archiving={f.archiving}
+                          batchId={f.archiving_batch_id}
+                          onArchive={() => archive(f)}
+                          onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, f.description ?? f.category ?? "finding"))}
+                        />
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -20,6 +20,7 @@ OVERRIDABLE_KEYS = (
     "nessus_domain_map",
     "nessus_default_domain",
     "asset_type_aliases",
+    "archive_retention_days",
 )
 
 
@@ -34,6 +35,8 @@ class IngestionSettings:
     nessus_default_domain: Domain
     # Asset type name -> category, layered the same way.
     asset_type_aliases: dict[str, str]
+    # Days an archived item is kept before auto-purge.
+    archive_retention_days: int
     overridden: frozenset[str]
 
 
@@ -56,6 +59,7 @@ def resolve_ingestion_settings(org: Organization) -> IngestionSettings:
             **settings.ASSET_TYPE_ALIASES,
             **overrides.get("asset_type_aliases", {}),
         },
+        archive_retention_days=overrides.get("archive_retention_days", settings.ARCHIVE_RETENTION_DAYS),
         overridden=frozenset(key for key in overrides if key in OVERRIDABLE_KEYS),
     )
 

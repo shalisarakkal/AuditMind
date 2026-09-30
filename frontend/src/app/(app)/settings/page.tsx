@@ -2,6 +2,7 @@
 
 import ImportProfilesPanel from "@/components/ImportProfilesPanel";
 import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
+import PurgeLogPanel from "@/components/PurgeLogPanel";
 import { useApp } from "@/context/AppContext";
 
 export default function SettingsPage() {
@@ -19,8 +20,8 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-lg font-medium text-white">Ingestion</h2>
           <p className="text-sm text-white/60">
-            How asset imports and findings uploads are handled for this organization. Settings marked Default follow the
-            server-wide configuration.
+            How asset imports and findings uploads are handled for this organization, and how long archived items are kept.
+            Settings marked Default follow the server-wide configuration.
           </p>
         </div>
         <IngestionSettingsPanel orgId={org.id} isAdmin={org.role === "admin"} />
@@ -36,6 +37,19 @@ export default function SettingsPage() {
         </div>
         <ImportProfilesPanel orgId={org.id} isAdmin={org.role === "admin"} />
       </section>
+
+      {org.role === "admin" && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-medium text-white">Purge log</h2>
+            <p className="text-sm text-white/60">
+              Archived items deleted for good: purged by an admin, at the end of the retention period, or duplicates
+              dropped when restoring.
+            </p>
+          </div>
+          <PurgeLogPanel orgId={org.id} />
+        </section>
+      )}
 
       <section>
         <h2 className="text-lg font-medium text-white">Connectors &amp; AI</h2>

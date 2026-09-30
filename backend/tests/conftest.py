@@ -51,7 +51,10 @@ def db_session():
     assert _is_test_db(TEST_DB_URL), "refusing to create and drop tables outside a *_test database"
     engine = create_engine(TEST_DB_URL)
     # `documents` needs the pgvector extension enabled in the test DB
-    # (see scripts/create_databases.sql).
+    # (see scripts/create_databases.sql). Dropped first too: a run that was
+    # cut off, or a copy of real data loaded for measuring, leaves tables
+    # behind that create_all would keep.
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     session = SessionLocal()

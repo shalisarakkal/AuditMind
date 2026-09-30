@@ -17,15 +17,16 @@ from app.api.paging import (
     ordered,
     page_params,
 )
-from app.api.uploads import IMPORT_RESPONSES, start_import
+from app.api.uploads import IMPORT_RESPONSES, confirm_form, start_import
 from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.enums import UserRole
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
-from app.schemas.asset import AssetCreate, AssetFacets, AssetRead
+from app.schemas.asset import AssetCreate, AssetFacets, AssetListItem, AssetRead
 from app.schemas.ingestion import ImportResponse
 from app.schemas.paging import Page
+from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.asset_types import resolve_asset_type
 from app.services.org_settings import resolve_ingestion_settings
 
@@ -57,7 +58,7 @@ _TYPE_LABELS = {
 }
 
 
-@router.get("", response_model=Page[AssetRead])
+@router.get("", response_model=Page[AssetListItem])
 def list_assets(
     org_id: uuid.UUID,
     q: str | None = Query(
@@ -78,7 +79,7 @@ def list_assets(
     page: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_member),
-) -> Page[AssetRead]:
+) -> Page[AssetListItem]:
     """The org's assets, a page at a time: by default in the order they were
     added. Filters combine (all must match); text filters match partially."""
     tag_text = func.array_to_string(Asset.tags, " ")
@@ -105,7 +106,9 @@ def list_assets(
         one_of(Asset.environment, environment),
         one_of(Asset.criticality, criticality),
     ]
-    query = db.query(Asset).filter(Asset.org_id == org_id, *(c for c in conditions if c is not None))
+    query = db.query(Asset).filter(
+        Asset.org_id == org_id, Asset.archived_at.is_(None), *(c for c in conditions if c is not None)
+    )
     total = query.count()
     items = (
         query.order_by(ordered(_SORT_COLUMNS[sort], order), Asset.created_at, Asset.id)
@@ -113,7 +116,14 @@ def list_assets(
         .limit(page.limit)
         .all()
     )
-    return Page(items=items, total=total)
+    unfinished = unfinished_archives(db, org_id, [a.id for a in items])
+    return Page(
+        items=[
+            AssetListItem(**AssetRead.model_validate(a).model_dump(), **archiving_fields(unfinished, a.id))
+            for a in items
+        ],
+        total=total,
+    )
 
 
 @router.get("/facets", response_model=AssetFacets)
@@ -122,7 +132,7 @@ def asset_facets(
 ) -> AssetFacets:
     """The values each pick-list filter can offer ("" first when some assets
     have none)."""
-    assets = db.query(Asset).filter(Asset.org_id == org_id)
+    assets = db.query(Asset).filter(Asset.org_id == org_id, Asset.archived_at.is_(None))
     return AssetFacets(
         type=distinct_values(assets, Asset.type),
         subtype=distinct_values(assets, Asset.subtype),
@@ -166,6 +176,7 @@ async def import_assets(
     background_tasks: BackgroundTasks,
     response: Response,
     file: UploadFile = File(..., description="Asset inventory: .csv or .json"),
+    confirm: bool = confirm_form(),
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> ImportResponse:
@@ -183,6 +194,7 @@ async def import_assets(
         file=file,
         kind="assets",
         started_by=membership.user_id,
+        confirm=confirm,
     )
 
 

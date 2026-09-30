@@ -87,6 +87,7 @@ export async function renderSignedIn(
     "GET /orgs": () => [org({ role })],
     "GET /orgs/org-1/scans?tracked=true": () => [],
     "GET /orgs/org-1/scans?active=true": () => [],
+    "GET /orgs/org-1/archive-jobs?tracked=true": () => [],
     "GET /orgs/org-1/assets/facets": () => ({ type: [], subtype: [], environment: [], criticality: [] }),
     "GET /orgs/org-1/findings/facets": () => ({ source: [] }),
     ...routes,

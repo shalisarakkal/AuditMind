@@ -7,15 +7,21 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
+# The partial indexes' condition: queries over active rows must say
+# `archived_at IS NULL` to use them.
+ACTIVE = text("archived_at IS NULL")
+
 
 class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
         # Import matching: by cloud ID, else hostname (case-insensitive) and
-        # category, else IP (see _find_assets in ingestion_service.py).
-        Index("ix_assets_org_hostname", "org_id", text("lower(hostname)")),
-        Index("ix_assets_org_ip", "org_id", "ip"),
-        Index("ix_assets_org_cloud_id", "org_id", "cloud_id"),
+        # category, else IP (see import_matching.py). Active assets only.
+        Index("ix_assets_org_hostname", "org_id", text("lower(hostname)"), postgresql_where=ACTIVE),
+        Index("ix_assets_org_ip", "org_id", "ip", postgresql_where=ACTIVE),
+        Index("ix_assets_org_cloud_id", "org_id", "cloud_id", postgresql_where=ACTIVE),
+        # Restoring or purging an archive batch.
+        Index("ix_assets_archive_batch", "archive_batch_id", postgresql_where=text("archive_batch_id IS NOT NULL")),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -42,6 +48,12 @@ class Asset(Base):
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    # Archived (Phase 2d part 2): hidden everywhere until restored or purged;
+    # archive_batch_id is the archive action that took it (see models/archive.py).
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archive_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("archive_batches.id", ondelete="SET NULL")
     )
 
     organization: Mapped["Organization"] = relationship(back_populates="assets")
