@@ -301,16 +301,20 @@ def test_the_list_searches_filters_and_sorts(client, admin, db_session):
 
 
 def test_archived_and_imports_filter_and_sort(client, admin):
+    # Names that sort the same whether the database compares characters one
+    # by one (Windows dev) or ignores punctuation (Linux: CI, production).
+    # The lists sort with the database's own collation, so sorting stays
+    # indexed (hostname on 2M assets: instant, 0.63 s with COLLATE "C").
     for name, content in (("b.csv", ASSETS), ("a.csv", ASSETS + b"server,web-09\n")):
         upload(client, _url(admin, "/assets/import"), admin[0], name, content)
-    bad = upload(client, _url(admin, "/assets/import"), admin[0], "bad.csv", b"type,hostname\nnot-a-type,x\n").json()
+    bad = upload(client, _url(admin, "/assets/import"), admin[0], "c-bad.csv", b"type,hostname\nnot-a-type,x\n").json()
 
     uploads = lambda **params: [u["filename"] for u in client.get(_url(admin, "/uploads"), headers=admin[0], params=params).json()["items"]]  # noqa: E731
-    assert uploads() == ["bad.csv", "a.csv", "b.csv"]  # newest first
-    assert uploads(sort="filename", order="asc") == ["a.csv", "b.csv", "bad.csv"]
-    assert uploads(status="failed") == ["bad.csv"]
-    assert uploads(filename="b") == ["bad.csv", "b.csv"]
-    assert uploads(uploaded_by="owner", type="asset_import") == ["bad.csv", "a.csv", "b.csv"]
+    assert uploads() == ["c-bad.csv", "a.csv", "b.csv"]  # newest first
+    assert uploads(sort="filename", order="asc") == ["a.csv", "b.csv", "c-bad.csv"]
+    assert uploads(status="failed") == ["c-bad.csv"]
+    assert uploads(filename="b") == ["c-bad.csv", "b.csv"]
+    assert uploads(uploaded_by="owner", type="asset_import") == ["c-bad.csv", "a.csv", "b.csv"]
     facets = client.get(_url(admin, "/uploads/facets"), headers=admin[0]).json()
     assert facets == {"type": ["asset_import"], "status": ["completed", "failed"]}
 
@@ -321,10 +325,10 @@ def test_archived_and_imports_filter_and_sort(client, admin):
         for i in client.get(_url(admin, "/archive"), headers=admin[0], params={"type": "upload", **params}).json()["items"]
     ]
     assert archived()[0] == "b.csv"  # archived last: first
-    assert archived(sort="name", order="asc") == ["a.csv", "b.csv", "bad.csv"]
-    assert archived(name="bad") == ["bad.csv"]
+    assert archived(sort="name", order="asc") == ["a.csv", "b.csv", "c-bad.csv"]
+    assert archived(name="bad") == ["c-bad.csv"]
     assert archived(archived_by="nobody") == []
-    assert set(archived(q="owner")) == {"a.csv", "b.csv", "bad.csv"}
+    assert set(archived(q="owner")) == {"a.csv", "b.csv", "c-bad.csv"}
     assert bad["status"] == "failed"
 
 
