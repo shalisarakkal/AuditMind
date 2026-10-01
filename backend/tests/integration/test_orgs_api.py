@@ -77,7 +77,7 @@ def test_admin_adds_member_who_can_then_select_the_org(client):
     assert {(o["name"], o["role"]) for o in auditor_orgs} == {("Globex", "admin"), ("Acme Corp", "auditor")}
     assert client.get(f"/api/v1/orgs/{acme_id}/assets", headers=auditor).status_code == 200
 
-    members = client.get(f"/api/v1/orgs/{acme_id}/users", headers=owner).json()
+    members = client.get(f"/api/v1/orgs/{acme_id}/members", headers=owner).json()["items"]
     assert {(m["email"], m["role"]) for m in members} == {
         ("owner@acmecorp.io", "admin"),
         ("auditor@globex.io", "auditor"),
@@ -90,8 +90,6 @@ def test_add_member_rules(client):
     viewer = _register(client, "viewer@globex.io", "Globex")
     acme_id = client.get("/api/v1/orgs", headers=owner).json()[0]["id"]
     url = f"/api/v1/orgs/{acme_id}/members"
-
-    assert client.post(url, json={"email": "nobody@nowhere.io"}, headers=owner).status_code == 404
 
     first = client.post(url, json={"email": "viewer@globex.io"}, headers=owner)
     assert first.status_code == 201

@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/archived", label: "Archived" },
   { href: "/activity", label: "Activity" },
   { href: "/reports", label: "Reports" },
+  { href: "/people", label: "People" },
   { href: "/settings", label: "Settings" },
 ];
 

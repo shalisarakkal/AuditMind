@@ -346,3 +346,32 @@ export type ProfileParams = {
   stale_login_days?: number;
   stale_severity?: Severity;
 };
+
+/** A person's state (backend services/people.py). */
+export type MemberStatus = "active" | "locked" | "must_change_password" | "deactivated";
+
+/** A member of the org, as People lists them (GET /orgs/{id}/members). */
+export type Member = {
+  id: string;
+  email: string;
+  name: string | null;
+  auth_provider: string;
+  created_at: string;
+  role: UserRole;
+  added_at: string;
+  status: MemberStatus;
+  /** Locked until then; null while locked: until an admin unlocks it. */
+  locked_until: string | null;
+  /** Their temporary password works until then. */
+  temp_password_expires_at: string | null;
+  /** Also in other orgs: their name and password are the Sysadmin's to change. */
+  in_other_orgs: boolean;
+};
+
+/** POST /orgs/{id}/members: the temporary password, shown once, for a new account. */
+export type MemberAdded = Member & { temporary_password: string | null };
+
+/** POST /orgs/{id}/members/{user}/reset-password, shown once. */
+export type PasswordReset = { temporary_password: string; expires_at: string };
+
+export type MemberFacets = { role: string[]; status: string[] };

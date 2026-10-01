@@ -11,6 +11,7 @@ from app.api.routes import (
     findings,
     import_profiles,
     orgs,
+    people,
     reports,
     risk,
     scans,
@@ -40,6 +41,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 api_router_prefix = settings.API_V1_STR
 app.include_router(auth.router, prefix=api_router_prefix)
 app.include_router(orgs.router, prefix=api_router_prefix)
+app.include_router(people.router, prefix=api_router_prefix)
 app.include_router(assets.router, prefix=api_router_prefix)
 app.include_router(scans.router, prefix=api_router_prefix)
 app.include_router(findings.router, prefix=api_router_prefix)

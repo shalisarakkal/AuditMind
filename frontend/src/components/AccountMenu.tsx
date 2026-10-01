@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/apiClient";
-import { CHANGE_PASSWORD_PATH } from "@/lib/paths";
+import { ACCOUNT_PATH, CHANGE_PASSWORD_PATH } from "@/lib/paths";
 import type { Me } from "@/lib/types";
 
-/** The signed-in user, at the foot of the sidebar: Change password and Sign
- * out (the page's AuthGuard then shows the sign-in page). */
+/** The signed-in user, at the foot of the sidebar: Your account, Change
+ * password and Sign out (the page's AuthGuard then shows the sign-in page). */
 export default function AccountMenu() {
-  const { logout } = useApp();
+  const { logout, accountVersion } = useApp();
   const [user, setUser] = useState<Me | null>(null);
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
@@ -21,7 +21,7 @@ export default function AccountMenu() {
       .get<Me>("/auth/me")
       .then(setUser)
       .catch(() => setUser(null));
-  }, []);
+  }, [accountVersion]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +44,9 @@ export default function AccountMenu() {
     <div ref={menu} className="relative mt-auto border-t border-white/10 pt-3">
       {open && (
         <div role="menu" className="absolute bottom-full left-0 right-0 mb-1 rounded-md border border-white/10 bg-navy p-1 shadow-lg">
+          <Link role="menuitem" href={ACCOUNT_PATH} className={item} onClick={() => setOpen(false)}>
+            Your account
+          </Link>
           <Link role="menuitem" href={CHANGE_PASSWORD_PATH} className={item} onClick={() => setOpen(false)}>
             Change password
           </Link>

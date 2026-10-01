@@ -43,6 +43,9 @@ def _unauthorized(detail: str = "Could not validate credentials", code: str = "t
 SESSION_ENDED = {
     "idle": "You were signed out after a period of inactivity. Please sign in again.",
     "expired": "Your sign-in has expired. Please sign in again.",
+    "role_changed": "An administrator changed your role. Please sign in again.",
+    "removed": "An administrator removed you from an organization. Please sign in again.",
+    "password_reset": "An administrator reset your password. Sign in with the temporary password they give you.",
 }
 
 

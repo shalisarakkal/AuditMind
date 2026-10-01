@@ -1012,20 +1012,45 @@ platform defaults, then each org's changes. Part 3 adds the screens.
   on refresh); the sign-up page says "Email already registered" (public
   sign-up goes in Part 3)
 
-### Part 2: people (not started)
+### Part 2: people (built 2026-10-01, awaiting verification)
 
-Besides the people decisions above:
-
-- [ ] Names can be edited (agreed 2026-10-01). Everyone edits their own on
+- [x] People page (sidebar), a list page like the others: name, email,
+      role, status (Active, Locked, Must change password, Deactivated),
+      added; search, filters, sorting, paging. Every member sees it; the
+      actions are the admins' (`/orgs/{id}/members`, routes/people.py,
+      services/people.py)
+- [x] Add person: email, name, role. A new account gets a temporary
+      password, shown once (with Copy) and never stored as typed; an email
+      that already has an account just gets the membership and keeps its
+      own password and name. The Sysadmin's account can't be added
+- [x] Change role (pick it in the row, then confirm), Remove (the account
+      stays), Reset password (a temporary one, shown once), Unlock. A role
+      change, removal or reset ends that person's sessions; the sign-in
+      page then says why ("An administrator changed your role")
+- [x] An org always keeps an admin, and admins don't change their own role,
+      remove themselves or reset their own password: another admin does
+      (the org's row is locked while members change, so two admins
+      demoting each other can't leave none)
+- [x] Names can be edited (agreed 2026-10-01). Everyone edits their own on
       a Your account page in the account menu (beside Change password),
       which also shows their email and their orgs and roles. An org admin
       edits the name of people who belong to that org alone; anyone in
       several orgs is renamed by the Sysadmin (the password-reset rule).
       Each rename is recorded in Activity with the old and new names
-- [ ] The email (the sign-in ID) can't be edited by its owner or an org
+- [x] The email (the sign-in ID) can't be edited by its owner or an org
       admin: changing it safely needs a confirmation email. The Sysadmin
-      may change it until email is set up; self-service with a
+      may change it until email is set up (Part 3); self-service with a
       confirmation link comes with email
+- [x] Activity: Member added (and whether it's a new account), Member
+      removed, Role changed, Name changed, Password reset, Account
+      unlocked; renames and unlocks show in each of the person's orgs
+- [x] Tests that each admin action stays inside its own org (an admin of
+      another org gets 404 or 403)
+- Until Part 3, someone in several orgs can't have their password reset
+  or be renamed by anyone but themselves: that's the Sysadmin's, who
+  doesn't exist yet
+- No schema change (no migration). GET /orgs/{id}/users became
+  GET /orgs/{id}/members (paged)
 
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 

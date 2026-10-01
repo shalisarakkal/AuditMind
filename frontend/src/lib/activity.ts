@@ -14,6 +14,11 @@ export const EVENT_LABELS: Record<string, string> = {
   profile_updated: "File format changed",
   profile_deleted: "File format deleted",
   member_added: "Member added",
+  member_removed: "Member removed",
+  role_changed: "Role changed",
+  name_changed: "Name changed",
+  password_reset: "Password reset",
+  account_unlocked: "Account unlocked",
   registered: "Signed up",
   login: "Signed in",
   login_failed: "Failed sign-in",
@@ -86,13 +91,19 @@ export function eventSummary(event: ActivityEvent): string {
       parts.push(`${key.replace(/_/g, " ")}: ${show(from)} → ${show(to)}`);
     }
   }
-  if (event.type === "member_added" && details.role) parts.push(`as ${details.role}`);
+  if (event.type === "member_added" && details.role) {
+    parts.push(`as ${details.role}${details.new_account ? ", new account" : ""}`);
+  }
+  if (event.type === "member_removed" && details.role) parts.push(`was ${details.role}`);
+  if (event.type === "role_changed" || event.type === "name_changed") {
+    parts.push(`${show(details.from, "no name")} → ${show(details.to, "no name")}`);
+  }
   if (event.type === "repeat_upload" && details.previously_by) parts.push(`first uploaded by ${details.previously_by}`);
   if (event.type === "profile_updated" && Array.isArray(details.changed)) parts.push(`changed: ${details.changed.join(", ")}`);
   return parts.join(", ");
 }
 
-function show(value: unknown): string {
-  if (value === null || value === undefined) return "default";
+function show(value: unknown, missing = "default"): string {
+  if (value === null || value === undefined) return missing;
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }

@@ -19,6 +19,10 @@ type AppContextValue = {
   orgsLoading: boolean;
   orgsError: string | null;
   selectedOrg: MyOrganization | null;
+  /** Goes up when the signed-in user's own details change (their name), so
+   * what shows them (the account menu) loads them again. */
+  accountVersion: number;
+  accountChanged(): void;
   login(email: string, password: string): Promise<void>;
   register(details: { orgName: string; email: string; password: string; name?: string }): Promise<void>;
   logout(): Promise<void>;
@@ -38,6 +42,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [orgsError, setOrgsError] = useState<string | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [accountVersion, setAccountVersion] = useState(0);
+  const accountChanged = useCallback(() => setAccountVersion((v) => v + 1), []);
 
   const selectOrg = useCallback((orgId: string) => {
     window.localStorage.setItem(ORG_KEY, orgId);
@@ -172,6 +178,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       orgsLoading,
       orgsError,
       selectedOrg: orgs.find((o) => o.id === selectedOrgId) ?? null,
+      accountVersion,
+      accountChanged,
       login,
       register,
       logout,
@@ -188,6 +196,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       orgsLoading,
       orgsError,
       selectedOrgId,
+      accountVersion,
+      accountChanged,
       login,
       register,
       logout,

@@ -28,7 +28,7 @@ WRITE_ROUTES = [
     ("post", "/members", {"json": {"email": "nobody@example.io"}}, {"admin"}),
 ]
 
-READ_ROUTES = ["", "/users", "/assets", "/findings", "/scans?tracked=true", "/uploads", "/reports", "/dashboard", "/settings", "/import-profiles"]
+READ_ROUTES = ["", "/members", "/members/facets", "/assets", "/findings", "/scans?tracked=true", "/uploads", "/reports", "/dashboard", "/settings", "/import-profiles"]
 
 
 @pytest.fixture

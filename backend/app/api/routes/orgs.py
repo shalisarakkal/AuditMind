@@ -10,8 +10,7 @@ from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.org_settings import IngestionSettingsRead, IngestionSettingsUpdate
-from app.schemas.organization import MemberAdd, MyOrganizationRead, OrganizationCreate, OrganizationRead
-from app.schemas.user import MemberRead, UserRead
+from app.schemas.organization import MyOrganizationRead, OrganizationCreate, OrganizationRead
 from app.services.events import record_event
 from app.services.org_settings import apply_overrides, resolve_ingestion_settings
 
@@ -22,10 +21,6 @@ def _my_org(membership: OrgMembership) -> MyOrganizationRead:
     return MyOrganizationRead(
         **OrganizationRead.model_validate(membership.organization).model_dump(), role=membership.role
     )
-
-
-def _member(membership: OrgMembership) -> MemberRead:
-    return MemberRead(**UserRead.model_validate(membership.user).model_dump(), role=membership.role)
 
 
 def _ingestion_settings(org: Organization) -> IngestionSettingsRead:
@@ -79,38 +74,6 @@ def get_org(
     if not org:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return org
-
-
-@router.get("/{org_id}/users", response_model=list[MemberRead])
-def list_org_users(
-    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
-) -> list[MemberRead]:
-    memberships = db.query(OrgMembership).filter(OrgMembership.org_id == org_id).all()
-    return [_member(m) for m in memberships]
-
-
-@router.post("/{org_id}/members", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
-def add_member(
-    org_id: uuid.UUID,
-    payload: MemberAdd,
-    db: Session = Depends(get_db),
-    admin: OrgMembership = Depends(require_org_role(UserRole.admin)),
-) -> MemberRead:
-    """Give an existing user access to this org. Admins only."""
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No user with that email")
-    if db.get(OrgMembership, (user.id, org_id)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already a member")
-
-    membership = OrgMembership(user_id=user.id, org_id=org_id, role=payload.role)
-    db.add(membership)
-    record_event(
-        db, "member_added", org_id=org_id, actor=admin.user, item=user.email, details={"role": payload.role.value}
-    )
-    db.commit()
-    db.refresh(membership)
-    return _member(membership)
 
 
 @router.get("/{org_id}/settings", response_model=IngestionSettingsRead)

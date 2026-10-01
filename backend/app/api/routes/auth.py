@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.api.deps import SignedIn, get_signed_in, is_background, parse_access_token
+from app.api.deps import SignedIn, get_current_user, get_signed_in, is_background, parse_access_token
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import get_db
@@ -27,7 +27,8 @@ from app.models.organization import Organization
 from app.models.session import UserSession
 from app.models.user import User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, Me, PasswordRulesRead, RegisterRequest, Token
-from app.services import accounts, sessions
+from app.schemas.user import NameUpdate
+from app.services import accounts, people, sessions
 from app.services.events import record_event, record_for_user_orgs
 from app.services.rate_limit import login_limiter
 from app.services.security_policy import SecurityPolicy, effective_policy
@@ -256,7 +257,19 @@ def _bearer_session(db: Session, request: Request) -> UserSession | None:
 
 @router.get("/me", response_model=Me)
 def me(signed_in: SignedIn = Depends(get_signed_in), db: Session = Depends(get_db)) -> Me:
-    user = signed_in.user
+    return _me(db, signed_in.user)
+
+
+@router.patch("/me", response_model=Me)
+def update_me(payload: NameUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Me:
+    """Change one's own name (the email, the sign-in, can't be changed here).
+    Recorded in each of their orgs' Activity."""
+    people.rename(db, user, user, payload.name)
+    db.commit()
+    return _me(db, user)
+
+
+def _me(db: Session, user: User) -> Me:
     days = effective_policy(db, user).password.expiry_days
     return Me(
         id=str(user.id),
