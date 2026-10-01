@@ -4,24 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { useApp } from "@/context/AppContext";
-import { api } from "@/lib/apiClient";
 import { ACCOUNT_PATH, CHANGE_PASSWORD_PATH } from "@/lib/paths";
-import type { Me } from "@/lib/types";
+import { useMe } from "@/lib/useMe";
 
 /** The signed-in user, at the foot of the sidebar: Your account, Change
  * password and Sign out (the page's AuthGuard then shows the sign-in page). */
 export default function AccountMenu() {
-  const { logout, accountVersion } = useApp();
-  const [user, setUser] = useState<Me | null>(null);
+  const { logout } = useApp();
+  const user = useMe();
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    api
-      .get<Me>("/auth/me")
-      .then(setUser)
-      .catch(() => setUser(null));
-  }, [accountVersion]);
 
   useEffect(() => {
     if (!open) return;

@@ -210,3 +210,23 @@ def effective_policy(db: Session, user: User | None) -> SecurityPolicy:
     if not orgs:
         return combine([(None, platform)])
     return combine([(org.name, resolve_org_security(db, org, platform)) for org in orgs])
+
+
+def change_layer(base: SecuritySettings, stored: dict | None, changes: dict) -> tuple[dict, SecuritySettings]:
+    """A layer's stored changes after `changes` (a value sets a setting,
+    None goes back to the layer below), and the settings that results.
+    Raises ValueError for an unknown setting, and pydantic's
+    ValidationError for a value out of range (the whole result is checked,
+    so the Complex rule's settings are too)."""
+    unknown = set(changes) - set(SecuritySettings.model_fields)
+    if unknown:
+        raise ValueError(f"Unknown setting: {', '.join(sorted(unknown))}")
+    new = dict(stored or {})
+    for key, value in changes.items():
+        if value is None:
+            new.pop(key, None)
+        else:
+            new[key] = value
+    effective = apply_changes(base, new)
+    # Kept as the validated values (e.g. "15" stored as 15).
+    return {key: getattr(effective, key) for key in new}, effective

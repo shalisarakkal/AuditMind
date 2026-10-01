@@ -4,6 +4,7 @@ import ImportProfilesPanel from "@/components/ImportProfilesPanel";
 import Link from "next/link";
 
 import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
+import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import { useApp } from "@/context/AppContext";
 
 export default function SettingsPage() {
@@ -38,6 +39,17 @@ export default function SettingsPage() {
           </p>
         </div>
         <ImportProfilesPanel orgId={org.id} isAdmin={org.role === "admin"} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-medium text-white">Security</h2>
+          <p className="text-sm text-white/60">
+            How long a sign-in lasts, when an account locks, and the password rule. Settings marked Default follow the
+            platform defaults set by the Sysadmin. Someone in several organizations gets the strictest of each.
+          </p>
+        </div>
+        <SecuritySettingsForm path={`/orgs/${org.id}/security`} editable={org.role === "admin"} belowName="platform default" />
       </section>
 
       <section className="space-y-1">

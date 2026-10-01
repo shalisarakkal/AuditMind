@@ -57,7 +57,17 @@ export type Organization = {
   created_at: string;
 };
 
-export type MyOrganization = Organization & { role: UserRole };
+export type MyOrganization = Organization & {
+  /** What the user may do here. Viewer for the Sysadmin (reading an org it
+   * doesn't belong to) and, in the app, in an archived org (AppContext). */
+  role: UserRole;
+  /** "sysadmin": the Sysadmin reading an org it doesn't belong to. */
+  access?: "member" | "sysadmin";
+  /** Read-only for everyone until the Sysadmin restores it. */
+  archived?: boolean;
+  /** Their role as a member, when `role` was lowered (an archived org). */
+  member_role?: UserRole;
+};
 
 export type Asset = {
   id: string;
@@ -375,3 +385,62 @@ export type MemberAdded = Member & { temporary_password: string | null };
 export type PasswordReset = { temporary_password: string; expires_at: string };
 
 export type MemberFacets = { role: string[]; status: string[] };
+
+/** One layer's security settings (backend services/security_policy.py). */
+export type SecuritySettings = {
+  idle_minutes: number;
+  max_session_days: number;
+  lockout_threshold: number;
+  lockout_window_minutes: number;
+  lock_minutes: number;
+  password_rule: "simple" | "complex";
+  min_length: number;
+  require_upper: boolean;
+  require_lower: boolean;
+  require_digit: boolean;
+  require_symbol: boolean;
+  history_count: number;
+  expiry_days: number;
+};
+
+/** GET /platform/security, GET /orgs/{id}/security. */
+export type SecuritySettingsLayer = {
+  values: SecuritySettings;
+  /** The settings this layer changes; the rest follow `below`. */
+  changed: (keyof SecuritySettings)[];
+  /** Built-in values under the platform's; the platform's under an org's. */
+  below: SecuritySettings;
+};
+
+export type OrgStatus = "active" | "archived" | "purging";
+
+/** An organization in the Platform section (GET /platform/orgs). */
+export type PlatformOrg = {
+  id: string;
+  name: string;
+  industry: string | null;
+  size: string | null;
+  created_at: string;
+  status: OrgStatus;
+  archived_at: string | null;
+  members: number;
+  admins: string[];
+};
+
+export type PlatformOrgCreated = PlatformOrg & {
+  temporary_password: string | null;
+  temp_password_expires_at: string | null;
+};
+
+/** An account in the Platform section (GET /platform/users). */
+export type PlatformUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  created_at: string;
+  status: MemberStatus;
+  is_sysadmin: boolean;
+  locked_until: string | null;
+  temp_password_expires_at: string | null;
+  orgs: { org_id: string; name: string; role: UserRole }[];
+};

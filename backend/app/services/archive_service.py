@@ -556,10 +556,13 @@ def purge_expired(db: Session, now: datetime | None = None, queue: bool = False)
     Run by scripts/purge_expired.py; each purge is an Activity event by
     "System". `queue`: only queue the purges (the background worker's daily
     run), as low-priority jobs it takes when nothing else waits; returns how
-    many were queued."""
+    many were queued. An archived org is left as it is (read-only, kept
+    whole until the Sysadmin restores or purges it)."""
     now = now or _now()
     purged = 0
-    for org in db.scalars(select(Organization)).all():
+    for org in db.scalars(
+        select(Organization).where(Organization.archived_at.is_(None), Organization.purge_requested_at.is_(None))
+    ).all():
         cutoff = now - timedelta(days=resolve_ingestion_settings(org).archive_retention_days)
         due = db.scalars(
             select(ArchiveBatch.id).where(

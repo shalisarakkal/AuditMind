@@ -1052,6 +1052,51 @@ platform defaults, then each org's changes. Part 3 adds the screens.
 - No schema change (no migration). GET /orgs/{id}/users became
   GET /orgs/{id}/members (paged)
 
+### Part 3: Sysadmin, organizations, security settings screens (built 2026-10-01, awaiting verification)
+
+- [x] The Sysadmin: an account of its own, in no org, created only on the
+      server (`scripts/create_sysadmin.py --email … --name …`, a temporary
+      password shown once). It reads every org read-only (the picker lists
+      them all as "Sysadmin: read-only"; api/deps.py SysadminView) and has a
+      Platform section in the sidebar
+- [x] Public sign-up off by default (`PUBLIC_SIGNUP`, .env); members no
+      longer create orgs (POST /orgs is gone). The sign-in page offers
+      "Create an account" only while sign-up is open (GET /auth/options).
+      With it on, sign-up still says whether an email has an account
+- [x] Platform > Organizations: create one with its first admin (a new
+      account's temporary password shown once); archive (refused while its
+      uploads or archive jobs wait or run), restore, purge (archived only,
+      after typing its name). Migration 0016 (archived_at/by,
+      purge_requested_at/by)
+- [x] An archived org is read-only for everyone (every change goes through
+      require_org_role, which refuses it; the bulk archive jobs too), shown
+      "(archived)" in the picker with a banner, and left out of the daily
+      auto-purge. Never purged automatically
+- [x] Purge: the org is gone for everyone at once; the background worker
+      deletes its rows table by table in chunks of 10,000 (each committed,
+      so a purge cut off carries on), then the org. Accounts stay. Recorded
+      in Platform activity with counts (the org's own Activity goes with it)
+- [x] Platform > Accounts: every account with its orgs and roles; edit the
+      name or the email (the sign-in), reset the password (anyone, whatever
+      their orgs), unlock, deactivate (signed out at once; refused for an
+      org's only admin who can sign in) or reactivate, change a role in an
+      org (the org keeps an admin). The Sysadmin's own row: Edit only
+- [x] "An org keeps an admin" now counts only admins who can sign in
+      (a deactivated admin doesn't look after the org)
+- [x] Platform activity: events of no org (the Sysadmin's actions, the
+      worker). Org Activity shows the worker's events but not the
+      platform's; actions on an account also show in each of its orgs
+- [x] Security settings screens: Platform > Security defaults (over the
+      built-in values) and each org's Settings > Security (over the
+      platform defaults; admins edit, members read). Each setting shows
+      Default or Changed with "Use default"; the backend checks the ranges
+      (422). Recorded as Settings changed
+- [x] Part 1 leftovers: the session cookie's expiry is renewed on every
+      refresh (follows the longest sign-in if an admin changes it); sign-up
+      enumeration answered by closing sign-up
+- After upgrading: run `alembic upgrade head` (0016) and restart the
+  background worker (it purges orgs)
+
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 
 Requested 2026-09-28, after `azure_azure_activity_500000.json` failed as a

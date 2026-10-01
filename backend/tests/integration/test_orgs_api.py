@@ -35,21 +35,6 @@ def test_registration_org_is_listed_with_admin_role(client):
 
 
 @requires_db
-def test_created_org_appears_in_picker_and_is_accessible(client):
-    headers = _register(client, "owner@acmecorp.io", "Acme Corp")
-
-    created = client.post("/api/v1/orgs", json={"name": "Acme Labs", "industry": "R&D"}, headers=headers)
-    assert created.status_code == 201, created.text
-    assert created.json()["role"] == "admin"
-
-    orgs = client.get("/api/v1/orgs", headers=headers).json()
-    assert [o["name"] for o in orgs] == ["Acme Corp", "Acme Labs"]
-    for org in orgs:
-        assert client.get(f"/api/v1/orgs/{org['id']}", headers=headers).status_code == 200
-        assert client.get(f"/api/v1/orgs/{org['id']}/assets", headers=headers).status_code == 200
-
-
-@requires_db
 def test_non_member_is_denied(client):
     owner = _register(client, "owner@acmecorp.io", "Acme Corp")
     outsider = _register(client, "someone@globex.io", "Globex")

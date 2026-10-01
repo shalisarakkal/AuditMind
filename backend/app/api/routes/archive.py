@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_org_member, require_org_role
+from app.api.deps import refuse_if_archived, require_org_member, require_org_role
 from app.api.paging import (
     DateRange,
     PageParams,
@@ -219,6 +219,7 @@ def start_bulk(
     allowed = (UserRole.admin,) if body.action == ArchiveAction.purge else (UserRole.admin, UserRole.auditor)
     if membership.role not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    refuse_if_archived(membership)
     if body.action == ArchiveAction.archive and body.item_type is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Say which item_type the ids are")
     jobs, refused = [], []

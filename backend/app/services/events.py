@@ -48,6 +48,15 @@ TYPES: dict[str, Criticality] = {
     "name_changed": Criticality.info,
     "password_reset": Criticality.info,
     "account_unlocked": Criticality.info,
+    # The Sysadmin's (Phase 2e part 3).
+    "org_created": Criticality.info,
+    "org_archived": Criticality.warning,
+    "org_restored": Criticality.info,
+    "org_purged": Criticality.critical,
+    "user_deactivated": Criticality.warning,
+    "user_reactivated": Criticality.info,
+    "email_changed": Criticality.warning,
+    "sysadmin_created": Criticality.warning,
     "registered": Criticality.info,
     "login": Criticality.info,
     "login_failed": Criticality.warning,
@@ -58,6 +67,12 @@ TYPES: dict[str, Criticality] = {
     "worker_started": Criticality.info,
     "worker_stopped": Criticality.info,
 }
+
+
+# Events of the whole system (no org) that every org's Activity shows too:
+# the background worker runs everyone's uploads. Other events with no org
+# are the platform's (the Sysadmin's Platform activity), not shown to orgs.
+SHARED_SYSTEM_TYPES = ("worker_started", "worker_stopped")
 
 
 def _now() -> datetime:
@@ -107,6 +122,15 @@ def record_event(
     )
     db.add(event)
     return event
+
+
+def record_for_platform_and_user_orgs(db: Session, type: str, user: User, actor: User, **fields) -> None:
+    """An action on an account (the Sysadmin's): in Platform activity, and
+    in each of the account's orgs, so their admins see it."""
+    record_event(db, type, org_id=None, actor=actor, item=user.email, **fields)
+    org_ids = db.scalars(select(OrgMembership.org_id).where(OrgMembership.user_id == user.id)).all()
+    for org_id in org_ids:
+        record_event(db, type, org_id=org_id, actor=actor, item=user.email, **fields)
 
 
 def record_for_user_orgs(db: Session, type: str, user: User, *, by_user: bool = True, **fields) -> None:

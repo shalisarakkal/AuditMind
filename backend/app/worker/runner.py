@@ -38,7 +38,7 @@ from app.models.archive import ArchiveJob
 from app.models.enums import ScanStatus
 from app.models.event import WorkerStatus
 from app.models.scan import Scan
-from app.services import archive_service, ingestion_background
+from app.services import archive_service, ingestion_background, platform
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
 from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, job_is_running
@@ -131,10 +131,18 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
 
 
 def run_once(db: Session) -> bool:
-    """Take and run one waiting job; False if there's none."""
+    """Take and run one waiting job; else purge an org whose purge the
+    Sysadmin asked for (it's already gone for everyone, so it waits its
+    turn). False if there's nothing to do."""
     claimed = claim_next(db)
     if claimed is None:
-        return False
+        try:
+            return platform.purge_next_org(db)
+        except Exception:
+            # Carries on from where it stopped next time.
+            logger.exception("Purging an organization failed")
+            db.rollback()
+            return False
     kind, job_id = claimed
     current.set(claimed)
     try:

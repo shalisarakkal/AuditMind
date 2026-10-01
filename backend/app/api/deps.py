@@ -10,6 +10,7 @@ from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.membership import OrgMembership
+from app.models.organization import Organization
 from app.models.session import UserSession
 from app.models.user import User
 from app.services.sessions import SessionEnded, check_session
@@ -84,22 +85,64 @@ def get_current_user(signed_in: SignedIn = Depends(get_signed_in)) -> User:
     return signed_in.user
 
 
+@dataclass
+class SysadminView:
+    """The Sysadmin's access to an org it doesn't belong to: read-only, like
+    a viewer's (not a membership row: nothing is saved)."""
+
+    user: User
+    organization: Organization
+    role: UserRole = UserRole.viewer
+
+    @property
+    def user_id(self) -> uuid.UUID:
+        return self.user.id
+
+    @property
+    def org_id(self) -> uuid.UUID:
+        return self.organization.id
+
+
 def require_org_member(
     org_id: uuid.UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)
-) -> OrgMembership:
-    """Gate for every /orgs/{org_id}/... route: the caller must belong to that org."""
+) -> OrgMembership | SysadminView:
+    """Gate for every /orgs/{org_id}/... route: the caller must belong to
+    that org (or be the Sysadmin, who reads every org). An org being purged
+    is gone for everyone."""
     membership = db.get(OrgMembership, (user.id, org_id))
-    if membership is None:
+    if membership is None and user.is_sysadmin:
+        org = db.get(Organization, org_id)
+        if org is not None:
+            membership = SysadminView(user=user, organization=org)
+    if membership is None or membership.organization.purge_requested_at is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-organization access denied")
     return membership
 
 
+def refuse_if_archived(membership: OrgMembership | SysadminView) -> None:
+    if membership.organization.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "org_archived", "message": f"{membership.organization.name} is archived, so it's read-only."},
+        )
+
+
 def require_org_role(*roles: UserRole):
-    """Like require_org_member, but also checks the caller's role in that org."""
+    """Like require_org_member, but also checks the caller's role in that
+    org. Every change to an org's data goes through here, so an archived
+    org (read-only) is refused here too."""
 
     def checker(membership: OrgMembership = Depends(require_org_member)) -> OrgMembership:
         if membership.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        refuse_if_archived(membership)
         return membership
 
     return checker
+
+
+def require_sysadmin(user: User = Depends(get_current_user)) -> User:
+    """Gate for /platform/...: the Sysadmin only."""
+    if not user.is_sysadmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sysadmin only")
+    return user

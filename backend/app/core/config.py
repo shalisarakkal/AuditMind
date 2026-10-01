@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     TEMP_PASSWORD_DAYS: int = Field(7, ge=1)
     # A session's last activity is saved at most this often (seconds).
     SESSION_TOUCH_SECONDS: int = Field(60, ge=1)
+    # Anyone may sign up, creating an org of their own. Off: only the
+    # Sysadmin creates orgs (with their first admin), and admins add people.
+    PUBLIC_SIGNUP: bool = False
     # The security settings themselves (idle time, longest sign-in, lockout,
     # password rule) aren't here: the platform defaults are in the database,
     # set by the Sysadmin, over built-in values (services/security_policy.py).

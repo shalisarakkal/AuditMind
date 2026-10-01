@@ -22,6 +22,7 @@ import {
 } from "@/components/ListPage";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
+import TemporaryPassword, { type Handover } from "@/components/TemporaryPassword";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/apiClient";
 import { formatDateTime } from "@/lib/domain";
@@ -49,9 +50,6 @@ const STATUS_BADGES: Record<MemberStatus, string> = {
 type Pending =
   | { kind: "role"; member: Member; role: UserRole }
   | { kind: "remove" | "reset" | "unlock"; member: Member };
-
-/** A temporary password to show the admin, once. */
-type Handover = { who: string; password: string; expiresAt: string | null; added: boolean };
 
 // The list reads its sort and filters from the page address.
 export default function PeoplePage() {
@@ -503,34 +501,5 @@ function RenamePerson({
       </button>
       {error && <p className="w-full text-sm text-red-300">{error}</p>}
     </form>
-  );
-}
-
-/** The temporary password, shown once: the admin passes it on. */
-function TemporaryPassword({ handover, onDone }: { handover: Handover; onDone(): void }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div role="group" aria-label="Temporary password" className="space-y-2 rounded-lg border border-cyan/30 bg-cyan/5 p-4 text-sm">
-      <p className="text-white">
-        {handover.added ? `${handover.who} is added.` : `${handover.who}'s password is reset.`} Give them this temporary
-        password: it&apos;s shown only once{handover.expiresAt ? `, and works until ${formatDateTime(handover.expiresAt)}` : ""}.
-        They choose their own when they sign in.
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <code className="rounded bg-navy px-3 py-1.5 font-mono text-base text-cyan select-all">{handover.password}</code>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(handover.password).then(() => setCopied(true));
-          }}
-          className="text-xs text-cyan hover:underline"
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
-        <button type="button" onClick={onDone} className={BUTTON}>
-          Done
-        </button>
-      </div>
-    </div>
   );
 }

@@ -2,9 +2,12 @@
 
 import AuthForm from "@/components/AuthForm";
 import { useApp } from "@/context/AppContext";
+import { useAuthOptions } from "@/lib/useAuthOptions";
 
 export default function LoginPage() {
   const { login, signedOutReason } = useApp();
+  // "Create an account" only while anyone may sign up (PUBLIC_SIGNUP).
+  const options = useAuthOptions();
   return (
     <AuthForm
       notice={signedOutReason}
@@ -15,7 +18,7 @@ export default function LoginPage() {
       ]}
       submitLabel="Sign in"
       onSubmit={(v) => login(v.email, v.password)}
-      footer={{ text: "New to AuditMind?", linkLabel: "Create an account", href: "/register" }}
+      footer={options?.public_signup ? { text: "New to AuditMind?", linkLabel: "Create an account", href: "/register" } : undefined}
     />
   );
 }

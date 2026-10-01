@@ -19,6 +19,14 @@ export const EVENT_LABELS: Record<string, string> = {
   name_changed: "Name changed",
   password_reset: "Password reset",
   account_unlocked: "Account unlocked",
+  org_created: "Organization created",
+  org_archived: "Organization archived",
+  org_restored: "Organization restored",
+  org_purged: "Organization purged",
+  user_deactivated: "Account deactivated",
+  user_reactivated: "Account reactivated",
+  email_changed: "Email changed",
+  sysadmin_created: "Sysadmin created",
   registered: "Signed up",
   login: "Signed in",
   login_failed: "Failed sign-in",
@@ -72,6 +80,10 @@ const COUNT_LABELS: Record<string, string> = {
   findings: "findings",
   duplicates_purged: "duplicates purged",
   findings_kept_with_asset: "kept with their asset",
+  // An org purged.
+  scans: "uploads",
+  events: "events",
+  org_memberships: "memberships",
   expired: "past retention",
   trimmed: "trimmed early",
 };
@@ -95,9 +107,11 @@ export function eventSummary(event: ActivityEvent): string {
     parts.push(`as ${details.role}${details.new_account ? ", new account" : ""}`);
   }
   if (event.type === "member_removed" && details.role) parts.push(`was ${details.role}`);
-  if (event.type === "role_changed" || event.type === "name_changed") {
+  if (event.type === "role_changed" || event.type === "name_changed" || event.type === "email_changed") {
     parts.push(`${show(details.from, "no name")} → ${show(details.to, "no name")}`);
+    if (typeof details.org === "string") parts.push(`in ${details.org}`);
   }
+  if (event.type === "org_created" && typeof details.admin === "string") parts.push(`admin ${details.admin}`);
   if (event.type === "repeat_upload" && details.previously_by) parts.push(`first uploaded by ${details.previously_by}`);
   if (event.type === "profile_updated" && Array.isArray(details.changed)) parts.push(`changed: ${details.changed.join(", ")}`);
   return parts.join(", ");

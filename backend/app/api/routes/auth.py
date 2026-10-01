@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import SignedIn, get_current_user, get_signed_in, is_background, parse_access_token
@@ -126,9 +126,26 @@ def _password_rejected(problems) -> HTTPException:
     )
 
 
+class AuthOptions(BaseModel):
+    # Whether the sign-in page offers "Create an account" (PUBLIC_SIGNUP).
+    public_signup: bool
+
+
+@router.get("/options", response_model=AuthOptions)
+def options() -> AuthOptions:
+    """What the sign-in page offers, before anyone signs in."""
+    return AuthOptions(public_signup=settings.PUBLIC_SIGNUP)
+
+
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, response: Response, db: Session = Depends(get_db)) -> Token:
-    # Public sign-up goes in Phase 2e part 3, when the Sysadmin creates orgs.
+    """Sign up with a new org, when PUBLIC_SIGNUP is on (it says whether the
+    email has an account: the price of open sign-up)."""
+    if not settings.PUBLIC_SIGNUP:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "signup_closed", "message": "Sign-up is closed. Ask your administrator for an account."},
+        )
     _check_origin(request, require_header=False)
     _rate_limit(request)
     if db.query(User).filter(User.email == payload.email).first():
@@ -227,6 +244,8 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     if not user.must_change_password and accounts.password_expired(user, policy, _now()):
         user.must_change_password = True
         db.commit()
+    # Its expiry follows the longest sign-in, which an admin may have changed.
+    _set_cookie(response, request.cookies[COOKIE_NAME], session)
     return _token(session, user)
 
 

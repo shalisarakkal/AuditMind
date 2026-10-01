@@ -10,6 +10,8 @@ from sqlalchemy import select
 
 from app.core.security import create_access_token
 from app.models.event import Event
+from app.models.enums import UserRole
+from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.session import UserSession
 from app.models.user import User
@@ -307,7 +309,11 @@ def test_the_complex_rule_and_its_history(client, db_session, ann):
 
 def test_rules_say_which_org_asks_for_them(client, db_session, ann):
     org_id = first_org_id(client, ann)
-    client.post("/api/v1/orgs", json={"name": "Zeta"}, headers=ann)
+    # Ann is in a second org, with the default rule.
+    zeta = Organization(name="Zeta")
+    db_session.add(zeta)
+    db_session.flush()
+    db_session.add(OrgMembership(user_id=user(db_session).id, org_id=zeta.id, role=UserRole.admin))
     acme = db_session.get(Organization, uuid.UUID(org_id))
     acme.security_settings = {"password_rule": "complex", "min_length": 20}
     db_session.commit()

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,4 +28,9 @@ class MyOrganizationRead(OrganizationRead):
     Drives the org picker."""
 
     role: UserRole
+    # "member", or "sysadmin": the Sysadmin reading an org it doesn't belong
+    # to (as a viewer).
+    access: Literal["member", "sysadmin"] = "member"
+    # Archived: read-only for everyone until the Sysadmin restores it.
+    archived: bool = False
 

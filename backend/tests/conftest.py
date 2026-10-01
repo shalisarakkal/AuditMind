@@ -56,8 +56,10 @@ requires_db = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def _sign_in_defaults(monkeypatch):
     """The test client talks plain http, so the session cookie mustn't be
-    HTTPS-only; and each test starts with no sign-in attempts counted."""
+    HTTPS-only; and each test starts with no sign-in attempts counted.
+    Sign-up is open: most tests make their accounts that way (helpers.register)."""
     monkeypatch.setattr(settings, "COOKIE_SECURE", False)
+    monkeypatch.setattr(settings, "PUBLIC_SIGNUP", True)
     login_limiter.reset()
 
 

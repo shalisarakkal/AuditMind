@@ -26,7 +26,7 @@ from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.user import User
 from app.services import accounts
-from app.services.events import record_event
+from app.services.events import record_event, record_for_platform_and_user_orgs
 from app.services.security_policy import effective_policy
 from app.services.sessions import end_user_sessions
 
@@ -88,9 +88,21 @@ def _lock_org_members(db: Session, org_id: uuid.UUID) -> None:
 
 
 def _admins(db: Session, org_id: uuid.UUID) -> int:
+    """Admins who can sign in (a deactivated one can't look after the org)."""
     return db.scalar(
-        select(func.count()).where(OrgMembership.org_id == org_id, OrgMembership.role == UserRole.admin)
+        select(func.count())
+        .select_from(OrgMembership)
+        .join(User, User.id == OrgMembership.user_id)
+        .where(OrgMembership.org_id == org_id, OrgMembership.role == UserRole.admin, User.is_active.is_(True))
     )
+
+
+def orgs_needing(db: Session, user: User) -> list[str]:
+    """The orgs where `user` is the only admin who can sign in."""
+    admin_of = db.scalars(
+        select(OrgMembership).where(OrgMembership.user_id == user.id, OrgMembership.role == UserRole.admin)
+    ).all()
+    return [m.organization.name for m in admin_of if _admins(db, m.org_id) <= 1]
 
 
 def _record_in_user_orgs(db: Session, type: str, user: User, actor: User, **fields) -> None:
@@ -114,7 +126,7 @@ def _not_yourself(membership: OrgMembership, actor: User, what: str) -> None:
 
 
 def _keeps_an_admin(db: Session, membership: OrgMembership) -> None:
-    if membership.role == UserRole.admin and _admins(db, membership.org_id) <= 1:
+    if membership.role == UserRole.admin and membership.user.is_active and _admins(db, membership.org_id) <= 1:
         raise PeopleError(409, "last_admin", "An organization must keep at least one admin.")
 
 
@@ -186,13 +198,15 @@ def change_role(db: Session, membership: OrgMembership, actor: User, role: UserR
 
 
 def rename(db: Session, user: User, actor: User, name: str) -> None:
-    """Set `user`'s name (their own change, or an admin's: the caller checks
-    which may); recorded in each of their orgs with the old and new names."""
+    """Set `user`'s name (their own change, or an admin's or the Sysadmin's:
+    the caller checks which may); recorded in each of their orgs with the
+    old and new names (and in Platform activity, by the Sysadmin)."""
     if name == user.name:
         return
     before = user.name
     user.name = name
-    _record_in_user_orgs(db, "name_changed", user, actor, details={"from": before, "to": name})
+    record = record_for_platform_and_user_orgs if actor.is_sysadmin else _record_in_user_orgs
+    record(db, "name_changed", user, actor, details={"from": before, "to": name})
 
 
 def rename_member(db: Session, membership: OrgMembership, actor: User, name: str) -> None:

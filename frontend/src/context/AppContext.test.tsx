@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { AppProvider, useApp } from "@/context/AppContext";
 import { api, getToken, setToken } from "@/lib/apiClient";
-import { callsTo, json, mockApi, org, requestBody } from "@/test/helpers";
+import { callsTo, json, mockApi, org } from "@/test/helpers";
 
 function Probe() {
   const app = useApp();
@@ -18,7 +18,7 @@ function Probe() {
       <button onClick={() => app.logout()}>logout</button>
       <button onClick={() => app.changePassword("old-password", "new-password")}>change</button>
       <button onClick={() => app.selectOrg("org-2")}>select-2</button>
-      <button onClick={() => app.createOrg("Acme Labs")}>create</button>
+      <span data-testid="role">{app.selectedOrg?.role ?? "none"}</span>
       <button onClick={() => api.get("/orgs").catch(() => undefined)}>reload-orgs</button>
     </div>
   );
@@ -115,23 +115,13 @@ describe("AppProvider", () => {
     expect(window.localStorage.getItem("auditmind_org_id")).toBe("org-1");
   });
 
-  it("creating an org selects it", async () => {
+  it("an archived org is read-only: its pages act as for a viewer", async () => {
     setToken("tok");
-    let orgs = [org()];
-    const fetchMock = mockApi({
-      "GET /orgs": () => orgs,
-      "POST /orgs": () => {
-        orgs = [...orgs, org({ id: "org-3", name: "Acme Labs" })];
-        return orgs[1];
-      },
-    });
+    mockApi({ "GET /orgs": () => [org({ archived: true })] });
     render(<AppProvider><Probe /></AppProvider>);
+
     await waitFor(() => expect(screen.getByTestId("selected")).toHaveTextContent("Acme Corp"));
-
-    await act(() => screen.getByText("create").click());
-
-    expect(screen.getByTestId("selected")).toHaveTextContent("Acme Labs");
-    expect(requestBody(fetchMock, 1)).toEqual({ name: "Acme Labs" });
+    expect(screen.getByTestId("role")).toHaveTextContent("viewer");
   });
 
   it("logout ends the session on the server and clears the org", async () => {

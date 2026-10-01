@@ -232,7 +232,9 @@ describe("Your account", () => {
     const [[, init]] = callsTo(fetchMock, "PATCH /auth/me");
     expect(JSON.parse(String(init.body))).toEqual({ name: "Ann Lee" });
     // The account menu loads the new name.
-    await waitFor(() => expect(callsTo(fetchMock, "GET /auth/me").length).toBeGreaterThanOrEqual(3));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/auth/me?v=1"))).toBe(true),
+    );
   });
 });
 

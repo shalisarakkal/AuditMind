@@ -23,12 +23,13 @@ type AppContextValue = {
    * what shows them (the account menu) loads them again. */
   accountVersion: number;
   accountChanged(): void;
+  /** Load the org list again (the Sysadmin's, after creating or archiving one). */
+  reloadOrgs(): Promise<void>;
   login(email: string, password: string): Promise<void>;
   register(details: { orgName: string; email: string; password: string; name?: string }): Promise<void>;
   logout(): Promise<void>;
   changePassword(current: string, next: string): Promise<void>;
   selectOrg(orgId: string): void;
-  createOrg(name: string): Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -57,7 +58,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOrgsLoading(true);
       setOrgsError(null);
       try {
-        const list = await api.get<MyOrganization[]>("/orgs");
+        // An archived org is read-only: the pages act as for a viewer.
+        const list = (await api.get<MyOrganization[]>("/orgs")).map((o) =>
+          o.archived ? { ...o, role: "viewer" as const, member_role: o.role } : o,
+        );
         setOrgs(list);
         const wanted = preferOrgId ?? window.localStorage.getItem(ORG_KEY);
         const next = list.find((o) => o.id === wanted) ?? list[0];
@@ -71,6 +75,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [selectOrg],
   );
+
+  const reloadOrgs = useCallback(() => loadOrgs(selectedOrgId ?? undefined), [loadOrgs, selectedOrgId]);
 
   // Signed in (or the session renewed on load): the orgs, unless the
   // password must be changed first (they'd be refused).
@@ -160,14 +166,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [mustChangePassword, loadOrgs],
   );
 
-  const createOrg = useCallback(
-    async (name: string) => {
-      const org = await api.post<MyOrganization>("/orgs", { name });
-      await loadOrgs(org.id);
-    },
-    [loadOrgs],
-  );
-
   const value = useMemo<AppContextValue>(
     () => ({
       hydrated,
@@ -180,12 +178,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectedOrg: orgs.find((o) => o.id === selectedOrgId) ?? null,
       accountVersion,
       accountChanged,
+      reloadOrgs,
       login,
       register,
       logout,
       changePassword,
       selectOrg,
-      createOrg,
     }),
     [
       hydrated,
@@ -198,12 +196,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectedOrgId,
       accountVersion,
       accountChanged,
+      reloadOrgs,
       login,
       register,
       logout,
       changePassword,
       selectOrg,
-      createOrg,
     ],
   );
 

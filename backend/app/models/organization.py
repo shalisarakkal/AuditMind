@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, text
+from sqlalchemy import DateTime, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,25 @@ class Organization(Base):
     security_settings: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
+
+    # Archived by the Sysadmin: read-only for everyone, until restored or
+    # purged (Phase 2e part 3).
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # Being purged: gone for everyone; the background worker deletes its
+    # data in chunks, then the org itself.
+    purge_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    purge_requested_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    @property
+    def status(self) -> str:
+        if self.purge_requested_at is not None:
+            return "purging"
+        return "archived" if self.archived_at is not None else "active"
 
     memberships: Mapped[list["OrgMembership"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"

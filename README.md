@@ -57,6 +57,21 @@ backend itself with the visitor's address (`X-Forwarded-For`, and uvicorn's
 `COOKIE_SECURE=true`. Through the frontend's own forwarding every request looks as if
 it came from one address, which the per-address sign-in limit would count together.
 
+### The first accounts
+
+Sign-up is closed unless `PUBLIC_SIGNUP=true`. Create the Sysadmin on the server, never
+through the website (it gets a temporary password, shown once, to change at the first
+sign-in):
+
+```powershell
+cd backend
+.venv\Scripts\python scripts\create_sysadmin.py --email you@example.com --name "Platform admin"
+```
+
+The Sysadmin creates organizations with their first admin (Platform > Organizations),
+and each org's admins add its people (People). The Sysadmin reads every org but changes
+none of their data.
+
 Docker Compose (`infra/docker-compose.yml`) hasn't been kept up to date since Phase 1
 and doesn't start the worker; this project is developed without Docker (see
 `PLAN.md`, Environment notes).
@@ -86,11 +101,12 @@ Phases 1-2 are done: multi-organization accounts and roles; asset and findings u
 (CSV, JSON, Nessus, and tool exports through import profiles) with per-row reports;
 large uploads processed by the background worker with progress, recovery and Retry;
 archive, restore and purge with retention; an Activity log; paged, searchable lists;
-rule-based risk scores on the Dashboard. Phase 2e part 1: sign-in sessions checked on
-every request (sign-out, idle and longest sign-in), lockout, the Simple/Complex password
-rule and Change password.
+rule-based risk scores on the Dashboard. Phase 2e: sign-in sessions checked on every
+request, lockout, the Simple/Complex password rule and Change password; People (admins
+add people with a temporary password, change roles, reset passwords, unlock); the
+Sysadmin's Platform section (organizations created, archived and purged; accounts;
+platform activity; security defaults) and each org's Settings > Security.
 
-Next: the rest of users and organization administration (Phase 2e), activity and audit log
-sources (Phase 2f), then the AI audit and reports (Phase 3). `PLAN.md` tracks every
+Next: activity and audit log sources (Phase 2f), then the AI audit and reports (Phase 3). `PLAN.md` tracks every
 phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the
 original roadmap.

@@ -5,7 +5,10 @@ import { usePathname } from "next/navigation";
 
 import AccountMenu from "@/components/AccountMenu";
 import OrgPicker from "@/components/OrgPicker";
+import { useApp } from "@/context/AppContext";
 import { importHome, isInterrupted, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
+import { PLATFORM_PATH } from "@/lib/paths";
+import { useMe } from "@/lib/useMe";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
@@ -19,9 +22,19 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings" },
 ];
 
+// The Sysadmin's.
+const PLATFORM_ITEMS = [
+  { href: `${PLATFORM_PATH}/organizations`, label: "Organizations" },
+  { href: `${PLATFORM_PATH}/accounts`, label: "Accounts" },
+  { href: `${PLATFORM_PATH}/activity`, label: "Platform activity" },
+  { href: `${PLATFORM_PATH}/security`, label: "Security defaults" },
+];
+
 export default function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const imports = useImports();
+  const { orgs } = useApp();
+  const me = useMe();
   const running = imports.scans.filter(isRunning);
   // The one running first, then those queued.
   const runningJobs = imports.jobs.filter(isRunning).sort((a, b) => Number(b.status === "running") - Number(a.status === "running"));
@@ -34,24 +47,13 @@ export default function Sidebar() {
       <div className="mb-6">
         <OrgPicker />
       </div>
-      <ul className="space-y-1">
-        {NAV_ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`block rounded-md px-3 py-2 text-sm transition-colors hover:bg-cyan/10 hover:text-cyan ${
-                  active ? "bg-cyan/10 text-cyan" : "text-white/80"
-                }`}
-              >
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      {orgs.length > 0 && <NavList items={NAV_ITEMS} pathname={pathname} />}
+      {me?.is_sysadmin && (
+        <div className={orgs.length > 0 ? "mt-6" : ""}>
+          <p className="mb-1 px-3 text-xs uppercase tracking-wide text-white/50">Platform</p>
+          <NavList items={PLATFORM_ITEMS} pathname={pathname} label="Platform" />
+        </div>
+      )}
       {running.length > 0 && (
         <ul aria-label="Uploads in progress" className="mt-6 space-y-1">
           {running.map((scan) => (
@@ -95,6 +97,29 @@ export default function Sidebar() {
       )}
       <AccountMenu />
     </nav>
+  );
+}
+
+function NavList({ items, pathname, label }: { items: { href: string; label: string }[]; pathname: string; label?: string }) {
+  return (
+    <ul aria-label={label} className="space-y-1">
+      {items.map((item) => {
+        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`block rounded-md px-3 py-2 text-sm transition-colors hover:bg-cyan/10 hover:text-cyan ${
+                active ? "bg-cyan/10 text-cyan" : "text-white/80"
+              }`}
+            >
+              {item.label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

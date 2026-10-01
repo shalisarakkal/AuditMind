@@ -17,7 +17,7 @@ type AuthFormProps = {
   fields: AuthField[];
   submitLabel: string;
   onSubmit(values: Record<string, string>): Promise<void>;
-  footer: { text: string; linkLabel: string; href: string };
+  footer?: { text: string; linkLabel: string; href: string };
   /** Shown above the fields, e.g. why the user was signed out. */
   notice?: string | null;
 };
@@ -79,12 +79,14 @@ export default function AuthForm({ title, fields, submitLabel, onSubmit, footer,
       >
         {submitting ? "Please wait…" : submitLabel}
       </button>
-      <p className="text-center text-sm text-white/60">
-        {footer.text}{" "}
-        <Link href={footer.href} className="text-cyan hover:underline">
-          {footer.linkLabel}
-        </Link>
-      </p>
+      {footer && (
+        <p className="text-center text-sm text-white/60">
+          {footer.text}{" "}
+          <Link href={footer.href} className="text-cyan hover:underline">
+            {footer.linkLabel}
+          </Link>
+        </p>
+      )}
     </form>
   );
 }
