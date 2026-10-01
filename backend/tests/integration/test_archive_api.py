@@ -132,11 +132,14 @@ def test_archived_rows_are_left_out_everywhere(client, admin):
     assert [f["category"] for f in dashboard["top_findings"]] == ["BKP"]
     assert dashboard["asset_count"] == 3
     assert findings not in [s["id"] for s in dashboard["recent_scans"]]
-    assert findings not in [s["id"] for s in _get(client, admin, "/scans")]
+    assert findings not in [s["id"] for s in _get(client, admin, "/uploads")["items"]]
+    # Not readable by its ID either, and its report can't be dismissed.
+    assert client.get(_url(admin, f"/scans/{findings}"), headers=admin[0]).status_code == 404
+    assert client.post(_url(admin, f"/scans/{findings}/dismiss"), headers=admin[0]).status_code == 404
     risk = client.post(_url(admin, "/risk/score"), headers=admin[0]).json()
     identity = next(d for d in risk["domains"] if d["dimension"] == "identity_access")
     assert identity["score"] == 100.0
-    assert other in [s["id"] for s in _get(client, admin, "/scans")]
+    assert other in [s["id"] for s in _get(client, admin, "/uploads")["items"]]
 
 
 def test_imports_never_match_archived_assets_or_findings(client, admin):

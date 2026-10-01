@@ -245,6 +245,41 @@ describe("Uploads page", () => {
     expect(empty).toHaveAttribute("colspan", String(columns));
   });
 
+  it("retries a failed upload from its kept file, then follows the new one", async () => {
+    const failed = upload({ status: "failed", summary: { error: "Cut off twice (the background worker stopped)" }, retryable: true });
+    const { fetchMock } = await renderSignedIn(<UploadsPage />, "auditor", {
+      "GET /orgs/org-1/uploads": () => page([failed]),
+      "POST /orgs/org-1/scans/s1/retry": () => json({ scan_id: "s2", status: "pending", report: null }, 202),
+      "GET /orgs/org-1/scans/s2": () => scan({ id: "s2", status: "pending", filename: "findings.csv", summary: null }),
+    });
+    const before = gets(fetchMock, "/uploads?");
+    fireEvent.click(await screen.findByRole("button", { name: "Retry findings.csv" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/scans/s2"))).toBe(true));
+    await waitFor(() => expect(gets(fetchMock, "/uploads?")).toBeGreaterThan(before));
+    expect(requestInit(fetchMock, fetchMock.mock.calls.findIndex(([u]) => String(u).endsWith("/retry"))).method).toBe("POST");
+  });
+
+  it("offers Retry only where it can help, and says why it was refused", async () => {
+    const rejected = upload({ id: "s3", filename: "bad.csv", status: "failed", summary: { failed: 2 }, retryable: false });
+    const cutOff = upload({ status: "failed", summary: { error: "Cut off twice" }, retryable: true });
+    await renderSignedIn(<UploadsPage />, "auditor", {
+      "GET /orgs/org-1/uploads": () => page([cutOff, rejected]),
+      "POST /orgs/org-1/scans/s1/retry": () => json({ detail: "Only the uploader or an admin can retry this" }, 403),
+    });
+    const badRow = (await screen.findByText("bad.csv")).closest("tr")!;
+    expect(within(badRow).queryByRole("button", { name: /Retry/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry findings.csv" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't retry findings.csv: Only the uploader or an admin");
+  });
+
+  it("has no Retry for viewers", async () => {
+    await renderSignedIn(<UploadsPage />, "viewer", {
+      "GET /orgs/org-1/uploads": () => page([upload({ status: "failed", summary: { error: "Cut off twice" }, retryable: true })]),
+    });
+    await screen.findByText("findings.csv");
+    expect(screen.queryByRole("button", { name: /^Retry/ })).not.toBeInTheDocument();
+  });
+
   it("shows why the server refused", async () => {
     await renderSignedIn(<UploadsPage />, "admin", {
       "GET /orgs/org-1/uploads": () => page([upload()]),
@@ -295,14 +330,18 @@ describe("Uploads page", () => {
 
 describe("Archived page", () => {
   it("shows each archived item with its countdown, and restores one", async () => {
+    const item = archived();
     const { fetchMock } = await renderSignedIn(<ArchivedPage />, "auditor", {
-      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
+      "GET /orgs/org-1/archive": () => archivedPage([item]),
       "POST /orgs/org-1/archive/b1/restore": () => job({ action: "restore", summary: { uploads: 1, assets: 2, findings: 2, duplicates_purged: 1 } }),
     });
 
     const row = (await screen.findByText("findings.csv")).closest("tr")!;
     expect(within(row).getByText("1 upload, 2 assets, 3 findings")).toBeInTheDocument();
     expect(within(row).getByText("Deleted in 173 days")).toBeInTheDocument();
+    // And when, to the second, like the Archived column.
+    const purgeAt = (await screen.findByText("Deleted in 173 days")).nextElementSibling!;
+    expect(purgeAt.textContent).toBe(new Date(item.purge_at).toLocaleString());
     expect(within(row).getByText("Ann")).toBeInTheDocument();
     // Auditors restore; only admins purge.
     expect(within(row).queryByRole("button", { name: "Purge findings.csv" })).not.toBeInTheDocument();
@@ -315,6 +354,24 @@ describe("Archived page", () => {
       ),
     ).toBeInTheDocument();
     expect(requestInit(fetchMock, fetchMock.mock.calls.findIndex(([u]) => String(u).endsWith("/restore"))).method).toBe("POST");
+  });
+
+  it("opens an archived upload's report for every member, read-only", async () => {
+    await renderSignedIn(<ArchivedPage />, "viewer", {
+      "GET /orgs/org-1/archive": () =>
+        archivedPage([archived(), archived({ id: "b2", item_type: "asset", item_id: "a1", label: "web-01", counts: { assets: 1 } })]),
+      "GET /orgs/org-1/archive/b1/report": () =>
+        scan({ status: "completed", filename: "findings.csv", scan_type: "findings_csv", summary: { created: 3, errors: [], warnings: [] } }),
+    });
+    const assetRow = (await screen.findByText("web-01")).closest("tr")!;
+    expect(within(assetRow).queryByRole("button", { name: /report/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show report for findings.csv" }));
+    const report = await screen.findByRole("region", { name: "Upload result" });
+    expect(report).toHaveTextContent(/created\s*3/i);
+    expect(within(report).queryByRole("button", { name: /Retry|Dismiss/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide report for findings.csv" }));
+    expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument();
   });
 
   it("says how many findings stayed archived with their asset", async () => {

@@ -1,3 +1,5 @@
+import os
+import secrets
 from contextlib import nullcontext
 
 import pytest
@@ -6,11 +8,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import settings
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
-from app.services import ingestion_background
+# The app refuses to start with the built-in signing key (check_secret_key);
+# tests get a random one unless one's set already.
+os.environ.setdefault("SECRET_KEY", secrets.token_urlsafe(48))
+
+from app.core.config import settings  # noqa: E402
+from app.db.base import Base  # noqa: E402
+from app.db.session import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.services import ingestion_background  # noqa: E402
 
 # The DB fixture creates and drops every table, so tests only ever use a
 # database named *_test (TEST_DATABASE_URL), never the app's own: falling back

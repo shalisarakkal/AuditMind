@@ -51,6 +51,16 @@ describe("ImportReportPanel", () => {
     expect(onDismiss).toHaveBeenCalled();
   });
 
+  it("offers Retry on a failure only when asked to", () => {
+    const onRetry = vi.fn();
+    const failed = { status: "failed" as const, report: null, error: "Cut off twice", filename: "big.csv" };
+    const { rerender } = render(<ImportReportPanel result={failed} onRetry={onRetry} />);
+    screen.getByRole("button", { name: "Retry" }).click();
+    expect(onRetry).toHaveBeenCalled();
+    rerender(<ImportReportPanel result={failed} />);
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
   it("labels asset and finding counts for a profile import and lists warnings apart", () => {
     const profileReport = {
       ...report,

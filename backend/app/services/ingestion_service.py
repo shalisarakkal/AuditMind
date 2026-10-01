@@ -376,6 +376,29 @@ def _finish(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
         details=details,
     )
     db.commit()
+    if status == ScanStatus.completed and scan.content_hash:
+        _drop_superseded_files(db, scan)
+
+
+def _drop_superseded_files(db: Session, scan: Scan) -> None:
+    """The same file (same content) is now imported: earlier failed uploads
+    of it in the org no longer keep theirs for Retry, which would only import
+    it again."""
+    from app.api.uploads import upload_path  # the api package imports this module
+
+    failed = db.scalars(
+        select(Scan.id).where(
+            Scan.org_id == scan.org_id,
+            Scan.content_hash == scan.content_hash,
+            Scan.status == ScanStatus.failed,
+            Scan.id != scan.id,
+        )
+    ).all()
+    for scan_id in failed:
+        try:
+            upload_path(scan_id).unlink(missing_ok=True)
+        except OSError:  # the worker's daily clean-up gets it later
+            pass
 
 
 def _import(

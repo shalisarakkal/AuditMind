@@ -15,8 +15,10 @@ from app.api.routes import (
     risk,
     scans,
 )
-from app.core.config import settings
+from app.core.config import check_secret_key, settings
 from app.core.middleware import UploadSizeLimitMiddleware
+
+check_secret_key(settings.SECRET_KEY)
 
 
 # Background work (large imports, archive jobs, the daily purges) runs in

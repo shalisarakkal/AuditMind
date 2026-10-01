@@ -28,7 +28,7 @@ WRITE_ROUTES = [
     ("post", "/members", {"json": {"email": "nobody@example.io"}}, {"admin"}),
 ]
 
-READ_ROUTES = ["", "/users", "/assets", "/findings", "/scans", "/reports", "/dashboard", "/settings", "/import-profiles"]
+READ_ROUTES = ["", "/users", "/assets", "/findings", "/scans?tracked=true", "/uploads", "/reports", "/dashboard", "/settings", "/import-profiles"]
 
 
 @pytest.fixture
@@ -51,7 +51,8 @@ def test_write_access_by_role(client, org, role, method, path, kwargs, allowed):
 
     if role in allowed:
         # members/nobody@example.io -> 404 (no such user) still proves access.
-        assert resp.status_code in (200, 201, 202, 404), resp.text
+        # Discovery and report generation aren't available yet: 501.
+        assert resp.status_code in (200, 201, 202, 404, 501), resp.text
     else:
         assert resp.status_code == 403, resp.text
         assert resp.json()["detail"] == "Insufficient permissions"
@@ -69,4 +70,4 @@ def test_viewer_write_attempt_changes_nothing(client, org):
     client.post(f"/api/v1/orgs/{org_id}/assets/import", headers=headers["viewer"], files=CSV_FILE)
 
     assert client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers["admin"]).json() == {"items": [], "total": 0}
-    assert client.get(f"/api/v1/orgs/{org_id}/scans", headers=headers["admin"]).json() == []
+    assert client.get(f"/api/v1/orgs/{org_id}/uploads", headers=headers["admin"]).json()["total"] == 0

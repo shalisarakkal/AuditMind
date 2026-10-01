@@ -57,4 +57,21 @@ class Scan(Base):
     )
 
     organization: Mapped["Organization"] = relationship(back_populates="scans")
+
+    @property
+    def retryable(self) -> bool:
+        """A large upload that failed for a reason other than its content
+        (summary "error": cut off twice, an unexpected error) and whose file
+        is still kept (UPLOAD_KEEP_FAILED_DAYS): it can be run again from
+        that file. One its content failed (row errors) can't: it would fail
+        the same way."""
+        from app.api.uploads import upload_path  # the api package imports the models
+
+        return (
+            self.status == ScanStatus.failed
+            and self.source == "upload"
+            and self.archived_at is None
+            and bool(self.summary and self.summary.get("error"))
+            and upload_path(self.id).exists()
+        )
     findings: Mapped[list["Finding"]] = relationship(back_populates="scan", cascade="all, delete-orphan")

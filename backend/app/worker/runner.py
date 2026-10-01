@@ -33,7 +33,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.api.uploads import upload_path
-from app.core.config import settings
+from app.core.config import check_secret_key, settings
 from app.models.archive import ArchiveJob
 from app.models.enums import ScanStatus
 from app.models.event import WorkerStatus
@@ -160,8 +160,9 @@ def drain(db: Session) -> int:
 
 def run_import(db: Session, scan_id: uuid.UUID) -> None:
     """Import an upload from its saved file, then delete the file once the
-    outcome (imported or failed) is saved. If the import was cut off
-    (Ctrl+C, the database went away) the file stays, to start it again."""
+    outcome is saved, unless it failed for a reason other than its content
+    (kept for Retry, see Scan.retryable). If the import was cut off (Ctrl+C,
+    the database went away) the file stays, to start it again."""
     scan = db.get(Scan, scan_id)
     path = upload_path(scan.id)
     if not path.exists():
@@ -193,15 +194,16 @@ def run_import(db: Session, scan_id: uuid.UUID) -> None:
 
 
 def _delete_if_finished(db: Session, scan_id: uuid.UUID, path) -> None:
-    """Delete the saved file if the import's outcome is saved; if that can't
-    be checked (the database went away), keep it."""
+    """Delete the saved file if the import's outcome is saved, except after a
+    failure that wasn't its content's (kept for Retry); if that can't be
+    checked (the database went away), keep it."""
     try:
         db.rollback()
-        status = db.scalar(select(Scan.status).where(Scan.id == scan_id))
+        status, summary = db.execute(select(Scan.status, Scan.summary).where(Scan.id == scan_id)).one()
     except Exception:
         logger.warning("Couldn't check import %s; keeping its file", scan_id, exc_info=True)
         return
-    if status in (ScanStatus.completed, ScanStatus.failed):
+    if status == ScanStatus.completed or (status == ScanStatus.failed and not (summary or {}).get("error")):
         path.unlink(missing_ok=True)
 
 
@@ -235,11 +237,13 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
             scan.status, scan.retry_count, scan.heartbeat_at, scan.progress = ScanStatus.pending, 1, None, None
             db.commit()
             continue
-        upload_path(scan.id).unlink(missing_ok=True)
+        if not (by_worker and saved):
+            upload_path(scan.id).unlink(missing_ok=True)
         if not by_worker:
             message = "Stopped when the server restarted: import it again"
         elif scan.retry_count:
-            message = "Cut off twice (the background worker stopped): import it again"
+            # Its file is kept: Retry runs it again.
+            message = "Cut off twice (the background worker stopped)"
         else:
             message = "Cut off, and its saved file is gone: import it again"
         logger.warning("Import %s (%s) failed: %s", scan.id, scan.filename, message)
@@ -273,9 +277,21 @@ def _sweep_uploads(db: Session) -> None:
     folder = settings.upload_dir
     if not folder.exists():
         return
+    kept_since = _now() - timedelta(days=settings.UPLOAD_KEEP_FAILED_DAYS)
     waiting = {
         str(scan_id)
-        for scan_id in db.scalars(select(Scan.id).where(Scan.status.in_((ScanStatus.pending, ScanStatus.running))))
+        for scan_id in db.scalars(
+            select(Scan.id).where(
+                Scan.status.in_((ScanStatus.pending, ScanStatus.running))
+                # Failed but not for its content: kept for Retry a while.
+                | (
+                    (Scan.status == ScanStatus.failed)
+                    & Scan.summary.has_key("error")
+                    & Scan.archived_at.is_(None)
+                    & (Scan.completed_at > kept_since)
+                )
+            )
+        )
     }
     old = time.time() - 3600
     for path in folder.iterdir():
@@ -315,6 +331,7 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    check_secret_key(settings.SECRET_KEY)
     stop = threading.Event()
     started_at = _now()
 

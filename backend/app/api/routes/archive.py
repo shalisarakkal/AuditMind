@@ -33,9 +33,10 @@ from app.models.scan import Scan
 from app.models.user import User
 from app.schemas.archive import ArchivedItemRead, ArchivedPage, ArchiveJobRead, UploadRead
 from app.schemas.paging import Page
-from app.schemas.scan import brief_scan
+from app.schemas.scan import ScanRead, brief_scan
 from app.services import archive_service
 from app.services.archive_service import ArchiveError
+from app.services.org_lock import org_is_busy
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["archive"])
 
@@ -72,14 +73,16 @@ def _job_read(job: ArchiveJob, batch: ArchiveBatch) -> ArchiveJobRead:
 
 def _start(db: Session, response: Response, start) -> ArchiveJobRead:
     """Start a job (`start` creates it, pending) and run it now (200,
-    finished) or, above ARCHIVE_SYNC_MAX_ROWS rows, leave it for the
-    background worker (202)."""
+    finished) or leave it for the background worker (202): above
+    ARCHIVE_SYNC_MAX_ROWS rows, or when the org is busy (an upload writing
+    its rows holds the org's lock for minutes; the request would wait for
+    it, so the job queues behind it instead)."""
     try:
         job = start()
     except ArchiveError as exc:
         db.rollback()
         raise HTTPException(status_code=exc.status, detail=str(exc))
-    small = archive_service.estimated_rows(db, job) <= settings.ARCHIVE_SYNC_MAX_ROWS
+    small = archive_service.estimated_rows(db, job) <= settings.ARCHIVE_SYNC_MAX_ROWS and not org_is_busy(db, job.org_id)
     # Claimed first: the worker may be looking at it too.
     if small and archive_service.claim_job(db, job.id):
         job = archive_service.run_job(db, job.id)
@@ -118,6 +121,28 @@ _archive_route(ArchiveItemType.asset, "/assets/{item_id}/archive", "Archive an a
 _archive_route(
     ArchiveItemType.finding, "/findings/{item_id}/archive", "Archive a manually added finding (one with no upload)"
 )
+
+
+@router.get(
+    "/archive/{batch_id}/report",
+    response_model=ScanRead,
+    responses={404: {"description": "No such archived upload in this org (not an upload, restored, or purged)"}},
+)
+def archived_upload_report(
+    org_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: OrgMembership = Depends(require_org_member),
+) -> Scan:
+    """An archived upload's full report, read-only, from the Archived page
+    (to decide whether to restore or purge it). The normal route,
+    GET /scans/{id}, doesn't serve archived uploads; once restored it does
+    again, and once purged the report is gone."""
+    batch = db.get(ArchiveBatch, batch_id)
+    scan = db.get(Scan, batch.item_id) if batch and batch.item_type == ArchiveItemType.upload else None
+    if not batch or batch.org_id != org_id or scan is None or scan.archived_at is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archived upload not found")
+    return scan
 
 
 @router.post("/archive/{batch_id}/restore", response_model=ArchiveJobRead, responses=JOB_RESPONSES)

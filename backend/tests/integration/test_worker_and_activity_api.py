@@ -134,8 +134,8 @@ def test_an_import_cut_off_twice_is_failed(client, admin, monkeypatch, db_sessio
 
     runner.reap_stale(db_session)
     assert scan.status == ScanStatus.failed
-    assert scan.summary == {"error": "Cut off twice (the background worker stopped): import it again"}
-    assert not upload_path(scan_id).exists()
+    assert scan.summary == {"error": "Cut off twice (the background worker stopped)"}
+    assert upload_path(scan_id).exists()  # kept for Retry
     [event] = _events(client, admin, type="import")
     assert (event["outcome"], event["criticality"]) == ("failed", "warning")
 

@@ -160,7 +160,7 @@ def test_scans_list_includes_import_details_newest_first(client, admin):
     upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, "assets_valid.csv")
     upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, "sample.nessus")
 
-    scans = client.get(f"/api/v1/orgs/{org_id}/scans", headers=headers).json()
+    scans = client.get(f"/api/v1/orgs/{org_id}/uploads", headers=headers).json()["items"]
 
     assert [(s["scan_type"], s["filename"]) for s in scans] == [
         ("nessus", "sample.nessus"),

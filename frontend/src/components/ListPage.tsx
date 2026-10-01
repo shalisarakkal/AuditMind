@@ -126,6 +126,11 @@ export function Badge({ className, children }: { className: string; children: Re
 
 /** Row actions: right-aligned text buttons; red for what can't be undone. */
 export const ROW_ACTION = "text-xs text-cyan hover:underline";
+/** Only shows something (Report, Details): white, always underlined, so it
+ * reads as a link rather than cell text, and stays apart from the cyan of
+ * what changes data. */
+export const ROW_ACTION_VIEW =
+  "text-xs text-white underline decoration-white/40 underline-offset-2 hover:decoration-white";
 export const ROW_ACTION_DANGER = "text-xs text-red-300 hover:underline";
 export const ACTIONS_CELL = "whitespace-nowrap px-4 py-2 text-right space-x-3";
 

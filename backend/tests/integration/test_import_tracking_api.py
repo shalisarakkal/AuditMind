@@ -35,7 +35,11 @@ def _import(client, admin, headers=None):
 
 
 def _scans(client, admin, headers=None, **params):
+    """The tracker's list (tracked/active), or with neither every upload
+    (GET /uploads: the scans list needs a filter)."""
     _, org_id = admin
+    if not params:
+        return client.get(f"/api/v1/orgs/{org_id}/uploads", headers=headers or admin[0]).json()["items"]
     return client.get(f"/api/v1/orgs/{org_id}/scans", headers=headers or admin[0], params=params).json()
 
 
@@ -126,6 +130,7 @@ def test_the_tracker_lists_running_imports_and_my_undismissed_reports(client, ad
     running = Scan(
         org_id=uuid.UUID(org_id),
         scan_type="asset_import",
+        source="upload",
         status=ScanStatus.running,
         started_at=datetime.now(timezone.utc),
         started_by=_user_id(db_session, f"auditor-{org_id[:8]}@example.io"),
@@ -139,7 +144,7 @@ def test_the_tracker_lists_running_imports_and_my_undismissed_reports(client, ad
     assert tracked == {mine, str(running.id)}
     assert theirs not in tracked
     assert {s["id"] for s in _scans(client, admin, headers=auditor, tracked="true")} == {theirs, str(running.id)}
-    assert len(_scans(client, admin)) == 4  # untracked: every scan
+    assert len(_scans(client, admin)) == 4  # untracked: every upload
 
 
 def test_only_the_uploader_can_dismiss_a_finished_report(client, admin, db_session):

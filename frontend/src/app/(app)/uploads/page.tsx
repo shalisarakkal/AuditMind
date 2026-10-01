@@ -18,6 +18,7 @@ import {
   PageHeader,
   ROW,
   ROW_ACTION,
+  ROW_ACTION_VIEW,
   SELECT_CELL,
   SelectBox,
   SelectionAction,
@@ -31,7 +32,7 @@ import {
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { isRunning, scanResult } from "@/context/ImportsContext";
+import { isRunning, scanResult, useImports } from "@/context/ImportsContext";
 import { canWrite, formatDateTime, scanTypeLabel } from "@/lib/domain";
 import { importCountsText } from "@/lib/importCounts";
 import type { Page, Scan, Upload } from "@/lib/types";
@@ -72,6 +73,9 @@ function Uploads() {
   const selection = useSelection(list, org.id);
   const [opened, setOpened] = useState<string | null>(null);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
+  const { retry } = useImports();
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
 
@@ -87,6 +91,17 @@ function Uploads() {
       ),
       confirmLabel: "Archive",
     });
+
+  // A failed large upload, run again from its kept file (the uploader or an
+  // admin; the server says so to anyone else).
+  const retryUpload = (upload: Upload) => {
+    setRetrying(upload.id);
+    setRetryError(null);
+    retry(upload)
+      .then(reload)
+      .catch((err: Error) => setRetryError(`Couldn't retry ${upload.filename ?? "the upload"}: ${err.message}`))
+      .finally(() => setRetrying(null));
+  };
 
   // An upload still processing, or being archived, can't be picked.
   const pickable = (u: Upload) => !isRunning(u) && u.archiving !== "running";
@@ -122,6 +137,11 @@ function Uploads() {
       )}
       {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
 
+      {retryError && (
+        <p role="alert" className="text-sm text-red-300">
+          {retryError}
+        </p>
+      )}
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
         <ListTable>
@@ -189,9 +209,20 @@ function Uploads() {
                         aria-expanded={opened === u.id}
                         aria-label={`${opened === u.id ? "Hide" : "Show"} report for ${u.filename ?? "upload"}`}
                         onClick={() => setOpened(opened === u.id ? null : u.id)}
-                        className={ROW_ACTION}
+                        className={ROW_ACTION_VIEW}
                       >
                         {opened === u.id ? "Hide report" : "Report"}
+                      </button>
+                    )}
+                    {writer && u.retryable && (
+                      <button
+                        type="button"
+                        aria-label={`Retry ${u.filename ?? "upload"}`}
+                        disabled={retrying === u.id}
+                        onClick={() => retryUpload(u)}
+                        className={ROW_ACTION}
+                      >
+                        {retrying === u.id ? "Retrying…" : "Retry"}
                       </button>
                     )}
                     {writer && (

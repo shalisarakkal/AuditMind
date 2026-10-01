@@ -133,6 +133,8 @@ export type Scan = {
   progress: ImportProgress | null;
   /** Set while the background worker runs it (it checks in every ~15 s). */
   heartbeat_at?: string | null;
+  /** Failed, but can run again from its kept file (Retry). */
+  retryable?: boolean;
 };
 
 /** A running import's progress, stage by stage: reading (checking) the file's

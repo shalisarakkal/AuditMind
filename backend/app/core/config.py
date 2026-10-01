@@ -20,12 +20,17 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://auditmind:auditmind@localhost:5432/auditmind"
     TEST_DATABASE_URL: str | None = None
 
+    # Required: the server and worker refuse the default or a short one
+    # (check_secret_key below).
     SECRET_KEY: str = "change-me-to-a-random-secret"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     ALGORITHM: str = "HS256"
 
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-5"
+    # How long one Claude request may take (seconds); the SDK retries a
+    # timed-out or failed request twice more before giving up.
+    CLAUDE_TIMEOUT_SECONDS: float = Field(60.0, gt=0)
 
     CORS_ORIGINS: str = "http://localhost:3000"
 
@@ -38,6 +43,10 @@ class Settings(BaseSettings):
     # Where larger files wait for the background worker (deleted once
     # imported). Relative paths are from the backend folder.
     UPLOAD_DIR: str = "uploads"
+    # A large upload that failed for a reason other than its content (cut
+    # off twice, an unexpected error) keeps its file this many days, so it
+    # can be retried without uploading it again; then the worker deletes it.
+    UPLOAD_KEEP_FAILED_DAYS: int = Field(7, ge=0)
 
     # --- Background worker (python -m app.worker). ---
     # A job the worker runs with no check-in for this long was cut off (the
@@ -109,3 +118,19 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+DEFAULT_SECRET_KEY = "change-me-to-a-random-secret"
+SECRET_KEY_MIN_LENGTH = 32
+
+
+def check_secret_key(key: str) -> None:
+    """Refuse to run with the built-in key, or one short enough to guess: it
+    signs every login token, so anyone who knows it could forge one. Checked
+    when the web server and the background worker start."""
+    if key == DEFAULT_SECRET_KEY or len(key) < SECRET_KEY_MIN_LENGTH:
+        raise RuntimeError(
+            f"SECRET_KEY is the built-in default or shorter than {SECRET_KEY_MIN_LENGTH} characters. "
+            "Set a long random one in backend/.env, e.g. from: "
+            'python -c "import secrets; print(secrets.token_urlsafe(48))" '
+            "(a new key signs everyone out)"
+        )

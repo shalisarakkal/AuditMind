@@ -782,7 +782,7 @@ After the review (requested 2026-09-30):
         running: Dashboard 1.2 s, Assets 0.75 s, Findings 0.7 s, almost all
         of it exact counts. Tracked in Phase 4 (estimated counts)
 
-### Part 4 — Review fixes (CoPilotReview.md, after Part 3 sign-off, before Phase 2e)
+### Part 4 — Review fixes (CoPilotReview.md; signed off 2026-10-01)
 
 External review of the repo plus the uncommitted import-report change
 (2026-09-30). All 8 findings checked against the code and confirmed
@@ -800,27 +800,36 @@ one goes:
 | 7 | Sign-in token in `localStorage` (readable by XSS) | Medium | Phase 2e (sign-in is reworked there) |
 | 8 | Unpaged lists: `GET /scans` (no filter), `GET /reports` | Medium | Scans here; reports in Phase 3 |
 
-- [ ] 1: `GET /scans/{id}` and `POST /scans/{id}/dismiss` answer 404 for
+- [x] 1: `GET /scans/{id}` and `POST /scans/{id}/dismiss` answer 404 for
       an archived upload (it stays reachable from Archived). Tests for both.
       Needed before the new "open a past upload's report" goes out
-- [ ] 2: `POST /assets/discover` answers 501 Not Implemented until a
+- [x] 2: `POST /assets/discover` answers 501 Not Implemented until a
       connector exists
-- [ ] 3: `POST /reports/generate` answers 501 until Phase 3 wires the real
+- [x] 3: `POST /reports/generate` answers 501 until Phase 3 wires the real
       job (through the worker queue); no more `pending` reports that never
       finish
-- [ ] 4: The server refuses to start with the default key or one shorter
+- [x] 4: The server refuses to start with the default key or one shorter
       than 32 characters, with a message saying how to generate one;
       `.env.example`, CI and the test setup get their own. Documented: a
-      new key signs everyone out
-- [ ] 6 (stopgap): the Claude smoke test (`POST /ai/claude/test`) gets a
+      new key signs everyone out. Done: checked when the web server and the
+      worker start (`check_secret_key`; alembic and scripts unaffected);
+      `.env.example` ships an empty key; tests set a random one (CI needs
+      nothing); your local `.env` got a random key (2026-09-30)
+- [x] 6 (stopgap): the Claude smoke test (`POST /ai/claude/test`) gets a
       timeout and becomes admin-only; provider errors come back as a clear
-      502/503, not a 500
-- [ ] 8: `GET /scans` without `active`/`tracked` (the app doesn't use it)
-      removed, or paged like the other lists
-- [ ] README's Status still says "Week 1 foundation" (CoPilotSuggestions,
+      502/503, not a 500. Done: CLAUDE_TIMEOUT_SECONDS (60) with 2 SDK
+      retries; admin of some org (until Phase 2e ends public sign-up,
+      anyone can be that by registering); 503 no key / key refused / busy
+      / unreachable, 504 timeout, 502 other errors
+- [x] 8: `GET /scans` without `active`/`tracked` (the app doesn't use it)
+      removed, or paged like the other lists. Done: removed (400 pointing
+      to `GET /uploads`, which is paged)
+- [x] README's Status still says "Week 1 foundation" (CoPilotSuggestions,
       2026-09-30): bring it up to date (Phases 1-2d done, what's next), with
-      a pointer to PLAN.md for the detail
-- [ ] Retry a failed upload without uploading it again (from Part 3
+      a pointer to PLAN.md for the detail. Also: setup now covers the
+      required SECRET_KEY, the worker and start-dev.ps1; says Docker
+      Compose is out of date (no worker); RISK_SCORING.md typo
+- [x] Retry a failed upload without uploading it again (from Part 3
       verification, 2026-09-30: an upload cut off twice failed and its
       saved file was deleted, so the only way on was to upload it again).
       A large upload's file waits in `backend/uploads/<scan id>.upload`
@@ -830,8 +839,40 @@ one goes:
       button on the failed report and on Uploads, for the uploader and
       admins: it queues the same file again as a new attempt. Not for
       files rejected as unreadable (retrying can't help). Small uploads
-      (processed during the request) aren't saved, so they have no Retry
-- [ ] Tests for each; CI green
+      (processed during the request) aren't saved, so they have no Retry.
+      Done: a failure that isn't the content's (summary "error": cut off
+      twice, an unexpected error) keeps the file UPLOAD_KEEP_FAILED_DAYS
+      (7); scans show `retryable`; `POST /scans/{id}/retry` (uploader or
+      admin) queues a new upload with the file moved to it and dismisses
+      the failed report; Retry on the failed report card and on Uploads
+      (still there after Dismiss, which only hides the card). When the same
+      content (file hash) later imports successfully, uploaded again by
+      hand, earlier failed copies in the org drop their kept file and their
+      Retry (it would only import it again); the name plays no part
+- [x] A small archive, restore or purge no longer waits for a running upload
+      (asked 2026-10-01): an upload writing its rows holds the org's lock
+      for minutes, and a small job run during the request waited for it,
+      so the click sat on "Archiving…" (e.g. archiving a failed attempt while
+      its file is being uploaded again). Now, if the org's lock is taken,
+      the job is queued for the worker (202, "Queued…") and runs after the
+      upload. Archiving a failed attempt never touches another upload's
+      data or file: each upload keeps its file under its own ID, and the
+      clean-ups skip uploads that are waiting or running
+- [x] An archived upload's report, read-only, on the Archived page (asked
+      2026-10-01: only Restore and Purge were offered, so there was no way
+      to see what an upload held before deciding). Report on upload rows,
+      for every member; `GET /archive/{batch_id}/report` serves it only
+      while archived (the normal `GET /scans/{id}` stays closed to archived
+      uploads, finding 1); no Retry or Dismiss; gone once purged
+- [x] Row actions in three tiers (asked 2026-10-01): Report and Details
+      (only show something) white and always underlined
+      (`ROW_ACTION_VIEW`; soft grey first, too close to cell text), actions
+      that change data cyan, Purge red; rule in docs/UI_CONVENTIONS.md.
+      Archived's Purge column shows the date and time under the countdown
+- [x] Tests for each: 540 backend + 161 frontend pass, typecheck and lint
+      clean (2026-10-01); CI result to confirm on GitHub after the push
+- **Signed off 2026-10-01** after your verification (guide Part 4 steps
+  1-5). Next: Phase 2e (users and organizations)
 
 ## Phase 2e — Users and organizations (after Phase 2d, before Phase 2f)
 

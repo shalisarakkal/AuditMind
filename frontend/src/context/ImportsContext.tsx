@@ -28,6 +28,10 @@ type ImportsContextValue = {
   track(scanId: string, page: ImportPage): Promise<void>;
   /** Hide a finished import's report for good. */
   dismiss(scanId: string): Promise<void>;
+  /** Run a failed large upload again from its kept file (scan.retryable): a
+   * new upload, followed like one just made; the failed one's report goes.
+   * Throws if the server refuses. */
+  retry(scan: Scan): Promise<void>;
   /** Archive, restore and purge jobs, tracked the same way: the org's running
    * ones, and the user's finished ones not yet dismissed. */
   jobs: ArchiveJob[];
@@ -162,6 +166,17 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     [orgId, apply],
   );
 
+  const retry = useCallback(
+    async (scan: Scan) => {
+      if (!orgId) return;
+      const { scan_id } = await api.post<{ scan_id: string }>(`/orgs/${orgId}/scans/${scan.id}/retry`);
+      current.current.dismissed.add(scan.id);
+      apply(orgId, begin(), current.current.scans.filter((s) => s.id !== scan.id));
+      await track(scan_id, importHome(scan));
+    },
+    [orgId, apply, track],
+  );
+
   const onJobsFinished = useCallback((count: number) => setFinishedCount((c) => c + count), []);
   const { jobs, startJob, startBulk, dismissJob, requested } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
 
@@ -172,8 +187,8 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
   const workerDown = useWorkerDown(waiting, WORKER_CHECK_MS);
 
   const value = useMemo(
-    () => ({ scans, finishedCount, track, dismiss, jobs, startJob, startBulk, dismissJob, requested, workerDown }),
-    [scans, finishedCount, track, dismiss, jobs, startJob, startBulk, dismissJob, requested, workerDown],
+    () => ({ scans, finishedCount, track, dismiss, retry, jobs, startJob, startBulk, dismissJob, requested, workerDown }),
+    [scans, finishedCount, track, dismiss, retry, jobs, startJob, startBulk, dismissJob, requested, workerDown],
   );
   return <ImportsContext.Provider value={value}>{children}</ImportsContext.Provider>;
 }

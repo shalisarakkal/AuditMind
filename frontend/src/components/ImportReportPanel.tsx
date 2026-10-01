@@ -22,7 +22,16 @@ function counts(scanType: string | undefined, report: ImportReport) {
   return shown.map((c) => ({ ...c, label: c.label[0].toUpperCase() + c.label.slice(1) }));
 }
 
-export default function ImportReportPanel({ result, onDismiss }: { result: ImportResult; onDismiss?: () => void }) {
+export default function ImportReportPanel({
+  result,
+  onDismiss,
+  onRetry,
+}: {
+  result: ImportResult;
+  onDismiss?: () => void;
+  /** Offered for a failed upload that can run again from its kept file. */
+  onRetry?: () => void;
+}) {
   const { status, report, error, filename, scanType } = result;
   const failed = status === "failed";
   const warnings = report?.warnings ?? [];
@@ -38,11 +47,18 @@ export default function ImportReportPanel({ result, onDismiss }: { result: Impor
           <span className="font-medium">{filename}</span>{" "}
           {failed ? <span className="text-red-300">— processing failed</span> : <span className="text-emerald-300">— processed</span>}
         </p>
-        {onDismiss && (
-          <button type="button" onClick={onDismiss} className="text-xs text-white/60 hover:text-white">
-            Dismiss
-          </button>
-        )}
+        <div className="flex shrink-0 gap-3">
+          {failed && onRetry && (
+            <button type="button" onClick={onRetry} className="text-xs text-cyan hover:underline">
+              Retry
+            </button>
+          )}
+          {onDismiss && (
+            <button type="button" onClick={onDismiss} className="text-xs text-white/60 hover:text-white">
+              Dismiss
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}

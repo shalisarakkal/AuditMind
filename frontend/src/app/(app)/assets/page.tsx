@@ -14,7 +14,7 @@ import {
   ListTable,
   ListToolbar,
   PageHeader,
-  ROW_ACTION,
+  ROW_ACTION_VIEW,
   SELECT_CELL,
   SelectBox,
   SelectionAction,
@@ -218,7 +218,7 @@ function Assets() {
                             aria-expanded={open}
                             aria-label={`${open ? "Hide" : "Show"} details for ${a.hostname ?? a.ip ?? a.cloud_id}`}
                             onClick={() => toggle(a.id)}
-                            className={ROW_ACTION}
+                            className={ROW_ACTION_VIEW}
                           >
                             {open ? "Hide details" : "Details"}
                           </button>

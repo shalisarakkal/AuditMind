@@ -111,7 +111,7 @@ def test_findings_never_point_at_or_show_another_orgs_asset(client, admin, db_se
         client, f"/api/v1/orgs/{other_org}/assets/import", other, "a.csv", b"type,hostname,ip\nserver,their-host,10.9.9.9\n"
     ).status_code == 201
     their_asset = client.get(f"/api/v1/orgs/{other_org}/assets", headers=other).json()["items"][0]["id"]
-    their_scan = client.get(f"/api/v1/orgs/{other_org}/scans", headers=other).json()[0]["id"]
+    their_scan = client.get(f"/api/v1/orgs/{other_org}/uploads", headers=other).json()["items"][0]["id"]
     headers, org_id = admin
 
     for field, ref in (("asset_id", their_asset), ("scan_id", their_scan)):

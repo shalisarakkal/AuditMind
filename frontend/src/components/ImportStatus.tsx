@@ -8,7 +8,7 @@ import { importPages, isInterrupted, isRunning, progressText, scanResult, useImp
 /** A page's imports: progress while they run, then the report (for the
  * uploader) until it's dismissed. */
 export default function ImportStatus({ page }: { page: "assets" | "findings" }) {
-  const { scans, dismiss, workerDown } = useImports();
+  const { scans, dismiss, retry, workerDown } = useImports();
   const [error, setError] = useState<string | null>(null);
   const mine = scans.filter((s) => importPages(s).includes(page));
   if (mine.length === 0) return null;
@@ -36,7 +36,7 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
       })}
       {error && (
         <p role="alert" className="text-sm text-red-300">
-          Couldn&apos;t dismiss the report: {error}
+          {error}
         </p>
       )}
       {mine
@@ -47,8 +47,16 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
             result={scanResult(scan)}
             onDismiss={() => {
               setError(null);
-              dismiss(scan.id).catch((err: Error) => setError(err.message));
+              dismiss(scan.id).catch((err: Error) => setError(`Couldn't dismiss the report: ${err.message}`));
             }}
+            onRetry={
+              scan.retryable
+                ? () => {
+                    setError(null);
+                    retry(scan).catch((err: Error) => setError(`Couldn't retry ${scan.filename ?? "the upload"}: ${err.message}`));
+                  }
+                : undefined
+            }
           />
         ))}
     </div>

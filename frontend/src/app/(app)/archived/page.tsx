@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
 import JobButton from "@/components/JobButton";
 import JobConfirm, { type JobRequest } from "@/components/JobConfirm";
+import ImportReportPanel from "@/components/ImportReportPanel";
 import JobStatus from "@/components/JobStatus";
 import { PickFilter, SortHeader, TextFilter } from "@/components/ListControls";
 import {
@@ -18,6 +19,7 @@ import {
   PageHeader,
   ROW,
   ROW_ACTION_DANGER,
+  ROW_ACTION_VIEW,
   SELECT_CELL,
   SelectBox,
   SelectionAction,
@@ -30,9 +32,9 @@ import {
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { isRunning, useImports } from "@/context/ImportsContext";
+import { isRunning, scanResult, useImports } from "@/context/ImportsContext";
 import { canWrite, countsText, formatDateTime, purgeCountdown } from "@/lib/domain";
-import type { ArchivedItem, ArchivedPage, ArchiveItemType } from "@/lib/types";
+import type { ArchivedItem, ArchivedPage, ArchiveItemType, Scan } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useSelection } from "@/lib/useSelection";
@@ -69,6 +71,7 @@ function Archived() {
   const { jobs } = useImports();
   const selection = useSelection(list, org.id);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
   const busy = (item: ArchivedItem) => item.running !== null || jobs.some((j) => isRunning(j) && j.batch_id === item.id);
   const restoreSelected = () =>
     setBulk({
@@ -196,30 +199,53 @@ function Archived() {
           <tbody>
             {page.items.length === 0 && <EmptyRow colSpan={COLUMNS + (writer ? 1 : 0)} noun="archived items" filtered={list.hasFilters} />}
             {page.items.map((item) => (
-              <tr key={item.id} className={ROW}>
-                {writer && (
-                  <td className={SELECT_CELL}>
-                    <SelectBox selection={selection} id={item.id} name={item.label} disabled={busy(item)} />
-                  </td>
-                )}
-                <td className={`${TD} text-white`}>{item.label}</td>
-                <td className={TD}>{TYPE_LABELS[item.item_type]}</td>
-                <td className={TD}>{countsText(item.counts)}</td>
-                <td className={TD}>{item.archived_by ?? "—"}</td>
-                <td className={`${TD} text-xs text-white/60`}>{formatDateTime(item.archived_at)}</td>
-                <td className={`${TD} text-xs text-white/60`}>{purgeCountdown(item.purge_at)}</td>
-                <td className={ACTIONS_CELL}>
+              <Fragment key={item.id}>
+                <tr className={ROW}>
                   {writer && (
-                    <RowActions
-                      item={item}
-                      busy={busy(item)}
-                      canPurge={admin}
-                      onRestore={() => restore(item)}
-                      onPurge={() => purge(item)}
-                    />
+                    <td className={SELECT_CELL}>
+                      <SelectBox selection={selection} id={item.id} name={item.label} disabled={busy(item)} />
+                    </td>
                   )}
-                </td>
-              </tr>
+                  <td className={`${TD} text-white`}>{item.label}</td>
+                  <td className={TD}>{TYPE_LABELS[item.item_type]}</td>
+                  <td className={TD}>{countsText(item.counts)}</td>
+                  <td className={TD}>{item.archived_by ?? "—"}</td>
+                  <td className={`${TD} text-xs text-white/60`}>{formatDateTime(item.archived_at)}</td>
+                  <td className={`${TD} text-xs text-white/60`}>
+                    <div>{purgeCountdown(item.purge_at)}</div>
+                    <div className="text-white/40">{formatDateTime(item.purge_at)}</div>
+                  </td>
+                  <td className={ACTIONS_CELL}>
+                    {item.item_type === "upload" && (
+                      <button
+                        type="button"
+                        aria-expanded={opened === item.id}
+                        aria-label={`${opened === item.id ? "Hide" : "Show"} report for ${item.label}`}
+                        onClick={() => setOpened(opened === item.id ? null : item.id)}
+                        className={ROW_ACTION_VIEW}
+                      >
+                        {opened === item.id ? "Hide report" : "Report"}
+                      </button>
+                    )}
+                    {writer && (
+                      <RowActions
+                        item={item}
+                        busy={busy(item)}
+                        canPurge={admin}
+                        onRestore={() => restore(item)}
+                        onPurge={() => purge(item)}
+                      />
+                    )}
+                  </td>
+                </tr>
+                {opened === item.id && (
+                  <tr>
+                    <td colSpan={COLUMNS + (writer ? 1 : 0)} className="px-4 pb-3">
+                      <ArchivedReport orgId={org.id} batchId={item.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </ListTable>
@@ -227,6 +253,14 @@ function Archived() {
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
     </div>
   );
+}
+
+/** An archived upload's full report, read-only (no Retry or Dismiss): to
+ * decide whether to restore or purge it. */
+function ArchivedReport({ orgId, batchId }: { orgId: string; batchId: string }) {
+  const { data: scan, error, loading } = useApi<Scan>(`/orgs/${orgId}/archive/${batchId}/report`);
+  if (!scan) return <StatusMessage loading={loading} error={error} />;
+  return <ImportReportPanel result={scanResult(scan)} />;
 }
 
 /** Restore and (admins) Purge. While a job runs on the item, its button reads

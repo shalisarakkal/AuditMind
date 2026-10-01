@@ -20,20 +20,20 @@ def list_reports(
     return db.query(Report).filter(Report.org_id == org_id).all()
 
 
-@router.post("/generate", response_model=ReportRead, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/generate",
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    responses={501: {"description": "Not available yet: report generation arrives in Phase 3"}},
+)
 def generate_report(
     org_id: uuid.UUID,
     payload: ReportCreate,
-    db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
-) -> Report:
-    # Placeholder: full Claude-driven report generation (PROMPTS_CLAUDE.md section 5)
-    # lands once risk scoring + RAG are wired up.
-    report = Report(org_id=org_id, **payload.model_dump())
-    db.add(report)
-    db.commit()
-    db.refresh(report)
-    return report
+) -> None:
+    """Report generation: not available yet (501). Phase 3 makes it a job
+    for the background worker (PROMPTS_CLAUDE.md section 5); until then no
+    report is recorded that would never be written."""
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Report generation isn't available yet")
 
 
 @router.get("/{report_id}", response_model=ReportRead)

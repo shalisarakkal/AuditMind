@@ -205,9 +205,14 @@ async def import_assets(
     )
 
 
-@router.post("/discover", status_code=status.HTTP_202_ACCEPTED)
-def discover_assets(
-    org_id: uuid.UUID, _: OrgMembership = Depends(require_org_role(UserRole.admin))
-) -> dict[str, str]:
-    # Placeholder: wire up to a connector (CONNECTORS_SPEC.md) in a later milestone.
-    return {"status": "not_implemented", "message": "Connector-based discovery is not wired up yet."}
+@router.post(
+    "/discover",
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    responses={501: {"description": "Not available yet: connectors arrive in Phase 5 (CONNECTORS_SPEC.md)"}},
+)
+def discover_assets(org_id: uuid.UUID, _: OrgMembership = Depends(require_org_role(UserRole.admin))) -> None:
+    """Asset discovery through a connector: not available yet (501), so no
+    client waits for a scan that would never run."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Asset discovery through connectors isn't available yet"
+    )

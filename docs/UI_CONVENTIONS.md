@@ -53,8 +53,10 @@ Agreed 2026-09-30.
   running" alert). Not red (failed: nothing is lost, it goes on when the
   worker is back) and not amber (an import report's warnings).
 - **Row actions** go in the last column, right-aligned (`ACTIONS_CELL`), as
-  text buttons: cyan (`ROW_ACTION`), red for what can't be undone
-  (`ROW_ACTION_DANGER`, e.g. Purge). From the moment it's confirmed, a
+  text buttons in three tiers: white, always underlined, for what only
+  shows something (`ROW_ACTION_VIEW`: Report, Details), cyan for what
+  changes data (`ROW_ACTION`: Archive, Restore, Retry, Undo), red for what
+  can't be undone (`ROW_ACTION_DANGER`, e.g. Purge). From the moment it's confirmed, a
   job's button says so ("Archiving…") and is disabled, whether it runs in
   the request or in the background; a small one done in the request then
   says "Archived" until the row leaves the list; a job that stopped

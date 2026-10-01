@@ -29,6 +29,18 @@ def lock_org(db: Session, org_id: uuid.UUID, on_wait: Callable[[], object] | Non
     db.execute(select(func.pg_advisory_xact_lock(key)))
 
 
+def org_is_busy(db: Session, org_id: uuid.UUID) -> bool:
+    """Whether someone holds the org's lock right now (an import writing its
+    rows, an archive job's chunk), checked without waiting: on a connection
+    of its own, so the caller's transaction is left as it is."""
+    with db.get_bind().connect() as conn:
+        free = conn.execute(select(func.pg_try_advisory_lock(_key(org_id)))).scalar()
+        if free:
+            conn.execute(select(func.pg_advisory_unlock(_key(org_id))))
+        conn.commit()
+    return not free
+
+
 def lock_org_jobs(db: Session, org_id: uuid.UUID) -> None:
     """Hold the org's job-start lock until this transaction ends: checking
     that no archive, restore or purge is running on an item and starting one
