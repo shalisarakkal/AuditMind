@@ -29,6 +29,9 @@ class ScanRead(BaseModel):
     started_by: uuid.UUID | None
     dismissed_at: datetime | None
     progress: dict | None
+    # Set only while the background worker runs the import (it checks in
+    # every ~15 s); None for one run during its request.
+    heartbeat_at: datetime | None
 
 
 def brief_scan(scan) -> ScanRead:

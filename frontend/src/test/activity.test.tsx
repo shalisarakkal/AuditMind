@@ -137,6 +137,32 @@ describe("The background worker", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The background worker isn't running");
   });
 
+  it("warns when it stopped in the middle of a job, and says the job was interrupted", async () => {
+    // The worker ran it (it checked in) and then stopped: it stays "running".
+    const cutOff = scan({ status: "running", filename: "big.csv", summary: null, heartbeat_at: "2026-09-30T21:08:13Z",
+      progress: { phase: "reading", rows_done: 122000, rows_total: 500000 } });
+    await renderSignedIn(<Sidebar />, "admin", {
+      "GET /orgs/org-1/scans?tracked=true": () => [cutOff],
+      "GET /orgs/org-1/scans?active=true": () => [cutOff],
+      "GET /worker-status": () => ({ running: false, last_seen: "2026-09-30T21:08:13Z" }),
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("The background worker isn't running");
+    // The upload in the sidebar is marked interrupted (violet, a warning sign).
+    const entry = within(screen.getByRole("list", { name: "Uploads in progress" })).getByRole("link");
+    await waitFor(() => expect(entry).toHaveClass("text-violet-200"));
+    expect(entry).toHaveTextContent("⚠");
+  });
+
+  it("isn't asked about for an upload run during its request", async () => {
+    const small = scan({ status: "running", filename: "small.csv", summary: null, heartbeat_at: null });
+    const { fetchMock } = await renderSignedIn(<Sidebar />, "admin", {
+      "GET /orgs/org-1/scans?tracked=true": () => [small],
+      "GET /orgs/org-1/scans?active=true": () => [small],
+    });
+    await screen.findByText(/Processing small\.csv/);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/worker-status"))).toBe(false);
+  });
+
   it("says nothing while the worker is running", async () => {
     const waiting = scan({ status: "pending", filename: "big.csv", summary: null });
     const { fetchMock } = await renderSignedIn(<Sidebar />, "admin", {

@@ -551,10 +551,12 @@ def purge_at(org: Organization, archived_at: datetime) -> datetime:
     return archived_at + timedelta(days=resolve_ingestion_settings(org).archive_retention_days)
 
 
-def purge_expired(db: Session, now: datetime | None = None) -> int:
+def purge_expired(db: Session, now: datetime | None = None, queue: bool = False) -> int:
     """Purge every archived item past its org's retention; returns how many.
-    Run daily by the background worker (app/worker) or
-    scripts/purge_expired.py. Each purge is an Activity event by "System"."""
+    Run by scripts/purge_expired.py; each purge is an Activity event by
+    "System". `queue`: only queue the purges (the background worker's daily
+    run), as low-priority jobs it takes when nothing else waits; returns how
+    many were queued."""
     now = now or _now()
     purged = 0
     for org in db.scalars(select(Organization)).all():
@@ -573,6 +575,8 @@ def purge_expired(db: Session, now: datetime | None = None) -> int:
                 db.rollback()
                 logger.info("Auto-purge skipped batch %s: %s", batch_id, exc)
                 continue
-            if claim_job(db, job.id) and run_job(db, job.id).status == ScanStatus.completed:
+            if queue:
+                purged += 1
+            elif claim_job(db, job.id) and run_job(db, job.id).status == ScanStatus.completed:
                 purged += 1
     return purged

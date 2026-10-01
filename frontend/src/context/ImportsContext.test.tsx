@@ -249,6 +249,14 @@ describe("Import tracking", () => {
 describe("import helpers", () => {
   it("describes progress", () => {
     expect(progressText(scan({ status: "pending" }))).toBe("Waiting for the background worker…");
+    // The worker was running it and stopped; one run during its request isn't the worker's.
+    const byWorker = scan({ status: "running", heartbeat_at: "2026-09-30T21:08:13Z", progress: { phase: "writing", rows_done: 1, rows_total: 2 } });
+    expect(progressText(byWorker, true)).toMatch(/^Interrupted: the background worker stopped\. This upload starts again from the beginning/);
+    expect(progressText(byWorker, false)).toBe("Writing rows: 1 / 2 (50%)");
+    expect(progressText({ ...byWorker, heartbeat_at: null }, true)).toBe("Writing rows: 1 / 2 (50%)");
+    expect(progressText(scan({ status: "pending" }), true)).toBe(
+      "Interrupted: the background worker stopped. This upload starts when it's back.",
+    );
     expect(progressText(scan({ status: "running", progress: null }))).toBe("Reading file…");
     expect(progressText(scan({ status: "running", progress: { phase: "writing", rows_done: 120000, rows_total: 500000 } }))).toBe(
       "Writing rows: 120,000 / 500,000 (24%)",

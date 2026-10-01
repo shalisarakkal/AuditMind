@@ -85,6 +85,8 @@ export type FindingPage = Page<FindingListItem> & {
 export type RowError = { row: number; message: string };
 /** Imported, but worth checking (same shape as RowError). */
 export type RowWarning = RowError;
+/** A row left out on purpose (skipped, or a duplicate): what it was and why. */
+export type RowNote = { row: number; item: string; message: string };
 
 /** For profile imports, created/updated/skipped count assets and
  * findings_created/duplicates count findings. */
@@ -99,6 +101,10 @@ export type ImportReport = {
   warnings: RowWarning[];
   /** All warnings; the list holds at most the first 1,000. */
   warnings_total?: number;
+  /** The first 1,000 rows counted in skipped and duplicates, with why
+   * (uploads before 2026-09-30 have none). */
+  skipped_rows?: RowNote[];
+  duplicate_rows?: RowNote[];
 };
 
 export type ImportResponse = {
@@ -125,6 +131,8 @@ export type Scan = {
   started_by: string | null;
   dismissed_at: string | null;
   progress: ImportProgress | null;
+  /** Set while the background worker runs it (it checks in every ~15 s). */
+  heartbeat_at?: string | null;
 };
 
 /** A running import's progress, stage by stage: reading (checking) the file's
@@ -236,6 +244,8 @@ export type ArchiveJob = {
   completed_at: string | null;
   dismissed_at: string | null;
   progress: { phase: string; rows_done?: number; rows_total?: number } | null;
+  /** Set while the background worker runs it (it checks in every ~15 s). */
+  heartbeat_at?: string | null;
   /** The rows done; on restore also duplicates_purged and
    * findings_kept_with_asset (their asset is archived separately); or {error}. */
   summary: (ArchiveCounts & { duplicates_purged?: number; findings_kept_with_asset?: number; error?: string }) | null;

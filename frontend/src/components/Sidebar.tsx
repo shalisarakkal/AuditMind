@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import OrgPicker from "@/components/OrgPicker";
 import { useApp } from "@/context/AppContext";
-import { importHome, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
+import { importHome, isInterrupted, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
@@ -60,9 +60,9 @@ export default function Sidebar() {
               <Link
                 href={`/${importHome(scan)}`}
                 title={scan.filename ?? undefined}
-                className="block truncate rounded-md px-3 py-2 text-xs text-cyan hover:bg-cyan/10"
+                className={`block truncate rounded-md px-3 py-2 text-xs hover:bg-cyan/10 ${isInterrupted(scan, imports.workerDown) ? "text-violet-200" : "text-cyan"}`}
               >
-                <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
+                <Indicator interrupted={isInterrupted(scan, imports.workerDown)} />
                 Processing {scan.filename ?? "a file"}…
               </Link>
             </li>
@@ -76,9 +76,9 @@ export default function Sidebar() {
               <Link
                 href={job.action === "archive" ? "/uploads" : "/archived"}
                 title={job.label}
-                className="block truncate rounded-md px-3 py-2 text-xs text-cyan hover:bg-cyan/10"
+                className={`block truncate rounded-md px-3 py-2 text-xs hover:bg-cyan/10 ${isInterrupted(job, imports.workerDown) ? "text-violet-200" : "text-cyan"}`}
               >
-                <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
+                <Indicator interrupted={isInterrupted(job, imports.workerDown)} />
                 {jobTitle(job)}…
               </Link>
             </li>
@@ -89,7 +89,7 @@ export default function Sidebar() {
         </ul>
       )}
       {imports.workerDown && (
-        <p role="alert" className="mt-6 rounded-md border border-yellow-400/30 bg-yellow-400/5 px-3 py-2 text-xs text-yellow-200">
+        <p role="alert" className="mt-6 rounded-md border border-violet-400/40 bg-violet-400/10 px-3 py-2 text-xs text-violet-200">
           The background worker isn&apos;t running, so large uploads and archive jobs are waiting. Start it with
           start-dev.ps1, or <code>python -m app.worker</code> in the backend folder.
         </p>
@@ -105,5 +105,14 @@ export default function Sidebar() {
         Log out
       </button>
     </nav>
+  );
+}
+
+/** A pulsing dot while it runs; a warning sign while the worker is down. */
+function Indicator({ interrupted }: { interrupted: boolean }) {
+  return interrupted ? (
+    <span aria-hidden className="mr-1">⚠</span>
+  ) : (
+    <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
   );
 }

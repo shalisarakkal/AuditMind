@@ -48,6 +48,10 @@ Agreed 2026-09-30.
 - **Statuses are badges** (`StatusBadge`): completed green, failed or stopped
   red, running cyan, pending grey. Criticality (`CriticalityBadge`): critical
   red, warning yellow, info grey. Severity keeps its own four colours.
+- **Interrupted is violet, with ⚠**: an upload or job waiting for, or cut off
+  by, the background worker while it's down (and the sidebar's "worker isn't
+  running" alert). Not red (failed: nothing is lost, it goes on when the
+  worker is back) and not amber (an import report's warnings).
 - **Row actions** go in the last column, right-aligned (`ACTIONS_CELL`), as
   text buttons: cyan (`ROW_ACTION`), red for what can't be undone
   (`ROW_ACTION_DANGER`, e.g. Purge). From the moment it's confirmed, a

@@ -80,9 +80,29 @@ class _Current:
 current = _Current()
 
 
+def _oldest_job(db: Session, low_priority: bool):
+    """The oldest waiting archive job: one someone started, or a System one
+    (the auto-purge) that has waited AUTO_PURGE_MAX_WAIT_MINUTES; or, with
+    `low_priority`, any System one."""
+    by_system = ArchiveJob.started_by.is_(None)
+    if not low_priority:
+        overdue = ArchiveJob.started_at <= _now() - timedelta(minutes=settings.AUTO_PURGE_MAX_WAIT_MINUTES)
+        by_system = ~by_system | overdue
+    return db.execute(
+        select(ArchiveJob.id, ArchiveJob.started_at)
+        .where(ArchiveJob.status == ScanStatus.pending, by_system)
+        .order_by(ArchiveJob.started_at)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    ).first()
+
+
 def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
     """Take the oldest waiting job: ("import", scan id) or ("archive", job
-    id). Committed as running, with a first check-in."""
+    id). Committed as running, with a first check-in. Jobs the system started
+    (the daily auto-purge) are low priority: taken only when no upload or
+    job someone started waits, until they've waited
+    AUTO_PURGE_MAX_WAIT_MINUTES; then they take their turn by age."""
     scan = db.execute(
         select(Scan.id, Scan.started_at)
         .where(Scan.status == ScanStatus.pending, Scan.source == "upload")
@@ -90,13 +110,9 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
         .limit(1)
         .with_for_update(skip_locked=True)
     ).first()
-    job = db.execute(
-        select(ArchiveJob.id, ArchiveJob.started_at)
-        .where(ArchiveJob.status == ScanStatus.pending)
-        .order_by(ArchiveJob.started_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    ).first()
+    job = _oldest_job(db, low_priority=False)
+    if scan is None and job is None:
+        job = _oldest_job(db, low_priority=True)
     if scan is None and job is None:
         db.rollback()
         return None
@@ -247,7 +263,8 @@ def housekeeping(db: Session) -> None:
     """Purge archived items and Activity events past their retention (each
     recorded in Activity), and delete uploaded files nothing is waiting for."""
     if settings.ARCHIVE_AUTO_PURGE:
-        logger.info("Auto-purge: %d archived item(s) purged", archive_service.purge_expired(db))
+        queued = archive_service.purge_expired(db, queue=True)
+        logger.info("Auto-purge: %d archived item(s) queued (run when nothing else waits)", queued)
         logger.info("Activity clean-up: %d event(s) deleted", purge_expired_events(db))
     _sweep_uploads(db)
 

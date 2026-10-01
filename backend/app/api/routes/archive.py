@@ -66,6 +66,7 @@ def _job_read(job: ArchiveJob, batch: ArchiveBatch) -> ArchiveJobRead:
         dismissed_at=job.dismissed_at,
         progress=job.progress,
         summary=job.summary,
+        heartbeat_at=job.heartbeat_at,
     )
 
 

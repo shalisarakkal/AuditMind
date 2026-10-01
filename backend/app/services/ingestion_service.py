@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
 from psycopg.types.json import Jsonb
-from sqlalchemy import bindparam, update
+from sqlalchemy import bindparam, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
@@ -35,10 +35,10 @@ from app.models.finding import Finding
 from app.models.organization import Organization
 from app.models.scan import Scan
 from app.models.user import User
-from app.schemas.ingestion import ImportReport, RowError, RowWarning
+from app.schemas.ingestion import ImportReport, RowError, RowNote, RowWarning
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
 from app.services.events import record_event
-from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, finding_key
+from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, Origin, finding_key
 from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity, parse_nessus
 from app.services.org_lock import IMPORT_JOB, job_running, lock_org
 from app.services.org_settings import IngestionSettings, resolve_ingestion_settings
@@ -421,6 +421,12 @@ def _import(
                 finding = nessus_finding(item, ingestion, row_warnings)
                 if finding is None:
                     report.skipped += 1
+                    _note(
+                        report.skipped_rows,
+                        item.row,
+                        f"{item.hostname or item.ip or 'no host'}: Nessus {item.plugin_id} {item.plugin_name}",
+                        "Info severity: skipped, as Settings say (Nessus Info items: Skip them)",
+                    )
                     return None, []
                 return None, [finding]
 
@@ -705,6 +711,12 @@ def _write_assets(
             report.created += 1
         elif strategy == "skip":
             report.skipped += 1
+            _note(
+                report.skipped_rows,
+                row.row,
+                _host(row),
+                "Already recorded: left unchanged, as Settings say (Asset already in inventory: Leave it unchanged)",
+            )
         else:
             values = {
                 name: value
@@ -753,6 +765,7 @@ def _write_findings(
     if own_phase:
         writes.start_phase("findings", len(rows))
     previous_row = None
+    duplicates: list[tuple[FindingRow, Origin]] = []  # the first, to list
     for row in rows:
         if own_phase or (row.row not in asset_by_row and row.row != previous_row):
             writes.row_done()
@@ -791,8 +804,10 @@ def _write_findings(
         key = finding_key(asset.id, row.source, row.category, row.description)
         if key in findings:
             report.duplicates += 1
+            if len(duplicates) < MAX_REPORTED_ERRORS:
+                duplicates.append((row, findings.origin(key)))
             continue
-        findings.add(key)  # later rows in the same file dedup against it
+        findings.add(key, row.row)  # later rows in the same file dedup against it
         writes.create_finding(
             {
                 "id": uuid.uuid4(),
@@ -809,6 +824,35 @@ def _write_findings(
             }
         )
         setattr(report, count_as, getattr(report, count_as) + 1)
+    report.duplicate_rows = _duplicate_notes(db, duplicates)
+
+
+def _duplicate_notes(db: Session, duplicates: list[tuple[FindingRow, Origin]]) -> list[RowNote]:
+    """Each listed duplicate, with what it duplicates: a finding from an
+    earlier upload (named), one added by hand, or an earlier row of this file."""
+    scan_ids = {origin for _, origin in duplicates if isinstance(origin, uuid.UUID)}
+    uploads = dict(db.execute(select(Scan.id, Scan.filename).where(Scan.id.in_(scan_ids))).tuples().all()) if scan_ids else {}
+    notes = []
+    for row, origin in duplicates:
+        if isinstance(origin, int):
+            message = f"Same as row {origin} of this file"
+        elif origin is None:
+            message = "Same as a finding added by hand"
+        else:
+            message = f"Same as a finding from {uploads.get(origin) or 'an earlier upload'}"
+        what = row.category or row.description or "uncategorised"
+        notes.append(RowNote(row=row.row, item=f"{_host(row)}: {what}"[:300], message=message))
+    return notes
+
+
+def _note(notes: list[RowNote], row: int, item: str, message: str) -> None:
+    """List a skipped row, up to MAX_REPORTED_ERRORS (the count has them all)."""
+    if len(notes) < MAX_REPORTED_ERRORS:
+        notes.append(RowNote(row=row, item=item[:300], message=message))
+
+
+def _host(row: AssetRow | FindingRow) -> str:
+    return row.hostname or row.ip or row.cloud_id or "no host"
 
 
 def _new_asset(index: AssetIndex, writes: _PendingWrites, org_id, **values) -> IndexedAsset:

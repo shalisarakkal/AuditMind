@@ -259,6 +259,8 @@ Its own phase, built with the feature-dev workflow once Phase 2 is signed off
 and before Phase 3, so Phase 3's reports and documents get the same lifecycle
 from the start. Two parts, each tested and checked in with you before the
 next: part 1 first, because part 2 changes the same import write path.
+(Part 3, the background worker, was added 2026-09-29; Part 4, fixes from
+an external review, 2026-09-30.)
 Decisions so far (2026-09-28); the full clarifying round comes at the start of
 the phase.
 
@@ -716,6 +718,14 @@ After the review (requested 2026-09-30):
       waited ~2 s, because `localhost` is tried over IPv6 first on Windows
       and the backend listens on IPv4 only. The frontend now calls
       127.0.0.1 (default and .env.example): 2.0 s per call became 0.02-0.06 s
+- Committed c5872fe; CI #8 failed on one test: Linux Postgres sorts text
+  language-aware (ignores punctuation: bad.csv before b.csv), Windows dev
+  character by character. Kept the database's own sort order (it's what
+  production does, and it keeps sorting indexed: hostname over 2M assets
+  instant, 0.63 s if forced to byte order); the test's names now sort the
+  same either way (6d487f1). Dev and production can differ only in how
+  punctuation sorts
+- CI #9 green on 6d487f1 (2026-09-30); all items done, awaiting sign-off
 - 509 backend + 144 frontend tests pass; lint, typecheck and build pass
 - [x] Only jobs that are really dead are marked failed at startup (review of
       Part 2, finding 4): today every starting process fails every running
@@ -725,8 +735,95 @@ After the review (requested 2026-09-30):
       instead
 - [x] The import tracker and pages unchanged: same status, progress and
       reports
-- [ ] Measured: page requests while a 500K-row import runs (target: as fast
-      as with nothing running)
+- [x] Found in your verification (2026-09-30): the worker stopped in the
+      middle of a 500K import (reading, 24%) and the app gave no warning;
+      the upload stayed "running" with its progress frozen. The warning only
+      looked at jobs waiting to start. Now scans and archive jobs show
+      heartbeat_at (set only by the worker), and the warning also covers
+      jobs the worker is running. While the worker is down, every job
+      waiting for it or cut off by it reads "Interrupted: the background
+      worker stopped." plus what happens when it's back (waiting: starts;
+      an upload cut off: starts again from the beginning; an archive job
+      cut off: carries on where it left off). Shown in violet with ⚠ (the
+      card, its sidebar entry and the sidebar alert), so it stands out from
+      running (cyan), failed (red) and report warnings (amber); rule in
+      docs/UI_CONVENTIONS.md)
+- [x] Auto-purge is low priority (requested 2026-09-30, after an upload
+      waited 1 min 23 s behind 4 auto-purges): the worker's daily run ran
+      every expired purge itself before looking at the queue. Now it only
+      queues them (by System), and the worker takes them when no upload or
+      job someone started is waiting; once one has waited
+      AUTO_PURGE_MAX_WAIT_MINUTES (default 60), it takes its turn by age
+      like any other job, so a busy queue can't put it off for ever. A job
+      already running is finished
+      first (a purge of 500K rows: ~1-2 min). scripts/purge_expired.py
+      still purges at once. While its purge waits, an expired item can't be
+      restored ("Another archive, restore or purge … is already running")
+- [x] Measured: page requests while a 500K-row import runs (target: as fast
+      as with nothing running). 2026-09-30, network_scan 500K file (500K
+      assets, 498K findings, ~5.5 min in the worker), all 8 calls a page
+      load makes, timed over and over, median per round:
+      - The web server is no longer blocked: uploads, archive, events,
+        import tracker and worker status stay at 5-10 ms throughout (were
+        2-3 s each before the worker)
+      - Other orgs unaffected: an org with 500K assets and findings, 2.7 s
+        per round idle, 3.1 s during the import
+      - The importing org's own Dashboard/Assets/Findings slow down while
+        its rows are being written (~0.1-1.1 s, peaks 2.5 s; up to 7 s in
+        the first run): the import is one transaction, so their counts step
+        over the not-yet-saved rows. That's about what those pages cost once
+        the rows are in (next point); nothing is blocked. Met
+      - Found: an org with 500K assets and findings is slow with nothing
+        running: Dashboard 1.2 s, Assets 0.75 s, Findings 0.7 s, almost all
+        of it exact counts. Tracked in Phase 4 (estimated counts)
+
+### Part 4 — Review fixes (CoPilotReview.md, after Part 3 sign-off, before Phase 2e)
+
+External review of the repo plus the uncommitted import-report change
+(2026-09-30). All 8 findings checked against the code and confirmed
+accurate; it found no defect in the import-report change itself. Where each
+one goes:
+
+| # | Finding | Severity | Decision |
+|---|---------|----------|----------|
+| 1 | Archived upload still readable/dismissable by ID | Medium | Fix here |
+| 2 | Asset discovery answers 202 but does nothing | Medium | Fix here |
+| 3 | Report generation answers 202, job never runs | Medium | Fix here (stopgap); real job in Phase 3 |
+| 4 | Built-in default `SECRET_KEY` accepted | High | Fix here |
+| 5 | `/health` checks nothing | Medium | Phase 4 (with hosting) |
+| 6 | Claude calls unbounded (timeout, retries, quotas, cost) | Medium | Stopgap here; built into Phase 3 |
+| 7 | Sign-in token in `localStorage` (readable by XSS) | Medium | Phase 2e (sign-in is reworked there) |
+| 8 | Unpaged lists: `GET /scans` (no filter), `GET /reports` | Medium | Scans here; reports in Phase 3 |
+
+- [ ] 1: `GET /scans/{id}` and `POST /scans/{id}/dismiss` answer 404 for
+      an archived upload (it stays reachable from Archived). Tests for both.
+      Needed before the new "open a past upload's report" goes out
+- [ ] 2: `POST /assets/discover` answers 501 Not Implemented until a
+      connector exists
+- [ ] 3: `POST /reports/generate` answers 501 until Phase 3 wires the real
+      job (through the worker queue); no more `pending` reports that never
+      finish
+- [ ] 4: The server refuses to start with the default key or one shorter
+      than 32 characters, with a message saying how to generate one;
+      `.env.example`, CI and the test setup get their own. Documented: a
+      new key signs everyone out
+- [ ] 6 (stopgap): the Claude smoke test (`POST /ai/claude/test`) gets a
+      timeout and becomes admin-only; provider errors come back as a clear
+      502/503, not a 500
+- [ ] 8: `GET /scans` without `active`/`tracked` (the app doesn't use it)
+      removed, or paged like the other lists
+- [ ] Retry a failed upload without uploading it again (from Part 3
+      verification, 2026-09-30: an upload cut off twice failed and its
+      saved file was deleted, so the only way on was to upload it again).
+      A large upload's file waits in `backend/uploads/<scan id>.upload`
+      (UPLOAD_DIR) and today is deleted as soon as the outcome is saved.
+      Keep it for a while after a failure (e.g. 7 days, a setting; the
+      worker's daily clean-up deletes it after that), and add a Retry
+      button on the failed report and on Uploads, for the uploader and
+      admins: it queues the same file again as a new attempt. Not for
+      files rejected as unreadable (retrying can't help). Small uploads
+      (processed during the request) aren't saved, so they have no Retry
+- [ ] Tests for each; CI green
 
 ## Phase 2e — Users and organizations (after Phase 2d, before Phase 2f)
 
@@ -758,6 +855,11 @@ plus self-service password change):
       Sysadmin. An archived org is read-only for its members and shown as
       "Archived" in the picker; the Sysadmin can restore it, or purge it after
       typing its name; the purge log records it
+- [ ] Sign-in token out of `localStorage` (CoPilot review, finding 7): a
+      short-lived token kept in memory plus an `HttpOnly`, `Secure`,
+      `SameSite` cookie to renew it (with CSRF protection), so injected
+      script can't read it; signing out, a password change or a reset ends
+      the user's other sessions. Plus security headers (CSP)
 
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 
@@ -773,6 +875,20 @@ cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
       (saved to disk, processed in batches), so memory stays flat at any
       size; all-or-nothing imports get a check-first pass. Log exports are
       routinely this large (split_json.py is the stopgap until then)
+- [ ] Imports that resume from where they were cut off (from Part 3
+      verification, 2026-09-30: a 500K upload cut off while writing rows
+      started again from reading). Today an import is one transaction, so
+      a cut-off loses everything and the restart redoes it all (~3-5 min
+      for 500K rows). Instead: write rows in committed chunks to a staging
+      area users can't see, recording how far it got; then publish in one
+      short final step, so users still never see half an upload. A restart
+      carries on from the last chunk. Also ends the long transaction that
+      slows the importing org's Assets/Dashboard during an import
+      (measured ~0.1-1.1 s), and suits many workers (Phase 4, SaaS).
+      Builds on the chunked reading above. To settle at the start: matching
+      and duplicate checks against rows staged but not yet published, two
+      uploads into one org (the org lock stays held until publish?), and
+      clearing a staging area left by a failed import
 - [ ] Sources (import profiles) for Azure Activity Log, AWS CloudTrail and
       GCP Audit Logs, detected from their columns like the existing ones
 - [ ] Endpoint security events in the OSSEM format (Sysmon/EDR telemetry;
@@ -803,6 +919,15 @@ generation endpoint.
 - Claude auth: keep `ANTHROPIC_API_KEY` in `backend/.env` for local dev, and
   keep every Claude call going through `app/services/claude_service.py`, so the
   auth method can change in one place later (see Phase 4).
+- [ ] Claude calls bounded (CoPilot review, finding 6), in
+      `claude_service.py`: timeouts, a few retries for temporary errors,
+      per-org limits, token and cost recorded per call, provider errors
+      mapped to clear messages, and the model's output checked before any
+      score or report is saved. Tests with a mocked provider (timeout, rate
+      limit, bad output, outage)
+- [ ] Report generation is a real job (findings 3 and 8): queued for the
+      worker like imports, with status, failure details and retries;
+      `GET /reports` paged, newest first, full report only by ID
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
@@ -824,6 +949,16 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       Decide once hosting is chosen; confirm what the Claude API supports at
       that point. Likely shape: a `CLAUDE_AUTH_MODE` setting read by
       `claude_service.py`, with local dev staying on the API key.
+- [ ] Readiness check (CoPilot review, finding 5): `/health` stays a cheap
+      "the process is up"; a new `/ready` checks the database, the uploads
+      folder and the worker's last check-in (quickly, without revealing
+      connection details), for the host's load balancer
+- [ ] Big orgs' list pages (found measuring Phase 2d Part 3, 2026-09-30):
+      with 500K assets and findings, Dashboard 1.2 s, Assets 0.75 s,
+      Findings 0.7 s, mostly exact counts. Estimated counts ("about
+      500,000") and cached pick-list values, as proposed in
+      [docs/DATABASE_PERFORMANCE.md](docs/DATABASE_PERFORMANCE.md); can be
+      brought forward if it bothers users sooner
 - [ ] Uploads folder permissions (from the Phase 2d part 3 review): the
       folder holding uploaded files should be readable only by the app's
       service account, not inherit the user's folder permissions
@@ -838,6 +973,32 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       keyless Claude auth above). Dev stays on Windows Postgres, moved to the
       C: SSD (2026-09-29); Postgres in Docker (WSL2) is an option later for
       parity with CI's `pgvector/pgvector` image.
+- [ ] Scaling for SaaS (discussed 2026-09-30): today one worker runs every
+      job, oldest first, across all orgs (a 500K-row upload ~3-5 min, a
+      500K-row purge ~1-2 min), so one tenant's queue or the auto-purge
+      delays everyone (seen in verification: an upload waited 1 min 23 s
+      behind 4 auto-purges in another org). Already in place: workers claim
+      jobs with `FOR UPDATE SKIP LOCKED` (safe with several), one upload at
+      a time per org, per-job check-ins. To add, roughly in order:
+  - Several workers, scaled automatically on the number of waiting jobs
+    (imports resuming from where they were cut off, Phase 2f, keeps a
+    worker restart or scale-down cheap)
+  - Fair turns between tenants (round-robin by org, a cap on each org's
+    running jobs) instead of strictly oldest first
+  - Separate worker groups: uploads; archive/purge (auto-purge already low
+    priority; run it off-peak too); Phase 3's AI reports
+  - Uploaded files in object storage (Azure Blob / S3) instead of
+    `backend/uploads`, so any worker on any machine can read them
+  - Database: a larger managed instance plus read replicas for list pages
+    and the Dashboard; estimated counts (above); assets and findings
+    partitioned by org, so purging an org or a big upload is near instant;
+    later, a database of their own for very large tenants
+  - Per-tenant limits by plan: file size, uploads running at once, rows
+    per month
+  - Monitoring: queue wait per tenant, job durations, alerts when waits
+    grow
+  - A dedicated queue service (Azure Service Bus, SQS) only if the
+    database queue can't keep up
 
 ## Test policy
 

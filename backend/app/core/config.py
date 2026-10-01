@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     WORKER_STALE_SECONDS: int = Field(120, ge=30)
     # How often the worker looks for new jobs when it has none.
     WORKER_POLL_SECONDS: float = Field(2.0, gt=0)
+    # The daily auto-purge's jobs wait until no upload or job someone started
+    # is waiting; after this long they take their turn by age like any other
+    # job, so a busy queue can't put them off for ever.
+    AUTO_PURGE_MAX_WAIT_MINUTES: int = Field(60, ge=0)
 
     # --- Archiving. ---
     # Archive, restore and purge jobs up to this many rows run during the

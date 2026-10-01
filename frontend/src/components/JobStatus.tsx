@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { isRunning, jobProgressText, jobResultText, jobTitle, useImports } from "@/context/ImportsContext";
+import { isInterrupted, isRunning, jobProgressText, jobResultText, jobTitle, useImports } from "@/context/ImportsContext";
 import type { ArchiveJob } from "@/lib/types";
 
 // Past this many, jobs are summed up rather than shown one by one (e.g.
@@ -15,7 +15,7 @@ const DONE = { archive: "Archived", restore: "Restored", purge: "Purged" } as co
  * outcome (for whoever started it) until it's dismissed. Many at once are
  * summed up: the one running, how many wait their turn, and one result. */
 export default function JobStatus() {
-  const { jobs, dismissJob } = useImports();
+  const { jobs, dismissJob, workerDown } = useImports();
   const [error, setError] = useState<string | null>(null);
   if (jobs.length === 0) return null;
 
@@ -30,15 +30,21 @@ export default function JobStatus() {
 
   return (
     <div className="space-y-3">
-      {shown.map((job) => (
-        <section key={job.id} aria-label={jobTitle(job)} className="rounded-xl border border-cyan/30 bg-cyan/5 p-4 text-sm">
-          <p className="text-white">
-            <span className="font-medium">{jobTitle(job)}</span>{" "}
-            <span className="text-white/60">— in the background</span>
-          </p>
-          <p className="mt-1 text-cyan">{jobProgressText(job)}</p>
-        </section>
-      ))}
+      {shown.map((job) => {
+        const interrupted = isInterrupted(job, workerDown);
+        return (
+          <section key={job.id} aria-label={jobTitle(job)} className={interrupted ? "rounded-xl border border-violet-400/40 bg-violet-400/10 p-4 text-sm" : "rounded-xl border border-cyan/30 bg-cyan/5 p-4 text-sm"}>
+            <p className="text-white">
+              <span className="font-medium">{jobTitle(job)}</span>{" "}
+              <span className="text-white/60">— in the background</span>
+            </p>
+            <p className={`mt-1 ${interrupted ? "text-violet-200" : "text-cyan"}`}>
+              {interrupted && <span aria-hidden className="mr-1">⚠</span>}
+              {jobProgressText(job, workerDown)}
+            </p>
+          </section>
+        );
+      })}
       {queued > 0 && (
         <section aria-label="Queued jobs" className="rounded-xl border border-cyan/30 bg-cyan/5 p-4 text-sm text-white">
           {queued.toLocaleString("en-US")} {shown.length ? "more " : ""}

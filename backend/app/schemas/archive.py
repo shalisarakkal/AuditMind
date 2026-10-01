@@ -28,6 +28,9 @@ class ArchiveJobRead(BaseModel):
     dismissed_at: datetime | None
     progress: dict | None
     summary: dict | None
+    # Set only while the background worker runs the job (it checks in every
+    # ~15 s); None for one run during its request.
+    heartbeat_at: datetime | None = None
 
 
 class ArchivedItemRead(BaseModel):

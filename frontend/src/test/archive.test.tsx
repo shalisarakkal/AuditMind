@@ -6,6 +6,7 @@ import FindingsPage from "@/app/(app)/findings/page";
 import UploadsPage from "@/app/(app)/uploads/page";
 import ImportButton from "@/components/ImportButton";
 import Sidebar from "@/components/Sidebar";
+import { jobProgressText } from "@/context/ImportsContext";
 import { countsText, purgeCountdown } from "@/lib/domain";
 import type { ArchivedItem, ArchiveJob, FindingListItem, Upload } from "@/lib/types";
 import { json, renderSignedIn, requestInit, scan } from "@/test/helpers";
@@ -78,6 +79,27 @@ function gets(fetchMock: FetchMock, path: string): number {
 }
 
 describe("Uploads page", () => {
+  it("opens a past upload's full report under its row", async () => {
+    await renderSignedIn(<UploadsPage />, "viewer", {
+      "GET /orgs/org-1/uploads": () => page([upload()]),
+      "GET /orgs/org-1/scans/s1": () =>
+        scan({
+          filename: "findings.csv",
+          scan_type: "findings_csv",
+          summary: {
+            created: 3, updated: 0, skipped: 0, duplicates: 1, failed: 0, findings_created: 0, errors: [], warnings: [],
+            duplicate_rows: [{ row: 4, item: "web-01: CVE-1", message: "Same as row 2 of this file" }],
+          },
+        }),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Show report for findings.csv" }));
+    const report = await screen.findByRole("region", { name: "Upload result" });
+    expect(report).toHaveTextContent("Duplicates — 1");
+    expect(report).toHaveTextContent("Same as row 2 of this file");
+    fireEvent.click(screen.getByRole("button", { name: "Hide report for findings.csv" }));
+    expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument();
+  });
+
   it("lists uploads and archives one after confirming, then reloads the list", async () => {
     const { fetchMock } = await renderSignedIn(<UploadsPage />, "auditor", {
       "GET /orgs/org-1/uploads": () => page([upload()]),
@@ -540,5 +562,16 @@ describe("Several at once", () => {
     await renderSignedIn(<ArchivedPage />, "viewer", { "GET /orgs/org-1/archive": () => archivedPage([archived()]) });
     await screen.findByText("findings.csv");
     expect(screen.queryByRole("checkbox", { name: /^Select/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("An archive job the worker was running when it stopped", () => {
+  it("says it was interrupted and will carry on", () => {
+    const running = job({ status: "running", heartbeat_at: "2026-09-30T21:08:13Z", progress: { phase: "findings", rows_done: 1, rows_total: 4 } });
+    expect(jobProgressText(running, true)).toMatch(/^Interrupted: the background worker stopped\. This carries on where it left off/);
+    expect(jobProgressText(running, false)).toBe("Findings: 1 / 4 (25%)");
+    expect(jobProgressText({ ...running, heartbeat_at: null }, true)).toBe("Findings: 1 / 4 (25%)");
+    expect(jobProgressText(job({ status: "pending" }), true)).toBe("Interrupted: the background worker stopped. This starts when it's back.");
+    expect(jobProgressText(job({ status: "pending" }), false)).toBe("Waiting for the background worker…");
   });
 });

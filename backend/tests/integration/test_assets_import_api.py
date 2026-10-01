@@ -42,6 +42,8 @@ def test_csv_import_creates_assets_and_records_a_scan(client, admin, db_session)
         "errors": [],
         "warnings": [],
         "warnings_total": 0,
+        "skipped_rows": [],
+        "duplicate_rows": [],
     }
 
     assets = {a["hostname"] or a["ip"]: a for a in _assets(client, admin)}
@@ -134,6 +136,14 @@ def test_existing_asset_strategy_from_env(client, admin, monkeypatch, strategy, 
 
     assert {k: report[k] for k in expected_report} == expected_report
     assert sorted(a["environment"] for a in _assets(client, admin)) == expected_assets
+    if strategy == "skip":
+        assert report["skipped_rows"] == [
+            {
+                "row": 2,
+                "item": "web",
+                "message": "Already recorded: left unchanged, as Settings say (Asset already in inventory: Leave it unchanged)",
+            }
+        ]
 
 
 def test_all_or_nothing_writes_nothing_and_fails_the_scan(client, admin, monkeypatch, db_session):

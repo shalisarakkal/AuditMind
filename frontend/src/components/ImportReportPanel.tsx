@@ -1,5 +1,5 @@
 import { importCounts } from "@/lib/importCounts";
-import type { ImportReport, RowError, ScanStatus } from "@/lib/types";
+import type { ImportReport, RowError, RowNote, ScanStatus } from "@/lib/types";
 
 export type ImportResult = {
   status: ScanStatus;
@@ -81,9 +81,45 @@ export default function ImportReportPanel({ result, onDismiss }: { result: Impor
               )}
             </RowTable>
           )}
+          <NoteList title="Skipped" rows={report.skipped_rows ?? []} total={report.skipped} />
+          <NoteList title="Duplicates" rows={report.duplicate_rows ?? []} total={report.duplicates} />
         </>
       )}
     </section>
+  );
+}
+
+/** Rows left out on purpose (skipped, duplicates): expected, so folded
+ * away; each with what it was and why. */
+function NoteList({ title, rows, total }: { title: string; rows: RowNote[]; total: number }) {
+  if (rows.length === 0) return null;
+  return (
+    <details className="mt-3 text-sm">
+      <summary className="cursor-pointer text-xs font-medium text-white/70 hover:text-white">
+        {title} — {total.toLocaleString("en-US")}
+        {total > rows.length && ` (the first ${rows.length.toLocaleString("en-US")} listed)`}
+      </summary>
+      <div className="mt-1 max-h-64 overflow-auto" role="region" aria-label={title}>
+        <table className="w-full table-fixed text-left">
+          <thead className="text-xs uppercase tracking-wide text-white/50">
+            <tr>
+              <th className="w-16 py-1 pr-4">Row</th>
+              <th className="py-1 pr-4">Item</th>
+              <th className="py-1">Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((note, i) => (
+              <tr key={i} className="border-t border-white/10 text-white/80">
+                <td className="py-1 pr-4 align-top">{note.row}</td>
+                <td className="break-words py-1 pr-4 align-top">{note.item}</td>
+                <td className="py-1 align-top text-white/60">{note.message}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 

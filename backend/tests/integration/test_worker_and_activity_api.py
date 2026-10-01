@@ -71,6 +71,24 @@ def test_a_small_upload_is_never_the_workers(client, admin, db_session):
     assert not settings.upload_dir.exists() or list(settings.upload_dir.iterdir()) == []
 
 
+def test_the_app_can_tell_a_job_the_worker_runs(client, admin, monkeypatch, db_session):
+    """heartbeat_at is shown: set only by the worker, so the app can say a job
+    was interrupted when the worker stops in the middle of it."""
+    scan_id = _large_upload(client, admin, monkeypatch)
+    scan = db_session.get(Scan, scan_id)
+    scan.status, scan.heartbeat_at = ScanStatus.running, datetime.now(timezone.utc)
+    db_session.commit()
+    shown = client.get(_url(admin, f"/scans/{scan_id}"), headers=admin[0]).json()
+    assert shown["heartbeat_at"] is not None
+    tracked = client.get(_url(admin, "/scans"), headers=admin[0], params={"tracked": True}).json()
+    assert tracked[0]["heartbeat_at"] is not None
+
+    monkeypatch.setattr(settings, "IMPORT_SYNC_MAX_BYTES", 10 * 1024 * 1024)
+    small = upload(client, _url(admin, "/assets/import"), admin[0], "b.csv", BAD_ROWS)
+    assert small.status_code == 201, small.text
+    assert client.get(_url(admin, f"/scans/{small.json()['scan_id']}"), headers=admin[0]).json()["heartbeat_at"] is None
+
+
 def test_the_oldest_waiting_job_goes_first(client, admin, monkeypatch, db_session):
     first = _large_upload(client, admin, monkeypatch, name="first.csv")
     second = _large_upload(client, admin, monkeypatch, content=ASSETS + b"server,web-03\n", name="second.csv")

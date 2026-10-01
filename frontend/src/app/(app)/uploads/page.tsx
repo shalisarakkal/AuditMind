@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
+import ImportReportPanel from "@/components/ImportReportPanel";
 import { ArchiveButtons } from "@/components/JobButton";
 import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
 import JobStatus from "@/components/JobStatus";
@@ -16,6 +17,7 @@ import {
   ListToolbar,
   PageHeader,
   ROW,
+  ROW_ACTION,
   SELECT_CELL,
   SelectBox,
   SelectionAction,
@@ -29,10 +31,10 @@ import {
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
-import { isRunning } from "@/context/ImportsContext";
+import { isRunning, scanResult } from "@/context/ImportsContext";
 import { canWrite, formatDateTime, scanTypeLabel } from "@/lib/domain";
 import { importCountsText } from "@/lib/importCounts";
-import type { Page, Upload } from "@/lib/types";
+import type { Page, Scan, Upload } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useSelection } from "@/lib/useSelection";
@@ -68,6 +70,7 @@ function Uploads() {
   const facets = useApi<{ type: string[]; status: string[] }>(`/orgs/${org.id}/uploads/facets`);
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
   const selection = useSelection(list, org.id);
+  const [opened, setOpened] = useState<string | null>(null);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
@@ -164,35 +167,55 @@ function Uploads() {
           <tbody>
             {page.items.length === 0 && <EmptyRow colSpan={COLUMNS + (writer ? 1 : 0)} noun="uploads" filtered={list.hasFilters} />}
             {page.items.map((u) => (
-              <tr key={u.id} className={ROW}>
-                {writer && (
-                  <td className={SELECT_CELL}>
-                    <SelectBox selection={selection} id={u.id} name={u.filename ?? "upload"} disabled={!pickable(u)} />
-                  </td>
-                )}
-                <td className={`${TD} text-white`}>{u.filename ?? "—"}</td>
-                <td className={TD}>{scanTypeLabel(u.scan_type)}</td>
-                <td className={TD}>{u.uploaded_by ?? "—"}</td>
-                <td className={`${TD} text-xs text-white/60`}>{formatDateTime(u.started_at)}</td>
-                <td className={TD}>
-                  <StatusBadge status={u.status} />
-                </td>
-                <td className={`${TD} text-xs text-white/60`}>{outcome(u)}</td>
-                <td className={ACTIONS_CELL}>
+              <Fragment key={u.id}>
+                <tr className={ROW}>
                   {writer && (
-                    <ArchiveButtons
-                      itemId={u.id}
-                      name={u.filename ?? "upload"}
-                      archiving={u.archiving}
-                      batchId={u.archiving_batch_id}
-                      onArchive={() => archive(u)}
-                      onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, u.filename ?? "upload"))}
-                      disabled={isRunning(u)}
-                      disabledTitle="Archive it once it has finished processing"
-                    />
+                    <td className={SELECT_CELL}>
+                      <SelectBox selection={selection} id={u.id} name={u.filename ?? "upload"} disabled={!pickable(u)} />
+                    </td>
                   )}
-                </td>
-              </tr>
+                  <td className={`${TD} text-white`}>{u.filename ?? "—"}</td>
+                  <td className={TD}>{scanTypeLabel(u.scan_type)}</td>
+                  <td className={TD}>{u.uploaded_by ?? "—"}</td>
+                  <td className={`${TD} text-xs text-white/60`}>{formatDateTime(u.started_at)}</td>
+                  <td className={TD}>
+                    <StatusBadge status={u.status} />
+                  </td>
+                  <td className={`${TD} text-xs text-white/60`}>{outcome(u)}</td>
+                  <td className={ACTIONS_CELL}>
+                    {!isRunning(u) && (
+                      <button
+                        type="button"
+                        aria-expanded={opened === u.id}
+                        aria-label={`${opened === u.id ? "Hide" : "Show"} report for ${u.filename ?? "upload"}`}
+                        onClick={() => setOpened(opened === u.id ? null : u.id)}
+                        className={ROW_ACTION}
+                      >
+                        {opened === u.id ? "Hide report" : "Report"}
+                      </button>
+                    )}
+                    {writer && (
+                      <ArchiveButtons
+                        itemId={u.id}
+                        name={u.filename ?? "upload"}
+                        archiving={u.archiving}
+                        batchId={u.archiving_batch_id}
+                        onArchive={() => archive(u)}
+                        onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, u.filename ?? "upload"))}
+                        disabled={isRunning(u)}
+                        disabledTitle="Archive it once it has finished processing"
+                      />
+                    )}
+                  </td>
+                </tr>
+                {opened === u.id && (
+                  <tr>
+                    <td colSpan={COLUMNS + (writer ? 1 : 0)} className="px-4 pb-3">
+                      <UploadReport orgId={org.id} scanId={u.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </ListTable>
@@ -200,4 +223,12 @@ function Uploads() {
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
     </div>
   );
+}
+
+/** A past upload's full report: counts, problems, warnings, and the rows
+ * skipped or found to be duplicates. */
+function UploadReport({ orgId, scanId }: { orgId: string; scanId: string }) {
+  const { data: scan, error, loading } = useApi<Scan>(`/orgs/${orgId}/scans/${scanId}`);
+  if (!scan) return <StatusMessage loading={loading} error={error} />;
+  return <ImportReportPanel result={scanResult(scan)} />;
 }

@@ -43,8 +43,8 @@ type ImportsContextValue = {
    * the request runs (small jobs run during it), then "done" for a short
    * while if it finished then, until the lists have reloaded. */
   requested: Record<string, "starting" | "done">;
-  /** True while something waits for the background worker and the worker
-   * hasn't checked in lately (it isn't running). */
+  /** True while something waits for (or is run by) the background worker
+   * and the worker hasn't checked in lately (it isn't running). */
   workerDown: boolean;
 };
 
@@ -165,7 +165,10 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
   const onJobsFinished = useCallback((count: number) => setFinishedCount((c) => c + count), []);
   const { jobs, startJob, startBulk, dismissJob, requested } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
 
-  const waiting = scans.some((s) => s.status === "pending") || jobs.some((j) => j.status === "pending");
+  // Waiting for the worker, or being run by it (a job it was running when it
+  // stopped stays "running" until it's back).
+  const needsWorker = (item: Scan | ArchiveJob) => item.status === "pending" || runByWorker(item);
+  const waiting = scans.some(needsWorker) || jobs.some(needsWorker);
   const workerDown = useWorkerDown(waiting, WORKER_CHECK_MS);
 
   const value = useMemo(
@@ -334,8 +337,10 @@ export function jobTitle(job: ArchiveJob): string {
 }
 
 /** Where a running job is, e.g. "Findings: 120,000 / 500,000 (24%)". */
-export function jobProgressText(job: ArchiveJob): string {
+export function jobProgressText(job: ArchiveJob, workerDown = false): string {
+  if (workerDown && job.status === "pending") return `${STOPPED} This starts when it's back.`;
   if (job.status === "pending") return WAITING;
+  if (workerDown && runByWorker(job)) return `${STOPPED} This carries on where it left off when it's back.`;
   const phase = job.progress?.phase ?? "";
   const label = JOB_PHASES[phase] ?? "Working";
   return counted(label, job.progress?.rows_done, job.progress?.rows_total) ?? `${label}…`;
@@ -395,11 +400,28 @@ function rememberOrigin(scanId: string, page: ImportPage) {
 
 // A large import or archive job not yet taken by the background worker.
 const WAITING = "Waiting for the background worker…";
+// The worker isn't checking in: what waits for it, or what it was running,
+// goes on when it's back (an import from the start: imports are all-or-nothing).
+const STOPPED = "Interrupted: the background worker stopped.";
 
-/** Where a running import is, e.g. "Writing rows: 120,000 / 500,000 (24%)". */
-export function progressText(scan: Scan): string {
+/** Waiting for the background worker, or cut off by it, while it's down:
+ * shown as a warning (the user should know). */
+export function isInterrupted(item: Scan | ArchiveJob, workerDown: boolean): boolean {
+  return workerDown && (item.status === "pending" || runByWorker(item));
+}
+
+/** Whether the background worker runs it (not the request that started it). */
+export function runByWorker(item: Scan | ArchiveJob): boolean {
+  return item.status === "running" && item.heartbeat_at != null;
+}
+
+/** Where a running import is, e.g. "Writing rows: 120,000 / 500,000 (24%)";
+ * `workerDown`: the background worker isn't checking in. */
+export function progressText(scan: Scan, workerDown = false): string {
   const progress = scan.progress;
+  if (workerDown && scan.status === "pending") return `${STOPPED} This upload starts when it's back.`;
   if (scan.status === "pending") return WAITING;
+  if (workerDown && runByWorker(scan)) return `${STOPPED} This upload starts again from the beginning when it's back.`;
   switch (progress?.phase) {
     case "waiting":
       return "Waiting for another upload into this organization to finish processing…";

@@ -279,6 +279,52 @@ def test_auto_purge_after_the_orgs_retention(client, admin, db_session):
     assert event["actor_label"] == "System" and event["actor_id"] is None
 
 
+def test_the_workers_auto_purge_waits_behind_everything_else(client, admin, monkeypatch, db_session):
+    """The worker's daily run only queues expired purges (by System); they go
+    after uploads and jobs people started, even ones that came later."""
+    from app.services import ingestion_background
+    from app.worker.runner import claim_next
+
+    _, findings, other = _setup(client, admin)
+    _post(client, admin, f"/scans/{findings}/archive")
+    assert archive_service.purge_expired(db_session, datetime.now(timezone.utc) + timedelta(days=200), queue=True) == 1
+    [queued] = db_session.scalars(select(ArchiveJob).where(ArchiveJob.action == ArchiveAction.purge)).all()
+    assert (queued.status, queued.started_by) == (ScanStatus.pending, None)
+
+    monkeypatch.setattr(settings, "ARCHIVE_SYNC_MAX_ROWS", 0)
+    resp = _post(client, admin, f"/scans/{other}/archive")  # someone's, later
+    assert resp.status_code == 202
+    someones = uuid.UUID(resp.json()["id"])
+    monkeypatch.setattr(settings, "IMPORT_SYNC_MAX_BYTES", 10)
+    upload_id = uuid.UUID(
+        upload(client, _url(admin, "/assets/import"), admin[0], "late.csv", b"type,hostname\nserver,late-01\n").json()["scan_id"]
+    )
+
+    with ingestion_background.open_session() as db:
+        first, second, third = claim_next(db), claim_next(db), claim_next(db)
+    # Oldest first among those, then System's purge (the oldest of all).
+    assert [first, second, third] == [("archive", someones), ("import", upload_id), ("archive", queued.id)]
+
+
+def test_an_auto_purge_that_waited_long_enough_takes_its_turn(client, admin, monkeypatch, db_session):
+    """Past AUTO_PURGE_MAX_WAIT_MINUTES a busy queue can't put it off any
+    longer: it goes by age like any other job."""
+    from app.services import ingestion_background
+    from app.worker.runner import claim_next
+
+    _, findings, _ = _setup(client, admin)
+    _post(client, admin, f"/scans/{findings}/archive")
+    assert archive_service.purge_expired(db_session, datetime.now(timezone.utc) + timedelta(days=200), queue=True) == 1
+    [queued] = db_session.scalars(select(ArchiveJob).where(ArchiveJob.action == ArchiveAction.purge)).all()
+    queued.started_at -= timedelta(minutes=61)  # queued an hour ago
+    db_session.commit()
+    monkeypatch.setattr(settings, "IMPORT_SYNC_MAX_BYTES", 10)
+    upload(client, _url(admin, "/assets/import"), admin[0], "late.csv", b"type,hostname\nserver,late-01\n")
+
+    with ingestion_background.open_session() as db:
+        assert claim_next(db) == ("archive", queued.id)
+
+
 def test_large_jobs_run_in_the_background_a_chunk_at_a_time(client, admin, monkeypatch):
     _, findings, _ = _setup(client, admin)
     monkeypatch.setattr(settings, "ARCHIVE_SYNC_MAX_ROWS", 0)

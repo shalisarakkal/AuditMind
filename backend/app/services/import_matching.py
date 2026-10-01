@@ -195,11 +195,18 @@ def finding_key(
     return (asset_id, source, category, description if category is None else None)
 
 
-class FindingIndex:
-    """Duplicate keys (see finding_key) of the findings on some assets."""
+# Where a finding already recorded came from: the upload (scan id), None for
+# one added by hand, or the row of the file being imported.
+Origin = uuid.UUID | int | None
 
-    def __init__(self, keys: Iterable[tuple] = ()):
-        self._keys = set(keys)
+
+class FindingIndex:
+    """Duplicate keys (see finding_key) of the findings on some assets, each
+    with where its finding came from (so a duplicate can say what it
+    duplicates)."""
+
+    def __init__(self, keys: Iterable[tuple] | dict[tuple, Origin] = ()):
+        self._origins: dict[tuple, Origin] = keys if isinstance(keys, dict) else dict.fromkeys(keys)
 
     @classmethod
     def load(cls, db: Session, org_id: uuid.UUID, asset_ids: Iterable[uuid.UUID]) -> "FindingIndex":
@@ -207,20 +214,30 @@ class FindingIndex:
         its own asset, and a new asset has none yet."""
         # Descriptions only matter for uncategorised findings.
         description = case((Finding.category.is_(None), Finding.description))
-        query = select(Finding.asset_id, Finding.source, Finding.category, description).where(
+        query = select(Finding.asset_id, Finding.source, Finding.category, description, Finding.scan_id).where(
             Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.source.is_not(None)
         )
+        # One object per upload, not one per row: millions of findings share
+        # a few uploads.
+        uploads: dict[uuid.UUID, uuid.UUID] = {}
+
+        def entry(row) -> tuple[tuple, Origin]:
+            scan_id = row[4]
+            return finding_key(*row[:4]), scan_id and uploads.setdefault(scan_id, scan_id)
+
         asset_ids = list(asset_ids)
         if len(asset_ids) > TARGETED_LOAD_MAX:  # the whole org: one pass
-            rows = db.execute(query.where(Finding.asset_id.is_not(None)))
-            return cls(finding_key(*row) for row in rows)
-        keys = []
+            return cls(dict(entry(row) for row in db.execute(query.where(Finding.asset_id.is_not(None)))))
+        origins: dict[tuple, Origin] = {}
         for chunk in _chunks(asset_ids):
-            keys += (finding_key(*row) for row in db.execute(query.where(Finding.asset_id.in_(chunk))))
-        return cls(keys)
+            origins.update(entry(row) for row in db.execute(query.where(Finding.asset_id.in_(chunk))))
+        return cls(origins)
 
     def __contains__(self, key: tuple) -> bool:
-        return key in self._keys
+        return key in self._origins
 
-    def add(self, key: tuple) -> None:
-        self._keys.add(key)
+    def origin(self, key: tuple) -> Origin:
+        return self._origins.get(key)
+
+    def add(self, key: tuple, origin: Origin = None) -> None:
+        self._origins[key] = origin

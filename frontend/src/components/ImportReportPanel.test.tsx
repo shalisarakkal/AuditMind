@@ -98,4 +98,32 @@ describe("ImportReportPanel", () => {
     expect(panel).toHaveTextContent("Warnings 1500");
     expect(panel).toHaveTextContent("Showing the first 1 of 1500 warnings.");
   });
+
+  it("lists the rows skipped and the duplicates, with why, folded away", () => {
+    const withNotes = {
+      ...report,
+      errors: [],
+      failed: 0,
+      skipped: 487,
+      skipped_rows: [{ row: 3, item: "web-01: Nessus 19506 Scan Information", message: "Info severity: skipped, as Settings say" }],
+      duplicate_rows: [
+        { row: 7, item: "web-01: CVE-1", message: "Same as a finding from scan_0915.nessus" },
+        { row: 9, item: "db-01: MFA", message: "Same as row 4 of this file" },
+      ],
+    };
+    render(<ImportReportPanel result={{ status: "completed", report: withNotes, filename: "s.nessus", scanType: "nessus" }} />);
+
+    expect(screen.getByText("Skipped — 487 (the first 1 listed)")).toBeInTheDocument();
+    expect(screen.getByText("Duplicates — 2")).toBeInTheDocument();
+    const duplicates = within(screen.getByRole("region", { name: "Duplicates", hidden: true })).getAllByRole("row", { hidden: true });
+    expect(duplicates.slice(1).map((r) => r.textContent)).toEqual([
+      "7web-01: CVE-1Same as a finding from scan_0915.nessus",
+      "9db-01: MFASame as row 4 of this file",
+    ]);
+  });
+
+  it("shows no lists for an upload from before they were kept", () => {
+    render(<ImportReportPanel result={{ status: "completed", report: { ...report, skipped: 5 }, filename: "old.csv" }} />);
+    expect(screen.queryByText(/^Skipped —/)).not.toBeInTheDocument();
+  });
 });

@@ -23,6 +23,16 @@ class RowWarning(BaseModel):
     message: str
 
 
+class RowNote(BaseModel):
+    """A row left out on purpose (skipped, or a duplicate): what it was, and
+    why, e.g. item "web-01: Nessus 19506 (443/tcp)", message "Same as a
+    finding from scan_0915.nessus"."""
+
+    row: int
+    item: str
+    message: str
+
+
 class ImportReport(BaseModel):
     """For files that create assets and findings together (profile imports),
     created/updated/skipped count assets, and findings_created/duplicates
@@ -42,6 +52,10 @@ class ImportReport(BaseModel):
     warnings: list[RowWarning] = []
     # All warnings, when there are more than the report lists.
     warnings_total: int = 0
+    # The first of the rows counted in `skipped` and `duplicates`, with why
+    # (the counts are the totals). Uploads before 2026-09-30 have none.
+    skipped_rows: list[RowNote] = []
+    duplicate_rows: list[RowNote] = []
 
 
 class ImportResponse(BaseModel):

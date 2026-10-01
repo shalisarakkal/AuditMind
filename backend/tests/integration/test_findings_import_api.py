@@ -22,6 +22,10 @@ def _upload(client, admin, filename, content=None):
     return upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, filename, content)
 
 
+def _url(admin, path):
+    return f"/api/v1/orgs/{admin[1]}{path}"
+
+
 def _findings(db_session):
     return db_session.query(Finding).order_by(Finding.created_at).all()
 
@@ -69,6 +73,11 @@ def test_reuploading_the_same_findings_counts_duplicates(client, admin, db_sessi
     assert (csv_again["report"]["created"], csv_again["report"]["duplicates"]) == (0, 4)
     assert (json_again["report"]["created"], json_again["report"]["duplicates"]) == (0, 3)
     assert len(_findings(db_session)) == 7
+    # Each duplicate is listed with the upload whose finding it repeats.
+    listed = csv_again["report"]["duplicate_rows"]
+    assert len(listed) == 4
+    assert {n["message"] for n in listed} == {"Same as a finding from findings_generic.csv"}
+    assert listed[0]["row"] == 2 and listed[0]["item"].startswith("web-01.acme.io: ")
 
 
 def test_uncategorised_findings_dedup_on_description(client, admin, db_session):
@@ -80,6 +89,7 @@ def test_uncategorised_findings_dedup_on_description(client, admin, db_session):
     )
     report = _upload(client, admin, "f.csv", content).json()["report"]
     assert (report["created"], report["duplicates"]) == (2, 1)
+    assert report["duplicate_rows"] == [{"row": 4, "item": "mail: No runbook", "message": "Same as row 2 of this file"}]
 
 
 def test_findings_attach_to_inventory_assets(client, admin, db_session):
@@ -130,6 +140,22 @@ def test_nessus_reupload_is_all_duplicates(client, admin, db_session):
     report = _upload(client, admin, "sample.nessus").json()["report"]
     assert (report["created"], report["duplicates"], report["skipped"]) == (0, 6, 2)
     assert len(_findings(db_session)) == 6
+    assert len(report["duplicate_rows"]) == 6
+    skipped = report["skipped_rows"]
+    assert len(skipped) == 2 and " Nessus " in skipped[0]["item"]
+    assert skipped[0]["message"] == "Info severity: skipped, as Settings say (Nessus Info items: Skip them)"
+
+
+def test_duplicates_of_a_finding_added_by_hand_say_so(client, admin):
+    asset = client.post(_url(admin, "/assets"), headers=admin[0], json={"type": "server", "hostname": "mail"}).json()
+    client.post(
+        _url(admin, "/findings"),
+        headers=admin[0],
+        json={"asset_id": asset["id"], "domain": "incident_response", "severity": "low", "category": "IR-1", "source": "audit"},
+    )
+    content = b"hostname,domain,severity,category,source\nmail,incident_response,low,IR-1,audit\n"
+    report = _upload(client, admin, "f.csv", content).json()["report"]
+    assert report["duplicate_rows"] == [{"row": 2, "item": "mail: IR-1", "message": "Same as a finding added by hand"}]
 
 
 @pytest.mark.parametrize("fixture", ["malicious_xxe.nessus", "billion_laughs.nessus"])
