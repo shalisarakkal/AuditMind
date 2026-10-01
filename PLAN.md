@@ -557,7 +557,7 @@ Review (3 reviewers, every finding reproduced; 2026-09-29):
 - 474 backend + 135 frontend tests pass
 - [x] Your sign-off (2026-09-29): committed as e748b25, CI green (CI #7)
 
-### Part 3 — Background worker (after Part 2 sign-off, before Phase 2e)
+### Part 3 — Background worker (signed off 2026-09-30)
 
 Brought forward from Phase 4 (2026-09-29). With the database on the SSD,
 imports run ~15x faster (~1,500 findings/s, was ~100), and the web server
@@ -725,7 +725,12 @@ After the review (requested 2026-09-30):
   instant, 0.63 s if forced to byte order); the test's names now sort the
   same either way (6d487f1). Dev and production can differ only in how
   punctuation sorts
-- CI #9 green on 6d487f1 (2026-09-30); all items done, awaiting sign-off
+- CI #9 green on 6d487f1 (2026-09-30)
+- **Signed off 2026-09-30** after your verification (guide steps 1-6; step
+  4: active_directory500K.csv cut off while writing, restarted from its
+  saved file and completed, 10,800 created / 489,200 updated). Fixes from
+  verification in baad36e; pushed with e5aab0a (CI #10, result to confirm
+  on GitHub). Next: Part 4 (review fixes), then Phase 2e
 - 509 backend + 144 frontend tests pass; lint, typecheck and build pass
 - [x] Only jobs that are really dead are marked failed at startup (review of
       Part 2, finding 4): today every starting process fails every running
