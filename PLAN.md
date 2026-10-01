@@ -874,7 +874,12 @@ one goes:
 - **Signed off 2026-10-01** after your verification (guide Part 4 steps
   1-5). Next: Phase 2e (users and organizations)
 
-## Phase 2e — Users and organizations (after Phase 2d, before Phase 2f)
+## Phase 2e — Users and organizations (signed off 2026-10-01, not fully verified)
+
+Signed off by the user on 2026-10-01 without completing the verification
+guide's Phase 2e checks; parts were checked while verifying (the security
+settings form, Activity, lockout and reset, adding people). Anything found
+later is fixed as it comes up. Commits: c9a4239, bad7799, eaedd46, 232c28a.
 
 Requested 2026-09-28: a platform Sysadmin creates organizations and their
 admins; each org's admins create its users. Decisions (all as recommended,
@@ -971,7 +976,7 @@ platform defaults, then each org's changes. Part 3 adds the screens.
 - A per-IP limit on sign-in attempts (20 a minute) is a fixed server
   setting, not per org
 
-### Part 1: sessions and accounts (built 2026-10-01, awaiting verification)
+### Part 1: sessions and accounts (built 2026-10-01, signed off unverified)
 
 - [x] Sessions stored and checked on every request (`user_sessions`): sign-out,
       idle and longest sign-in end them at once; the access token (15 min)
@@ -1012,7 +1017,7 @@ platform defaults, then each org's changes. Part 3 adds the screens.
   on refresh); the sign-up page says "Email already registered" (public
   sign-up goes in Part 3)
 
-### Part 2: people (built 2026-10-01, awaiting verification)
+### Part 2: people (built 2026-10-01, signed off unverified)
 
 - [x] People page (sidebar), a list page like the others: name, email,
       role, status (Active, Locked, Must change password, Deactivated),
@@ -1052,7 +1057,7 @@ platform defaults, then each org's changes. Part 3 adds the screens.
 - No schema change (no migration). GET /orgs/{id}/users became
   GET /orgs/{id}/members (paged)
 
-### Part 3: Sysadmin, organizations, security settings screens (built 2026-10-01, awaiting verification)
+### Part 3: Sysadmin, organizations, security settings screens (built 2026-10-01, signed off unverified)
 
 - [x] The Sysadmin: an account of its own, in no org, created only on the
       server (`scripts/create_sysadmin.py --email … --name …`, a temporary
