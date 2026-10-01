@@ -812,6 +812,9 @@ one goes:
       502/503, not a 500
 - [ ] 8: `GET /scans` without `active`/`tracked` (the app doesn't use it)
       removed, or paged like the other lists
+- [ ] README's Status still says "Week 1 foundation" (CoPilotSuggestions,
+      2026-09-30): bring it up to date (Phases 1-2d done, what's next), with
+      a pointer to PLAN.md for the detail
 - [ ] Retry a failed upload without uploading it again (from Part 3
       verification, 2026-09-30: an upload cut off twice failed and its
       saved file was deleted, so the only way on was to upload it again).
@@ -860,6 +863,10 @@ plus self-service password change):
       `SameSite` cookie to renew it (with CSRF protection), so injected
       script can't read it; signing out, a password change or a reset ends
       the user's other sessions. Plus security headers (CSP)
+- [ ] From CoPilotSuggestions (2026-09-30): an org can never lose its last
+      admin (removing, demoting or deactivating them is refused); a role
+      change, removal or deactivation also ends that user's sessions; tests
+      that each admin action stays inside its own org
 
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 
@@ -907,7 +914,13 @@ cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
   and at what thresholds; what a finding attaches to, since these records
   name a subscription/resource group/resource type but no resource ID (the
   subscription or resource group as an asset? the caller?); the time window
-  (a whole export, or only recent events); whether to keep the raw events
+  (a whole export, or only recent events); whether to keep the raw events;
+  what counts as the same activity when grouping (the key repeated events
+  are grouped on)
+- From CoPilotSuggestions (2026-09-30), for the chunked reading above: a
+  test that a file bigger than the worker's memory imports with flat
+  memory; limits for malformed or deeply nested JSON and for compressed
+  files
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
@@ -928,6 +941,22 @@ generation endpoint.
 - [ ] Report generation is a real job (findings 3 and 8): queued for the
       worker like imports, with status, failure details and retries;
       `GET /reports` paged, newest first, full report only by ID
+- Scope in detail (from CoPilotSuggestions, 2026-09-30; to settle at the
+  start of the phase):
+  - [ ] Standards documents (CIS, NIST, ISO, and the org's own) loaded as a
+        worker job: chunked, embedded, with source and version, each org
+        seeing only its own documents plus the shared standards
+  - [ ] Retrieval with citations that reach the API response and the report
+  - [ ] Claude answers in a fixed structure, checked (Pydantic) before use
+  - [ ] AI scoring never replaces the rule-based score: both are kept,
+        with the evidence, model, prompt version and period they came from
+  - [ ] Remediation recommendations: priority, affected assets/findings,
+        why, confidence
+  - [ ] A finished report is a snapshot that doesn't change afterwards;
+        HTML and PDF download for org members only; kept per a retention
+        setting
+  - [ ] A report can be cancelled while it runs; asking twice doesn't
+        create two
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
@@ -999,6 +1028,48 @@ export, security hardening (rate limiting, audit logging, secrets handling).
     grow
   - A dedicated queue service (Azure Service Bus, SQS) only if the
     database queue can't keep up
+- [ ] Remediation workflow (CoPilotSuggestions, 2026-09-30; needed by
+      Phase 3's remediation and reports): a finding's status (open,
+      accepted risk, mitigated, resolved, false positive), assignee, due
+      date, notes and history; changing several at once; a re-import never
+      undoes someone's decision on a finding; scores and reports take status
+      into account. Ticketing integrations (Jira, ServiceNow) later
+- [ ] Production operations (CoPilotSuggestions, 2026-09-30), with the
+      hosting choice: infrastructure as code; separate dev, staging and
+      production; automated backups with point-in-time recovery and a
+      restore actually tested; runbooks for migrations and rolling back a
+      release (including the known `alembic` drift and the pgvector
+      downgrade limit noted in Phase 2a)
+- [ ] Security hardening, the rest of it (CoPilotSuggestions): secrets in
+      the cloud's secret manager, with a rotation procedure; rate limits on
+      sign-in, uploads and Claude calls; upload checks (content type, a
+      malware-scanning policy); CORS reviewed for the production domain
+- [ ] Observability (CoPilotSuggestions): structured logs with request,
+      job, org and user IDs to follow one action through web and worker;
+      error tracking and alerts (worker not checking in, jobs failing
+      repeatedly, database or storage nearly full, Claude outages);
+      credentials, tokens and personal data never written to logs
+- [ ] Automated checks (CoPilotSuggestions): a Playwright browser suite in
+      CI for what's checked by hand today (sign-in, org switching, roles,
+      uploads, worker recovery, archive/restore/purge, Activity, isolation
+      between orgs); CI scans for vulnerable dependencies (pip-audit,
+      npm audit), committed secrets and common code flaws (SAST); a
+      separate, opt-in performance suite with million-row files
+
+## Phase 5 — Live connectors (not yet scheduled)
+
+From CoPilotSuggestions (2026-09-30): only file uploads exist today;
+CONNECTORS_SPEC.md describes identity, cloud, scanner, SIEM and backup
+connectors, and `POST /assets/discover` is a placeholder (501 from Part 4).
+Start with one per category, read-only, on a common pattern:
+
+- [ ] The pattern: test connection, sync now, schedule, scope, cancel;
+      credentials encrypted at rest and never returned by the API; health
+      (last successful sync, duration, row counts, why it failed); retries
+      and rate-limit handling; every configuration change and sync in
+      Activity. Syncs run on the worker like uploads
+- [ ] Suggested order: one cloud provider, one identity provider, the Nessus
+      API, then SIEM and backup
 
 ## Test policy
 
