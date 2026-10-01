@@ -47,6 +47,7 @@ SESSION_ENDED = {
     "role_changed": "An administrator changed your role. Please sign in again.",
     "removed": "An administrator removed you from an organization. Please sign in again.",
     "password_reset": "An administrator reset your password. Sign in with the temporary password they give you.",
+    "signed_out_elsewhere": "You were signed out from another browser. Please sign in again.",
 }
 
 

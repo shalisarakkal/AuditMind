@@ -444,3 +444,15 @@ export type PlatformUser = {
   temp_password_expires_at: string | null;
   orgs: { org_id: string; name: string; role: UserRole }[];
 };
+
+/** One of the user's open sign-ins (GET /auth/sessions). */
+export type SignInSession = {
+  id: string;
+  signed_in_at: string;
+  last_active_at: string;
+  ip: string | null;
+  /** "Chrome on Windows". */
+  browser: string | null;
+  /** This browser. */
+  current: boolean;
+};

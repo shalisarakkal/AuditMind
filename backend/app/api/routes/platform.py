@@ -421,7 +421,11 @@ def update_security(
 
 def invalid_settings(error: Exception) -> HTTPException:
     if isinstance(error, ValidationError):
-        message = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'settings'}: {e['msg']}" for e in error.errors())
+        # "lockout_threshold: must be 0 (never lock) or 3 to 6" (not pydantic's "Value error, ...").
+        message = "; ".join(
+            f"{'.'.join(map(str, e['loc'])) or 'settings'}: {e['msg'].removeprefix('Value error, ')}"
+            for e in error.errors()
+        )
     else:
         message = str(error)
     return HTTPException(status_code=422, detail={"code": "invalid_settings", "message": message})

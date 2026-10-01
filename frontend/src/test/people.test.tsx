@@ -217,10 +217,11 @@ describe("Your account", () => {
       {
         "GET /auth/me": () => ME,
         "PATCH /auth/me": () => ({ ...ME, name: "Ann Lee" }),
+        "GET /auth/sessions": () => [],
       },
     );
     expect(await screen.findByText("ann@acme.io", { selector: "p" })).toBeInTheDocument();
-    const orgs = screen.getByRole("table");
+    const orgs = screen.getAllByRole("table")[0];
     expect(within(orgs).getByText("Acme Corp")).toBeInTheDocument();
     expect(within(orgs).getByText("Auditor")).toBeInTheDocument();
 
@@ -235,6 +236,40 @@ describe("Your account", () => {
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/auth/me?v=1"))).toBe(true),
     );
+  });
+});
+
+describe("Where you're signed in", () => {
+  const session = (overrides = {}) => ({
+    id: "s1",
+    signed_in_at: "2026-10-01T09:00:00Z",
+    last_active_at: "2026-10-01T09:30:00Z",
+    ip: "127.0.0.1",
+    browser: "Chrome on Windows",
+    current: true,
+    ...overrides,
+  });
+
+  it("lists each sign-in and signs out the others", async () => {
+    let sessions = [session(), session({ id: "s2", ip: "203.0.113.9", browser: "Safari on iOS", current: false })];
+    const { fetchMock } = await renderSignedIn(<AccountPage />, "viewer", {
+      "GET /auth/me": () => ME,
+      "GET /auth/sessions": () => sessions,
+      "DELETE /auth/sessions/s2": () => {
+        sessions = [session()];
+        return new Response(null, { status: 204 });
+      },
+    });
+    const row = (await screen.findByText("Safari on iOS")).closest("tr")!;
+    expect(within(row).getByText("203.0.113.9")).toBeInTheDocument();
+    const mine = screen.getByText("Chrome on Windows").closest("tr")!;
+    expect(within(mine).getByText("This browser")).toBeInTheDocument();
+    expect(within(mine).queryByRole("button")).not.toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(screen.queryByText("Safari on iOS")).not.toBeInTheDocument());
+    expect(callsTo(fetchMock, "DELETE /auth/sessions/s2")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Sign out everywhere else" })).not.toBeInTheDocument();
   });
 });
 
@@ -261,5 +296,11 @@ describe("People events in Activity", () => {
       "as viewer, new account",
     );
     expect(eventSummary(event({ type: "member_removed", details: { role: "auditor" } }))).toBe("was auditor");
+    expect(eventSummary(event({ type: "login_failed", details: { ip: "203.0.113.9", browser: "Chrome on Windows" } }))).toBe(
+      "from 203.0.113.9, Chrome on Windows",
+    );
+    expect(eventSummary(event({ type: "logout", details: { other_sign_ins: 2, from_elsewhere: true } }))).toBe(
+      "2 other sign-ins, from another browser",
+    );
   });
 });

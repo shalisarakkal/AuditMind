@@ -112,6 +112,15 @@ export function eventSummary(event: ActivityEvent): string {
     if (typeof details.org === "string") parts.push(`in ${details.org}`);
   }
   if (event.type === "org_created" && typeof details.admin === "string") parts.push(`admin ${details.admin}`);
+  // Where a sign-in came from (backend services/client_info.py).
+  if (["login", "login_failed", "account_locked", "logout"].includes(event.type)) {
+    if (typeof details.other_sign_ins === "number") {
+      parts.push(`${details.other_sign_ins} other sign-in${details.other_sign_ins === 1 ? "" : "s"}, from another browser`);
+    } else {
+      const where = [details.ip, details.browser].filter((part) => typeof part === "string").join(", ");
+      if (where) parts.push(`${details.from_elsewhere ? "signed out from another browser: " : "from "}${where}`);
+    }
+  }
   if (event.type === "repeat_upload" && details.previously_by) parts.push(`first uploaded by ${details.previously_by}`);
   if (event.type === "profile_updated" && Array.isArray(details.changed)) parts.push(`changed: ${details.changed.join(", ")}`);
   return parts.join(", ");

@@ -1096,6 +1096,18 @@ platform defaults, then each org's changes. Part 3 adds the screens.
       enumeration answered by closing sign-up
 - After upgrading: run `alembic upgrade head` (0016) and restart the
   background worker (it purges orgs)
+- Found while verifying (2026-10-01), done: the security settings form
+  checks each value as it's typed (red border and the range; Save
+  disabled until fixed); an org's Activity shows the worker's events only
+  since the org was created
+- Asked while verifying (2026-10-01), done: where sign-ins come from.
+  Signed in, Failed sign-in, Account locked and Signed out events carry
+  the address and browser ("Chrome on Windows", services/client_info.py);
+  Your account lists where you're signed in (browser, address, signed in,
+  last active) with Sign out for each other one and Sign out everywhere
+  else (GET /auth/sessions, DELETE /auth/sessions/{id}, POST
+  /auth/sessions/end-others). Locally every address is 127.0.0.1 (the
+  frontend forwards /api); behind the production proxy it's the visitor's
 
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 

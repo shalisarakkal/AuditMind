@@ -350,3 +350,20 @@ def test_refresh_renews_the_cookies_expiry(client, db_session, acme):
     resp = client.post(f"{AUTH}/refresh", headers={"X-Requested-With": "AuditMind"})
     assert resp.status_code == 200
     assert "auditmind_session=" in resp.headers["set-cookie"] and "Max-Age" in resp.headers["set-cookie"]
+
+
+def test_an_orgs_activity_shows_the_workers_events_only_since_the_org_was_created(client, db_session, acme):
+    from datetime import timedelta
+
+    from app.services.events import record_event
+
+    org_id, ann = acme
+    org = db_session.get(Organization, org_id)
+    before = record_event(db_session, "worker_started", org_id=None)
+    before.started_at = org.created_at - timedelta(days=1)
+    record_event(db_session, "worker_stopped", org_id=None)
+    db_session.commit()
+    types = [e["type"] for e in client.get(f"/api/v1/orgs/{org_id}/events", headers=ann).json()["items"]]
+    assert "worker_stopped" in types and "worker_started" not in types
+    facets = client.get(f"/api/v1/orgs/{org_id}/events/facets", headers=ann).json()
+    assert "worker_started" not in facets["type"]

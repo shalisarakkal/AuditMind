@@ -10,7 +10,7 @@ import { api } from "@/lib/apiClient";
 import { formatDateTime } from "@/lib/domain";
 import { CHANGE_PASSWORD_PATH } from "@/lib/paths";
 import { ROLE_LABELS } from "@/lib/people";
-import type { Me } from "@/lib/types";
+import type { Me, SignInSession } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 const INPUT =
@@ -60,6 +60,8 @@ export default function AccountPage() {
               </ListTable>
             )}
           </section>
+
+          <SignIns />
 
           <section className="space-y-1">
             <h2 className="text-lg font-medium text-white">Password</h2>
@@ -126,5 +128,93 @@ function NameForm({ me, onSaved }: { me: Me; onSaved(): void }) {
       </div>
       {error && <p className="text-sm text-red-300">{error}</p>}
     </form>
+  );
+}
+
+/** Each browser or device signed in to this account, with Sign out for the
+ * ones that aren't this one. */
+function SignIns() {
+  const { data, error, loading, reload } = useApi<SignInSession[]>("/auth/sessions");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function end(path: string, key: string, method: "delete" | "post") {
+    setBusy(key);
+    setActionError(null);
+    try {
+      await (method === "delete" ? api.delete(path) : api.post(path));
+      reload();
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const others = (data ?? []).filter((s) => !s.current).length;
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-medium text-white">Where you&apos;re signed in</h2>
+          <p className="text-xs text-white/50">Sign out anywhere you don&apos;t recognize, then change your password.</p>
+        </div>
+        {others > 0 && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void end("/auth/sessions/end-others", "others", "post")}
+            className="text-sm text-red-300 hover:underline disabled:opacity-50"
+          >
+            Sign out everywhere else
+          </button>
+        )}
+      </div>
+      <StatusMessage loading={loading && !data} error={error} />
+      {data && (
+        <ListTable>
+          <thead className={THEAD}>
+            <tr>
+              <th className={TH}>Browser</th>
+              <th className={TH}>Address</th>
+              <th className={TH}>Signed in</th>
+              <th className={TH}>Last active</th>
+              <th className={TH}>
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((session) => (
+              <tr key={session.id} className={ROW}>
+                <td className={`${TD} text-white`}>{session.browser ?? "Unknown"}</td>
+                <td className={TD}>{session.ip ?? "—"}</td>
+                <td className={`${TD} whitespace-nowrap text-xs text-white/60`}>{formatDateTime(session.signed_in_at)}</td>
+                <td className={`${TD} whitespace-nowrap text-xs text-white/60`}>{formatDateTime(session.last_active_at)}</td>
+                <td className={`${TD} text-right`}>
+                  {session.current ? (
+                    <span className="text-xs text-emerald-300">This browser</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void end(`/auth/sessions/${session.id}`, session.id, "delete")}
+                      className="text-xs text-red-300 hover:underline disabled:opacity-50"
+                    >
+                      {busy === session.id ? "Signing out…" : "Sign out"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </ListTable>
+      )}
+      {actionError && (
+        <p role="alert" className="text-sm text-red-300">
+          {actionError}
+        </p>
+      )}
+    </section>
   );
 }

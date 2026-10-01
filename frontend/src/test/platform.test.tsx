@@ -270,6 +270,34 @@ describe("Security settings", () => {
     });
   });
 
+  it("marks a value out of range as it's typed, and won't save until it's fixed", async () => {
+    setToken("tok");
+    mockApi({
+      "GET /orgs": () => [org()],
+      "GET /platform/security": () => ({ values: BUILT_IN, changed: [], below: BUILT_IN }),
+    });
+    render(
+      <AppProvider>
+        <SecuritySettingsForm path="/platform/security" editable belowName="built-in" />
+      </AppProvider>,
+    );
+    const threshold = await screen.findByLabelText("Failed sign-ins before locking");
+    const save = screen.getByRole("button", { name: "Save" });
+
+    fireEvent.change(threshold, { target: { value: "1" } });
+    expect(threshold).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Must be 3 to 6, or 0: never locks")).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    fireEvent.change(threshold, { target: { value: "" } });
+    expect(screen.getByText("Enter a whole number")).toBeInTheDocument();
+
+    fireEvent.change(threshold, { target: { value: "0" } }); // never locks: allowed
+    expect(threshold).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText(/Must be/)).not.toBeInTheDocument();
+    expect(save).toBeEnabled();
+  });
+
   it("is read-only for those who can't change it", async () => {
     setToken("tok");
     mockApi({

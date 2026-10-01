@@ -15,6 +15,8 @@ type Field = {
   kind: "number" | "rule" | "flag";
   min?: number;
   max?: number;
+  /** 0 is allowed too, below `min` (never locks, until unlocked, never expires). */
+  zero?: boolean;
   /** Only the Complex rule uses it. */
   complex?: boolean;
 };
@@ -24,9 +26,9 @@ type Field = {
 const FIELDS: Field[] = [
   { key: "idle_minutes", label: "Signed out after idle (minutes)", range: "10 to 600", kind: "number", min: 10, max: 600 },
   { key: "max_session_days", label: "Longest sign-in (days)", range: "2 to 10", kind: "number", min: 2, max: 10 },
-  { key: "lockout_threshold", label: "Failed sign-ins before locking", range: "3 to 6, or 0: never locks", kind: "number", min: 0, max: 6 },
+  { key: "lockout_threshold", label: "Failed sign-ins before locking", range: "3 to 6, or 0: never locks", kind: "number", min: 3, max: 6, zero: true },
   { key: "lockout_window_minutes", label: "Counted over (minutes)", range: "10 to 20", kind: "number", min: 10, max: 20 },
-  { key: "lock_minutes", label: "Lock lasts (minutes)", range: "10 to 20, or 0: until an admin unlocks", kind: "number", min: 0, max: 20 },
+  { key: "lock_minutes", label: "Lock lasts (minutes)", range: "10 to 20, or 0: until an admin unlocks", kind: "number", min: 10, max: 20, zero: true },
   { key: "password_rule", label: "Password rule", kind: "rule" },
   { key: "min_length", label: "Minimum length", range: "12 to 64", kind: "number", min: 12, max: 64, complex: true },
   { key: "require_upper", label: "An upper-case letter", kind: "flag", complex: true },
@@ -34,11 +36,21 @@ const FIELDS: Field[] = [
   { key: "require_digit", label: "A digit", kind: "flag", complex: true },
   { key: "require_symbol", label: "A symbol", kind: "flag", complex: true },
   { key: "history_count", label: "Not one of the last … passwords", range: "0 to 24", kind: "number", min: 0, max: 24, complex: true },
-  { key: "expiry_days", label: "Must be changed every (days)", range: "30 to 365, or 0: never", kind: "number", min: 0, max: 365, complex: true },
+  { key: "expiry_days", label: "Must be changed every (days)", range: "30 to 365, or 0: never", kind: "number", min: 30, max: 365, zero: true, complex: true },
 ];
 
 const INPUT =
   "w-24 rounded-md border border-white/15 bg-navy px-2 py-1 text-sm text-white focus:border-cyan focus:outline-none disabled:opacity-60";
+
+/** Why a value is out of range, or null if it's fine (the backend checks again). */
+function problem(field: Field, value: SecuritySettings[Key]): string | null {
+  if (field.kind !== "number") return null;
+  const n = value as number;
+  if (!Number.isInteger(n)) return "Enter a whole number";
+  if (field.zero && n === 0) return null;
+  if (n < field.min! || n > field.max!) return `Must be ${field.range}`;
+  return null;
+}
 
 function show(field: Field, value: SecuritySettings[Key]): string {
   if (field.kind === "flag") return value ? "required" : "not required";
@@ -90,6 +102,7 @@ function Form({
   const value = <K extends Key>(key: K): SecuritySettings[K] => (key in own ? own[key] : layer.below[key]) as SecuritySettings[K];
   const set = (key: Key, next: SecuritySettings[Key] | undefined) => {
     setSaved(false);
+    setError(null); // a refusal was about the values before this change
     setOwn((current) => {
       const copy = { ...current } as Record<string, unknown>;
       if (next === undefined) delete copy[key];
@@ -122,14 +135,18 @@ function Form({
   }
 
   const complex = value("password_rule") === "complex";
+  const shown = FIELDS.filter((field) => !field.complex || complex);
+  const problems = Object.fromEntries(shown.map((field) => [field.key, problem(field, value(field.key))]));
+  const invalid = Object.values(problems).some(Boolean);
   return (
     <form onSubmit={save} aria-label="Security settings" className="space-y-4">
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left text-sm">
           <tbody>
-            {FIELDS.filter((field) => !field.complex || complex).map((field) => {
+            {shown.map((field) => {
               const isOwn = field.key in own;
               const id = `security-${field.key}`;
+              const fieldProblem = problems[field.key];
               return (
                 <tr key={field.key} className="border-t border-white/10 first:border-t-0">
                   <td className={`px-4 py-2 ${field.complex ? "pl-8" : ""}`}>
@@ -139,7 +156,19 @@ function Form({
                     {field.range && <p className="text-xs text-white/40">{field.range}</p>}
                   </td>
                   <td className="px-4 py-2">
-                    <Control field={field} id={id} value={value(field.key)} disabled={!editable} onChange={(v) => set(field.key, v)} />
+                    <Control
+                      field={field}
+                      id={id}
+                      value={value(field.key)}
+                      invalid={Boolean(fieldProblem)}
+                      disabled={!editable}
+                      onChange={(v) => set(field.key, v)}
+                    />
+                    {fieldProblem && (
+                      <p id={`${id}-problem`} className="mt-1 text-xs text-red-300">
+                        {fieldProblem}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-xs">
                     {isOwn ? (
@@ -171,12 +200,13 @@ function Form({
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            disabled={busy || !dirty}
+            disabled={busy || !dirty || invalid}
             className="rounded-md bg-cyan px-3 py-1.5 text-sm font-medium text-navy hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Saving…" : "Save"}
           </button>
           {saved && !dirty && <span className="text-sm text-emerald-300">Saved</span>}
+          {invalid && <span className="text-sm text-red-300">Fix the values marked in red to save.</span>}
         </div>
       )}
       {error && (
@@ -192,12 +222,14 @@ function Control({
   field,
   id,
   value,
+  invalid,
   disabled,
   onChange,
 }: {
   field: Field;
   id: string;
   value: SecuritySettings[Key];
+  invalid: boolean;
   disabled: boolean;
   onChange(value: SecuritySettings[Key]): void;
 }) {
@@ -225,12 +257,15 @@ function Control({
     <input
       id={id}
       type="number"
-      min={field.min}
+      min={field.zero ? 0 : field.min}
       max={field.max}
-      value={String(value)}
+      // Emptied: NaN, shown empty and marked "Enter a whole number".
+      value={Number.isNaN(value) ? "" : String(value)}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-      className={INPUT}
+      aria-invalid={invalid}
+      aria-describedby={invalid ? `${id}-problem` : undefined}
+      onChange={(e) => onChange(e.target.value === "" ? Number.NaN : Number(e.target.value))}
+      className={`${INPUT} ${invalid ? "border-red-400 focus:border-red-400" : ""}`}
     />
   );
 }

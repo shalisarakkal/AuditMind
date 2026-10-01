@@ -28,6 +28,7 @@ from app.db.session import get_db
 from app.models.enums import Criticality
 from app.models.event import Event, WorkerStatus
 from app.models.membership import OrgMembership
+from app.models.organization import Organization
 from app.models.user import User
 from app.services.events import SHARED_SYSTEM_TYPES
 from app.schemas.paging import Page
@@ -62,9 +63,13 @@ class WorkerStatusRead(BaseModel):
     last_seen: datetime | None
 
 
-def _in_org(org_id: uuid.UUID):
-    # The org's own events, and the background worker's (not the platform's).
-    return or_(Event.org_id == org_id, and_(Event.org_id.is_(None), Event.type.in_(SHARED_SYSTEM_TYPES)))
+def _in_org(org: Organization):
+    # The org's own events, and the background worker's since the org was
+    # created (it runs everyone's uploads); not the platform's.
+    return or_(
+        Event.org_id == org.id,
+        and_(Event.org_id.is_(None), Event.type.in_(SHARED_SYSTEM_TYPES), Event.started_at >= org.created_at),
+    )
 
 
 # The event types' names as Activity shows them (frontend/src/lib/activity.ts),
@@ -177,22 +182,22 @@ def list_events(
     order: SortOrder = Query("desc"),
     page: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
-    _: OrgMembership = Depends(require_org_member),
+    membership: OrgMembership = Depends(require_org_member),
 ) -> Page[EventRead]:
     """What happened in the org, newest first by default. Every member can
     read it; nothing can change it."""
     return _event_page(
-        db, _in_org(org_id), q=q, type=type, item=item, who=who, result=result, criticality=criticality,
+        db, _in_org(membership.organization), q=q, type=type, item=item, who=who, result=result, criticality=criticality,
         dates=dates, sort=sort, order=order, page=page,
     )
 
 
 @router.get("/orgs/{org_id}/events/facets", response_model=EventFacets)
 def event_facets(
-    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
+    org_id: uuid.UUID, db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_member)
 ) -> EventFacets:
     """The values the pick-lists can offer: event types and results seen."""
-    return _facets(db, _in_org(org_id))
+    return _facets(db, _in_org(membership.organization))
 
 
 @router.get("/platform/events", response_model=Page[EventRead])

@@ -412,3 +412,44 @@ def test_security_headers(client, ann):
     assert login(client).headers["cache-control"] == "no-store"
     docs = client.get("/docs")
     assert docs.status_code == 200 and "content-security-policy" not in docs.headers
+
+
+# --- Where you're signed in ------------------------------------------------------
+
+BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36"}
+
+
+def test_sign_ins_record_where_they_came_from(client, db_session, ann):
+    assert client.post(f"{AUTH}/login", json={"email": EMAIL, "password": "wrong"}, headers=BROWSER).status_code == 401
+    assert client.post(f"{AUTH}/login", json={"email": EMAIL, "password": PASSWORD}, headers=BROWSER).status_code == 200
+    db_session.expire_all()
+    for type in ("login_failed", "login"):
+        event = db_session.scalars(select(Event).where(Event.type == type)).all()[-1]
+        assert event.details == {"ip": "testclient", "browser": "Chrome on Windows"}, type
+
+
+def test_listing_and_ending_ones_own_sign_ins(client, db_session, ann):
+    first = bearer(client.post(f"{AUTH}/login", json={"email": EMAIL, "password": PASSWORD}, headers=BROWSER).json()["access_token"])
+    second = bearer(login(client).json()["access_token"])
+    listed = client.get(f"{AUTH}/sessions", headers=second).json()
+    # Ann's sign-up, and these two; this one first and marked.
+    assert len(listed) == 3
+    assert [s["current"] for s in listed] == [True, False, False]
+    assert listed[1]["browser"] == "Chrome on Windows" and listed[1]["ip"] == "testclient"
+
+    current = listed[0]["id"]
+    assert client.delete(f"{AUTH}/sessions/{current}", headers=second).json()["detail"]["code"] == "current"
+    assert client.delete(f"{AUTH}/sessions/{listed[1]['id']}", headers=second).status_code == 204
+    ended = client.get("/api/v1/orgs", headers=first)
+    assert ended.json()["detail"]["message"] == "You were signed out from another browser. Please sign in again."
+
+    assert client.post(f"{AUTH}/sessions/end-others", headers=second).status_code == 204
+    assert [s["current"] for s in client.get(f"{AUTH}/sessions", headers=second).json()] == [True]
+    assert client.get("/api/v1/orgs", headers=ann).status_code == 401
+
+
+def test_no_one_ends_someone_elses_sign_in(client, ann):
+    bob = register(client, "bob@globex.io", "Globex")
+    ann_session = client.get(f"{AUTH}/sessions", headers=ann).json()[0]["id"]
+    assert client.delete(f"{AUTH}/sessions/{ann_session}", headers=bob).status_code == 404
+    assert client.get("/api/v1/orgs", headers=ann).status_code == 200

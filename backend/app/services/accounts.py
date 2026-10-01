@@ -51,9 +51,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def sign_in(db: Session, email: str, password: str, *, now: datetime | None = None) -> tuple[User, SecurityPolicy]:
+def sign_in(
+    db: Session, email: str, password: str, *, client: dict | None = None, now: datetime | None = None
+) -> tuple[User, SecurityPolicy]:
     """The account, if `password` is right and it may sign in; else raises
-    SignInRefused. Records failed attempts and locks (committed)."""
+    SignInRefused. Records failed attempts and locks (committed), with
+    `client` (where the attempt came from: client_info.client_details)."""
     now = now or _now()
     # Locked for update: two guesses at once can't both slip under the limit.
     user = db.scalar(select(User).where(User.email == email).with_for_update())
@@ -70,9 +73,9 @@ def sign_in(db: Session, email: str, password: str, *, now: datetime | None = No
     if not correct:
         # In each of the account's orgs, so its admins see attempts on their
         # people (not by whom: it's someone trying the password).
-        record_for_user_orgs(db, "login_failed", user, by_user=False, item=user.email)
+        record_for_user_orgs(db, "login_failed", user, by_user=False, item=user.email, details=client or None)
         if not user.is_locked(now):
-            _record_failure(db, user, policy, now=now)
+            _record_failure(db, user, policy, now=now, client=client)
         db.commit()
         raise SignInRefused(401, "invalid", INVALID)
 
@@ -104,7 +107,9 @@ def sign_in(db: Session, email: str, password: str, *, now: datetime | None = No
     return user, policy
 
 
-def _record_failure(db: Session, user: User, policy: SecurityPolicy, *, now: datetime | None = None) -> bool:
+def _record_failure(
+    db: Session, user: User, policy: SecurityPolicy, *, now: datetime | None = None, client: dict | None = None
+) -> bool:
     """Count a wrong password; lock the account when the count reaches the
     threshold within the window. True if it's now locked."""
     now = now or _now()
@@ -124,7 +129,7 @@ def _record_failure(db: Session, user: User, policy: SecurityPolicy, *, now: dat
         user,
         by_user=False,
         item=user.email,
-        details={"until": user.locked_until.isoformat() if user.locked_until else "unlocked by an admin"},
+        details={"until": user.locked_until.isoformat() if user.locked_until else "unlocked by an admin", **(client or {})},
     )
     return True
 

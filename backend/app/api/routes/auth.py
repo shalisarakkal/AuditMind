@@ -8,6 +8,7 @@ refresh and logout, also need the app's own header and an Origin of ours,
 so another site can't make a browser use it (CSRF).
 """
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -15,6 +16,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import SignedIn, get_current_user, get_signed_in, is_background, parse_access_token
@@ -29,6 +31,7 @@ from app.models.user import User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, Me, PasswordRulesRead, RegisterRequest, Token
 from app.schemas.user import NameUpdate
 from app.services import accounts, people, sessions
+from app.services.client_info import client_details, describe_browser
 from app.services.events import record_event, record_for_user_orgs
 from app.services.rate_limit import login_limiter
 from app.services.security_policy import SecurityPolicy, effective_policy
@@ -83,6 +86,17 @@ def _own_origin(request: Request) -> str:
     return f"{request.url.scheme}://{request.url.netloc}"
 
 
+def _ip(request: Request) -> str | None:
+    # Behind a proxy, uvicorn's --forwarded-allow-ips makes this the
+    # visitor's own address (README).
+    return request.client.host if request.client else None
+
+
+def _client(request: Request) -> dict:
+    """Where a sign-in comes from, for its Activity event."""
+    return client_details(_ip(request), request.headers.get("user-agent"))
+
+
 def _rate_limit(request: Request) -> None:
     retry_after = login_limiter.hit(request.client.host if request.client else "unknown")
     if retry_after is not None:
@@ -108,7 +122,7 @@ def _start_session(
         db,
         user,
         policy,
-        ip=request.client.host if request.client else None,
+        ip=_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_cookie(response, raw, session)
@@ -218,11 +232,11 @@ def _login(request: Request, response: Response, payload: LoginRequest, db: Sess
     _check_origin(request, require_header=False)
     _rate_limit(request)
     try:
-        user, policy = accounts.sign_in(db, payload.email, payload.password)
+        user, policy = accounts.sign_in(db, payload.email, payload.password, client=_client(request))
     except accounts.SignInRefused as refused:
         raise HTTPException(status_code=refused.status, detail={"code": refused.code, "message": refused.message})
     session = _start_session(db, request, response, user, policy)
-    record_for_user_orgs(db, "login", user, item=user.email)
+    record_for_user_orgs(db, "login", user, item=user.email, details=_client(request) or None)
     db.commit()
     return _token(session, user)
 
@@ -259,7 +273,9 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
         session = sessions.session_from_cookie(db, request.cookies.get(COOKIE_NAME))
     if session is not None and session.revoked_at is None:
         sessions.end_session(session, "signout")
-        record_for_user_orgs(db, "logout", session.user, item=session.user.email)
+        record_for_user_orgs(
+            db, "logout", session.user, item=session.user.email, details=_session_details(session) or None
+        )
         db.commit()
     _clear_cookie(response)
 
@@ -325,3 +341,83 @@ def change_password(
         )
     except accounts.PasswordRejected as rejected:
         raise _password_rejected(rejected.problems)
+
+
+# --- Where you're signed in ---------------------------------------------------
+
+
+def _session_details(session: UserSession) -> dict:
+    return client_details(session.ip, session.user_agent)
+
+
+class SessionRead(BaseModel):
+    id: str
+    signed_in_at: datetime
+    # Last seen active (not the app's own polling), to within
+    # SESSION_TOUCH_SECONDS.
+    last_active_at: datetime
+    ip: str | None
+    browser: str | None
+    # The sign-in this request comes from.
+    current: bool
+
+
+@router.get("/sessions", response_model=list[SessionRead])
+def list_sessions(signed_in: SignedIn = Depends(get_signed_in), db: Session = Depends(get_db)) -> list[SessionRead]:
+    """The caller's open sign-ins (each browser or device), newest first."""
+    now = _now()
+    open_sessions = db.scalars(
+        select(UserSession)
+        .where(
+            UserSession.user_id == signed_in.user.id,
+            UserSession.revoked_at.is_(None),
+            UserSession.expires_at > now,
+        )
+        .order_by(UserSession.created_at.desc())
+    ).all()
+    return [
+        SessionRead(
+            id=str(s.id),
+            signed_in_at=s.created_at,
+            last_active_at=s.last_seen_at,
+            ip=s.ip,
+            browser=describe_browser(s.user_agent),
+            current=s.id == signed_in.session.id,
+        )
+        for s in open_sessions
+        if now - s.last_seen_at <= timedelta(minutes=s.idle_minutes)
+    ]
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def end_session(
+    session_id: uuid.UUID, signed_in: SignedIn = Depends(get_signed_in), db: Session = Depends(get_db)
+) -> None:
+    """Sign out one of the caller's other sign-ins (Sign out ends this one)."""
+    session = db.get(UserSession, session_id)
+    if session is None or session.user_id != signed_in.user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such sign-in")
+    if session.id == signed_in.session.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "current", "message": "That's this browser: use Sign out."},
+        )
+    if session.revoked_at is None:
+        sessions.end_session(session, "signed_out_elsewhere")
+        record_for_user_orgs(
+            db, "logout", signed_in.user, item=signed_in.user.email, details={**_session_details(session), "from_elsewhere": True}
+        )
+        db.commit()
+
+
+@router.post("/sessions/end-others", status_code=status.HTTP_204_NO_CONTENT)
+def end_other_sessions(signed_in: SignedIn = Depends(get_signed_in), db: Session = Depends(get_db)) -> None:
+    """Sign out every other sign-in of the caller's."""
+    ended = sessions.end_user_sessions(
+        db, signed_in.user.id, "signed_out_elsewhere", except_session_id=signed_in.session.id
+    )
+    if ended:
+        record_for_user_orgs(
+            db, "logout", signed_in.user, item=signed_in.user.email, details={"other_sign_ins": ended, "from_elsewhere": True}
+        )
+    db.commit()
