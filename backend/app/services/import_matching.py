@@ -94,10 +94,12 @@ class AssetIndex:
         hostnames: Iterable[str] = (),
         ips: Iterable[str] = (),
         cloud_ids: Iterable[str] = (),
+        whole_org: bool = False,
     ) -> "AssetIndex":
         """The org's assets with any of these hostnames (case-insensitive),
         IPs or cloud IDs, oldest first; identity columns only (no tags or
-        details). Each lookup uses its (org_id, ...) index."""
+        details). Each lookup uses its (org_id, ...) index. `whole_org`: the
+        caller knows there are too many to look up one by one."""
         columns = select(
             Asset.id, Asset.type, Asset.type_known, Asset.hostname, Asset.ip, Asset.cloud_id, Asset.created_at
         ).where(Asset.org_id == org_id, Asset.archived_at.is_(None))
@@ -106,7 +108,7 @@ class AssetIndex:
             (Asset.ip, set(ips)),
             (Asset.cloud_id, set(cloud_ids)),
         )
-        if sum(len(values) for _, values in lookups) > TARGETED_LOAD_MAX:
+        if whole_org or sum(len(values) for _, values in lookups) > TARGETED_LOAD_MAX:
             rows = list(db.execute(columns))  # the whole org: one pass
         else:
             found = {}

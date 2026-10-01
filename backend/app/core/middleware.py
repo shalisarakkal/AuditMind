@@ -74,7 +74,10 @@ class UploadSizeLimitMiddleware:
 
 
 def upload_limit_message() -> str:
-    return f"File exceeds the {settings.IMPORT_MAX_BYTES // (1024 * 1024)} MB upload limit"
+    limit = settings.IMPORT_MAX_BYTES
+    if limit >= 1024**3 and limit % 1024**3 == 0:
+        return f"File exceeds the {limit // 1024**3} GB upload limit"
+    return f"File exceeds the {limit // (1024 * 1024)} MB upload limit"
 
 
 async def _reject(send: Send) -> None:

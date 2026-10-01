@@ -249,3 +249,6 @@ dev data before it's adopted.
 | Trigram indexes (`pg_trgm`) for "contains" search | Search boxes and column filters | Later (PLAN.md) |
 | `fillfactor = 90` on `findings`/`assets`, and fewer indexes that mention `archived_at` | Archiving can update rows in place without touching indexes | To measure |
 | Separate archive tables, partitioning | Very large databases | Over ~20 million rows |
+| Imports read a record at a time and staged in chunks (unlogged tables), resumable; published in one pass | Large uploads: 500K-row endpoint export (500K assets, 1.24M findings): peak memory 1,681 MB -> 708 MB, time 173 s -> 209 s (+21%, the price of resuming) | Done (Phase 2f part 1) |
+| Staging format: pickled chunks of 2,000 rows (measured: stage 14 s, read back 9 s for 500K rows; JSONB per row: 42 s and 29 s) | Staging cost | Done (Phase 2f part 1) |
+| A row cap or warning for huge uploads | Publishing keeps the org's matching assets in memory and holds the org lock: millions of rows need GBs and minutes | To decide |

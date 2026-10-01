@@ -61,7 +61,7 @@ class Scan(Base):
     @property
     def retryable(self) -> bool:
         """A large upload that failed for a reason other than its content
-        (summary "error": cut off twice, an unexpected error) and whose file
+        (summary "error": cut off too often, an unexpected error) and whose file
         is still kept (UPLOAD_KEEP_FAILED_DAYS): it can be run again from
         that file. One its content failed (row errors) can't: it would fail
         the same way."""

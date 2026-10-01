@@ -10,15 +10,15 @@ itself takes it first the same way.
 A thread checks in every HEARTBEAT_SECONDS (worker_status, and the running
 job's heartbeat_at), even while the main loop is busy in a long import. A
 job with no check-in for WORKER_STALE_SECONDS was cut off (the worker
-stopped): an import is started again once from its saved file (imports are
-all-or-nothing, so nothing of the first try was kept); an archive job
-carries on from where it was, up to MAX_RESUMES times. A job only waiting
+stopped): an import or an archive job carries on from where it got to (an
+import from its last staged chunk, see import_staging), up to MAX_RESUMES
+times. A job only waiting
 (for the org's lock) is never taken for dead: whoever runs a job holds its
 job lock (org_lock.job_running) until it's done.
 
 Ctrl+C stops it once the running job is done. A second Ctrl+C, or closing
 its window, stops it at once: what it was running is picked up again at the
-next start (an import from its saved file, an archive job where it was).
+next start (each from where it got to).
 """
 
 import logging
@@ -38,7 +38,7 @@ from app.models.archive import ArchiveJob
 from app.models.enums import ScanStatus
 from app.models.event import WorkerStatus
 from app.models.scan import Scan
-from app.services import archive_service, ingestion_background, platform
+from app.services import archive_service, import_staging, ingestion_background, platform
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
 from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, job_is_running
@@ -48,7 +48,8 @@ from app.services.sessions import purge_old_sessions
 logger = logging.getLogger("app.worker")
 
 HEARTBEAT_SECONDS = 15
-# An archive job cut off more often than this is failed, not carried on.
+# An import or archive job cut off more often than this is failed, not
+# carried on.
 MAX_RESUMES = 3
 HOUSEKEEPING_EVERY = timedelta(days=1)
 FIRST_HOUSEKEEPING_AFTER = timedelta(minutes=1)
@@ -185,14 +186,13 @@ def run_import(db: Session, scan_id: uuid.UUID) -> None:
         fail_import(db, scan, str(exc))
         path.unlink(missing_ok=True)
         return
-    content = path.read_bytes()
     try:
         process_import(
             db,
             scan,
             kind,
             fmt,
-            content,
+            path,  # read a record at a time, never whole
             profile,
             progress=lambda phase, done, total: ingestion_background.write_progress(scan_id, phase, done, total),
         )
@@ -222,8 +222,8 @@ def _delete_if_finished(db: Session, scan_id: uuid.UUID, path) -> None:
 def reap_stale(db: Session, now: datetime | None = None) -> None:
     """Jobs still "running" that nothing runs any more (no process holds
     their job lock, org_lock.job_running, and none has checked in for
-    WORKER_STALE_SECONDS): start again (an import, once), carry on (an
-    archive job), or mark failed. A job that's only waiting (for the org's
+    WORKER_STALE_SECONDS): carry on from where they got to (up to
+    MAX_RESUMES times), or mark failed. A job that's only waiting (for the org's
     lock, say) holds its job lock, so it's left alone however long it
     waits."""
     now = now or _now()
@@ -241,9 +241,14 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
             continue
         by_worker = scan.heartbeat_at is not None
         saved = upload_path(scan.id).exists()
-        if by_worker and scan.retry_count == 0 and saved:
-            logger.warning("Import %s (%s) was cut off: starting it again", scan.id, scan.filename)
-            scan.status, scan.retry_count, scan.heartbeat_at, scan.progress = ScanStatus.pending, 1, None, None
+        if by_worker and scan.retry_count < MAX_RESUMES and saved:
+            logger.warning("Import %s (%s) was cut off: carrying on", scan.id, scan.filename)
+            scan.status, scan.retry_count, scan.heartbeat_at, scan.progress = (
+                ScanStatus.pending,
+                scan.retry_count + 1,
+                None,
+                None,
+            )
             db.commit()
             continue
         if not (by_worker and saved):
@@ -252,7 +257,7 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
             message = "Stopped when the server restarted: import it again"
         elif scan.retry_count:
             # Its file is kept: Retry runs it again.
-            message = "Cut off twice (the background worker stopped)"
+            message = f"Cut off {scan.retry_count + 1} times (the background worker stopped)"
         else:
             message = "Cut off, and its saved file is gone: import it again"
         logger.warning("Import %s (%s) failed: %s", scan.id, scan.filename, message)
@@ -275,13 +280,14 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
 def housekeeping(db: Session) -> None:
     """Purge archived items and Activity events past their retention (each
     recorded in Activity), delete old ended sign-in sessions, and delete
-    uploaded files nothing is waiting for."""
+    uploaded files and staging nothing is waiting for."""
     if settings.ARCHIVE_AUTO_PURGE:
         queued = archive_service.purge_expired(db, queue=True)
         logger.info("Auto-purge: %d archived item(s) queued (run when nothing else waits)", queued)
         logger.info("Activity clean-up: %d event(s) deleted", purge_expired_events(db))
     logger.info("Sign-in clean-up: %d old session(s) deleted", purge_old_sessions(db))
     _sweep_uploads(db)
+    logger.info("Import staging clean-up: %d leftover row(s) deleted", import_staging.purge_orphans(db))
 
 
 def _sweep_uploads(db: Session) -> None:

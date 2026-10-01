@@ -2,25 +2,33 @@
 native .nessus), and profile imports, where each row of a tool's export
 becomes an asset plus any findings (import_profiles.py).
 
-Flow: parse the whole file -> validate every row -> write the valid rows. All
-validation happens before any DB write, so the all-or-nothing mode (per-org
-setting) never leaves a partial import behind.
+Flow (Phase 2f part 1): read the file a record at a time (import_readers)
+and check each row, staging what it gives (import_staging); then publish it
+all in one step under the org's lock: match each row's asset, write it and
+its findings. Nothing is written before every row is checked, so the
+all-or-nothing mode (per-org setting) never leaves a partial import behind,
+and no one sees half an upload.
 
-process_import() is the single entry point, called during the request for
-small files and from a background task for large ones (ingestion_background.py);
-it resolves the org's effective settings and records the outcome on the scan.
+The background worker's imports stage in the database, a chunk at a time,
+so one cut off carries on from where it got to; imports run in the request
+(small files) stage in memory.
+
+process_import() is the single entry point; it resolves the org's effective
+settings and records the outcome on the scan.
 """
 
-import csv
+import dataclasses
 import enum
-import io
+import hashlib
 import ipaddress
 import json
+import logging
 import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from psycopg.types.json import Jsonb
@@ -36,12 +44,17 @@ from app.models.organization import Organization
 from app.models.scan import Scan
 from app.models.user import User
 from app.schemas.ingestion import ImportReport, RowError, RowNote, RowWarning
+from app.services import import_staging
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
 from app.services.events import record_event
-from app.services.import_matching import AssetIndex, FindingIndex, IndexedAsset, Origin, finding_key
-from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity, parse_nessus
+from app.services.import_matching import TARGETED_LOAD_MAX, AssetIndex, FindingIndex, IndexedAsset, Origin, finding_key
+from app.services.import_readers import FileReader, ImportFileError
+from app.services.import_staging import Capped, ReadState, StagedRow
+from app.services.nessus_parser import NessusItem, map_nessus_domain, map_nessus_severity
 from app.services.org_lock import IMPORT_JOB, job_running, lock_org
 from app.services.org_settings import IngestionSettings, resolve_ingestion_settings
+
+logger = logging.getLogger(__name__)
 
 ImportKind = Literal["assets", "findings", "profile"]
 
@@ -52,7 +65,7 @@ FINDING_ASSET_TYPE = "server"
 FINDING_CLOUD_ASSET_TYPE = "cloud_resource"
 # The report lists at most this many row errors (and warnings); `failed`
 # still counts every error.
-MAX_REPORTED_ERRORS = 1000
+MAX_REPORTED_ERRORS = import_staging.MAX_LISTED
 IDENTITY_REQUIRED = "hostname, ip or cloud_id is required"
 # The columns a generic file identifies each row's host by. A generic import
 # whose file has none of them is almost certainly the wrong source for it.
@@ -61,7 +74,8 @@ _EXPECTED_COLUMNS = {
     "assets": "type, hostname and/or ip or cloud_id, and optionally subtype, environment, criticality, tags",
     "findings": "hostname and/or ip or cloud_id, domain, severity, and optionally category, description, source",
 }
-# New rows sent to the database per batch, and file rows per progress report.
+# New rows sent to the database per batch, file rows per staged chunk, and
+# file rows per progress report.
 WRITE_BATCH = 2000
 # Assets whose updates are gathered before they're sent (see _PendingWrites).
 UPDATE_BATCH = 20000
@@ -115,8 +129,8 @@ class FindingRow:
 
 
 # Told how a large import goes: (phase, done, total). Phases, in order:
-# "reading" (file rows checked), "waiting" (for another import into the org),
-# "writing" (file rows written), "findings" (a tool export's findings
+# "reading" (file rows checked; the total is an estimate until the end),
+# "waiting" (for another import into the org), "writing" (file rows
 # written), "saving" (committing). done/total are 0 when there's no count.
 ProgressCallback = Callable[[str, int, int], None]
 
@@ -133,6 +147,11 @@ class RowReader(Protocol):
     def read_row(
         self, row: int, record: Any, ingestion: IngestionSettings, warnings: list[str]
     ) -> tuple[AssetRow | None, list[FindingRow]]: ...
+
+    # A profile that sums rows up (event logs, Phase 2f part 2) may also have
+    # finish() -> list[StagedRow], called once every row is read, and
+    # snapshot() -> dict / restore(dict), so what it has gathered survives a
+    # resume. See _RowChecker.
 
 
 # --- Formats ---------------------------------------------------------------
@@ -153,34 +172,19 @@ def scan_type_for(kind: ImportKind, fmt: str) -> str:
 
 def parse_csv(content: bytes) -> list[tuple[int, dict]]:
     """(line number, record) per data row; header names are case-insensitive."""
-    text = _decode(content)
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        raise IngestionError("The CSV file has no header row")
-    records = []
-    try:
-        for record in reader:
-            # Cells beyond the header land under the None key; ignore them.
-            records.append((reader.line_num, {_key(k): v for k, v in record.items() if k is not None}))
-    except csv.Error as exc:
-        raise IngestionError(f"Invalid CSV at line {reader.line_num}: {exc}")
-    return records
+    return _read_all(content, "csv", "")
 
 
 def parse_json(content: bytes, list_key: str) -> list[tuple[int, Any]]:
     """(1-based position, record) for a top-level list, or {list_key: [...]}."""
+    return _read_all(content, "json", list_key)
+
+
+def _read_all(content: bytes, fmt: str, list_key: str) -> list[tuple[int, Any]]:
     try:
-        data = json.loads(_decode(content))
-    except json.JSONDecodeError as exc:
-        raise IngestionError(f"Invalid JSON: {exc}")
-    if isinstance(data, dict) and list_key in data:
-        data = data[list_key]
-    if not isinstance(data, list):
-        raise IngestionError(f'Expected a JSON list of records, or {{"{list_key}": [...]}}')
-    return [
-        (position, {_key(k): v for k, v in record.items()} if isinstance(record, dict) else record)
-        for position, record in enumerate(data, start=1)
-    ]
+        return list(FileReader(content, fmt, list_key).records())
+    except ImportFileError as exc:
+        raise IngestionError(str(exc))
 
 
 # --- Row validation (raises ValueError with a message for the report) -------
@@ -272,19 +276,22 @@ def process_import(
     scan: Scan,
     kind: ImportKind,
     fmt: str,
-    content: bytes,
+    source: bytes | Path,
     profile: RowReader | None = None,
     progress: ProgressCallback | None = None,
 ) -> ImportReport:
-    """Import `content` into the scan's org and record the outcome on the scan
-    (status, summary, completed_at). kind "profile" reads each row with
-    `profile`; `progress` is told how the writing goes. Unexpected errors mark
-    the scan failed and are re-raised."""
+    """Import `source` into the scan's org and record the outcome on the scan
+    (status, summary, completed_at). `source` is the file's content (run in
+    the request: staged in memory) or its saved path (the background
+    worker: staged in the database, resumable). kind "profile" reads each
+    row with `profile`; `progress` is told how it goes. Unexpected errors
+    mark the scan failed and are re-raised."""
     scan_id = scan.id
     org = db.get(Organization, scan.org_id)
     ingestion = resolve_ingestion_settings(org)
     scan.status = ScanStatus.running
-    scan.run_started_at = datetime.now(timezone.utc)
+    # Carrying on after a cut-off: it started when it first ran.
+    scan.run_started_at = scan.run_started_at or datetime.now(timezone.utc)
     scan.progress = {"phase": "reading"}
     db.commit()
 
@@ -292,7 +299,7 @@ def process_import(
     # runs (see org_lock.job_running).
     with job_running(db, IMPORT_JOB, scan_id):
         try:
-            report = _import(db, scan, kind, fmt, content, ingestion, profile, progress)
+            report = _import(db, scan, kind, fmt, source, ingestion, profile, progress)
             # Failed if all-or-nothing rejected the file, or no row was usable.
             usable = report.created + report.updated + report.skipped + report.duplicates
             rejected = report.failed > 0 and (not ingestion.import_partial_success or usable == 0)
@@ -358,7 +365,7 @@ def _finish(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
     if error := summary.get("error") or next((e["message"] for e in summary.get("errors", []) if e["row"] == 0), None):
         details["error"] = error
     if scan.retry_count:
-        details["retried"] = "Cut off (the worker stopped) and started again from the saved file"
+        details["retried"] = "Cut off (the worker stopped) and carried on from where it had got to"
     if scan.run_started_at and scan.started_at and (waited := scan.run_started_at - scan.started_at).total_seconds() >= 1:
         details["waited_seconds"] = round(waited.total_seconds())
     record_event(
@@ -376,6 +383,11 @@ def _finish(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
         details=details,
     )
     db.commit()
+    try:
+        import_staging.discard(db, scan.id)
+    except Exception:  # the worker's daily clean-up gets it later
+        logger.warning("Couldn't drop import %s's staging", scan.id, exc_info=True)
+        db.rollback()
     if status == ScanStatus.completed and scan.content_hash:
         _drop_superseded_files(db, scan)
 
@@ -406,110 +418,215 @@ def _import(
     scan: Scan,
     kind: ImportKind,
     fmt: str,
-    content: bytes,
+    source: bytes | Path,
     ingestion: IngestionSettings,
     profile: RowReader | None,
     progress: ProgressCallback | None = None,
 ) -> ImportReport:
-    report = ImportReport()
-    errors: list[RowError] = []
-    warnings: list[RowWarning] = []
-    asset_rows: list[AssetRow] = []
-    columns: list[str] = []  # the file's (first record's) column names
-    finding_rows: list[FindingRow] = []
-
-    def read(row: int, reader: Callable[[list[str]], tuple[AssetRow | None, list[FindingRow]]]) -> None:
-        """Run one row's reader. A ValueError fails the row, and its warnings
-        are dropped since nothing from it is imported."""
-        row_warnings: list[str] = []
-        try:
-            asset, findings = reader(row_warnings)
-        except ValueError as exc:
-            errors.append(RowError(row=row, message=str(exc)))
-            return
-        if asset is not None:
-            asset_rows.append(asset)
-        finding_rows.extend(findings)
-        warnings.extend(RowWarning(row=row, message=message) for message in row_warnings)
-
-    if fmt == "nessus":
-        try:
-            items = parse_nessus(content)
-        except ValueError as exc:
-            raise IngestionError(str(exc))
-        if not items:
-            raise IngestionError("The .nessus file contains no findings")
-        for position, item in enumerate(items, start=1):
-            def read_nessus(row_warnings: list[str], item: NessusItem = item):
-                finding = nessus_finding(item, ingestion, row_warnings)
-                if finding is None:
-                    report.skipped += 1
-                    _note(
-                        report.skipped_rows,
-                        item.row,
-                        f"{item.hostname or item.ip or 'no host'}: Nessus {item.plugin_id} {item.plugin_name}",
-                        "Info severity: skipped, as Settings say (Nessus Info items: Skip them)",
-                    )
-                    return None, []
-                return None, [finding]
-
-            read(item.row, read_nessus)
-            _report_reading(progress, position, len(items))
+    """Read and check every row into staging, then publish it (unless
+    all-or-nothing rejects the file)."""
+    if profile is not None:
+        list_key = profile.json_list_key
     else:
-        if profile is not None:
-            list_key = profile.json_list_key
-        else:
-            list_key = "assets" if kind == "assets" else "findings"
-        records = parse_csv(content) if fmt == "csv" else parse_json(content, list_key)
-        if not records:
-            raise IngestionError("The file contains no rows")
-        first = records[0][1]
-        columns = list(first) if isinstance(first, dict) else []
-        for position, (row, record) in enumerate(records, start=1):
-            def read_record(row_warnings: list[str], row: int = row, record: Any = record):
-                if profile is not None:
-                    return profile.read_row(row, record, ingestion, row_warnings)
-                if kind == "assets":
-                    return validate_asset(row, record, ingestion.asset_type_aliases, row_warnings), []
-                return None, [validate_finding(row, record, row_warnings)]
+        list_key = "assets" if kind == "assets" else "findings"
+    fresh = ReadState(
+        fingerprint=_fingerprint(kind, fmt, ingestion, profile),
+        identifiers=import_staging.Identifiers(limit=TARGETED_LOAD_MAX),
+    )
+    if isinstance(source, bytes):
+        staging = import_staging.MemoryStaging(fresh)
+    else:
+        staging = import_staging.DbStaging(db, scan.id, fresh)
+    state = staging.load()
+    if not state.read_done:
+        _stage(staging, state, FileReader(source, fmt, list_key), _RowChecker(kind, ingestion, profile), ingestion, progress)
 
-            read(row, read_record)
-            _report_reading(progress, position, len(records))
-        del records, record  # read into rows; free them before writing
-
-    if ingestion.asset_existing_strategy != "duplicate":
-        warnings += _repeated_asset_warnings(asset_rows)
-    report.failed = len(errors)
-    if profile is None and not asset_rows and not finding_rows:
-        if hint := _wrong_source_hint(kind, columns):
-            warnings.append(RowWarning(row=0, message=hint))
-    report.errors = errors[:MAX_REPORTED_ERRORS]
+    report = ImportReport(
+        failed=state.failed,
+        errors=list(state.errors.items),
+        skipped=state.skipped,
+        skipped_rows=list(state.skipped_rows.items),
+    )
+    # Warnings from reading, then publishing; listed by row, the lowest
+    # MAX_REPORTED_ERRORS of them, with the count of all.
+    warnings: list[Capped] = [state.warnings]
+    if profile is None and state.rows_with_output == 0:
+        if hint := _wrong_source_hint(kind, state.columns):
+            warnings.append(Capped([RowWarning(row=0, message=hint)], 1))
     # All-or-nothing with a bad row: nothing is written.
-    if not errors or ingestion.import_partial_success:
+    if not state.failed or ingestion.import_partial_success:
         lock_org(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
-        index = _load_asset_index(db, scan.org_id, asset_rows, finding_rows)
-        rows_total = len({r.row for r in asset_rows} | {r.row for r in finding_rows})
-        writes = _PendingWrites(db, scan.id, progress, rows_total)
-        asset_by_row = _write_assets(db, scan.org_id, asset_rows, ingestion, report, warnings, index, writes)
+        found = state.identifiers
+        index = AssetIndex.load(
+            db, scan.org_id, found.hostnames, found.ips, found.cloud_ids, whole_org=found.whole_org
+        )
+        writes = _PendingWrites(db, scan.id, progress, state.items_staged)
         # When a file creates assets too, `created` counts those, so its
         # findings are counted separately.
         count_findings_as = "findings_created" if profile is not None and profile.creates_assets else "created"
-        _write_findings(
-            db, scan.org_id, scan.id, finding_rows, report, warnings, index, writes, asset_by_row, count_findings_as
-        )
+        publisher = _Publisher(db, scan.org_id, scan.id, ingestion, report, index, writes, count_findings_as)
+        for item in staging.items():
+            publisher.publish(item)
+        warnings += publisher.finish()
         if progress is not None:
             progress("saving", 0, 0)
         writes.flush()
-    warnings.sort(key=lambda w: w.row)
-    report.warnings = warnings[:MAX_REPORTED_ERRORS]
-    report.warnings_total = len(warnings)
+    merged = sorted((w for capped in warnings for w in capped.items), key=lambda w: w.row)
+    report.warnings = merged[:MAX_REPORTED_ERRORS]
+    report.warnings_total = sum(capped.total for capped in warnings)
     return report
 
 
-def _report_reading(progress: ProgressCallback | None, rows_read: int, rows_total: int) -> None:
-    """Every WRITE_BATCH rows read, and once all are."""
-    if progress is not None and (rows_read % WRITE_BATCH == 0 or rows_read == rows_total):
-        progress("reading", rows_read, rows_total)
+def _fingerprint(kind: ImportKind, fmt: str, ingestion: IngestionSettings, profile: RowReader | None) -> str:
+    """What a staged read depends on: a resume with anything different
+    (settings changed, a newer app) reads the file again. Built from the
+    values themselves, sorted, never from repr(): that holds memory
+    addresses and set orders that change every time Python starts, so a
+    restarted worker would never carry on."""
+    basis = {
+        "version": import_staging.STAGING_VERSION,
+        "kind": kind,
+        "format": fmt,
+        "settings": dataclasses.asdict(ingestion),
+        "profile": None
+        if profile is None
+        else {
+            "key": profile.key,
+            "family": getattr(getattr(profile, "family", None), "key", None),
+            "column_map": getattr(profile, "column_map", None),
+            "params": params.model_dump(mode="json") if (params := getattr(profile, "params", None)) else None,
+        },
+    }
+    canonical = json.dumps(basis, sort_keys=True, default=_canonical)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _canonical(value: Any) -> Any:
+    """For json.dumps: sets sorted, enums by value."""
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    if isinstance(value, enum.Enum):
+        return value.value
+    raise TypeError(f"Can't fingerprint {type(value).__name__}")
+
+
+class _RowChecker:
+    """Reads and checks one record into what it gives (its asset and
+    findings), noting errors, warnings and skipped rows in the read state.
+    A ValueError fails the row, and its warnings are dropped since nothing
+    from it is imported.
+
+    The seam for profiles that sum rows up (Phase 2f part 2): finish() is
+    called once every row is read and may give more rows, and what they
+    gather is saved with each staged chunk (snapshot/restore), so it
+    survives a resume."""
+
+    def __init__(self, kind: ImportKind, ingestion: IngestionSettings, profile: RowReader | None):
+        self.kind = kind
+        self.ingestion = ingestion
+        self.profile = profile
+
+    def check(self, row: int, record: Any, state: ReadState) -> StagedRow | None:
+        row_warnings: list[str] = []
+        try:
+            asset, findings = self._read(row, record, row_warnings, state)
+        except ValueError as exc:
+            state.failed += 1
+            state.errors.add(RowError(row=row, message=str(exc)))
+            return None
+        for message in row_warnings:
+            state.warnings.add(RowWarning(row=row, message=message))
+        if asset is None and not findings:
+            return None
+        state.rows_with_output += 1
+        return StagedRow(row, asset, findings)
+
+    def _read(
+        self, row: int, record: Any, warnings: list[str], state: ReadState
+    ) -> tuple[AssetRow | None, list[FindingRow]]:
+        if isinstance(record, NessusItem):
+            finding = nessus_finding(record, self.ingestion, warnings)
+            if finding is None:
+                state.skipped += 1
+                state.skipped_rows.add(
+                    RowNote(
+                        row=record.row,
+                        item=f"{record.hostname or record.ip or 'no host'}: Nessus {record.plugin_id} "
+                        f"{record.plugin_name}"[:300],
+                        message="Info severity: skipped, as Settings say (Nessus Info items: Skip them)",
+                    )
+                )
+                return None, []
+            return None, [finding]
+        if self.profile is not None:
+            return self.profile.read_row(row, record, self.ingestion, warnings)
+        if self.kind == "assets":
+            return validate_asset(row, record, self.ingestion.asset_type_aliases, warnings), []
+        return None, [validate_finding(row, record, warnings)]
+
+    def finish(self) -> list[StagedRow]:
+        finish = getattr(self.profile, "finish", None)
+        return list(finish()) if finish else []
+
+    def snapshot(self) -> dict:
+        snapshot = getattr(self.profile, "snapshot", None)
+        return snapshot() if snapshot else {}
+
+    def restore(self, state: dict) -> None:
+        restore = getattr(self.profile, "restore", None)
+        if restore and state:
+            restore(state)
+
+
+def _stage(
+    staging: "import_staging.MemoryStaging | import_staging.DbStaging",
+    state: ReadState,
+    reader: FileReader,
+    checker: _RowChecker,
+    ingestion: IngestionSettings,
+    progress: ProgressCallback | None,
+) -> None:
+    """Read the file from where `state` got to, staging each WRITE_BATCH
+    rows' output with the state (a resumable point). Once a row has failed
+    and all-or-nothing will reject the file, rows are still checked (so the
+    report counts every error) but no longer staged."""
+    checker.restore(state.checker)
+    chunk: list[StagedRow] = []
+
+    def keep(item: StagedRow | None) -> None:
+        if item is not None and (not state.failed or ingestion.import_partial_success):
+            chunk.append(item)
+            state.identifiers.add_row(item)
+
+    def save(done: bool) -> None:
+        state.checker = checker.snapshot()
+        state.read_done = done
+        staging.add(chunk, state)
+        chunk.clear()
+
+    try:
+        for row, record in reader.records(skip_through=state.last_row):
+            if state.rows_seen == 0:
+                state.columns = list(record) if isinstance(record, dict) else []
+            state.rows_seen += 1
+            keep(checker.check(row, record, state))
+            state.last_row = row
+            if state.rows_seen % WRITE_BATCH == 0:
+                save(done=False)
+                if progress is not None:
+                    estimate = state.rows_seen * reader.size // max(reader.position, 1)
+                    progress("reading", state.rows_seen, max(estimate, state.rows_seen))
+    except ImportFileError as exc:
+        raise IngestionError(str(exc))
+    if state.rows_seen == 0:
+        raise IngestionError(
+            "The .nessus file contains no findings" if reader.fmt == "nessus" else "The file contains no rows"
+        )
+    for item in checker.finish():
+        keep(item)
+    save(done=True)
+    if progress is not None:
+        progress("reading", state.rows_seen, state.rows_seen)
 
 
 def _wrong_source_hint(kind: ImportKind, columns: list[str]) -> str | None:
@@ -537,28 +654,36 @@ def _asset_key(row: AssetRow) -> tuple[str, ...]:
     return "ip", row.ip or "", category
 
 
-def _repeated_asset_warnings(rows: list[AssetRow]) -> list[RowWarning]:
-    """One warning per asset that a file lists more than once with different
-    values: each row updates the same asset, so the last one wins."""
-    by_asset: dict[tuple[str, ...], list[AssetRow]] = {}
-    for row in rows:
-        by_asset.setdefault(_asset_key(row), []).append(row)
-    warnings = []
-    for repeats in by_asset.values():
-        if len(repeats) == 1:  # most assets: nothing to compare
-            continue
-        values = {repr({k: v for k, v in vars(r).items() if k != "row"}) for r in repeats}
-        if len(values) > 1:
-            last = repeats[-1]
-            label = last.cloud_id or last.hostname or last.ip
-            warnings.append(
-                RowWarning(
-                    row=last.row,
-                    message=f"{label} appears on {len(repeats)} rows with different values; "
-                    f"later rows overwrite earlier ones (the last is row {last.row})",
-                )
+class _RepeatedAssets:
+    """Assets a file lists more than once with different values: each row
+    updates the same asset, so the last one wins. One warning per asset,
+    at its last row. Kept per asset, not per row."""
+
+    def __init__(self):
+        # key -> [rows, first row's values (hashed), differ?, last row, label]
+        self._seen: dict[tuple[str, ...], list] = {}
+
+    def add(self, row: AssetRow) -> None:
+        values = hash(repr({k: v for k, v in vars(row).items() if k != "row"}))
+        label = row.cloud_id or row.hostname or row.ip
+        seen = self._seen.get(_asset_key(row))
+        if seen is None:
+            self._seen[_asset_key(row)] = [1, values, False, row.row, label]
+        else:
+            seen[0] += 1
+            seen[2] = seen[2] or values != seen[1]
+            seen[3], seen[4] = row.row, label
+
+    def warnings(self) -> list[RowWarning]:
+        return [
+            RowWarning(
+                row=last,
+                message=f"{label} appears on {count} rows with different values; "
+                f"later rows overwrite earlier ones (the last is row {last})",
             )
-    return warnings
+            for count, _, differ, last, label in self._seen.values()
+            if count > 1 and differ
+        ]
 
 
 class _PendingWrites:
@@ -626,18 +751,10 @@ class _PendingWrites:
         self.findings.append(values)
         self._created()
 
-    phase = "writing"
-
-    def start_phase(self, phase: str, rows_total: int) -> None:
-        """Count progress afresh, e.g. a tool export's findings after its rows."""
-        self.phase, self.rows_done, self.rows_total = phase, 0, rows_total
-        if self.progress is not None:
-            self.progress(phase, 0, rows_total)
-
     def row_done(self) -> None:
         self.rows_done += 1
         if self.progress is not None and (self.rows_done % WRITE_BATCH == 0 or self.rows_done == self.rows_total):
-            self.progress(self.phase, self.rows_done, self.rows_total)
+            self.progress("writing", self.rows_done, self.rows_total)
 
     def _created(self) -> None:
         if len(self.new_assets) + len(self.findings) >= WRITE_BATCH:
@@ -682,34 +799,63 @@ def _copy_value(value: Any) -> Any:
     return value
 
 
-def _write_assets(
-    db: Session,
-    org_id,
-    rows: list[AssetRow],
-    ingestion: IngestionSettings,
-    report: ImportReport,
-    warnings: list[RowWarning],
-    index: AssetIndex,
-    writes: _PendingWrites,
-) -> dict[int, IndexedAsset]:
-    """Create or update each row's asset per the org's strategy. Returns the
-    asset each row ended up as (created, updated, or matched and skipped), so
-    findings from the same row attach to it."""
-    strategy = ingestion.asset_existing_strategy
-    asset_by_row: dict[int, IndexedAsset] = {}
-    for row in rows:
+class _Publisher:
+    """Writes staged rows, in file order: each row's asset (created, updated
+    or matched and skipped, per the org's strategy), then its findings, on
+    that asset or else on the matching inventory asset of any category,
+    else on a new one whose type is a guess."""
+
+    def __init__(
+        self,
+        db: Session,
+        org_id: uuid.UUID,
+        scan_id: uuid.UUID,
+        ingestion: IngestionSettings,
+        report: ImportReport,
+        index: AssetIndex,
+        writes: _PendingWrites,
+        count_findings_as: Literal["created", "findings_created"],
+    ):
+        self.db, self.org_id, self.scan_id = db, org_id, scan_id
+        self.strategy = ingestion.asset_existing_strategy
+        self.report, self.index, self.writes = report, index, writes
+        self.count_findings_as = count_findings_as
+        self.findings = FindingIndex.load(db, org_id, index.existing_ids)
+        self.warnings: Capped = Capped()
+        self.duplicates: list[tuple[FindingRow, Origin]] = []  # the first, to list
+        self.repeated = _RepeatedAssets() if self.strategy != "duplicate" else None
+
+    def publish(self, item: StagedRow) -> None:
+        asset = self._asset(item.asset) if item.asset is not None else None
+        for finding in item.findings:
+            self._finding(finding, asset)
+        self.writes.row_done()
+
+    def finish(self) -> list[Capped]:
+        """The publishing warnings (and repeated assets'), and the listed
+        duplicates' notes."""
+        self.report.duplicate_rows = _duplicate_notes(self.db, self.duplicates)
+        repeated = Capped()
+        for warning in sorted(self.repeated.warnings() if self.repeated else [], key=lambda w: w.row):
+            repeated.add(warning)
+        return [repeated, self.warnings]
+
+    def _asset(self, row: AssetRow) -> IndexedAsset:
+        index, writes, report = self.index, self.writes, self.report
+        if self.repeated is not None:
+            self.repeated.add(row)
         existing = None
-        if strategy != "duplicate":
+        if self.strategy != "duplicate":
             category = row.type if row.type_known else None
             matches = index.find(row.hostname, row.ip, row.cloud_id, category)
             existing = matches[0] if matches else None
             if len(matches) > 1 and category is None:
-                warnings.append(_several_matches_warning(row, matches, "updated"))
+                self.warnings.add(_several_matches_warning(row, matches, "updated"))
         if existing is None:
-            if strategy != "duplicate" and row.type_known and row.hostname:
+            if self.strategy != "duplicate" and row.type_known and row.hostname:
                 others = index.other_categories(row.hostname, row.type)
                 if others:
-                    warnings.append(
+                    self.warnings.add(
                         RowWarning(
                             row=row.row,
                             message=f"{row.hostname} is already recorded as a {' and a '.join(others)}; "
@@ -719,7 +865,7 @@ def _write_assets(
             existing = _new_asset(
                 index,
                 writes,
-                org_id,
+                self.org_id,
                 type=row.type,
                 subtype=row.subtype,
                 type_known=row.type_known,
@@ -732,14 +878,17 @@ def _write_assets(
                 details=row.details,
             )
             report.created += 1
-        elif strategy == "skip":
+        elif self.strategy == "skip":
             report.skipped += 1
-            _note(
-                report.skipped_rows,
-                row.row,
-                _host(row),
-                "Already recorded: left unchanged, as Settings say (Asset already in inventory: Leave it unchanged)",
-            )
+            if len(report.skipped_rows) < MAX_REPORTED_ERRORS:
+                report.skipped_rows.append(
+                    RowNote(
+                        row=row.row,
+                        item=_host(row)[:300],
+                        message="Already recorded: left unchanged, as Settings say "
+                        "(Asset already in inventory: Leave it unchanged)",
+                    )
+                )
         else:
             values = {
                 name: value
@@ -758,43 +907,11 @@ def _write_assets(
             # Details are merged, so facts from different sources accumulate.
             writes.update_asset(existing.id, values, row.details or None)
             report.updated += 1
-        asset_by_row[row.row] = existing
         writes.link(existing.id)
-        writes.row_done()
-    return asset_by_row
+        return existing
 
-
-def _write_findings(
-    db: Session,
-    org_id,
-    scan_id,
-    rows: list[FindingRow],
-    report: ImportReport,
-    warnings: list[RowWarning],
-    index: AssetIndex,
-    writes: _PendingWrites,
-    asset_by_row: dict[int, IndexedAsset] | None = None,
-    count_as: Literal["created", "findings_created"] = "created",
-) -> None:
-    """Record each finding against its row's asset (from asset_by_row), else
-    the matching inventory asset of any category, else a new one whose type
-    is a guess."""
-    asset_by_row = asset_by_row or {}
-    findings = _load_finding_index(db, org_id, index.existing_ids)
-    # A tool export's rows were counted with their assets: count its
-    # findings as a phase of their own. A findings file counts file rows (a
-    # .nessus item or CSV row may give several findings).
-    own_phase = bool(asset_by_row) and bool(rows)
-    if own_phase:
-        writes.start_phase("findings", len(rows))
-    previous_row = None
-    duplicates: list[tuple[FindingRow, Origin]] = []  # the first, to list
-    for row in rows:
-        if own_phase or (row.row not in asset_by_row and row.row != previous_row):
-            writes.row_done()
-        previous_row = row.row
-
-        asset = asset_by_row.get(row.row)
+    def _finding(self, row: FindingRow, asset: IndexedAsset | None) -> None:
+        index, writes = self.index, self.writes
         if asset is None:
             matches = index.find(row.hostname, row.ip, row.cloud_id)
             if not matches:
@@ -802,7 +919,7 @@ def _write_findings(
                 asset = _new_asset(
                     index,
                     writes,
-                    org_id,
+                    self.org_id,
                     type=FINDING_CLOUD_ASSET_TYPE if only_cloud else FINDING_ASSET_TYPE,
                     type_known=False,
                     hostname=row.hostname,
@@ -812,7 +929,7 @@ def _write_findings(
             else:
                 asset = matches[0]
                 if len(matches) > 1:
-                    warnings.append(_several_matches_warning(row, matches, "recorded the finding on"))
+                    self.warnings.add(_several_matches_warning(row, matches, "recorded the finding on"))
                 # Fill in whichever identifier the inventory didn't have yet.
                 filled = {
                     name: getattr(row, name)
@@ -825,17 +942,17 @@ def _write_findings(
 
         writes.link(asset.id)
         key = finding_key(asset.id, row.source, row.category, row.description)
-        if key in findings:
-            report.duplicates += 1
-            if len(duplicates) < MAX_REPORTED_ERRORS:
-                duplicates.append((row, findings.origin(key)))
-            continue
-        findings.add(key, row.row)  # later rows in the same file dedup against it
+        if key in self.findings:
+            self.report.duplicates += 1
+            if len(self.duplicates) < MAX_REPORTED_ERRORS:
+                self.duplicates.append((row, self.findings.origin(key)))
+            return
+        self.findings.add(key, row.row)  # later rows in the same file dedup against it
         writes.create_finding(
             {
                 "id": uuid.uuid4(),
-                "org_id": org_id,
-                "scan_id": scan_id,
+                "org_id": self.org_id,
+                "scan_id": self.scan_id,
                 "asset_id": asset.id,
                 "category": row.category,
                 "domain": row.domain,
@@ -846,8 +963,7 @@ def _write_findings(
                 "created_at": writes.created_at(),
             }
         )
-        setattr(report, count_as, getattr(report, count_as) + 1)
-    report.duplicate_rows = _duplicate_notes(db, duplicates)
+        setattr(self.report, self.count_findings_as, getattr(self.report, self.count_findings_as) + 1)
 
 
 def _duplicate_notes(db: Session, duplicates: list[tuple[FindingRow, Origin]]) -> list[RowNote]:
@@ -866,12 +982,6 @@ def _duplicate_notes(db: Session, duplicates: list[tuple[FindingRow, Origin]]) -
         what = row.category or row.description or "uncategorised"
         notes.append(RowNote(row=row.row, item=f"{_host(row)}: {what}"[:300], message=message))
     return notes
-
-
-def _note(notes: list[RowNote], row: int, item: str, message: str) -> None:
-    """List a skipped row, up to MAX_REPORTED_ERRORS (the count has them all)."""
-    if len(notes) < MAX_REPORTED_ERRORS:
-        notes.append(RowNote(row=row, item=item[:300], message=message))
 
 
 def _host(row: AssetRow | FindingRow) -> str:
@@ -916,38 +1026,7 @@ def _several_matches_warning(row: AssetRow | FindingRow, matches: list[IndexedAs
     )
 
 
-def _load_asset_index(
-    db: Session, org_id: uuid.UUID, asset_rows: list[AssetRow], finding_rows: list[FindingRow]
-) -> AssetIndex:
-    """The org's assets the file can touch (see import_matching.py), loaded
-    once per import, after taking the lock so a concurrent import's assets
-    are committed and included."""
-    rows = [*asset_rows, *finding_rows]
-    return AssetIndex.load(
-        db,
-        org_id,
-        hostnames=(r.hostname for r in rows if r.hostname),
-        ips=(r.ip for r in rows if r.ip),
-        cloud_ids=(r.cloud_id for r in rows if r.cloud_id),
-    )
-
-
-def _load_finding_index(db: Session, org_id: uuid.UUID, asset_ids: list[uuid.UUID]) -> FindingIndex:
-    return FindingIndex.load(db, org_id, asset_ids)
-
-
 # --- Field helpers -------------------------------------------------------------
-
-
-def _decode(content: bytes) -> str:
-    try:
-        return content.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise IngestionError("The file is not valid UTF-8 text")
-
-
-def _key(key: Any) -> Any:
-    return key.strip().lower() if isinstance(key, str) else key
 
 
 def _require_object(record: Any) -> None:

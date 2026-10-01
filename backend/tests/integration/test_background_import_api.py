@@ -104,7 +104,7 @@ def test_unexpected_error_in_background_marks_scan_failed(client, admin, monkeyp
     def boom(*args, **kwargs):
         raise RuntimeError("database fell over")
 
-    monkeypatch.setattr(ingestion_service, "_write_assets", boom)
+    monkeypatch.setattr(ingestion_service._Publisher, "publish", boom)
 
     resp = upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, "assets_valid.csv")
 
@@ -122,7 +122,7 @@ def test_unexpected_error_during_request_marks_scan_failed_and_raises(client, ad
     def boom(*args, **kwargs):
         raise RuntimeError("database fell over")
 
-    monkeypatch.setattr(ingestion_service, "_write_findings", boom)
+    monkeypatch.setattr(ingestion_service._Publisher, "publish", boom)
 
     with pytest.raises(RuntimeError):
         upload(client, f"/api/v1/orgs/{org_id}/findings/import", headers, "findings_generic.csv")

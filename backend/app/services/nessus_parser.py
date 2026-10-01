@@ -9,8 +9,11 @@ onto our Severity/Domain enums is done by the map_* functions below, which take
 their settings as arguments so per-org overrides apply (org_settings.py).
 """
 
+import io
 import ipaddress
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import BinaryIO
 from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
@@ -55,22 +58,39 @@ class NessusItem:
 
 def parse_nessus(content: bytes) -> list[NessusItem]:
     """Raises ValueError for anything that isn't a well-formed, safe .nessus file."""
+    return list(iter_nessus(io.BytesIO(content)))
+
+
+def iter_nessus(file: BinaryIO) -> Iterator[NessusItem]:
+    """The file's ReportItems in order, read a host at a time (each host's
+    items once its element is complete, so its identity is known), with
+    finished hosts dropped as it goes: memory stays flat for any size.
+    Raises ValueError as parse_nessus does, possibly part-way through."""
     try:
-        root = ElementTree.fromstring(content)
+        root = None
+        parents: list[Element] = []
+        row = 0
+        for event, element in ElementTree.iterparse(file, events=("start", "end")):
+            if event == "start":
+                if root is None:
+                    root = element
+                    if element.tag != "NessusClientData_v2":
+                        raise ValueError("Invalid .nessus file: expected a NessusClientData_v2 export")
+                parents.append(element)
+                continue
+            parents.pop()
+            if element.tag != "ReportHost":
+                continue
+            hostname, ip = _host_identity(element)
+            for report_item in element.iter("ReportItem"):
+                row += 1
+                yield _parse_item(report_item, row, hostname, ip)
+            if parents:
+                parents[-1].remove(element)  # done with this host
     except DefusedXmlException:
         raise ValueError("Invalid .nessus file: DTDs and entity declarations are not allowed")
     except ElementTree.ParseError as exc:
         raise ValueError(f"Invalid .nessus file: {exc}")
-
-    if root.tag != "NessusClientData_v2":
-        raise ValueError("Invalid .nessus file: expected a NessusClientData_v2 export")
-
-    items: list[NessusItem] = []
-    for host in root.iter("ReportHost"):
-        hostname, ip = _host_identity(host)
-        for report_item in host.iter("ReportItem"):
-            items.append(_parse_item(report_item, len(items) + 1, hostname, ip))
-    return items
 
 
 def map_nessus_severity(raw: str, info_severity: str) -> Severity | None:

@@ -132,9 +132,10 @@ def _large_upload(client, admin, monkeypatch, content=ASSETS, name="a.csv", head
 
 
 def _cut_off_twice(db_session, scan_id):
+    """Cut off once more than it carries on after (runner.MAX_RESUMES)."""
     scan = db_session.get(Scan, scan_id)
     stale = datetime.now(timezone.utc) - timedelta(seconds=settings.WORKER_STALE_SECONDS + 60)
-    scan.status, scan.heartbeat_at, scan.retry_count = ScanStatus.running, stale, 1
+    scan.status, scan.heartbeat_at, scan.retry_count = ScanStatus.running, stale, runner.MAX_RESUMES
     db_session.commit()
     runner.reap_stale(db_session)
     assert scan.status == ScanStatus.failed

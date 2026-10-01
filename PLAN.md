@@ -1168,6 +1168,116 @@ cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
   memory; limits for malformed or deeply nested JSON and for compressed
   files
 
+### Decisions (2026-10-01, all as recommended)
+
+Found while exploring: the test logs are flat and random (every row a
+different user, subscription, project and IP; CloudTrail has no result,
+MFA or target; OSSEM no host), and risky event types make up 25-66% of
+each file. The 500K files are in synthetic_assets\Phase4, which also has
+firewall, VPN, identity, EDR, Sysmon and vulnerability event logs.
+
+1. Two parts. Part 1: every upload read in chunks with flat memory, and
+   imports that resume where they stopped (all uploads, not only logs).
+   Part 2: the event-log sources and their rules
+2. Resuming: rows are read and checked in chunks into a hidden staging
+   table, each chunk committed; once the whole file is read, matching and
+   publishing run in one step under the org lock, so no one sees half an
+   upload. A cut-off carries on from the last chunk (up to 3 times, like
+   archive jobs). All-or-nothing rejects by not publishing; staging is
+   cleaned up then, plus a daily sweep
+3. JSON read incrementally with the ijson library
+4. Upload limit (IMPORT_MAX_BYTES) raised from 100 MB to 1 GB once memory
+   stays flat
+5. Sources in 2f: Azure Activity, AWS CloudTrail, GCP Audit, OSSEM. The
+   other six logs (firewall, VPN, identity, EDR, Sysmon, vulnerability
+   events) go to Phase 5 (connectors)
+6. Both the flat test layout and the real export layouts (CloudTrail
+   Records[] with userIdentity.arn, Azure nested properties, GCP
+   protoPayload): nested field names such as userIdentity.arn
+7. Grouping: one finding per rule per upload ("Role assignments created:
+   2,497 events by 2,497 callers in 2,497 subscriptions"), keeping the top
+   10 subscriptions/accounts/projects/hosts and actors, and up to 5
+   example events
+8. No asset for these findings (tenant-level; "—" in the Asset column).
+   If an endpoint log names a host (host.name, computer), group per host
+   and attach to that host's asset
+9. New finding fields: event count, first seen, last seen, details (the
+   breakdowns and examples), by migration; Findings gets an Events column
+   and a details view
+10. Repeats: recognized by rule plus the events' date range; a newer
+    export adds findings for its period, the same file again is a
+    duplicate (the "uploaded before" warning already shows)
+11. Raw events not kept, only the findings with breakdowns and examples;
+    the uploaded file is deleted after success as today
+12. Time window: the whole export
+13. Default rules, each adjustable in File formats (on/off, severity):
+    Azure role assignment created (High if succeeded; Medium if failed),
+    many failed operations (Medium); CloudTrail anything by root (High;
+    a root console sign-in Critical), security group opened (High), bucket
+    policy changed (Medium), IAM user created (Medium), instances
+    terminated (Low); GCP firewall changed and succeeded (High), service
+    account created (Medium), bucket updated (Medium), permission denied
+    (Medium); OSSEM encoded PowerShell (Critical), Run-key persistence
+    (High), DLL in Temp (High), new service under HKLM Services (Medium),
+    whoami reconnaissance (Medium). Domains: Identity & Access (roles,
+    IAM, permission denied), Network & Config (firewalls, security
+    groups), Compliance (bucket policies), Incident Response (OSSEM)
+14. Same Upload button; the source is detected from the columns; the
+    "event logs can't be read yet" block is lifted for these sources
+
+### Part 1: big files and resumable imports (built 2026-10-01, awaiting verification)
+
+Three designs compared (minimal change, clean structure, pragmatic
+balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
+- Readers over a file path (CSV streamed, JSON with ijson, .nessus with
+  iterparse), same row numbers as today
+- Worker imports stage rows in chunks of 2,000 into UNLOGGED staging
+  tables (a database crash just means reading again from row 0), each
+  chunk committed with its cursor and the report so far; uploads of 10 MB
+  or less stay in memory (same readers and checks), as fast as today
+- Publish in one pass (each row's asset, then its findings) under the org
+  lock, from staging in keyset batches into the existing matching and
+  COPY writes; set-based SQL for identifiers and repeated-asset warnings
+- The row reader has finish() and snapshot()/restore(), so Part 2's
+  grouping can count across all rows and survive a resume
+- A cut-off resumes from the last chunk up to 3 times; changed settings
+  or format mean reading again from row 0; all-or-nothing stops staging
+  at the first bad row but keeps counting errors
+- Starts with a half-day speed test (500K rows through staging and back)
+- Known limit: publishing still keeps the org's matching index in
+  memory, so a file of millions of rows needs GBs and holds the org lock
+  for minutes; a row cap or warning to follow
+- Built: import_readers.py (CSV streamed, JSON with ijson 3.5.1 and its C
+  backend, .nessus with iterparse, a host at a time), import_staging.py
+  (MemoryStaging, DbStaging, ReadState, Capped lists), migration 0017
+  (unlogged import_staging_state and import_staging_chunks), the publisher
+  in ingestion_service (_RowChecker, _stage, _Publisher, _RepeatedAssets),
+  the worker passing the file's path, resuming up to 3 times and sweeping
+  leftover staging daily; IMPORT_MAX_BYTES 1 GB
+- Changed from the design after measuring (speed test, 500K rows): staging
+  is pickled chunks of 2,000 rows, not JSONB per row (stage 14 s and read
+  back 9 s, against 42 s and 29 s). So the identifiers to load and the
+  repeated-asset warnings are kept in Python while reading and publishing
+  (per asset, not per row) instead of SQL over staging
+- Measured, a 500K-row endpoint export (500K assets, 1.24M findings):
+  173 s -> 209 s (+21%), peak memory 1,681 MB -> 708 MB; small uploads
+  (in the request) unchanged
+- Behaviour changes: the progress no longer has a separate "findings"
+  stage (each row is written with its findings); the reading total is an
+  estimate until the end; a file problem (invalid JSON or UTF-8) late in a
+  big file is found when reading gets there, not up front (nothing is
+  published either way); when all-or-nothing rejects a file its
+  repeated-asset warnings aren't listed (nothing was written)
+- Review (3 reviewers, 2026-10-01), fixed: the resume fingerprint was
+  built from repr(), which holds memory addresses and set orders that
+  change every time Python starts, so a restarted worker never carried on
+  (all three found it; confirmed across two processes; now built from the
+  values themselves, sorted, with a two-process test); outdated "once" /
+  "twice" wording about cut-offs; duplicated staging code; the Part 2 seam
+  now tested with a stand-in source whose count survives a resume; test
+  clean-ups. Accepted: JSON with NaN/Infinity (not valid JSON) is now
+  refused
+
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
 **Scope:** load

@@ -125,16 +125,16 @@ def test_an_import_cut_off_is_started_again_once(client, admin, monkeypatch, db_
     assert event["details"]["retried"].startswith("Cut off")
 
 
-def test_an_import_cut_off_twice_is_failed(client, admin, monkeypatch, db_session):
+def test_an_import_cut_off_too_often_is_failed(client, admin, monkeypatch, db_session):
     scan_id = _large_upload(client, admin, monkeypatch)
     scan = db_session.get(Scan, scan_id)
     stale = datetime.now(timezone.utc) - timedelta(seconds=settings.WORKER_STALE_SECONDS + 60)
-    scan.status, scan.heartbeat_at, scan.retry_count = ScanStatus.running, stale, 1
+    scan.status, scan.heartbeat_at, scan.retry_count = ScanStatus.running, stale, runner.MAX_RESUMES
     db_session.commit()
 
     runner.reap_stale(db_session)
     assert scan.status == ScanStatus.failed
-    assert scan.summary == {"error": "Cut off twice (the background worker stopped)"}
+    assert scan.summary == {"error": f"Cut off {runner.MAX_RESUMES + 1} times (the background worker stopped)"}
     assert upload_path(scan_id).exists()  # kept for Retry
     [event] = _events(client, admin, type="import")
     assert (event["outcome"], event["criticality"]) == ("failed", "warning")
@@ -282,7 +282,7 @@ def test_an_import_rolled_back_leaves_no_event(client, admin, monkeypatch, db_se
     def boom(*args, **kwargs):
         raise RuntimeError("database fell over")
 
-    monkeypatch.setattr(ingestion_service, "_write_findings", boom)
+    monkeypatch.setattr(ingestion_service._Publisher, "publish", boom)
     with pytest.raises(RuntimeError):
         upload(client, _url(admin, "/findings/import"), admin[0], "f.csv", b"hostname,domain,severity\nh,network_config,low\n")
     [event] = _events(client, admin, type="import")

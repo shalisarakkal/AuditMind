@@ -83,8 +83,10 @@ def test_a_background_import_reports_each_stage(client, admin, monkeypatch):
     scan_id = _import(client, admin)
 
     assert reports == [
-        ("reading", 2, 5),
-        ("reading", 4, 5),
+        # The reading total is an estimate from how far into the file it is;
+        # a file this small is read in one go, so it's the rows so far.
+        ("reading", 2, 2),
+        ("reading", 4, 4),
         ("reading", 5, 5),
         ("writing", 2, 5),
         ("writing", 4, 5),
@@ -97,7 +99,7 @@ def test_a_background_import_reports_each_stage(client, admin, monkeypatch):
     assert scan["progress"] is None  # cleared once it's finished
 
 
-def test_a_tool_exports_findings_are_counted_as_a_stage_of_their_own(client, admin, monkeypatch):
+def test_a_tool_exports_rows_are_counted_once_with_their_findings(client, admin, monkeypatch):
     reports = _record_progress(monkeypatch)
     headers, org_id = admin
     # Three rows: three assets, and a finding for each disabled account.
@@ -110,12 +112,10 @@ def test_a_tool_exports_findings_are_counted_as_a_stage_of_their_own(client, adm
     assert resp.status_code == 202, resp.text
     run_worker()
     assert reports == [
-        ("reading", 2, 3),
+        ("reading", 2, 2),  # the total is estimated from how far into the file it is
         ("reading", 3, 3),
-        ("writing", 2, 3),
+        ("writing", 2, 3),  # each row with its asset and findings
         ("writing", 3, 3),
-        ("findings", 0, 2),
-        ("findings", 2, 2),
         ("saving", 0, 0),
     ]
 

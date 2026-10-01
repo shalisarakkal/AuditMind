@@ -64,19 +64,19 @@ class Settings(BaseSettings):
     # in the background and are tracked through their scan record.
     IMPORT_SYNC_MAX_BYTES: int = 10 * 1024 * 1024
     # Files over this size are rejected outright (413).
-    IMPORT_MAX_BYTES: int = 100 * 1024 * 1024
+    IMPORT_MAX_BYTES: int = 1024 * 1024 * 1024
     # Where larger files wait for the background worker (deleted once
     # imported). Relative paths are from the backend folder.
     UPLOAD_DIR: str = "uploads"
     # A large upload that failed for a reason other than its content (cut
-    # off twice, an unexpected error) keeps its file this many days, so it
+    # off too often, an unexpected error) keeps its file this many days, so it
     # can be retried without uploading it again; then the worker deletes it.
     UPLOAD_KEEP_FAILED_DAYS: int = Field(7, ge=0)
 
     # --- Background worker (python -m app.worker). ---
     # A job the worker runs with no check-in for this long was cut off (the
-    # worker stopped): an import is started again once, an archive job
-    # carries on.
+    # worker stopped): it carries on from where it got to (an import from
+    # its last staged chunk), up to 3 times.
     WORKER_STALE_SECONDS: int = Field(120, ge=30)
     # How often the worker looks for new jobs when it has none.
     WORKER_POLL_SECONDS: float = Field(2.0, gt=0)

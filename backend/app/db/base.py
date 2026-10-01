@@ -12,8 +12,11 @@ from app.models.import_profile import ImportProfile
 from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
 from app.models.event import Event, WorkerStatus
 from app.models.session import PasswordHistory, PlatformSetting, UserSession
+from app.models.import_staging import ImportStagingChunk, ImportStagingState
 
 __all__ = [
+    "ImportStagingChunk",
+    "ImportStagingState",
     "Base",
     "Organization",
     "User",

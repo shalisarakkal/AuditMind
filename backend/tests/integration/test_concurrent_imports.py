@@ -34,14 +34,13 @@ def test_concurrent_imports_share_one_asset(db_session, monkeypatch):
 
     # Widen the race: pause between loading the org's assets and writing, so
     # without serialisation both imports would load none and both insert.
-    load_index = ingestion_service._load_asset_index
+    start_publishing = ingestion_service._Publisher.__init__
 
-    def slow_load_index(*args, **kwargs):
-        index = load_index(*args, **kwargs)
+    def slow_start(*args, **kwargs):
+        start_publishing(*args, **kwargs)
         time.sleep(0.5)
-        return index
 
-    monkeypatch.setattr(ingestion_service, "_load_asset_index", slow_load_index)
+    monkeypatch.setattr(ingestion_service._Publisher, "__init__", slow_start)
 
     Session = sessionmaker(bind=db_session.get_bind(), autoflush=False)
     errors: list[BaseException] = []
