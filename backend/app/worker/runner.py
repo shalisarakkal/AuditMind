@@ -43,6 +43,7 @@ from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
 from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, job_is_running
 from app.services.ingestion_service import IngestionError, detect_format, fail_import, process_import
+from app.services.sessions import purge_old_sessions
 
 logger = logging.getLogger("app.worker")
 
@@ -265,11 +266,13 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
 
 def housekeeping(db: Session) -> None:
     """Purge archived items and Activity events past their retention (each
-    recorded in Activity), and delete uploaded files nothing is waiting for."""
+    recorded in Activity), delete old ended sign-in sessions, and delete
+    uploaded files nothing is waiting for."""
     if settings.ARCHIVE_AUTO_PURGE:
         queued = archive_service.purge_expired(db, queue=True)
         logger.info("Auto-purge: %d archived item(s) queued (run when nothing else waits)", queued)
         logger.info("Activity clean-up: %d event(s) deleted", purge_expired_events(db))
+    logger.info("Sign-in clean-up: %d old session(s) deleted", purge_old_sessions(db))
     _sweep_uploads(db)
 
 

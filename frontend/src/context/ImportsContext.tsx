@@ -8,6 +8,10 @@ import { api } from "@/lib/apiClient";
 import { countsText } from "@/lib/domain";
 import type { ArchiveAction, ArchiveItemType, ArchiveJob, BulkResult, ImportReport, Scan, WorkerStatus } from "@/lib/types";
 
+// The polling here is the app checking, not the person doing something: it
+// mustn't keep an idle session signed in (apiClient's background requests).
+const BACKGROUND = { background: true };
+
 const POLL_MS = 2000;
 const WORKER_CHECK_MS = 15000;
 // How long a row's button says "Archived" (or "Restored", "Purged") after a
@@ -106,14 +110,14 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     if (!orgId) return;
     const request = begin();
     try {
-      const active = await api.get<Scan[]>(`/orgs/${orgId}/scans?active=true`);
+      const active = await api.get<Scan[]>(`/orgs/${orgId}/scans?active=true`, BACKGROUND);
       const { scans: known, awaiting: waiting } = current.current;
       const running = known.filter(isRunning).map((s) => s.id).sort();
       const activeIds = active.map((s) => s.id).sort();
       const changed = running.join() !== activeIds.join() || waiting.length > 0;
       if (changed) {
         // An import started or finished: fetch the reports too.
-        const tracked = await api.get<Scan[]>(`/orgs/${orgId}/scans?tracked=true`);
+        const tracked = await api.get<Scan[]>(`/orgs/${orgId}/scans?tracked=true`, BACKGROUND);
         apply(orgId, request, tracked);
       } else {
         const byId = new Map(active.map((s) => [s.id, s]));
@@ -218,7 +222,7 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
     if (!orgId) return;
     const request = ++current.current.requested;
     try {
-      apply(orgId, request, await api.get<ArchiveJob[]>(`/orgs/${orgId}/archive-jobs?tracked=true`));
+      apply(orgId, request, await api.get<ArchiveJob[]>(`/orgs/${orgId}/archive-jobs?tracked=true`, BACKGROUND));
     } catch {
       // Keep what we have; the next poll tries again.
     }
@@ -301,7 +305,7 @@ function useWorkerDown(waiting: boolean, intervalMs: number): boolean {
   const [running, setRunning] = useState<boolean | null>(null);
   const check = useCallback(async () => {
     try {
-      setRunning((await api.get<WorkerStatus>("/worker-status")).running);
+      setRunning((await api.get<WorkerStatus>("/worker-status", BACKGROUND)).running);
     } catch {
       // Unknown: keep the last answer.
     }

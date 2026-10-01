@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
+import AccountMenu from "@/components/AccountMenu";
 import OrgPicker from "@/components/OrgPicker";
-import { useApp } from "@/context/AppContext";
 import { importHome, isInterrupted, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
 
 const NAV_ITEMS = [
@@ -20,8 +20,6 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { logout } = useApp();
   const imports = useImports();
   const running = imports.scans.filter(isRunning);
   // The one running first, then those queued.
@@ -94,16 +92,7 @@ export default function Sidebar() {
           start-dev.ps1, or <code>python -m app.worker</code> in the backend folder.
         </p>
       )}
-      <button
-        type="button"
-        onClick={() => {
-          logout();
-          router.replace("/login");
-        }}
-        className="mt-auto rounded-md px-3 py-2 text-left text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-      >
-        Log out
-      </button>
+      <AccountMenu />
     </nav>
   );
 }

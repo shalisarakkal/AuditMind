@@ -47,6 +47,8 @@ TYPES: dict[str, Criticality] = {
     "login": Criticality.info,
     "login_failed": Criticality.warning,
     "logout": Criticality.info,
+    "password_changed": Criticality.info,
+    "account_locked": Criticality.warning,
     "event_cleanup": Criticality.info,
     "worker_started": Criticality.info,
     "worker_stopped": Criticality.info,

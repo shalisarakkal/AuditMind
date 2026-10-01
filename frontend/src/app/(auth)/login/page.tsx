@@ -4,9 +4,10 @@ import AuthForm from "@/components/AuthForm";
 import { useApp } from "@/context/AppContext";
 
 export default function LoginPage() {
-  const { login } = useApp();
+  const { login, signedOutReason } = useApp();
   return (
     <AuthForm
+      notice={signedOutReason}
       title="Sign in"
       fields={[
         { name: "email", label: "Email", type: "email", autoComplete: "email" },

@@ -14,7 +14,40 @@ export type RiskTier = "low" | "medium" | "high" | "critical";
 export type UserRole = "admin" | "auditor" | "viewer";
 export type ScanStatus = "pending" | "running" | "completed" | "failed";
 
-export type Token = { access_token: string; token_type: string };
+export type Token = {
+  access_token: string;
+  token_type: string;
+  /** Seconds the access token lasts. */
+  expires_in: number;
+  /** Every page but Change password is refused until it's changed. */
+  must_change_password: boolean;
+};
+
+/** The signed-in user (GET /auth/me). */
+export type Me = {
+  id: string;
+  email: string;
+  name: string | null;
+  is_sysadmin: boolean;
+  must_change_password: boolean;
+  password_expires_at: string | null;
+};
+
+/** What a new password must meet (GET /auth/password-rules). */
+export type PasswordRules = {
+  rule: "simple" | "complex";
+  min_length: number;
+  max_length: number;
+  require_upper: boolean;
+  require_lower: boolean;
+  require_digit: boolean;
+  require_symbol: boolean;
+  history_count: number;
+  /** 0: never expires. */
+  expiry_days: number;
+  /** Setting -> the org that asks for its stricter value. */
+  required_by: Record<string, string>;
+};
 
 export type Organization = {
   id: string;

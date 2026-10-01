@@ -18,10 +18,12 @@ type AuthFormProps = {
   submitLabel: string;
   onSubmit(values: Record<string, string>): Promise<void>;
   footer: { text: string; linkLabel: string; href: string };
+  /** Shown above the fields, e.g. why the user was signed out. */
+  notice?: string | null;
 };
 
 /** Shared form for the login and register pages. */
-export default function AuthForm({ title, fields, submitLabel, onSubmit, footer }: AuthFormProps) {
+export default function AuthForm({ title, fields, submitLabel, onSubmit, footer, notice }: AuthFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function AuthForm({ title, fields, submitLabel, onSubmit, footer 
   return (
     <form method="post" onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-6">
       <h1 className="text-lg font-semibold text-white">{title}</h1>
+      {notice && !error && <p className="text-sm text-amber-200">{notice}</p>}
       {fields.map((field) => (
         <div key={field.name}>
           <label htmlFor={field.name} className="block text-sm text-white/70">

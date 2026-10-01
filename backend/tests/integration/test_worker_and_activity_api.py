@@ -219,12 +219,15 @@ def test_a_repeat_upload_imported_anyway_is_a_warning(client, admin):
 
 
 def test_sign_in_events(client, admin):
-    client.post("/api/v1/auth/login", json={"email": "owner@acmecorp.io", "password": PASSWORD})
+    login = client.post("/api/v1/auth/login", json={"email": "owner@acmecorp.io", "password": PASSWORD})
     client.post("/api/v1/auth/login", json={"email": "owner@acmecorp.io", "password": "wrong"})
     client.post("/api/v1/auth/login", json={"email": "nobody@nowhere.io", "password": "wrong"})
     assert client.post("/api/v1/auth/logout", headers=admin[0]).status_code == 204
+    # Signing out ends that session only; the other sign-in goes on.
+    assert client.get(_url(admin, "/events"), headers=admin[0]).status_code == 401
+    other = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-    types = [(e["type"], e["actor_label"], e["criticality"]) for e in _events(client, admin)]
+    types = [(e["type"], e["actor_label"], e["criticality"]) for e in _events(client, admin, headers=other)]
     assert types == [
         ("logout", "owner@acmecorp.io", "info"),
         # Someone tried this account's password: shown as unknown, not the owner.

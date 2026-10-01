@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import UserRole
+from app.schemas.types import LowerEmail
 
 
 class OrganizationCreate(BaseModel):
@@ -30,5 +31,5 @@ class MyOrganizationRead(OrganizationRead):
 
 
 class MemberAdd(BaseModel):
-    email: EmailStr
+    email: LowerEmail
     role: UserRole = UserRole.viewer

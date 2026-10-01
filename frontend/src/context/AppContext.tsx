@@ -2,22 +2,27 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { api, clearToken, getToken, setToken } from "@/lib/apiClient";
+import { api, clearToken, getToken, refreshAccessToken, setSessionHandlers, setToken } from "@/lib/apiClient";
 import type { MyOrganization, Token } from "@/lib/types";
 
 const ORG_KEY = "auditmind_org_id";
 
 type AppContextValue = {
-  /** False until localStorage has been read (it isn't available during prerender). */
+  /** False until the session has been looked for (the cookie, on load). */
   hydrated: boolean;
   isAuthenticated: boolean;
+  /** Every page but Change password is refused until it's changed. */
+  mustChangePassword: boolean;
+  /** Why the user was signed out (idle too long, say), for the sign-in page. */
+  signedOutReason: string | null;
   orgs: MyOrganization[];
   orgsLoading: boolean;
   orgsError: string | null;
   selectedOrg: MyOrganization | null;
   login(email: string, password: string): Promise<void>;
   register(details: { orgName: string; email: string; password: string; name?: string }): Promise<void>;
-  logout(): void;
+  logout(): Promise<void>;
+  changePassword(current: string, next: string): Promise<void>;
   selectOrg(orgId: string): void;
   createOrg(name: string): Promise<void>;
 };
@@ -27,6 +32,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [token, setTokenState] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [signedOutReason, setSignedOutReason] = useState<string | null>(null);
   const [orgs, setOrgs] = useState<MyOrganization[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [orgsError, setOrgsError] = useState<string | null>(null);
@@ -59,33 +66,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [selectOrg],
   );
 
-  useEffect(() => {
-    const stored = getToken();
-    setTokenState(stored);
-    setHydrated(true);
-    if (stored) void loadOrgs();
-  }, [loadOrgs]);
-
+  // Signed in (or the session renewed on load): the orgs, unless the
+  // password must be changed first (they'd be refused).
   const signIn = useCallback(
-    async (accessToken: string) => {
+    async (accessToken: string, mustChange: boolean) => {
       setToken(accessToken);
       setTokenState(accessToken);
-      await loadOrgs();
+      setSignedOutReason(null);
+      setMustChangePassword(mustChange);
+      if (!mustChange) await loadOrgs();
     },
     [loadOrgs],
   );
 
+  const signedOut = useCallback((reason: string | null) => {
+    clearToken();
+    window.localStorage.removeItem(ORG_KEY);
+    setTokenState(null);
+    setMustChangePassword(false);
+    setSignedOutReason(reason);
+    setOrgs([]);
+    setSelectedOrgId(null);
+  }, []);
+
+  useEffect(() => {
+    setSessionHandlers({
+      onSessionEnded: (message) => signedOut(message),
+      onPasswordChangeRequired: () => setMustChangePassword(true),
+    });
+    return () => setSessionHandlers(null);
+  }, [signedOut]);
+
+  // On load: the token is only in memory, so a new page (or a reload) asks
+  // for one with the session cookie. (One already there: set by a test, or
+  // kept across a hot reload in development.)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const existing = getToken();
+      const session = existing ? null : await refreshAccessToken().catch(() => null);
+      if (cancelled) return;
+      if (existing) await signIn(existing, false);
+      else if (session) await signIn(session.access_token, session.must_change_password);
+      setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [signIn]);
+
   const login = useCallback(
     async (email: string, password: string) => {
-      const { access_token } = await api.post<Token>("/auth/login", { email, password });
-      await signIn(access_token);
+      const session = await api.post<Token>("/auth/login", { email, password });
+      await signIn(session.access_token, session.must_change_password);
     },
     [signIn],
   );
 
   const register = useCallback(
     async (details: { orgName: string; email: string; password: string; name?: string }) => {
-      const { access_token } = await api.post<Token>("/auth/register", {
+      const session = await api.post<Token>("/auth/register", {
         org_name: details.orgName,
         email: details.email,
         password: details.password,
@@ -93,19 +133,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       // A new account's only org is the one just created, so select it.
       window.localStorage.removeItem(ORG_KEY);
-      await signIn(access_token);
+      await signIn(session.access_token, session.must_change_password);
     },
     [signIn],
   );
 
-  const logout = useCallback(() => {
-    if (getToken()) api.post("/auth/logout").catch(() => undefined);
-    clearToken();
-    window.localStorage.removeItem(ORG_KEY);
-    setTokenState(null);
-    setOrgs([]);
-    setSelectedOrgId(null);
-  }, []);
+  const logout = useCallback(async () => {
+    // Ends the session on the server (the cookie too); signed out here
+    // whatever happens.
+    await api.post("/auth/logout").catch(() => undefined);
+    signedOut(null);
+  }, [signedOut]);
+
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      await api.post("/auth/change-password", { current_password: current, new_password: next });
+      setMustChangePassword(false);
+      if (mustChangePassword) await loadOrgs();
+    },
+    [mustChangePassword, loadOrgs],
+  );
 
   const createOrg = useCallback(
     async (name: string) => {
@@ -119,6 +166,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       hydrated,
       isAuthenticated: token !== null,
+      mustChangePassword,
+      signedOutReason,
       orgs,
       orgsLoading,
       orgsError,
@@ -126,10 +175,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      changePassword,
       selectOrg,
       createOrg,
     }),
-    [hydrated, token, orgs, orgsLoading, orgsError, selectedOrgId, login, register, logout, selectOrg, createOrg],
+    [
+      hydrated,
+      token,
+      mustChangePassword,
+      signedOutReason,
+      orgs,
+      orgsLoading,
+      orgsError,
+      selectedOrgId,
+      login,
+      register,
+      logout,
+      changePassword,
+      selectOrg,
+      createOrg,
+    ],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

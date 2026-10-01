@@ -16,7 +16,7 @@ from app.api.routes import (
     scans,
 )
 from app.core.config import check_secret_key, settings
-from app.core.middleware import UploadSizeLimitMiddleware
+from app.core.middleware import SecurityHeadersMiddleware, UploadSizeLimitMiddleware
 
 check_secret_key(settings.SECRET_KEY)
 
@@ -34,6 +34,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Outermost, so every response has them, CORS preflights and errors too.
+app.add_middleware(SecurityHeadersMiddleware)
 
 api_router_prefix = settings.API_V1_STR
 app.include_router(auth.router, prefix=api_router_prefix)

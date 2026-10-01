@@ -18,6 +18,8 @@ export const EVENT_LABELS: Record<string, string> = {
   login: "Signed in",
   login_failed: "Failed sign-in",
   logout: "Signed out",
+  password_changed: "Password changed",
+  account_locked: "Account locked",
   event_cleanup: "Old activity deleted",
   worker_started: "Background worker started",
   worker_stopped: "Background worker stopped",

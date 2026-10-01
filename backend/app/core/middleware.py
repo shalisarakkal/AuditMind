@@ -87,3 +87,43 @@ async def _reject(send: Send) -> None:
         }
     )
     await send({"type": "http.response.body", "body": body})
+
+
+# Swagger and ReDoc load their scripts and styles from a CDN.
+_DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+_API_CSP = b"default-src 'none'; frame-ancestors 'none'"
+
+
+class SecurityHeadersMiddleware:
+    """Headers on every response: no framing, no type sniffing, no
+    referrer; on the API a CSP that allows nothing (it serves JSON, not
+    pages) and no caching of sign-in responses; HSTS over HTTPS. The
+    frontend's pages get their own CSP (frontend/src/proxy.ts)."""
+
+    def __init__(self, app: Callable[[Scope, Receive, Send], Awaitable[None]]) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope["path"]
+
+        async def with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers += [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"x-frame-options", b"DENY"),
+                    (b"referrer-policy", b"no-referrer"),
+                ]
+                if not path.startswith(_DOCS_PATHS):
+                    headers.append((b"content-security-policy", _API_CSP))
+                if path.startswith(f"{settings.API_V1_STR}/auth"):
+                    headers.append((b"cache-control", b"no-store"))
+                if settings.COOKIE_SECURE:
+                    headers.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains"))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, with_headers)

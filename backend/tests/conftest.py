@@ -17,6 +17,7 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services import ingestion_background  # noqa: E402
+from app.services.rate_limit import login_limiter  # noqa: E402
 
 # The DB fixture creates and drops every table, so tests only ever use a
 # database named *_test (TEST_DATABASE_URL), never the app's own: falling back
@@ -50,6 +51,14 @@ requires_db = pytest.mark.skipif(
     )
     + "; skipping DB-backed test.",
 )
+
+
+@pytest.fixture(autouse=True)
+def _sign_in_defaults(monkeypatch):
+    """The test client talks plain http, so the session cookie mustn't be
+    HTTPS-only; and each test starts with no sign-in attempts counted."""
+    monkeypatch.setattr(settings, "COOKIE_SECURE", False)
+    login_limiter.reset()
 
 
 @pytest.fixture

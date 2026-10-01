@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import OrgPicker from "@/components/OrgPicker";
 import { AppProvider } from "@/context/AppContext";
+import { setToken } from "@/lib/apiClient";
 import { mockApi, org } from "@/test/helpers";
 
 async function renderPicker(routes = {}) {
-  window.localStorage.setItem("auditmind_token", "tok");
+  setToken("tok");
   let orgs = [org(), org({ id: "org-2", name: "Globex", role: "viewer" })];
   const fetchMock = mockApi({
     "GET /orgs": () => orgs,

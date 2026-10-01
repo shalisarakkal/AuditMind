@@ -4,26 +4,38 @@ import { vi } from "vitest";
 import OrgGate from "@/components/OrgGate";
 import { AppProvider } from "@/context/AppContext";
 import { ImportsProvider } from "@/context/ImportsContext";
+import { setToken } from "@/lib/apiClient";
 import type { MyOrganization, Scan, UserRole } from "@/lib/types";
 
-export const API = "http://127.0.0.1:8000/api/v1";
+export const API = "/api/v1";
 
 type Handler = (init: RequestInit) => unknown | Response | Promise<unknown | Response>;
 
 /** Replaces fetch with handlers keyed by "METHOD /path" (path after /api/v1).
  * A key with a query string matches only that query; one without matches the
  * path with any query. A handler returns a body (sent as 200 JSON) or a full
- * Response. Returns the mock so tests can inspect calls. */
+ * Response. Returns the mock so tests can inspect calls. Unless routes say
+ * otherwise, there's no session cookie: POST /auth/refresh is refused. */
 export function mockApi(routes: Record<string, Handler>) {
+  const all: Record<string, Handler> = { "POST /auth/refresh": () => json({ detail: NO_SESSION }, 401), ...routes };
   const fetchMock = vi.fn(async (url: string, init: RequestInit = {}) => {
     const key = `${init.method ?? "GET"} ${url.replace(API, "")}`;
-    const handler = routes[key] ?? routes[key.split("?")[0]];
+    const handler = all[key] ?? all[key.split("?")[0]];
     if (!handler) throw new Error(`Unexpected request: ${key}`);
     const result = await handler(init);
     return result instanceof Response ? result : json(result);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+const NO_SESSION = { code: "session_ended", message: "Please sign in again." };
+
+/** The fetch calls made to "METHOD /path" (in order), as [url, init]. */
+export function callsTo(fetchMock: ReturnType<typeof mockApi>, key: string): [string, RequestInit][] {
+  return (fetchMock.mock.calls as [string, RequestInit][]).filter(
+    ([url, init]) => `${init?.method ?? "GET"} ${url.replace(API, "")}` === key,
+  );
 }
 
 /** The RequestInit of the index-th fetch call. */
@@ -82,7 +94,7 @@ export async function renderSignedIn(
   routes: Record<string, Handler> = {},
   pollIntervalMs = 10,
 ) {
-  window.localStorage.setItem("auditmind_token", "test-token");
+  setToken("test-token");
   const fetchMock = mockApi({
     "GET /orgs": () => [org({ role })],
     "GET /orgs/org-1/scans?tracked=true": () => [],

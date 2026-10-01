@@ -46,8 +46,16 @@ once the steps below are done, `start-dev.ps1` opens all three in their own wind
 powershell -ExecutionPolicy Bypass -File start-dev.ps1
 ```
 
-- Backend: http://127.0.0.1:8000 (docs at `/docs`)
-- Frontend: http://127.0.0.1:3000
+- Frontend: http://localhost:3000 (open the app here)
+- Backend: http://127.0.0.1:8000 (docs at `/docs`). The app reaches it through the
+  frontend's own `/api`, so the sign-in session cookie works; for local development
+  over http, `backend/.env` has `COOKIE_SECURE=false`
+
+In production, put a reverse proxy (e.g. nginx) in front that sends `/api` to the
+backend itself with the visitor's address (`X-Forwarded-For`, and uvicorn's
+`--forwarded-allow-ips`), and everything else to the frontend; serve over HTTPS with
+`COOKIE_SECURE=true`. Through the frontend's own forwarding every request looks as if
+it came from one address, which the per-address sign-in limit would count together.
 
 Docker Compose (`infra/docker-compose.yml`) hasn't been kept up to date since Phase 1
 and doesn't start the worker; this project is developed without Docker (see
@@ -78,9 +86,11 @@ Phases 1-2 are done: multi-organization accounts and roles; asset and findings u
 (CSV, JSON, Nessus, and tool exports through import profiles) with per-row reports;
 large uploads processed by the background worker with progress, recovery and Retry;
 archive, restore and purge with retention; an Activity log; paged, searchable lists;
-rule-based risk scores on the Dashboard.
+rule-based risk scores on the Dashboard. Phase 2e part 1: sign-in sessions checked on
+every request (sign-out, idle and longest sign-in), lockout, the Simple/Complex password
+rule and Change password.
 
-Next: users and organization administration (Phase 2e), activity and audit log
+Next: the rest of users and organization administration (Phase 2e), activity and audit log
 sources (Phase 2f), then the AI audit and reports (Phase 3). `PLAN.md` tracks every
 phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the
 original roadmap.

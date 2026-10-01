@@ -24,6 +24,12 @@ class Organization(Base):
     ingestion_overrides: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
+    # The org's changes to the platform's security settings (idle time,
+    # lockout, password rule); only changed keys are stored, like
+    # ingestion_overrides (see app/services/security_policy.py).
+    security_settings: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
 
     memberships: Mapped[list["OrgMembership"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"

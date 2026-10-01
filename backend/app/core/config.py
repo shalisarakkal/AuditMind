@@ -23,8 +23,28 @@ class Settings(BaseSettings):
     # Required: the server and worker refuse the default or a short one
     # (check_secret_key below).
     SECRET_KEY: str = "change-me-to-a-random-secret"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    # The sign-in token the app holds in memory; it's renewed through the
+    # session cookie, so a short life costs nothing. How long someone stays
+    # signed in is the security settings' idle and longest sign-in.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(15, ge=1, le=60)
     ALGORITHM: str = "HS256"
+
+    # --- Sign-in sessions. ---
+    # The session cookie is sent over HTTPS only. False for local development
+    # over http (backend/.env.example).
+    COOKIE_SECURE: bool = True
+    # Sign-in attempts allowed from one address a minute, over all accounts.
+    # Behind a proxy, run uvicorn with --forwarded-allow-ips=<the proxy's
+    # address> so each person's own address is counted (127.0.0.1, the
+    # frontend's own proxy in development, is trusted by default).
+    LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(20, ge=1)
+    # Days a temporary password (set by an admin) can be used to sign in.
+    TEMP_PASSWORD_DAYS: int = Field(7, ge=1)
+    # A session's last activity is saved at most this often (seconds).
+    SESSION_TOUCH_SECONDS: int = Field(60, ge=1)
+    # The security settings themselves (idle time, longest sign-in, lockout,
+    # password rule) aren't here: the platform defaults are in the database,
+    # set by the Sysadmin, over built-in values (services/security_policy.py).
 
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-5"
@@ -32,6 +52,8 @@ class Settings(BaseSettings):
     # timed-out or failed request twice more before giving up.
     CLAUDE_TIMEOUT_SECONDS: float = Field(60.0, gt=0)
 
+    # Where people open the app: sign-in and session renewal are refused
+    # from pages anywhere else (and CORS allows these to call the API).
     CORS_ORIGINS: str = "http://localhost:3000"
 
     # --- File imports (asset import, findings upload). Global only. ---

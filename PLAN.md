@@ -904,15 +904,128 @@ plus self-service password change):
       Sysadmin. An archived org is read-only for its members and shown as
       "Archived" in the picker; the Sysadmin can restore it, or purge it after
       typing its name; the purge log records it
-- [ ] Sign-in token out of `localStorage` (CoPilot review, finding 7): a
+- [x] Sign-in token out of `localStorage` (CoPilot review, finding 7): a
       short-lived token kept in memory plus an `HttpOnly`, `Secure`,
       `SameSite` cookie to renew it (with CSRF protection), so injected
       script can't read it; signing out, a password change or a reset ends
-      the user's other sessions. Plus security headers (CSP)
+      the user's other sessions. Plus security headers (CSP). Done in
+      Part 1 (below)
 - [ ] From CoPilotSuggestions (2026-09-30): an org can never lose its last
       admin (removing, demoting or deactivating them is refused); a role
       change, removal or deactivation also ends that user's sessions; tests
       that each admin action stays inside its own org
+
+### Decisions (2026-10-01, all as recommended)
+
+- Sign-in: sessions are stored and checked on every request, so ending one
+  takes effect at once; the frontend reaches the API through its own
+  address (same origin) so the cookie works. Emails are lower-cased
+  everywhere (the migration checks for clashes). "Deactivated" is shown only
+  after a correct password. A temporary password expires in 7 days
+- People: an org admin resets the password only of people who belong to
+  that org alone, otherwise the Sysadmin does. Adding someone who already
+  has an account gives no temporary password ("they sign in with their
+  existing password"). Removing someone's last membership keeps the
+  account. The People page is visible to all members; its actions to
+  admins only
+- Sysadmin: a separate account with no memberships, created only by the
+  script. In an emergency it resets passwords, deactivates/reactivates
+  users and changes roles, but never changes an org's data. It has a
+  Platform section (Organizations, Users, Platform activity) and sees every
+  org read-only in the picker
+- Organizations: created with name, industry and size plus the first
+  admin. Archiving is refused while jobs run; an archived org is read-only
+  for everyone and processes no uploads. Never purged automatically: the
+  Sysadmin purges after typing its name
+- Account menu: Change password, Sign out
+- Delivered in three parts: (1) sessions and accounts, (2) people, (3)
+  Sysadmin, organization lifecycle and the security settings screens
+
+### Security settings per organization
+
+The Sysadmin sets platform defaults in the app; a new org starts with them,
+and its admins can change them within these ranges (Settings > Security).
+The password, sign-in and lockout belong to the account, so for someone in
+several orgs the strictest value of each setting applies, and a message
+names the org that requires it. Every limit is read through one function
+(effective_policy, services/security_policy.py): the built-in values, the
+platform defaults, then each org's changes. Part 3 adds the screens.
+
+| Setting | Range | Default |
+|---|---|---|
+| Signed out after idle | 10 minutes to 10 hours | 8 hours |
+| Longest sign-in | 2 to 10 days | 7 days |
+| Failed sign-ins before locking | 0 (never locks) or 3 to 6 | 5 |
+| Window the failures are counted over | 10 to 20 minutes | 15 minutes |
+| How long the lock lasts | 10 to 20 minutes, or until an admin unlocks | 15 minutes |
+| Password rule | Simple or Complex | Simple |
+
+- Locked until an admin unlocks: any admin of one of the person's orgs, or
+  the Sysadmin, can unlock (recorded in Activity); the sign-in page says
+  "Your account is locked. Ask your administrator to unlock it."
+- Simple: 12 to 128 characters, not the email or the current password
+- Complex: the admin sets the minimum length (12 to 64, default 14);
+  upper case, lower case, digit and symbol each required or not (default
+  all); no reuse of the last 0 to 24 passwords (default 5); expiry after 30
+  to 365 days, or never (default never)
+- A per-IP limit on sign-in attempts (20 a minute) is a fixed server
+  setting, not per org
+
+### Part 1: sessions and accounts (built 2026-10-01, awaiting verification)
+
+- [x] Sessions stored and checked on every request (`user_sessions`): sign-out,
+      idle and longest sign-in end them at once; the access token (15 min)
+      lives in the page's memory, renewed by an HttpOnly, SameSite=Strict
+      cookie scoped to /api/v1/auth; refresh and logout need the app's
+      header and an Origin of ours (CSRF)
+- [x] The frontend reaches the API through its own /api (next.config.ts
+      rewrites; uploads up to 2 GB pass through); the app's own polling is
+      marked background, so an open page still times out when idle
+- [x] Lockout (count in a window, timed lock or until an admin unlocks, 0 =
+      never), revealed only after a correct password; per-address limit
+      of 20 sign-ins a minute (in memory, per web-server process)
+- [x] Password rule Simple/Complex with history, expiry, the 7-day
+      temporary password and forced change; lengths count characters in any
+      language; passwords normalized (NFKC) and hashed whole
+      (bcrypt_sha256; old hashes upgraded at sign-in)
+- [x] Security settings stored per org (`organizations.security_settings`)
+      and as platform defaults (`platform_settings`), strictest wins, with
+      the org named in messages; screens come in Part 3
+- [x] Change password page (also the forced one) and an account menu
+      (Change password, Sign out); emails lower-cased everywhere (migration
+      0015 stops on emails differing only in case)
+- [x] Security headers: the API's (nosniff, no framing, no-store on /auth,
+      HSTS over HTTPS) and the pages' CSP with a per-request nonce
+      (src/proxy.ts)
+- [x] Service functions ready for Part 2: end a user's sessions, set a
+      temporary password, unlock
+- Production note: a reverse proxy should send /api straight to the
+  backend with the visitor's address; through Next's forwarding every
+  sign-in comes from one address (README). CORS_ORIGINS must list the
+  site's public address: sign-in checks the browser's Origin against it
+- Review (2026-10-01), fixed: a server restart while renewing no longer
+  signs people out; Change password locks the account row like sign-in
+  (guesses sent together each count); the rules name each org asking for
+  a kind of character; .env.example gaps
+- Left for Part 3: when an admin lengthens the longest sign-in, the
+  browser's cookie keeps its old expiry until the next sign-in (renew it
+  on refresh); the sign-up page says "Email already registered" (public
+  sign-up goes in Part 3)
+
+### Part 2: people (not started)
+
+Besides the people decisions above:
+
+- [ ] Names can be edited (agreed 2026-10-01). Everyone edits their own on
+      a Your account page in the account menu (beside Change password),
+      which also shows their email and their orgs and roles. An org admin
+      edits the name of people who belong to that org alone; anyone in
+      several orgs is renamed by the Sysadmin (the password-reset rule).
+      Each rename is recorded in Activity with the old and new names
+- [ ] The email (the sign-in ID) can't be edited by its owner or an org
+      admin: changing it safely needs a confirmation email. The Sysadmin
+      may change it until email is set up; self-service with a
+      confirmation link comes with email
 
 ## Phase 2f — Activity and audit log sources (after Phase 2e, before Phase 3)
 

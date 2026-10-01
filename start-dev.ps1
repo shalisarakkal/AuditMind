@@ -20,4 +20,4 @@ Open-Window 'AuditMind backend' $backend '.\.venv\Scripts\uvicorn.exe app.main:a
 Open-Window 'AuditMind worker' $backend '.\.venv\Scripts\python.exe -m app.worker'
 Open-Window 'AuditMind frontend' $frontend 'npm run dev'
 
-Write-Host 'Started: backend http://localhost:8000, frontend http://localhost:3000, and the background worker.'
+Write-Host 'Started: the backend, the background worker and the frontend. Open the app at http://localhost:3000.'
