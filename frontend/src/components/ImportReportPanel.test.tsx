@@ -18,6 +18,16 @@ const report = {
 };
 
 describe("ImportReportPanel", () => {
+  it("counts each asset once and its other rows as repeats", () => {
+    const repeats = { ...report, created: 10800, updated: 0, repeated: 489200, errors: [], failed: 0, duplicates: 0 };
+    render(<ImportReportPanel result={{ status: "completed", report: repeats, filename: "ad.csv", scanType: "directory_import" }} />);
+
+    const panel = screen.getByRole("region", { name: "Upload result" });
+    expect(panel).toHaveTextContent("Assets created 10,800");
+    expect(panel).toHaveTextContent("Rows repeated an asset listed earlier in the file 489,200");
+    expect(panel).not.toHaveTextContent("Existing assets updated");
+  });
+
   it("shows the non-zero counts and each row problem", () => {
     render(<ImportReportPanel result={{ status: "completed", report, filename: "scan.csv", scanType: "network_scan_import" }} />);
 
@@ -25,7 +35,7 @@ describe("ImportReportPanel", () => {
     expect(panel).toHaveTextContent("scan.csv — processed");
     // Each count says what it counts: a tool export makes assets and findings.
     expect(panel).toHaveTextContent("Assets created 4");
-    expect(panel).toHaveTextContent("Assets updated 1");
+    expect(panel).toHaveTextContent("Existing assets updated 1");
     expect(panel).toHaveTextContent("Duplicate findings skipped 2");
     expect(panel).not.toHaveTextContent("left unchanged");
     expect(panel).not.toHaveTextContent("Warnings");
@@ -80,7 +90,7 @@ describe("ImportReportPanel", () => {
     const panel = screen.getByRole("region", { name: "Upload result" });
     expect(panel).toHaveTextContent("scan.csv — processed");
     expect(panel).toHaveTextContent("Assets created 4");
-    expect(panel).toHaveTextContent("Assets updated 1");
+    expect(panel).toHaveTextContent("Existing assets updated 1");
     expect(panel).toHaveTextContent("Findings created 8");
     expect(panel).toHaveTextContent("Duplicate findings skipped 1");
     expect(panel).toHaveTextContent("Warnings 2");

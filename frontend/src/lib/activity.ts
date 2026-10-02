@@ -68,8 +68,9 @@ export function timing(event: ActivityEvent): string | null {
 const COUNT_LABELS: Record<string, string> = {
   // Imports (backend ingestion_service.event_counts).
   assets_created: "assets created",
-  assets_updated: "assets updated",
-  assets_skipped: "assets left unchanged",
+  assets_updated: "existing assets updated",
+  assets_skipped: "existing assets left unchanged",
+  rows_repeated: "rows repeated an asset listed earlier in the file",
   findings_created: "findings created",
   duplicate_findings: "duplicate findings skipped",
   items_skipped: "items skipped",

@@ -323,11 +323,12 @@ def process_import(
 # record them under these names, so "900 created" says what was created.
 _EVENT_COUNTS = {
     "assets": {"created": "assets_created", "updated": "assets_updated", "skipped": "assets_skipped",
-               "failed": "rows_failed"},
+               "repeated": "rows_repeated", "failed": "rows_failed"},
     "findings": {"created": "findings_created", "duplicates": "duplicate_findings", "skipped": "items_skipped",
                  "failed": "rows_failed"},
     "profile": {"created": "assets_created", "updated": "assets_updated", "skipped": "assets_skipped",
-                "findings_created": "findings_created", "duplicates": "duplicate_findings", "failed": "rows_failed"},
+                "repeated": "rows_repeated", "findings_created": "findings_created",
+                "duplicates": "duplicate_findings", "failed": "rows_failed"},
 }
 
 
@@ -878,6 +879,8 @@ class _Publisher:
                 details=row.details,
             )
             report.created += 1
+        elif existing.id in writes.linked and self.strategy == "skip":
+            report.repeated += 1  # left as its first row had it
         elif self.strategy == "skip":
             report.skipped += 1
             if len(report.skipped_rows) < MAX_REPORTED_ERRORS:
@@ -906,7 +909,12 @@ class _Publisher:
             )
             # Details are merged, so facts from different sources accumulate.
             writes.update_asset(existing.id, values, row.details or None)
-            report.updated += 1
+            # Named by an earlier row of this file (created or matched by it):
+            # a repeat, not another asset updated.
+            if existing.id in writes.linked:
+                report.repeated += 1
+            else:
+                report.updated += 1
         writes.link(existing.id)
         return existing
 

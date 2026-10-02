@@ -35,15 +35,24 @@ class RowNote(BaseModel):
 
 class ImportReport(BaseModel):
     """For files that create assets and findings together (profile imports),
-    created/updated/skipped count assets, and findings_created/duplicates
-    count findings. Otherwise created/updated/skipped count the file's own
-    records."""
+    created/updated/skipped/repeated count assets, and
+    findings_created/duplicates count findings. Otherwise
+    created/updated/skipped count the file's own records.
+
+    Each asset the upload names is counted once, by its first row: created
+    (new), updated (already in the inventory) or skipped (already there,
+    left unchanged, strategy "skip"); its later rows are `repeated`. So the
+    assets an upload names are created + updated + skipped."""
 
     created: int = 0
     updated: int = 0
     # Assets left untouched (strategy "skip"), and Nessus Info items when
     # Info is set to be skipped.
     skipped: int = 0
+    # Rows naming an asset an earlier row of the same file already named:
+    # they update it (later rows win), or leave it (strategy "skip").
+    # Uploads before 2026-10-02 counted these as updated (or skipped).
+    repeated: int = 0
     # Findings identical to one already recorded (same asset, source, category).
     duplicates: int = 0
     failed: int = 0

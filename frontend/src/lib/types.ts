@@ -135,8 +135,12 @@ export type RowNote = { row: number; item: string; message: string };
  * findings_created/duplicates count findings. */
 export type ImportReport = {
   created: number;
+  /** Assets already in the inventory, updated (each once). */
   updated: number;
   skipped: number;
+  /** Rows naming an asset an earlier row of the file named (absent before
+   * 2026-10-02, when these were counted as updated). */
+  repeated?: number;
   duplicates: number;
   failed: number;
   findings_created: number;

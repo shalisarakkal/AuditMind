@@ -440,7 +440,11 @@ export function progressText(scan: Scan, workerDown = false): string {
   const progress = scan.progress;
   if (workerDown && scan.status === "pending") return `${STOPPED} This upload starts when it's back.`;
   if (scan.status === "pending") return WAITING;
-  if (workerDown && runByWorker(scan)) return `${STOPPED} This upload starts again from the beginning when it's back.`;
+  // The worker keeps what it has read and checked (Phase 2f): it carries on
+  // from there; one cut off while writing writes again, nothing half-written.
+  if (workerDown && runByWorker(scan)) {
+    return `${STOPPED} This upload carries on from where it got to when it's back.`;
+  }
   switch (progress?.phase) {
     case "waiting":
       return "Waiting for another upload into this organization to finish processing…";

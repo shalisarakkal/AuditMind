@@ -36,6 +36,7 @@ def test_csv_import_creates_assets_and_records_a_scan(client, admin, db_session)
         "created": 4,
         "updated": 0,
         "skipped": 0,
+        "repeated": 0,
         "duplicates": 0,
         "failed": 0,
         "findings_created": 0,
@@ -118,7 +119,8 @@ def test_ip_only_match_never_merges_differently_named_hosts(client, admin):
 
 def test_duplicate_rows_within_one_file_are_matched(client, admin):
     body = _import(client, admin, "a.csv", b"type,hostname\nserver,web\nserver,WEB\n").json()
-    assert (body["report"]["created"], body["report"]["updated"]) == (1, 1)
+    # The second row repeats the first: one asset, not one created and one updated.
+    assert (body["report"]["created"], body["report"]["updated"], body["report"]["repeated"]) == (1, 0, 1)
     assert len(_assets(client, admin)) == 1
 
 
@@ -224,7 +226,7 @@ def test_a_later_row_replaces_the_type_and_its_subtype_together(client, admin):
     # so no subtype) must not keep the earlier row's "Laptop" subtype.
     body = _import(client, admin, "a.csv", b"type,hostname\nLaptop,host-1\nWorkstation,host-1\n").json()
 
-    assert (body["report"]["created"], body["report"]["updated"]) == (1, 1)
+    assert (body["report"]["created"], body["report"]["updated"], body["report"]["repeated"]) == (1, 0, 1)
     [asset] = _assets(client, admin)
     assert (asset["type"], asset["subtype"]) == ("workstation", None)
 
@@ -244,7 +246,7 @@ def test_an_asset_listed_twice_with_different_values_is_warned_about(client, adm
 
     report = _import(client, admin, "a.csv", content).json()["report"]
 
-    assert (report["created"], report["updated"]) == (2, 2)
+    assert (report["created"], report["updated"], report["repeated"]) == (2, 0, 2)
     assert report["warnings"] == [
         {
             "row": 4,
@@ -327,3 +329,22 @@ def test_type_names_match_whatever_their_spacing(client, admin):
         ("lb-2", "network_device", "load-balancer"),
         ("vm-1", "server", "VIRTUAL_MACHINE"),
     }
+
+
+@pytest.mark.parametrize(
+    "strategy, expected",
+    [
+        ("update", {"created": 1, "updated": 1, "skipped": 0, "repeated": 2}),
+        ("skip", {"created": 1, "updated": 0, "skipped": 1, "repeated": 2}),
+    ],
+)
+def test_each_asset_is_counted_once_and_its_other_rows_as_repeats(client, admin, monkeypatch, strategy, expected):
+    """web was in the inventory, db is new; each is named twice more. The
+    assets the upload names: created + updated + skipped = 2."""
+    from app.core.config import settings
+
+    _import(client, admin, "a.csv", b"type,hostname\nserver,web\n")
+    monkeypatch.setattr(settings, "ASSET_EXISTING_STRATEGY", strategy)
+    content = b"type,hostname,environment\nserver,web,prod\nserver,db,prod\nserver,web,test\nserver,db,test\n"
+    report = _import(client, admin, "b.csv", content).json()["report"]
+    assert {k: report[k] for k in expected} == expected

@@ -4,11 +4,21 @@ import type { ImportReport } from "@/lib/types";
 // ingestion_service.event_counts): an asset list counts assets; a findings
 // file, findings; a tool export (import profile), assets and then findings.
 
-type ReportKey = "created" | "updated" | "skipped" | "findings_created" | "duplicates" | "failed";
+type ReportKey = "created" | "updated" | "skipped" | "repeated" | "findings_created" | "duplicates" | "failed";
 type Kind = "assets" | "findings" | "profile";
 
+// Each asset is counted once, by its first row (created, updated or left
+// unchanged); its later rows are repeats (backend ImportReport.repeated).
+const REPEATED = "rows repeated an asset listed earlier in the file";
+
 const LABELS: Record<Kind, Partial<Record<ReportKey, string>>> = {
-  assets: { created: "assets created", updated: "assets updated", skipped: "assets left unchanged", failed: "rows failed" },
+  assets: {
+    created: "assets created",
+    updated: "existing assets updated",
+    skipped: "existing assets left unchanged",
+    repeated: REPEATED,
+    failed: "rows failed",
+  },
   findings: {
     created: "findings created",
     duplicates: "duplicate findings skipped",
@@ -17,8 +27,9 @@ const LABELS: Record<Kind, Partial<Record<ReportKey, string>>> = {
   },
   profile: {
     created: "assets created",
-    updated: "assets updated",
-    skipped: "assets left unchanged",
+    updated: "existing assets updated",
+    skipped: "existing assets left unchanged",
+    repeated: REPEATED,
     findings_created: "findings created",
     duplicates: "duplicate findings skipped",
     failed: "rows failed",
@@ -44,7 +55,7 @@ export function importCounts(scanType: string | undefined, report: Partial<Impor
     .filter((c) => c.count > 0);
 }
 
-/** "900 assets created, 9,100 assets updated, 2,792 findings created". */
+/** "900 assets created, 9,100 existing assets updated, 2,792 findings created". */
 export function importCountsText(scanType: string | undefined, report: Partial<ImportReport>): string {
   return importCounts(scanType, report)
     .map((c) => `${c.count.toLocaleString("en-US")} ${c.label}`)

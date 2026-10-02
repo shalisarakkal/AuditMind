@@ -384,7 +384,7 @@ def test_a_different_cloud_id_is_a_different_resource_even_with_the_same_name(cl
 
     report = _import(client, admin, "c.csv", "cloud_inventory", content).json()["report"]
 
-    assert (report["created"], report["updated"]) == (2, 1)
+    assert (report["created"], report["updated"], report["repeated"]) == (2, 0, 1)
     names = {a.cloud_id: a.hostname for a in db_session.query(Asset)}
     assert names == {"i-1": "web-renamed", "i-2": "web"}
 

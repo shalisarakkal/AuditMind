@@ -205,7 +205,7 @@ describe("helpers", () => {
     // Events carried over from before kept every count, zeros included.
     expect(eventSummary(event({ counts: { failed: 0, assets_created: 66306, warnings_total: 0 } }))).toBe("66,306 assets created");
     expect(eventSummary(event({ counts: { assets_created: 900, assets_updated: 9100, findings_created: 2792, duplicate_findings: 4990 } }))).toBe(
-      "900 assets created, 9,100 assets updated, 2,792 findings created, 4,990 duplicate findings skipped",
+      "900 assets created, 9,100 existing assets updated, 2,792 findings created, 4,990 duplicate findings skipped",
     );
     expect(
       eventSummary(event({ type: "settings_changed", counts: null, details: { archive_retention_days: { from: null, to: 30 } } })),
