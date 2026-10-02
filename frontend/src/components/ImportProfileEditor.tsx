@@ -50,6 +50,16 @@ export default function ImportProfileEditor({ orgId, profile, onSaved, onCancel 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // An event log's rules: which are on, and at what severity.
+  const [rules, setRules] = useState<Record<string, { enabled: boolean; severity: Severity }>>(() =>
+    Object.fromEntries(
+      (profile.rules ?? []).map((rule) => [
+        rule.key,
+        { enabled: p.rules?.[rule.key]?.enabled ?? true, severity: p.rules?.[rule.key]?.severity ?? rule.severity },
+      ]),
+    ),
+  );
+  const events = Boolean(profile.events);
   const endpoint = profile.family === "endpoint_agent";
   const network = profile.family === "network_scan";
   const directory = profile.family === "directory";
@@ -69,6 +79,19 @@ export default function ImportProfileEditor({ orgId, profile, onSaved, onCancel 
     }
     Object.assign(result, severities);
     if (endpoint || directory) result.day_first_dates = dayFirst;
+    if (events) {
+      // Only what differs from each rule's default is stored.
+      result.rules = Object.fromEntries(
+        (profile.rules ?? []).flatMap((rule) => {
+          const setting = rules[rule.key];
+          const changed = {
+            ...(setting.enabled ? {} : { enabled: false }),
+            ...(setting.severity !== rule.severity ? { severity: setting.severity } : {}),
+          };
+          return Object.keys(changed).length ? [[rule.key, changed]] : [];
+        }),
+      );
+    }
     if (endpoint) {
       result.compliance_severity = rowsToMap(compliance) as Record<string, Severity>;
     }
@@ -137,11 +160,54 @@ export default function ImportProfileEditor({ orgId, profile, onSaved, onCancel 
             </label>
           ))}
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
-          <input type="checkbox" checked={keepOther} onChange={(e) => setKeepOther(e.target.checked)} />
-          Keep the file&apos;s other columns in each asset&apos;s details
-        </label>
+        {!events && (
+          <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
+            <input type="checkbox" checked={keepOther} onChange={(e) => setKeepOther(e.target.checked)} />
+            Keep the file&apos;s other columns in each asset&apos;s details
+          </label>
+        )}
       </Block>
+
+      {events && (
+        <Block
+          title="Rules"
+          help="Each rule sums up the events it matches into one finding per upload (with how many, first and last seen, who and where most often, and examples)."
+        >
+          <div className="space-y-2">
+            {(profile.rules ?? []).map((rule) => (
+              <div key={rule.key} className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+                <label className="flex min-w-72 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={rules[rule.key].enabled}
+                    onChange={(e) => setRules({ ...rules, [rule.key]: { ...rules[rule.key], enabled: e.target.checked } })}
+                  />
+                  {rule.title}
+                </label>
+                <select
+                  aria-label={`Severity for ${rule.title}`}
+                  value={rules[rule.key].severity}
+                  disabled={!rules[rule.key].enabled}
+                  onChange={(e) =>
+                    setRules({ ...rules, [rule.key]: { ...rules[rule.key], severity: e.target.value as Severity } })
+                  }
+                  className={selectClass}
+                >
+                  {SEVERITY_CHOICES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-white/50">
+                  {DOMAIN_LABELS[rule.domain]}
+                  {rule.min_events > 1 ? `, from ${rule.min_events} events` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Block>
+      )}
 
       <Block title="Default values" help="Used when the file has no value for a field, e.g. Environment → production.">
         <PairRows
@@ -272,18 +338,20 @@ export default function ImportProfileEditor({ orgId, profile, onSaved, onCancel 
         </Block>
       )}
 
-      <Block title="Type names" help="This format's own names for asset types, on top of the organization's list.">
-        <PairRows
-          rows={aliases}
-          onChange={setAliases}
-          keyLabel="Format type name"
-          valueLabel="Category for format type name"
-          keyPlaceholder="e.g. Hypervisor"
-          valueChoices={TYPE_CHOICES}
-          newValue="server"
-          addLabel="+ Add type name"
-        />
-      </Block>
+      {!events && (
+        <Block title="Type names" help="This format's own names for asset types, on top of the organization's list.">
+          <PairRows
+            rows={aliases}
+            onChange={setAliases}
+            keyLabel="Format type name"
+            valueLabel="Category for format type name"
+            keyPlaceholder="e.g. Hypervisor"
+            valueChoices={TYPE_CHOICES}
+            newValue="server"
+            addLabel="+ Add type name"
+          />
+        </Block>
+      )}
 
       {error && <p className="text-sm text-red-300">{error}</p>}
       <div className="flex gap-3">

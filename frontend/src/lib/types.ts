@@ -100,6 +100,19 @@ export type Finding = {
   description: string | null;
   source: string | null;
   created_at: string;
+  /** An event log's finding: how many events it sums up, and when. */
+  event_count?: number | null;
+  first_seen?: string | null;
+  last_seen?: string | null;
+  details?: EventDetails | null;
+};
+
+/** What an event log's finding keeps about its events (backend event_sources.py). */
+export type EventDetails = {
+  rule?: string;
+  actors?: { distinct: string; top: { value: string; events: number }[] };
+  scopes?: { name: string; distinct: string; top: { value: string; events: number }[] };
+  examples?: Record<string, unknown>[];
 };
 
 /** A finding in the org's paged list, with its asset's name. */
@@ -139,7 +152,7 @@ export type ImportReport = {
   updated: number;
   skipped: number;
   /** Rows naming an asset an earlier row of the file named (absent before
-   * 2026-10-02, when these were counted as updated). */
+   * 2026-10-01, when these were counted as updated). */
   repeated?: number;
   duplicates: number;
   failed: number;
@@ -262,6 +275,10 @@ export type ImportProfile = {
   creates_assets: boolean;
   creates_findings: boolean;
   fields: ProfileField[];
+  /** An event log: its events are summed up by rules into findings (no
+   * assets, no host column needed). */
+  events?: boolean;
+  rules?: EventRule[];
   /** Field -> column header in the file. */
   column_map: Record<string, string>;
   params: ProfileParams;
@@ -359,7 +376,12 @@ export type ProfileParams = {
   ok_values?: string[];
   stale_login_days?: number;
   stale_severity?: Severity;
+  /** An event log's rules as the profile changes them. */
+  rules?: Record<string, { enabled?: boolean; severity?: Severity | null }>;
 };
+
+/** One of an event log source's rules, with its defaults. */
+export type EventRule = { key: string; title: string; domain: Domain; severity: Severity; min_events: number };
 
 /** A person's state (backend services/people.py). */
 export type MemberStatus = "active" | "locked" | "must_change_password" | "deactivated";

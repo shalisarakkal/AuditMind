@@ -8,7 +8,10 @@ from tests.helpers import first_org_id, member, register
 
 pytestmark = requires_db
 
-BUILTIN_KEYS = ["generic_assets", "generic_findings", "endpoint_agent", "network_scan", "cloud_inventory", "directory"]
+BUILTIN_KEYS = [
+    "generic_assets", "generic_findings", "endpoint_agent", "network_scan", "cloud_inventory", "directory",
+    "azure_activity", "aws_cloudtrail", "gcp_audit", "ossem_events",
+]
 
 
 @pytest.fixture
@@ -45,6 +48,7 @@ def test_builtins_are_listed_with_their_fields_and_settings(client, admin):
         (True, True),  # network scan
         (True, False),  # cloud inventory
         (True, True),  # directory
+        *[(False, True)] * 4,  # event logs: findings that sum events up
     ]
     assert profiles[3]["params"]["risky_ports"]["23"] == {"label": "Telnet", "severity": "high"}
 

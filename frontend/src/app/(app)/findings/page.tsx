@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
@@ -16,6 +16,7 @@ import {
   ListTable,
   ListToolbar,
   PageHeader,
+  ROW_ACTION_VIEW,
   SELECT_CELL,
   SelectBox,
   SelectionAction,
@@ -35,7 +36,7 @@ import {
   canWrite,
   formatDateTime,
 } from "@/lib/domain";
-import type { FindingFacets, FindingListItem, FindingPage, ImportProfile } from "@/lib/types";
+import type { EventDetails, FindingFacets, FindingListItem, FindingPage, ImportProfile } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useSelection } from "@/lib/useSelection";
@@ -67,6 +68,8 @@ function Findings() {
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
   const selection = useSelection(list, org.id);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
+  // The event log finding whose details are open.
+  const [opened, setOpened] = useState<string | null>(null);
   const nameOf = (f: FindingListItem) => f.description ?? f.category ?? "finding";
   // Only findings added by hand, not being archived, can be picked.
   const pickable = (f: FindingListItem) => f.scan_id === null && f.archiving !== "running";
@@ -185,7 +188,8 @@ function Findings() {
                 <EmptyRow colSpan={writer ? 8 : 6} noun="findings" filtered={list.hasFilters} />
               )}
               {page.items.map((f) => (
-                <tr key={f.id} className="border-t border-white/10 text-white/80">
+                <Fragment key={f.id}>
+                <tr className="border-t border-white/10 text-white/80">
                   {writer && (
                     <td className={SELECT_CELL}>
                       {f.scan_id === null && <SelectBox selection={selection} id={f.id} name={nameOf(f)} disabled={!pickable(f)} />}
@@ -199,6 +203,25 @@ function Findings() {
                   <td className="px-4 py-2">
                     <p className="text-white">{f.description ?? f.category ?? "—"}</p>
                     {f.description && f.category && <p className="text-xs text-white/50">{f.category}</p>}
+                    {f.event_count != null && (
+                      <p className="mt-1 text-xs text-white/60">
+                        {f.event_count.toLocaleString("en-US")} {f.event_count === 1 ? "event" : "events"}
+                        {f.first_seen && f.last_seen && `, ${formatDateTime(f.first_seen)} to ${formatDateTime(f.last_seen)}`}
+                        {/* Under the text, not in the actions column: that's
+                            shown only to writers, and everyone may look
+                            (docs/UI_CONVENTIONS.md). */}
+                        {f.details && (
+                          <button
+                            type="button"
+                            aria-expanded={opened === f.id}
+                            onClick={() => setOpened(opened === f.id ? null : f.id)}
+                            className={`ml-3 ${ROW_ACTION_VIEW}`}
+                          >
+                            {opened === f.id ? "Hide details" : "Details"}
+                          </button>
+                        )}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-2">{DOMAIN_LABELS[f.domain]}</td>
                   <td className="truncate px-4 py-2" title={f.asset_cloud_id ?? undefined}>
@@ -221,11 +244,56 @@ function Findings() {
                     </td>
                   )}
                 </tr>
+                {opened === f.id && f.details && (
+                  <tr className="text-white/80">
+                    <td colSpan={writer ? 8 : 6} className="px-4 pb-4">
+                      <EventDetailsPanel details={f.details} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
         </ListTable>
       )}
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
+    </div>
+  );
+}
+
+/** What an event log finding keeps about its events: who and where most
+ * often, and a few of the events themselves. */
+function EventDetailsPanel({ details }: { details: EventDetails }) {
+  const top = (title: string, part?: { distinct: string; top: { value: string; events: number }[] }) =>
+    part && part.top.length > 0 ? (
+      <div>
+        <p className="text-xs uppercase tracking-wide text-white/50">
+          {title} ({part.distinct} in all)
+        </p>
+        <ul className="mt-1 space-y-0.5 text-xs">
+          {part.top.map((entry) => (
+            <li key={entry.value} className="flex justify-between gap-4">
+              <span className="truncate">{entry.value}</span>
+              <span className="text-white/50">{entry.events.toLocaleString("en-US")}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+  return (
+    <div role="region" aria-label="Event details" className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {top("Most frequent actors", details.actors)}
+        {top(`Most frequent ${details.scopes?.name ?? "scopes"}`, details.scopes)}
+      </div>
+      {details.examples && details.examples.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-white/50">Example events</p>
+          <pre className="mt-1 max-h-64 overflow-auto rounded bg-navy p-2 text-xs text-white/70">
+            {details.examples.map((example) => JSON.stringify(example)).join("\n")}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

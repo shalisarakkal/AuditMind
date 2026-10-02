@@ -278,9 +278,8 @@ def test_a_tool_export_imported_as_a_generic_list_explains_itself(client, admin)
             "row": 0,
             "message": "Nothing was imported: this file's columns (resourceid, type) don't match this source, which "
             "needs a hostname, ip or cloud_id column and expects type, hostname and/or ip or cloud_id, and "
-            "optionally subtype, environment, criticality, tags. If the file is a tool's export, import it with "
-            "that tool's source; event logs (cloud activity, audit or endpoint security events) can't be "
-            "imported yet.",
+            "optionally subtype, environment, criticality, tags. If the file is a tool's export or an event log "
+            "(Azure Activity, CloudTrail, GCP Audit, endpoint security events), import it with that source.",
         }
     ]
 

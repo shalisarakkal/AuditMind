@@ -44,6 +44,23 @@ class GenericAssetsParams(ProfileParams):
     pass
 
 
+class RuleSetting(BaseModel):
+    """An event source's rule, as a profile changes it (omitted: the
+    rule's own default)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    severity: Severity | None = None
+
+
+class EventLogParams(ProfileParams):
+    """An event log source (Phase 2f part 2): rule key -> its setting. The
+    rules and their defaults are the source's (services/event_sources.py)."""
+
+    rules: dict[str, RuleSetting] = {}
+
+
 class GenericFindingsParams(ProfileParams):
     pass
 
@@ -156,6 +173,17 @@ class ProfileField(BaseModel):
     detail: bool = False
 
 
+class EventRuleRead(BaseModel):
+    """One of an event source's rules, with its defaults."""
+
+    key: str
+    title: str
+    domain: Domain
+    severity: Severity
+    # Fewer matching events than this: no finding.
+    min_events: int
+
+
 class ImportProfileRead(BaseModel):
     """A built-in profile (key = its family) or one of the org's own copies
     (key = its id)."""
@@ -169,6 +197,10 @@ class ImportProfileRead(BaseModel):
     creates_findings: bool
     # The fields this family reads, for the column mapping editor.
     fields: list[ProfileField]
+    # An event log: its events are summed up by rules into findings (no
+    # assets, and no host column needed); the rules, for the editor.
+    events: bool = False
+    rules: list[EventRuleRead] = []
     # Field -> column header in the file.
     column_map: dict[str, str]
     params: dict

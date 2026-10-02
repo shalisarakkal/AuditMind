@@ -180,6 +180,18 @@ describe("Import tracking", () => {
     expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument();
   });
 
+  it("drops the report of an upload archived or purged since, without an error", async () => {
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", {
+      ...server(() => [scan({ summary: REPORT })]),
+      "POST /orgs/org-1/scans/s1/dismiss": () => json({ detail: "Scan not found" }, 404),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Upload result" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("keeps the report if dismissing fails", async () => {
     await renderSignedIn(<ImportStatus page="assets" />, "admin", {
       ...server(() => [scan({ summary: REPORT })]),

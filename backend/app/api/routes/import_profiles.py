@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.import_profile import ImportProfile
 from app.models.membership import OrgMembership
-from app.schemas.import_profile import ImportProfileCreate, ImportProfileRead, ImportProfileUpdate
+from app.schemas.import_profile import EventRuleRead, ImportProfileCreate, ImportProfileRead, ImportProfileUpdate
 from app.schemas.ingestion import ImportResponse
 from app.services.import_profiles import (
     FAMILIES,
@@ -40,6 +40,11 @@ def _read(
         creates_assets=family.creates_assets,
         creates_findings=family.creates_findings,
         fields=list(family.fields),
+        events=family.events is not None,
+        rules=[
+            EventRuleRead(key=r.key, title=r.title, domain=r.domain, severity=r.severity, min_events=r.min_events)
+            for r in (family.events.rules if family.events else ())
+        ],
         column_map=column_map,
         params=params,
         created_at=row.created_at if row else None,

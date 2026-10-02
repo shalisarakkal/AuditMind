@@ -12,6 +12,10 @@ Row flow: map the record's columns to fields -> fill blanks from the
 profile's default values -> the family builds the asset row (with details) and
 its findings. A ValueError fails the row; anything recoverable (a value that
 can't be read, an unusual IP) becomes a warning instead.
+
+Event logs (Phase 2f part 2, event_sources.py) are families too, but their
+rows are summed up: a profile of one reads an import's rows with a fresh
+EventTally (ProfileConfig.start), which gives findings once all are read.
 """
 
 import json
@@ -32,12 +36,15 @@ from app.schemas.import_profile import (
     CloudInventoryParams,
     DirectoryParams,
     EndpointAgentParams,
+    EventLogParams,
     GenericAssetsParams,
     GenericFindingsParams,
     NetworkScanParams,
     ProfileField,
     ProfileParams,
 )
+from app.services import event_sources
+from app.services.event_sources import EventSource, EventTally, lookup
 from app.services.ingestion_service import AssetRow, FindingRow, IngestionError, validate_asset, validate_finding
 from app.services.org_settings import IngestionSettings
 
@@ -88,7 +95,10 @@ class Family:
     fields: tuple[ProfileField, ...]
     default_column_map: dict[str, str]
     params_model: type[ProfileParams]
-    read: Callable[["ProfileConfig", int, dict, dict, IngestionSettings, list[str]], tuple[AssetRow | None, list[FindingRow]]]
+    # How a row becomes an asset and findings. None for an event log, whose
+    # rows are summed up by its rules instead (events; ProfileConfig.start).
+    read: Callable[["ProfileConfig", int, dict, dict, IngestionSettings, list[str]], tuple[AssetRow | None, list[FindingRow]]] | None = None
+    events: EventSource | None = None
 
     @property
     def field_names(self) -> set[str]:
@@ -119,17 +129,28 @@ class ProfileConfig:
         """The file's header for a field (its first name), for messages."""
         return self.column_map.get(field, field).split("|")[0].strip()
 
+    def start(self) -> "ProfileConfig | EventTally":
+        """What reads one import's rows: the profile itself, or for an
+        event log a fresh tally (see ingestion_service._RowChecker)."""
+        return EventTally(self) if self.family.events else self
+
+    def values(self, record: dict) -> dict[str, Any]:
+        """Each mapped field's value: its first column (or nested path,
+        "userIdentity.arn") the record has a value for."""
+        values: dict[str, Any] = {}
+        for field, header in self.column_map.items():
+            values[field] = next(
+                (value for name in column_names(header) if (value := lookup(record, name)) is not None), None
+            )
+        return values
+
     def read_row(
         self, row: int, record: Any, ingestion: IngestionSettings, warnings: list[str]
     ) -> tuple[AssetRow | None, list[FindingRow]]:
         if not isinstance(record, dict):
             raise ValueError("record must be an object")
-        values: dict[str, Any] = {}
-        read: set[str] = set()
-        for field, header in self.column_map.items():
-            names = column_names(header)
-            read.update(names)
-            values[field] = next((record[name] for name in names if name in record), None)
+        values = self.values(record)
+        read = {name for header in self.column_map.values() for name in column_names(header)}
         type_defaulted = False
         for field, default in self.params.default_values.items():
             if _blank(values.get(field)):
@@ -220,6 +241,11 @@ def validate_profile_parts(family: Family, column_map: dict, params: dict) -> tu
     for field in parsed.default_values:
         if field not in family.field_names:
             raise ValueError(f"default_values: {field!r} is not a field of {family.label} (fields: {_names(family)})")
+    if family.events:
+        known = {rule.key for rule in family.events.rules}
+        for key in getattr(parsed, "rules", {}):
+            if key not in known:
+                raise ValueError(f"params.rules: {key!r} is not a rule of {family.label} (rules: {', '.join(sorted(known))})")
     return cleaned, parsed
 
 
@@ -394,6 +420,92 @@ def _read_directory(profile, row, values, record, ingestion, warnings):
     return asset, findings
 
 
+def _event_family(
+    key: str, label: str, json_list_key: str, fields: dict[str, tuple[str, str]], source: EventSource
+) -> Family:
+    """fields: name -> (label, default columns)."""
+    return Family(
+        key=key,
+        label=label,
+        creates_assets=False,
+        creates_findings=True,
+        json_list_key=json_list_key,
+        fields=tuple(ProfileField(name=name, label=label) for name, (label, _) in fields.items()),
+        default_column_map={name: columns for name, (_, columns) in fields.items()},
+        params_model=EventLogParams,
+        events=source,
+    )
+
+
+EVENT_FAMILIES = (
+    _event_family(
+        "azure_activity",
+        "Azure Activity Log",
+        "value",
+        {
+            "time": ("Time", "time|eventTimestamp|timestamp"),
+            "operation": ("Operation", "operation_name|operationName.value|operationName"),
+            "status": ("Status", "status.value|status"),
+            "caller": ("Caller", "caller"),
+            "subscription": ("Subscription", "subscription_id|subscriptionId"),
+            "resource_group": ("Resource group", "resource_group|resourceGroupName"),
+            "resource": ("Resource", "resource_id|resourceId|resource_type|resourceType.value"),
+        },
+        event_sources.AZURE_ACTIVITY,
+    ),
+    _event_family(
+        "aws_cloudtrail",
+        "AWS CloudTrail",
+        "Records",
+        {
+            "time": ("Time", "event_time|eventTime"),
+            "event_name": ("Event", "event_name|eventName"),
+            "identity_type": ("Identity type", "user_identity|userIdentity.type"),
+            "actor": ("Identity", "userIdentity.arn|userIdentity.userName|user_identity"),
+            "source_ip": ("Source IP", "source_ip|sourceIPAddress"),
+            "region": ("Region", "aws_region|awsRegion"),
+            # A failed call has an errorCode; a failed console sign-in only an
+            # errorMessage, and responseElements.ConsoleLogin "Failure".
+            "error": ("Error", "errorCode|error_code|errorMessage|error_message"),
+            "console_result": ("Console sign-in result", "responseElements.ConsoleLogin|console_login"),
+        },
+        event_sources.AWS_CLOUDTRAIL,
+    ),
+    _event_family(
+        "gcp_audit",
+        "GCP Audit Logs",
+        "entries",
+        {
+            "time": ("Time", "timestamp|receiveTimestamp"),
+            "method": ("Method", "method_name|protoPayload.methodName"),
+            "status": ("Status", "status|protoPayload.status.code"),
+            "principal": ("Principal", "principal_email|protoPayload.authenticationInfo.principalEmail"),
+            "project": ("Project", "project_id|resource.labels.project_id"),
+            "resource": ("Resource", "resource_name|protoPayload.resourceName"),
+        },
+        event_sources.GCP_AUDIT,
+    ),
+    _event_family(
+        "ossem_events",
+        "Endpoint security events (OSSEM)",
+        "records",
+        {
+            "time": ("Time", "timestamp|@timestamp|event.created"),
+            "user": ("User", "user.name|user"),
+            "process": ("Process", "process.name"),
+            "command_line": ("Command line", "process.command_line|process.commandline|commandline"),
+            "file_path": ("File", "file.path|targetfilename"),
+            "registry_key": ("Registry key", "registry.key|registry.path|targetobject"),
+            "src_ip": ("Source IP", "network.src_ip|source.ip"),
+            "dst_ip": ("Destination IP", "network.dst_ip|destination.ip"),
+            "event_type": ("Event type", "event_type|event.action"),
+            "host": ("Host", "host.name|host.hostname|computer|hostname"),
+        },
+        event_sources.OSSEM_EVENTS,
+    ),
+)
+
+
 def _read_cloud_inventory(profile, row, values, record, ingestion, warnings):
     details = _details(values, ("region",))
     return validate_asset(row, values, profile.type_aliases(ingestion), warnings, details=details), []
@@ -517,6 +629,7 @@ FAMILIES: dict[str, Family] = {
             params_model=DirectoryParams,
             read=_read_directory,
         ),
+        *EVENT_FAMILIES,
     )
 }
 

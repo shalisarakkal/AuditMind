@@ -142,7 +142,7 @@ describe("ImportButton with import profiles", () => {
     expect((requestInit(fetchMock, uploaded(fetchMock)).body as FormData).get("profile")).toBe(CUSTOM_EDR_PROFILE.key);
   });
 
-  it("won't import a file no source can read (e.g. an activity log): Cancel is the way out", async () => {
+  it("won't import a file no source can read (here an activity log, its source not installed): Cancel is the way out", async () => {
     const { fetchMock } = await renderWithProfiles({});
     const activityLog = JSON.stringify([
       { operation_id: "AZ-1", time: "t", operation_name: "x", subscription_id: "s", resource_group: "r", resource_type: "v", status: "ok", caller: "u" },

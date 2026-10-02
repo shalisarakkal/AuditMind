@@ -147,3 +147,23 @@ export const BUILTIN_PROFILES = [
   CLOUD_PROFILE,
   DIRECTORY_PROFILE,
 ];
+
+export const AZURE_PROFILE = profile({
+  key: "azure_activity",
+  name: "Azure Activity Log",
+  family: "azure_activity",
+  creates_assets: false,
+  events: true,
+  fields: ["time", "operation", "status", "caller", "subscription"].map((name) => ({ name, label: name, detail: false })),
+  column_map: {
+    time: "time|eventTimestamp",
+    operation: "operation_name|operationName.value",
+    status: "status.value|status",
+    caller: "caller",
+    subscription: "subscription_id|subscriptionId",
+  },
+  rules: [
+    { key: "role_assignment_created", title: "Role assignment created", domain: "identity_access", severity: "high", min_events: 1 },
+    { key: "failed_operations", title: "Failed operations", domain: "identity_access", severity: "medium", min_events: 10 },
+  ],
+});

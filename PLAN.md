@@ -443,7 +443,8 @@ the report only to its uploader, until they dismiss it (for good).
       hosts by (generic: hostname/ip/cloud_id; tool sources: their own names,
       e.g. ResourceID, DeviceName), and the source supplies no default.
       Switching to a source that can read it re-enables Import; if none can
-      (activity logs), the note says so and Cancel is the way out. Judged per
+      (a file no source knows; event logs have sources since Phase 2f), the
+      note says so and Cancel is the way out. Judged per
       selected source, not by auto-detection, so a minimal generic file
       (type,hostname: too few columns to be detected) still imports
 - [x] `backend/scripts/split_json.py` (2026-09-28): splits a large JSON import
@@ -1124,11 +1125,11 @@ audit can reason over these findings too. Test files:
 S:\AuditMind-Scratch\TestData\synthetic_assets\ (azure_azure_activity,
 cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
 
-- [ ] Prerequisite, moved here from Phase 4: read large files in chunks
+- [x] Prerequisite, moved here from Phase 4: read large files in chunks
       (saved to disk, processed in batches), so memory stays flat at any
       size; all-or-nothing imports get a check-first pass. Log exports are
       routinely this large (split_json.py is the stopgap until then)
-- [ ] Imports that resume from where they were cut off (from Part 3
+- [x] Imports that resume from where they were cut off (from Part 3
       verification, 2026-09-30: a 500K upload cut off while writing rows
       started again from reading). Today an import is one transaction, so
       a cut-off loses everything and the restart redoes it all (~3-5 min
@@ -1141,22 +1142,24 @@ cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
       Builds on the chunked reading above. To settle at the start: matching
       and duplicate checks against rows staged but not yet published, two
       uploads into one org (the org lock stays held until publish?), and
-      clearing a staging area left by a failed import
-- [ ] Sources (import profiles) for Azure Activity Log, AWS CloudTrail and
+      clearing a staging area left by a failed import (all settled: see
+      Part 1 below)
+- [x] Sources (import profiles) for Azure Activity Log, AWS CloudTrail and
       GCP Audit Logs, detected from their columns like the existing ones
-- [ ] Endpoint security events in the OSSEM format (Sysmon/EDR telemetry;
+- [x] Endpoint security events in the OSSEM format (Sysmon/EDR telemetry;
       test file ossem_ossem_events_500000.csv: event_id, timestamp,
       user.name, process.name/pid/command_line, file.path, registry.key,
       network.src_ip/dst_ip, event_type). Signals in the sample: encoded
       PowerShell (-enc), Run-key persistence, DLLs in Temp. It names no host
-      (no host.name column): decide what its findings attach to
-      (network.src_ip? a host column in real exports?)
-- [ ] Rules that turn events into findings, grouped rather than one per event
+      (no host.name column): settled by decision 8 (no asset; per host when
+      a log names hosts)
+- [x] Rules that turn events into findings, grouped rather than one per event
       (500K events would flood the list), e.g. role/permission assignments
       and policy changes (Identity & Access), deletions, firewall/network
       rule changes (Network & Config), repeated failed operations,
       logging/monitoring switched off (Monitoring & Detection)
-- Open questions for the start of the phase: which events count as risky
+- Open questions for the start of the phase (all answered by the
+  decisions below): which events count as risky
   and at what thresholds; what a finding attaches to, since these records
   name a subscription/resource group/resource type but no resource ID (the
   subscription or resource group as an asset? the caller?); the time window
@@ -1165,8 +1168,9 @@ cloudtrail_cloudtrail, gcp_gcp_audit; 142-176 MB, 500K events each).
   are grouped on)
 - From CoPilotSuggestions (2026-09-30), for the chunked reading above: a
   test that a file bigger than the worker's memory imports with flat
-  memory; limits for malformed or deeply nested JSON and for compressed
-  files
+  memory (done: the readers' flat-memory test); limits for malformed or
+  deeply nested JSON (an event log's examples are bounded) and for
+  compressed files (still open)
 
 ### Decisions (2026-10-01, all as recommended)
 
@@ -1277,6 +1281,57 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
   now tested with a stand-in source whose count survives a resume; test
   clean-ups. Accepted: JSON with NaN/Infinity (not valid JSON) is now
   refused
+
+### Part 2: event-log sources (built 2026-10-01, in review)
+
+- Four built-in sources (families of kind "events"): Azure Activity, AWS
+  CloudTrail, GCP Audit, OSSEM; detected from their columns; flat test
+  layout and real export layouts (CloudTrail {"Records": [...]} and
+  userIdentity.arn, Azure properties.*, GCP protoPayload.*): a field name
+  is a literal column or a dotted path into nested JSON
+- Rules (decision 13) tally matching events: count, first and last seen,
+  top 10 actors and scopes, up to 5 examples; one finding per rule per
+  upload (OSSEM with a host column: per host, on that host's asset). The
+  tally is saved with each staged chunk (Part 1's seam, with a fresh tally
+  per import). Distinct actors/scopes counted exactly up to 5,000, then
+  "over 5,000"
+- Findings: migration 0018 adds event_count, first_seen, last_seen,
+  details; no asset (but OSSEM per host); the category holds the date
+  range, so a later export adds findings and the same file is a duplicate;
+  they count as findings
+- Screens: the "event logs can't be read yet" block lifted for these
+  sources; File formats lists each source's rules (on/off, severity);
+  Findings shows each one's events and Details (period, top actors and
+  scopes, examples); rows without an asset show "—"
+- Built: services/event_sources.py (sources, rules, EventTally), the four
+  families in import_profiles.py (ProfileConfig.start() gives each import a
+  fresh tally; values() reads columns or nested paths), EventLogParams
+  (rule settings, unknown rules refused), migration 0018 (findings:
+  event_count, first_seen, last_seen, details), findings on no asset with
+  their own duplicate check, the profiles API listing each source's rules;
+  File formats rules block; Findings shows "N events, first to last" under
+  the finding with Details (not a column of its own: every column there is
+  sortable, and this one needn't be)
+- Measured: each 500K-event test log imports in 17-25 s into 3-6
+  findings (Azure 3, CloudTrail 6, GCP 4, OSSEM 5)
+- Also fixed (found by the user): dismissing the report of an upload since
+  archived or purged said "Scan not found"; the report now just goes, and
+  the tracker reloads after archive jobs
+- Review (3 reviewers, 2026-10-01), fixed: a failed CloudTrail console
+  sign-in (no errorCode, only errorMessage and ConsoleLogin "Failure") was
+  counted as a sign-in; two logs of different subscriptions/accounts/
+  projects over the same dates collided as duplicates (the title now
+  names a single scope, or counts several with a short reference to
+  which); hosts differing only in case made two findings; unbounded per
+  host groups (at most 500 hosts per rule, then one "other hosts"
+  finding), value lengths (300), examples (4 levels, 1,600 characters)
+  and the text a pattern checks (8 KB, so a huge command line can't make
+  it slow); the dead row reader of event families, duplicated rule
+  helpers; outdated tests and notes. The Details toggle under a finding is
+  an allowed exception in docs/UI_CONVENTIONS.md (the actions column is
+  only shown to those who can change things). Two logs with neither a
+  scope nor host columns, over the same dates, still look alike (nothing
+  tells them apart)
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 

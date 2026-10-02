@@ -51,7 +51,7 @@ class ImportReport(BaseModel):
     skipped: int = 0
     # Rows naming an asset an earlier row of the same file already named:
     # they update it (later rows win), or leave it (strategy "skip").
-    # Uploads before 2026-10-02 counted these as updated (or skipped).
+    # Uploads before this change (2026-10-01) counted these as updated (or skipped).
     repeated: int = 0
     # Findings identical to one already recorded (same asset, source, category).
     duplicates: int = 0

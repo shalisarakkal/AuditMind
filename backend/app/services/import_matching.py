@@ -228,9 +228,11 @@ class FindingIndex:
             return finding_key(*row[:4]), scan_id and uploads.setdefault(scan_id, scan_id)
 
         asset_ids = list(asset_ids)
+        # Findings on no asset (an event log's, about a whole tenant): few.
+        origins: dict[tuple, Origin] = dict(entry(row) for row in db.execute(query.where(Finding.asset_id.is_(None))))
         if len(asset_ids) > TARGETED_LOAD_MAX:  # the whole org: one pass
-            return cls(dict(entry(row) for row in db.execute(query.where(Finding.asset_id.is_not(None)))))
-        origins: dict[tuple, Origin] = {}
+            origins.update(entry(row) for row in db.execute(query.where(Finding.asset_id.is_not(None))))
+            return cls(origins)
         for chunk in _chunks(asset_ids):
             origins.update(entry(row) for row in db.execute(query.where(Finding.asset_id.in_(chunk))))
         return cls(origins)

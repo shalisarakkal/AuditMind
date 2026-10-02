@@ -182,7 +182,8 @@ const IDENTITY_FIELDS = ["hostname", "ip", "cloud_id"];
  * names), or the source fills one in by default. Files whose columns are
  * unknown ([]) are given the benefit of the doubt: the server reports. */
 export function canRead(profile: ImportProfile, columns: string[]): boolean {
-  if (columns.length === 0) return true;
+  // An event log's findings sum its events up: no host needed.
+  if (columns.length === 0 || profile.events) return true;
   const present = new Set(columns.map((c) => c.trim().toLowerCase()));
   return IDENTITY_FIELDS.some(
     (field) =>

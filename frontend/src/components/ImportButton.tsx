@@ -198,8 +198,8 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
             <p role="note" className="basis-full text-right text-xs text-amber-300">
               {noSourceReads ? (
                 <>
-                  No source can read this file: none of its columns ({shortList(columns)}) identifies a host. Event
-                  logs (cloud activity, audit or endpoint security events) can&apos;t be read yet; press Cancel.
+                  No source can read this file: none of its columns ({shortList(columns)}) identifies a host,
+                  and it isn&apos;t an event log we know. Pick a source, or press Cancel.
                 </>
               ) : (
                 <>

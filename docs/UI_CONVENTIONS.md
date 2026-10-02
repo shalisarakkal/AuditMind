@@ -61,6 +61,10 @@ Agreed 2026-09-30.
   the request or in the background; a small one done in the request then
   says "Archived" until the row leaves the list; a job that stopped
   part-way offers "Retry …" (`JobButton`).
+  One exception: a toggle that only opens more about a row, which every
+  member may see, can sit under the row's text instead (Findings: an event
+  log finding's Details), since the actions column is shown only to those
+  who can change things.
 - **Several at once**: where rows take an action (archive, restore,
   purge), writers get a checkbox column first (`SelectBox`, and
   `SelectPageBox` in the header for the page's rows; `useSelection`).

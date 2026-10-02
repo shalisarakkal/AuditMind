@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import type { ImportResult } from "@/components/ImportReportPanel";
 import { useApp } from "@/context/AppContext";
-import { api } from "@/lib/apiClient";
+import { api, ApiError } from "@/lib/apiClient";
 import { countsText } from "@/lib/domain";
 import type { ArchiveAction, ArchiveItemType, ArchiveJob, BulkResult, ImportReport, Scan, WorkerStatus } from "@/lib/types";
 
@@ -159,7 +159,12 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     async (scanId: string) => {
       if (!orgId) return;
       const request = begin();
-      await api.post<Scan>(`/orgs/${orgId}/scans/${scanId}/dismiss`);
+      try {
+        await api.post<Scan>(`/orgs/${orgId}/scans/${scanId}/dismiss`);
+      } catch (err) {
+        // Archived or purged since: its report is gone anyway.
+        if (!(err instanceof ApiError && err.status === 404)) throw err;
+      }
       current.current.dismissed.add(scanId);
       apply(
         orgId,
@@ -181,7 +186,15 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     [orgId, apply, track],
   );
 
-  const onJobsFinished = useCallback((count: number) => setFinishedCount((c) => c + count), []);
+  // An archive, restore or purge finished: pages reload, and so does this
+  // list (an upload archived or purged no longer has a report to show).
+  const onJobsFinished = useCallback(
+    (count: number) => {
+      setFinishedCount((c) => c + count);
+      void loadAll();
+    },
+    [loadAll],
+  );
   const { jobs, startJob, startBulk, dismissJob, requested } = useArchiveJobs(orgId, pollIntervalMs, onJobsFinished);
 
   // Waiting for the worker, or being run by it (a job it was running when it

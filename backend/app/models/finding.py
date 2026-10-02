@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,6 +43,13 @@ class Finding(Base):
     description: Mapped[str | None] = mapped_column(Text)
     raw_data: Mapped[dict | None] = mapped_column(JSONB)
     source: Mapped[str | None] = mapped_column(String(100))
+    # A finding that sums an event log's events up (Phase 2f part 2): how
+    # many, first and last seen, and details (top actors and scopes,
+    # examples). Empty for other findings.
+    event_count: Mapped[int | None] = mapped_column(Integer)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    details: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

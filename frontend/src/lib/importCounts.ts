@@ -38,7 +38,17 @@ const LABELS: Record<Kind, Partial<Record<ReportKey, string>>> = {
 
 // Findings files, and the import profile that records findings only
 // (backend ingestion_service.FINDINGS_ONLY_SCAN_TYPES).
-const FINDINGS_ONLY = ["findings_csv", "findings_json", "nessus", "generic_findings_import"];
+const FINDINGS_ONLY = [
+  "findings_csv",
+  "findings_json",
+  "nessus",
+  "generic_findings_import",
+  // Event logs: findings that sum events up (Phase 2f part 2).
+  "azure_activity_import",
+  "aws_cloudtrail_import",
+  "gcp_audit_import",
+  "ossem_events_import",
+];
 
 export function importKind(scanType: string | undefined): Kind {
   if (scanType === "asset_import") return "assets";

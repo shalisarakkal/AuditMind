@@ -31,6 +31,11 @@ class FindingRead(BaseModel):
     description: str | None
     source: str | None
     created_at: datetime
+    # An event log's finding: the events it sums up (else null).
+    event_count: int | None = None
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
+    details: dict | None = None
 
 
 class FindingListItem(FindingRead):

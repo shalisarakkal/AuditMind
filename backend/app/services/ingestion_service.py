@@ -126,6 +126,11 @@ class FindingRow:
     source: str
     raw_data: dict = field(default_factory=dict)
     cloud_id: str | None = None
+    # An event log's finding sums events up (event_sources.py).
+    event_count: int | None = None
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
+    details: dict | None = None
 
 
 # Told how a large import goes: (phase, done, total). Phases, in order:
@@ -148,10 +153,12 @@ class RowReader(Protocol):
         self, row: int, record: Any, ingestion: IngestionSettings, warnings: list[str]
     ) -> tuple[AssetRow | None, list[FindingRow]]: ...
 
-    # A profile that sums rows up (event logs, Phase 2f part 2) may also have
-    # finish() -> list[StagedRow], called once every row is read, and
-    # snapshot() -> dict / restore(dict), so what it has gathered survives a
-    # resume. See _RowChecker.
+    # Optional extras, found with getattr (see _RowChecker): start() gives
+    # what reads one import's rows (an event log's profile gives a fresh
+    # tally of its own); a reader that sums rows up (event logs, Phase 2f
+    # part 2) has finish() -> list[StagedRow], called once every row is
+    # read, and snapshot() -> dict / restore(dict), so what it has gathered
+    # survives a resume.
 
 
 # --- Formats ---------------------------------------------------------------
@@ -333,7 +340,17 @@ _EVENT_COUNTS = {
 
 
 # Import profiles that record findings only: their "created" counts findings.
-FINDINGS_ONLY_SCAN_TYPES = ("findings_csv", "findings_json", "nessus", "generic_findings_import")
+FINDINGS_ONLY_SCAN_TYPES = (
+    "findings_csv",
+    "findings_json",
+    "nessus",
+    "generic_findings_import",
+    # Event logs (Phase 2f part 2): findings that sum events up.
+    "azure_activity_import",
+    "aws_cloudtrail_import",
+    "gcp_audit_import",
+    "ossem_events_import",
+)
 
 
 def import_kind(scan_type: str) -> str:
@@ -525,7 +542,10 @@ class _RowChecker:
     def __init__(self, kind: ImportKind, ingestion: IngestionSettings, profile: RowReader | None):
         self.kind = kind
         self.ingestion = ingestion
-        self.profile = profile
+        # What reads this import's rows: the profile, or (an event log) a
+        # fresh tally of its own.
+        start = getattr(profile, "start", None)
+        self.profile = start() if start else profile
 
     def check(self, row: int, record: Any, state: ReadState) -> StagedRow | None:
         row_warnings: list[str] = []
@@ -640,8 +660,8 @@ def _wrong_source_hint(kind: ImportKind, columns: list[str]) -> str | None:
     return (
         f"Nothing was imported: this file's columns ({shown}) don't match this source, which needs a "
         f"hostname, ip or cloud_id column and expects {_EXPECTED_COLUMNS[kind]}. If the file is a tool's "
-        "export, import it with that tool's source; event logs (cloud activity, audit or endpoint security "
-        "events) can't be imported yet."
+        "export or an event log (Azure Activity, CloudTrail, GCP Audit, endpoint security events), "
+        "import it with that source."
     )
 
 
@@ -920,6 +940,10 @@ class _Publisher:
 
     def _finding(self, row: FindingRow, asset: IndexedAsset | None) -> None:
         index, writes = self.index, self.writes
+        if asset is None and not (row.hostname or row.ip or row.cloud_id):
+            # An event log's finding about no one host (a whole tenant).
+            self._create_finding(row, None)
+            return
         if asset is None:
             matches = index.find(row.hostname, row.ip, row.cloud_id)
             if not matches:
@@ -949,26 +973,35 @@ class _Publisher:
                     writes.update_asset(asset.id, filled)
 
         writes.link(asset.id)
-        key = finding_key(asset.id, row.source, row.category, row.description)
+        self._create_finding(row, asset)
+
+    def _create_finding(self, row: FindingRow, asset: IndexedAsset | None) -> None:
+        """Unless the same finding is already recorded (on its asset, or for
+        no asset): then it's counted as a duplicate."""
+        key = finding_key(asset.id if asset else None, row.source, row.category, row.description)
         if key in self.findings:
             self.report.duplicates += 1
             if len(self.duplicates) < MAX_REPORTED_ERRORS:
                 self.duplicates.append((row, self.findings.origin(key)))
             return
         self.findings.add(key, row.row)  # later rows in the same file dedup against it
-        writes.create_finding(
+        self.writes.create_finding(
             {
                 "id": uuid.uuid4(),
                 "org_id": self.org_id,
                 "scan_id": self.scan_id,
-                "asset_id": asset.id,
+                "asset_id": asset.id if asset else None,
                 "category": row.category,
                 "domain": row.domain,
                 "severity": row.severity,
                 "description": row.description,
                 "source": row.source,
                 "raw_data": row.raw_data,
-                "created_at": writes.created_at(),
+                "event_count": row.event_count,
+                "first_seen": row.first_seen,
+                "last_seen": row.last_seen,
+                "details": row.details,
+                "created_at": self.writes.created_at(),
             }
         )
         setattr(self.report, self.count_findings_as, getattr(self.report, self.count_findings_as) + 1)
