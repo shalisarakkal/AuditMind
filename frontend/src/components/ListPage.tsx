@@ -271,12 +271,13 @@ export function SelectionBar({ selection, children }: { selection: Selection; ch
 }
 
 /** A button in the SelectionBar; red for what can't be undone. */
-export function SelectionAction({ onClick, danger = false, children }: { onClick(): void; danger?: boolean; children: React.ReactNode }) {
+export function SelectionAction({ onClick, danger = false, disabled = false, children }: { onClick(): void; danger?: boolean; disabled?: boolean; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1 text-sm font-medium text-navy hover:opacity-90 ${danger ? "bg-red-400/80" : "bg-cyan"}`}
+      disabled={disabled}
+      className={`rounded-md px-3 py-1 text-sm font-medium text-navy hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${danger ? "bg-red-400/80" : "bg-cyan"}`}
     >
       {children}
     </button>

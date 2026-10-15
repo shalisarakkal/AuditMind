@@ -8,6 +8,10 @@ from app.models.finding import Finding
 from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.document import Document
+from app.models.knowledge import (
+    KnowledgeDocument, KnowledgeVersion, EmbeddingProfile, KnowledgeIndex,
+    KnowledgeChunk, KnowledgeConsent, ReportEvidenceUse,
+)
 from app.models.import_profile import ImportProfile
 from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
 from app.models.event import Event, WorkerStatus

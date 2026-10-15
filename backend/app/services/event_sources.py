@@ -235,7 +235,10 @@ class EventTally:
                 group.last = when if group.last is None or when > group.last else group.last
             group.actors.add(text(values.get(self.source.actor_field)))
             if self.source.scope_field:
-                group.scopes.add(text(values.get(self.source.scope_field)))
+                scope = text(values.get(self.source.scope_field))
+                if self.source is AWS_CLOUDTRAIL and values.get("account"):
+                    scope = f"{text(values['account'])}/{scope or 'global'}"
+                group.scopes.add(scope)
             if group.hosts is not None:
                 group.hosts.add(host.lower())  # hosts are told apart without regard to case
             if len(group.examples) < EXAMPLES:

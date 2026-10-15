@@ -121,9 +121,10 @@ def renew(
     policy = effective_policy(db, session.user)
     session.idle_minutes = policy.idle_minutes
     session.expires_at = session.created_at + timedelta(days=policy.max_session_days)
+    _check(db, session, now)
     _touch(session, now, background)
     db.commit()
-    return _check(db, session, now), policy
+    return session, policy
 
 
 def session_from_cookie(db: Session, raw_token: str | None) -> UserSession | None:

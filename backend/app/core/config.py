@@ -51,11 +51,21 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-5"
+    # Exposes a local-only rule-based report workflow for UI/download testing.
+    RULE_BASED_TEST_REPORTS_ENABLED: bool = False
     # How long one Claude request may take (seconds); the SDK retries a
     # timed-out or failed request twice more before giving up.
     CLAUDE_TIMEOUT_SECONDS: float = Field(60.0, gt=0)
 
+    # --- Embeddings & RAG Knowledge Base ---
+    OPENAI_API_KEY: str = ""
+    VOYAGE_API_KEY: str = ""
+    # "local_deterministic", "openai", or "voyage"
+    EMBEDDING_PROVIDER: str = "local_deterministic"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+
     # Where people open the app: sign-in and session renewal are refused
+
     # from pages anywhere else (and CORS allows these to call the API).
     CORS_ORIGINS: str = "http://localhost:3000"
 

@@ -25,7 +25,11 @@ class Document(Base):
     title: Mapped[str | None] = mapped_column(String(255))
     content: Mapped[str | None] = mapped_column(Text)
     content_ref: Mapped[str | None] = mapped_column(String(500))
+    framework: Mapped[str | None] = mapped_column(String(50), index=True)
+    control_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    version: Mapped[str | None] = mapped_column(String(20))
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+

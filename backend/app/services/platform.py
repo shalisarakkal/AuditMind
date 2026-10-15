@@ -212,6 +212,11 @@ def set_active(db: Session, user: User, actor: User, active: bool) -> None:
         return
     _not_the_sysadmin(user, actor, "deactivate" if not active else "reactivate")
     if not active:
+        org_ids = db.scalars(
+            select(OrgMembership.org_id).where(OrgMembership.user_id == user.id).order_by(OrgMembership.org_id)
+        ).all()
+        for org_id in org_ids:
+            people._lock_org_members(db, org_id)
         alone = people.orgs_needing(db, user)
         if alone:
             raise PeopleError(

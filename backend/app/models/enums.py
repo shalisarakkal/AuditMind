@@ -40,8 +40,11 @@ class ScanStatus(str, enum.Enum):
 
 class ReportStatus(str, enum.Enum):
     pending = "pending"
+    running = "running"
+    completed = "completed"
     generated = "generated"
     failed = "failed"
+
 
 
 class ArchiveItemType(str, enum.Enum):

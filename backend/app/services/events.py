@@ -48,7 +48,24 @@ TYPES: dict[str, Criticality] = {
     "name_changed": Criticality.info,
     "password_reset": Criticality.info,
     "account_unlocked": Criticality.info,
+    # Reports (Phase 3).
+    "report_queued": Criticality.info,
+    "report_generated": Criticality.info,
+    "report_test_generated": Criticality.info,
+    "report_failed": Criticality.warning,
+    "report_cancelled": Criticality.info,
+    "report_deleted": Criticality.warning,
+    # Knowledge sources and report/embedding approvals (Phase 3).
+    "document_uploaded": Criticality.info,
+    "document_index_queued": Criticality.info,
+    "document_reactivation_queued": Criticality.info,
+    "document_retired": Criticality.warning,
+    "document_removed": Criticality.critical,
+    "knowledge_consent_changed": Criticality.warning,
+    "shared_standards_queued": Criticality.info,
+    "embedding_profile_changed": Criticality.info,
     # The Sysadmin's (Phase 2e part 3).
+
     "org_created": Criticality.info,
     "org_archived": Criticality.warning,
     "org_restored": Criticality.info,

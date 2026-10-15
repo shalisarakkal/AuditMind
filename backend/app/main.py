@@ -7,6 +7,7 @@ from app.api.routes import (
     assets,
     auth,
     dashboard,
+    documents,
     events,
     findings,
     import_profiles,
@@ -54,6 +55,7 @@ app.include_router(import_profiles.router, prefix=api_router_prefix)
 app.include_router(ai.router, prefix=api_router_prefix)
 app.include_router(archive.router, prefix=api_router_prefix)
 app.include_router(events.router, prefix=api_router_prefix)
+app.include_router(documents.router, prefix=api_router_prefix)
 
 
 @app.get("/health")
