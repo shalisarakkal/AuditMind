@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/archived", label: "Archived" },
   { href: "/activity", label: "Activity" },
   { href: "/reports", label: "Reports" },
+  { href: "/documents", label: "Documents" },
   { href: "/people", label: "People" },
   { href: "/settings", label: "Settings" },
 ];
@@ -28,6 +29,7 @@ const PLATFORM_ITEMS = [
   { href: `${PLATFORM_PATH}/accounts`, label: "Accounts" },
   { href: `${PLATFORM_PATH}/activity`, label: "Platform activity" },
   { href: `${PLATFORM_PATH}/security`, label: "Security defaults" },
+  { href: `${PLATFORM_PATH}/documents`, label: "Shared standards" },
 ];
 
 export default function Sidebar() {

@@ -50,6 +50,13 @@ def upload(
     return client.post(url, headers=headers, files={"file": (filename, content)}, data=data)
 
 
+def approve_reports(client: TestClient, headers: dict[str, str], org_id: str) -> None:
+    target = client.get(f"/api/v1/orgs/{org_id}/documents/settings", headers=headers).json()["report_target"]
+    response = client.put(f"/api/v1/orgs/{org_id}/documents/settings/consent", headers=headers,
+                          json={"purpose": "report", "granted": True, "target": target})
+    assert response.status_code == 200, response.text
+
+
 def run_worker() -> int:
     """Run the background worker's waiting jobs (large imports, archive
     jobs) until there are none; returns how many it ran. It uses the test's

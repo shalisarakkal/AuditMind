@@ -51,8 +51,9 @@ def test_write_access_by_role(client, org, role, method, path, kwargs, allowed):
 
     if role in allowed:
         # members/nobody@example.io -> 404 (no such user) still proves access.
-        # Discovery and report generation aren't available yet: 501.
-        assert resp.status_code in (200, 201, 202, 404, 501), resp.text
+        # Discovery is 501; report generation is consent-gated and will 409 until
+        # an admin approves external AI audit processing for the org.
+        assert resp.status_code in (200, 201, 202, 404, 409, 501), resp.text
     else:
         assert resp.status_code == 403, resp.text
         assert resp.json()["detail"] == "Insufficient permissions"

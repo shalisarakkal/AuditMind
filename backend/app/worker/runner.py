@@ -35,13 +35,16 @@ from sqlalchemy.orm import Session
 from app.api.uploads import upload_path
 from app.core.config import check_secret_key, settings
 from app.models.archive import ArchiveJob
-from app.models.enums import ScanStatus
+from app.models.enums import ReportStatus, ScanStatus
 from app.models.event import WorkerStatus
+from app.models.report import Report
+from app.models.knowledge import KnowledgeIndex
+from app.services import knowledge_service
 from app.models.scan import Scan
-from app.services import archive_service, import_staging, ingestion_background, platform
+from app.services import archive_service, import_staging, ingestion_background, platform, report_service
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
-from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, job_is_running
+from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, REPORT_JOB, DOCUMENT_JOB, job_is_running, job_running
 from app.services.ingestion_service import IngestionError, detect_format, fail_import, process_import
 from app.services.sessions import purge_old_sessions
 
@@ -99,11 +102,22 @@ def _oldest_job(db: Session, low_priority: bool):
     ).first()
 
 
+def _oldest_report_job(db: Session):
+    """The oldest waiting report generation job."""
+    return db.execute(
+        select(Report.id, Report.created_at)
+        .where(Report.status == ReportStatus.pending)
+        .order_by(Report.created_at)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    ).first()
+
+
 def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
-    """Take the oldest waiting job: ("import", scan id) or ("archive", job
-    id). Committed as running, with a first check-in. Jobs the system started
-    (the daily auto-purge) are low priority: taken only when no upload or
-    job someone started waits, until they've waited
+    """Take the oldest waiting job: ("import", scan id), ("report", report id),
+    or ("archive", job id). Committed as running, with a first check-in.
+    Jobs the system started (the daily auto-purge) are low priority: taken only
+    when no upload, report or job someone started waits, until they've waited
     AUTO_PURGE_MAX_WAIT_MINUTES; then they take their turn by age."""
     scan = db.execute(
         select(Scan.id, Scan.started_at)
@@ -112,22 +126,44 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
         .limit(1)
         .with_for_update(skip_locked=True)
     ).first()
+    report = _oldest_report_job(db)
+    document = db.execute(select(KnowledgeIndex.id, KnowledgeIndex.created_at)
+        .where(KnowledgeIndex.status == "pending").order_by(KnowledgeIndex.created_at)
+        .limit(1).with_for_update(skip_locked=True)).first()
     job = _oldest_job(db, low_priority=False)
-    if scan is None and job is None:
+    if scan is None and report is None and document is None and job is None:
         job = _oldest_job(db, low_priority=True)
-    if scan is None and job is None:
+    if scan is None and report is None and document is None and job is None:
         db.rollback()
         return None
+
     now = _now()
-    if job is None or (scan is not None and scan.started_at <= job.started_at):
-        db.execute(update(Scan).where(Scan.id == scan.id).values(status=ScanStatus.running, heartbeat_at=now))
-        claimed = ("import", scan.id)
+    # Find candidate with oldest timestamp
+    candidates = []
+    if scan is not None:
+        candidates.append(("import", scan.id, scan.started_at))
+    if report is not None:
+        candidates.append(("report", report.id, report.created_at))
+    if document is not None:
+        candidates.append(("document", document.id, document.created_at))
+    if job is not None:
+        candidates.append(("archive", job.id, job.started_at))
+
+    candidates.sort(key=lambda c: c[2])
+    kind, item_id, _ = candidates[0]
+
+    if kind == "import":
+        db.execute(update(Scan).where(Scan.id == item_id).values(status=ScanStatus.running, heartbeat_at=now))
+    elif kind == "report":
+        db.execute(update(Report).where(Report.id == item_id).values(status=ReportStatus.running, heartbeat_at=now, run_started_at=now))
+    elif kind == "document":
+        db.execute(update(KnowledgeIndex).where(KnowledgeIndex.id == item_id)
+                   .values(status="running", heartbeat_at=now, run_started_at=now))
     else:
-        db.execute(
-            update(ArchiveJob).where(ArchiveJob.id == job.id).values(status=ScanStatus.running, heartbeat_at=now)
-        )
-        claimed = ("archive", job.id)
-    db.commit()  # also lets go of the one not taken
+        db.execute(update(ArchiveJob).where(ArchiveJob.id == item_id).values(status=ScanStatus.running, heartbeat_at=now))
+
+    claimed = (kind, item_id)
+    db.commit()  # also lets go of the ones not taken
     return claimed
 
 
@@ -149,6 +185,12 @@ def run_once(db: Session) -> bool:
     try:
         if kind == "import":
             run_import(db, job_id)
+        elif kind == "report":
+            with job_running(db, REPORT_JOB, job_id):
+                report_service.process_report_job(db, job_id)
+        elif kind == "document":
+            with job_running(db, DOCUMENT_JOB, job_id):
+                knowledge_service.process_index(db, job_id)
         else:
             archive_service.run_job(db, job_id)
     except Exception:
@@ -158,6 +200,7 @@ def run_once(db: Session) -> bool:
     finally:
         current.set(None)
     return True
+
 
 
 def drain(db: Session) -> int:
@@ -274,6 +317,39 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
         archive_service.fail_job(db, job, "Stopped part-way: start it again to carry on from where it stopped")
 
 
+    stale_reports = select(Report).where(
+        Report.status == ReportStatus.running,
+        func.coalesce(Report.heartbeat_at, Report.run_started_at, Report.created_at) < stale,
+    ).with_for_update(skip_locked=True)
+    for report in db.scalars(stale_reports).all():
+        if running_here == ("report", report.id) or job_is_running(db, REPORT_JOB, report.id):
+            continue
+        if report.cancel_requested_at:
+            report.status = ReportStatus.failed
+            report.error_message = "Generation cancelled by user"
+        elif report.retry_count < MAX_RESUMES:
+            report.status = ReportStatus.pending
+            report.retry_count += 1
+            report.heartbeat_at = None
+            report.run_started_at = None
+        else:
+            report.status = ReportStatus.failed
+            report.error_message = "Report generation interrupted too many times; generate a new report"
+    for index in db.scalars(select(KnowledgeIndex).where(KnowledgeIndex.status == "running",
+            func.coalesce(KnowledgeIndex.heartbeat_at, KnowledgeIndex.run_started_at, KnowledgeIndex.created_at) < stale)
+            .with_for_update(skip_locked=True)).all():
+        if running_here == ("document", index.id) or job_is_running(db, DOCUMENT_JOB, index.id):
+            continue
+        if index.retry_count < MAX_RESUMES:
+            index.status = "pending"
+            index.retry_count += 1
+            index.heartbeat_at = None
+        else:
+            index.status = "failed"
+            index.error_message = "Indexing interrupted too many times; retry after checking the worker"
+    db.commit()
+
+
 # --- Daily housekeeping -------------------------------------------------------
 
 
@@ -339,9 +415,17 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
                 )
                 job = current.get()
                 if job is not None:
-                    model = Scan if job[0] == "import" else ArchiveJob
+                    if job[0] == "import":
+                        model = Scan
+                    elif job[0] == "report":
+                        model = Report
+                    elif job[0] == "document":
+                        model = KnowledgeIndex
+                    else:
+                        model = ArchiveJob
                     db.execute(update(model).where(model.id == job[1]).values(heartbeat_at=now))
                 db.commit()
+
         except Exception:
             logger.warning("Couldn't check in", exc_info=True)
 

@@ -464,6 +464,7 @@ EVENT_FAMILIES = (
             "actor": ("Identity", "userIdentity.arn|userIdentity.userName|user_identity"),
             "source_ip": ("Source IP", "source_ip|sourceIPAddress"),
             "region": ("Region", "aws_region|awsRegion"),
+            "account": ("Account", "recipientAccountId|recipient_account_id|account_id|userIdentity.accountId"),
             # A failed call has an errorCode; a failed console sign-in only an
             # errorMessage, and responseElements.ConsoleLogin "Failure".
             "error": ("Error", "errorCode|error_code|errorMessage|error_message"),

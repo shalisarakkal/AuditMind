@@ -19,6 +19,20 @@ export const EVENT_LABELS: Record<string, string> = {
   name_changed: "Name changed",
   password_reset: "Password reset",
   account_unlocked: "Account unlocked",
+  report_queued: "Report generation queued",
+  report_generated: "Report generated",
+  report_test_generated: "Rule-based test report generated",
+  report_failed: "Report generation failed",
+  report_cancelled: "Report generation cancelled",
+  report_deleted: "Report deleted",
+  document_uploaded: "Document uploaded",
+  document_index_queued: "Document indexing queued",
+  document_reactivation_queued: "Document version reactivation queued",
+  document_retired: "Document version retired",
+  document_removed: "Document version removed",
+  knowledge_consent_changed: "Document processing consent changed",
+  shared_standards_queued: "Shared standards queued",
+  embedding_profile_changed: "Embedding profile changed",
   org_created: "Organization created",
   org_archived: "Organization archived",
   org_restored: "Organization restored",
@@ -83,6 +97,7 @@ const COUNT_LABELS: Record<string, string> = {
   findings_kept_with_asset: "kept with their asset",
   // An org purged.
   scans: "uploads",
+  documents: "documents",
   events: "events",
   org_memberships: "memberships",
   expired: "past retention",
@@ -124,6 +139,21 @@ export function eventSummary(event: ActivityEvent): string {
   }
   if (event.type === "repeat_upload" && details.previously_by) parts.push(`first uploaded by ${details.previously_by}`);
   if (event.type === "profile_updated" && Array.isArray(details.changed)) parts.push(`changed: ${details.changed.join(", ")}`);
+  if (event.type === "document_uploaded" && typeof details.version === "number") {
+    parts.push(`version ${details.version}${typeof details.content_kind === "string" ? ` · ${details.content_kind.replace(/_/g, " ")}` : ""}`);
+  }
+  if ((event.type === "document_index_queued" || event.type === "document_reactivation_queued") && typeof details.version === "number") {
+    parts.push(`version ${details.version}`);
+  }
+  if ((event.type === "document_retired" || event.type === "document_removed") && typeof details.version === "number") {
+    parts.push(`version ${details.version}`);
+  }
+  if (event.type === "knowledge_consent_changed") {
+    parts.push(`${details.to ? "approved" : "revoked"} for ${show(details.target, "the configured provider")}`);
+  }
+  if (event.type === "embedding_profile_changed") {
+    parts.push(`${show(details.from)} → ${show(details.to)}`);
+  }
   return parts.join(", ");
 }
 

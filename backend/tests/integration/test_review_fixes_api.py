@@ -22,7 +22,7 @@ from app.models.scan import Scan
 from app.services.org_lock import _key
 from app.worker import runner
 from tests.conftest import requires_db
-from tests.helpers import first_org_id, member, register, run_worker, upload
+from tests.helpers import approve_reports, first_org_id, member, register, run_worker, upload
 
 pytestmark = requires_db
 
@@ -42,12 +42,20 @@ def _url(admin, path):
 # --- Placeholders and the scans list -------------------------------------------
 
 
-def test_discovery_and_report_generation_say_not_available(client, admin, db_session):
+def test_discovery_says_not_available_and_reports_queue(client, admin, db_session):
     resp = client.post(_url(admin, "/assets/discover"), headers=admin[0])
     assert resp.status_code == 501 and "isn't available" in resp.json()["detail"]
+    # Phase 3 policy: report generation is gated by explicit org approval.
+    report_target = client.get(f"/api/v1/orgs/{admin[1]}/documents/settings", headers=admin[0]).json()["report_target"]
+    consent = client.put(
+        f"/api/v1/orgs/{admin[1]}/documents/settings/consent",
+        headers=admin[0],
+        json={"purpose": "report", "granted": True, "target": report_target},
+    )
+    assert consent.status_code == 200, consent.text
     resp = client.post(_url(admin, "/reports/generate"), headers=admin[0], json={"title": "Q3"})
-    assert resp.status_code == 501
-    assert db_session.query(Report).count() == 0  # no report left pending for ever
+    assert resp.status_code == 202
+
 
 
 def test_the_scans_list_needs_a_filter(client, admin):

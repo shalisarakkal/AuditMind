@@ -191,6 +191,7 @@ export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>("GET", path, undefined, options),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
+  put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
   delete: (path: string) => request<void>("DELETE", path),
   /** Multipart upload: the file, plus any extra form fields. */
   upload: <T>(path: string, file: File, fields: Record<string, string> = {}) => {
@@ -199,4 +200,12 @@ export const api = {
     for (const [name, value] of Object.entries(fields)) form.append(name, value);
     return request<T>("POST", path, form);
   },
+  /** Auth headers for direct fetch() calls (e.g. streaming downloads). */
+  authHeaders(): Record<string, string> {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}`, ...APP_HEADER } : { ...APP_HEADER };
+  },
 };
+
+/** Alias for components that import `apiClient` directly. */
+export const apiClient = api;

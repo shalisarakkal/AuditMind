@@ -1,7 +1,7 @@
 # UI conventions: list pages
 
 Every page that lists things (Assets, Findings, Imports, Archived, Activity,
-and any new one) looks and behaves the same. Build new list pages from the
+Reports, Documents, and any new one) looks and behaves the same. Build new list pages from the
 shared pieces in `frontend/src/components/ListPage.tsx` and
 `frontend/src/components/ListControls.tsx` rather than styling them afresh.
 Agreed 2026-09-30.
@@ -104,6 +104,17 @@ Agreed 2026-09-30:
   `backend/app/api/paging.py`), `sort` and `order`, and `limit`/`offset`,
   and returns `{items, total}`.
 - A pick-list's values come from a `GET .../facets` endpoint.
+- Reports may show a separate "Rule-based test report" action only when the
+  API's test-only capability is enabled. These reports must be labeled as
+  non-AI and explicitly state that framework controls were not evaluated.
+- Completed reports offer separate HTML and direct PDF downloads; "Print"
+  opens the browser print dialog and is not a substitute for PDF export.
+  Selected completed reports download as one ZIP of PDFs. Bulk deletion is
+  admin-only and remains separate from downloading.
+- Retired document versions can be reactivated by writers. Reactivation
+  reindexes the retained content and only makes it current after indexing
+  succeeds; while it is queued or running, show "Reactivating…" and prevent
+  removal. A failed reactivation leaves the version retired and retryable.
 
 ## Checklist for a new list page
 
@@ -115,3 +126,28 @@ Agreed 2026-09-30:
 - [ ] backend: `q`, per-column filters, `since`/`until` on the date
       column, `sort`/`order`, paging, facets
 - [ ] tests: filters reach the API, sorting, the empty and filtered messages
+
+## Accessibility
+
+All interactive components must meet **WCAG 2.0/2.1 AA** at minimum.
+
+### Rules
+
+- Every `role="group"` element (e.g. `FilterChips`) must carry an `aria-label`
+  describing what the group controls.
+- Icon-only buttons must have a visible `aria-label` or a `<span className="sr-only">` label.
+- Form inputs must have a `<label>` or `aria-label`; placeholder text is not a
+  substitute.
+- Focus order must follow the visual reading order; do not use `tabIndex > 0`.
+- Use semantic HTML (`<button>` for actions, `<a>` for navigation, `<nav>`,
+  `<main>`, `<header>`) rather than styled `<div>` elements.
+
+### Audit script
+
+`npm run a11y` launches the app's dev server pages through Playwright + Axe
+and exits non-zero if any WCAG 2.0/2.1 AA violation is found.
+Script: [`frontend/scripts/a11y.js`](../frontend/scripts/a11y.js).
+Pages audited: `/login`, `/reports`, `/`.
+
+**Last audit:** 2026-10-12 — **0 violations** on all three pages (`/login`, `/reports`, `/`).
+

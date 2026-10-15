@@ -13,6 +13,86 @@ export type Severity = "critical" | "high" | "medium" | "low";
 export type RiskTier = "low" | "medium" | "high" | "critical";
 export type UserRole = "admin" | "auditor" | "viewer";
 export type ScanStatus = "pending" | "running" | "completed" | "failed";
+export type ReportStatus = "pending" | "running" | "completed" | "generated" | "failed";
+
+export type DomainScoreAI = {
+  domain: Domain;
+  score: number;
+  tier: RiskTier;
+  justification: string;
+  strengths: string[];
+  weaknesses: string[];
+};
+
+export type RemediationActionAI = {
+  title: string;
+  description: string;
+  priority: "Critical" | "High" | "Medium" | "Low";
+  domain: Domain;
+  estimated_effort: "Quick Win" | "Moderate" | "Major Project" | string;
+  expected_impact: string;
+  related_controls: string[];
+  affected_asset_types: string[];
+};
+
+export type ComplianceCitation = {
+  citation_id?: string;
+  version_id?: string;
+  source?: string;
+  content_kind?: string;
+  content_hash?: string;
+  control_id: string;
+  framework: string;
+  version?: string;
+  title: string;
+  content: string;
+  content_ref?: string;
+  distance?: number;
+};
+
+export type AuditReportSnapshot = {
+  provenance?: {
+    model?: string; prompt_version?: string; prompt_hash?: string; captured_at?: string;
+    period_semantics?: string; evidence_limitation?: string | null; sample_limit?: number;
+    assessment_type?: "rule_based_test" | string;
+    method?: string; version?: string; external_processing?: boolean;
+    framework_evaluation?: string;
+    rule_based?: { overall_score: number; overall_tier: string };
+    sampled_findings?: { finding_id: string; description: string; severity: string }[];
+  };
+  title: string;
+  executive_summary: string;
+  overall_score: number;
+  overall_tier: RiskTier;
+  resilience_summary: string;
+  domains: DomainScoreAI[];
+  remediations: RemediationActionAI[];
+  compliance_citations: ComplianceCitation[];
+  total_assets: number;
+  total_findings: number;
+  findings_by_severity: Record<string, number>;
+  frameworks_evaluated: string[];
+};
+
+export type AuditReport = {
+  id: string;
+  org_id: string;
+  title: string;
+  assessment_type?: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  frameworks: string | null;
+  status: ReportStatus;
+  generated_at: string | null;
+  format: string | null;
+  location: string | null;
+  error_message: string | null;
+  started_by: string | null;
+  created_at: string;
+  overall_score?: number | null;
+  data?: AuditReportSnapshot | null;
+};
+
 
 export type Token = {
   access_token: string;

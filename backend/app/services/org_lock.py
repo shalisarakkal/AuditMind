@@ -54,6 +54,8 @@ def lock_org_jobs(db: Session, org_id: uuid.UUID) -> None:
 # Job kinds for job_running (the first key of the lock).
 IMPORT_JOB = 2
 ARCHIVE_JOB = 3
+REPORT_JOB = 4
+DOCUMENT_JOB = 5
 
 
 def _job_key(job_id: uuid.UUID) -> int:

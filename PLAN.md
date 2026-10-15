@@ -1339,7 +1339,31 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
 CIS/NIST/ISO docs (pgvector is already set up), Claude-driven risk scoring with RAG citations, full report
 generation endpoint.
 
-- [ ] Not started
+- [ ] In progress in the working tree; not signed off.
+- Review fixes (2026-10-06): reproduced before implementation, with regression
+  tests for CloudTrail account separation, assetless finding restore, idle-timeout
+  renewal, concurrent last-admin deactivation, report recovery/cancellation,
+  severity ordering, structured output, reporting dates, and report-list/viewer
+  behavior. The existing org gate already resets report state on organization
+  changes; its regression passed without changing that behavior.
+- Report behavior: missing Claude credentials, provider failures and invalid
+  output now fail the job rather than returning a canned assessment. Tests use
+  a mocked provider. Scores and tiers must agree, and all seven domains must
+  appear exactly once. Failed generation must not be treated as an audit result.
+- Reporting dates select **currently active findings created within the inclusive
+  UTC date range** (user decision, 2026-10-06); inventory counts are current, not
+  reconstructed historical inventory. Reversed ranges are rejected.
+- Interrupted report jobs resume up to three times, then fail. Cancellation
+  prevents a result being saved, but does not abort an already-issued provider
+  request. Report lists expose `overall_score` without including the snapshot;
+  an open running report refreshes until it reaches a terminal state.
+- CloudTrail uses the recipient account (identity account as a fallback) plus
+  region to distinguish findings. Logs without account fields retain the old
+  region-only behavior; already imported collisions cannot recover discarded
+  evidence automatically. Reimport source logs containing account identifiers.
+- The separate unfinished requirements below (idempotency, per-org quotas/cost
+  accounting, document-ingestion jobs, evidence provenance and retention/PDF)
+  were explicitly excluded from this defect-fix pass.
 - Claude auth: keep `ANTHROPIC_API_KEY` in `backend/.env` for local dev, and
   keep every Claude call going through `app/services/claude_service.py`, so the
   auth method can change in one place later (see Phase 4).
@@ -1369,6 +1393,47 @@ generation endpoint.
   - [ ] A report can be cancelled while it runs; asking twice doesn't
         create two
 
+## Phase 3a — Local and Claude report providers
+
+**Approved scope (2026-10-08):** support both local and Claude report generation
+with the same validation and evidence requirements. Start with one local runtime
+and one evaluated model, not unrestricted model compatibility.
+
+**Status:** planned, not implemented. Complete and verify the Phase 3 ingestion,
+retrieval, and provenance foundation before integrating this extension. Hardware
+assessment and design can proceed first; runtime/model selection requires approval.
+See [Phase3.md — Phase 3a](Phase3.md#phase-3a--local-and-claude-report-generation)
+for decisions, dependencies, implementation steps, and acceptance criteria.
+
+- [ ] Assess deployment hardware, concurrency, acceptable latency, and model license.
+- [ ] Select and approve one local runtime, model, quantization, and pinned version.
+- [ ] Introduce a report-provider interface; retain Claude and add a local adapter.
+- [ ] Keep report-provider selection independent of embedding-provider selection.
+- [ ] Preserve schema/score/citation validation, separate rule scores, and immutable evidence.
+- [ ] Define provider-specific consent, endpoint restrictions, and offline behavior;
+      never silently fall back from local generation to an external provider.
+- [ ] Record provider/model identity and generation parameters per report job/snapshot.
+- [ ] Integrate worker limits, timeout/recovery/cancellation, and configuration UI.
+- [ ] Evaluate accuracy, citation fidelity, completeness, latency, and memory on a
+      fixed evidence set; agree acceptance thresholds before selecting the default.
+- [ ] Verify existing Claude behavior, local-only operation, and retained report readability.
+- [ ] Document setup and operations, complete quality review, and obtain sign-off.
+
+## Phase 3b — OpenAI hosted report generation (future proposal)
+
+**Request recorded (2026-10-08):** support customers whose only hosted-model credential is an OpenAI API key. This is a documented future extension, not an implementation approval or model selection.
+
+The current report-generation path uses Anthropic; `OPENAI_API_KEY` currently configures embeddings only. A key alone does not switch report providers. Coordinate this work with the Phase 3a provider boundary; keep report and embedding provider/model configuration distinct, and do not require an Anthropic key for an OpenAI-selected report.
+
+- [ ] Approve the provider interface, OpenAI model/structured-output approach, and cost limits.
+- [ ] Add OpenAI report generation with the existing snapshot validation and evidence protections; never call Anthropic on the OpenAI path.
+- [ ] Generalize explicit report consent to provider/model identity; require fresh consent after target changes and pin provider/model to queued jobs.
+- [ ] Record provider/model and evidence provenance; preserve existing Anthropic and rule-based snapshots.
+- [ ] Test OpenAI-only configuration, missing credentials, mocked API/provider failures, invalid output, consent/routing, and no Anthropic invocation. Do not make live provider calls in tests.
+- [ ] Document local key configuration, account/API access, cost, and restart requirements; review and sign off.
+
+See [Phase3.md — Phase 3b](Phase3.md#phase-3b--openai-hosted-report-generation-future-proposal) for requirements and sequencing. No external OpenAI requests or implementation are approved by this entry.
+
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
 **Scope:** per-domain scoring refinement, remediation generation, PDF/HTML
@@ -1383,6 +1448,12 @@ export, security hardening (rate limiting, audit logging, secrets handling).
     plus each organization's own logo, uploaded by its admins (needs a small
     backend addition to store it)
   - Product name and the current organization's name shown in the UI header
+  - Dashboard "Recent activity" (raised 2026-10-02: no value as it is). It
+    lists every Info event (sign-ins, worker started/stopped), so routine
+    noise fills it. Decided (2026-10-02): replace it with a security
+    summary: a few counts for the last 7 days (failed sign-ins, new users,
+    role changes, data purged), each linking to Activity filtered to those
+    events. Worker and sign-in events stay in the full Activity log only
 - [ ] Keyless Claude auth for deployed environments (no long-lived API key):
       identity federation with the host platform's workload identity, or
       Amazon Bedrock / Google Vertex AI with cloud IAM if hosted on AWS/GCP.
@@ -1481,6 +1552,40 @@ Start with one per category, read-only, on a common pattern:
       Activity. Syncs run on the worker like uploads
 - [ ] Suggested order: one cloud provider, one identity provider, the Nessus
       API, then SIEM and backup
+
+## Deferred backlog — Standards and evidence expansion (after Phase 3)
+
+**Decision (2026-10-08):** document additional standards, guidance, threat feeds,
+and operational-evidence capabilities for a later phase. Not scheduled; no new
+phase number assigned. These additions do not block Phase 3 sign-off.
+Detailed scope, dependencies, and acceptance criteria are in
+[Phase3.md — Deferred backlog](Phase3.md#deferred-backlog--additional-standards-and-evidence-sources).
+
+- [ ] Expand beyond the agreed NIST baseline with selected SP 800-53/53A,
+      contingency-planning and incident-response catalogs; add CISA performance
+      goals and licensed ISO continuity/privacy sources as applicable.
+- [ ] Add CISA KEV, FIRST EPSS, and NVD/CVE enrichment with refresh jobs,
+      timestamps, stale-data handling, CVE matching, and report snapshots of
+      the actual facts used.
+- [ ] Add inventory-aware vendor guidance, product-specific CIS Benchmarks,
+      and OWASP application/API guidance.
+- [ ] Add MITRE ATT&CK threat/detection mappings with version and rationale.
+- [ ] Add organization-selected regulatory/assurance packs (for example PCI
+      DSS, SOC 2 criteria, HIPAA, GDPR, NIS2, DORA) only after applicability and
+      licensing review; do not represent reports as certification or attestation.
+- [ ] Add structured operational evidence: recovery objectives, restore-test
+      results, incident exercises, and criticality-based evaluation.
+- [ ] Extend cross-source governance: applicability selection, sourced versus
+      inferred mappings, and prevention of duplicate risk deductions for the
+      same finding across frameworks.
+
+Phase 3 still includes the agreed CIS/NIST/ISO baseline, organization-policy
+text/Markdown ingestion, source/version identity, organization isolation,
+retrieval citations, and evidence provenance. Exact baseline editions remain
+subject to the Phase 3 architecture decision. Verify source rights before
+acquiring, processing, or distributing additional material. Scheduling this
+backlog requires a separate decision; no additional integrations are being
+implemented now.
 
 ## Test policy
 

@@ -197,6 +197,14 @@ describe("helpers", () => {
   it("name, time and sum up events", () => {
     expect(eventLabel(event({ type: "restore", details: { undo: true } }))).toBe("Undo archive");
     expect(eventLabel(event({ type: "something_new" }))).toBe("something_new");
+    expect(eventLabel(event({ type: "document_uploaded" }))).toBe("Document uploaded");
+    expect(eventLabel(event({ type: "document_retired" }))).toBe("Document version retired");
+    expect(eventSummary(event({ type: "document_uploaded", counts: {}, details: { version: 2, content_kind: "organization_policy" } }))).toBe(
+      "version 2 · organization policy",
+    );
+    expect(eventSummary(event({ type: "knowledge_consent_changed", counts: {}, details: { to: true, target: "anthropic:model" } }))).toBe(
+      "approved for anthropic:model",
+    );
     expect(timing(event({ started_at: "2026-09-29T10:00:00Z", ended_at: "2026-09-29T12:05:00Z" }))).toBe("took 2 h 5 min");
     expect(timing(event({ started_at: "2026-09-29T10:00:00Z", ended_at: "2026-09-29T10:00:42Z" }))).toBe("took 42 s");
     expect(timing(event({ started_at: "2026-09-29T10:00:00Z", ended_at: "2026-09-29T10:00:00Z", details: { waited_seconds: 90 } }))).toBe(
