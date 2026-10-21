@@ -175,20 +175,20 @@ export function FilterChips<V extends string>({
   name: string;
   label: string;
   options: { value: V; label: string }[];
-  counts: Partial<Record<V, number>>;
+  counts?: Partial<Record<V, number>>;
 }) {
   const chosen = list.values(name);
-  const all = Object.values<number | undefined>(counts).reduce<number>((sum, n) => sum + (n ?? 0), 0);
+  const all = counts && Object.values<number | undefined>(counts).reduce<number>((sum, n) => sum + (n ?? 0), 0);
   return (
     <div role="group" aria-label={label} className="flex flex-wrap gap-2">
       <Chip label="All" count={all} active={chosen.length === 0} onClick={() => list.setValues(name, [])} />
       {options
-        .filter((o) => counts[o.value] || chosen.includes(o.value))
+        .filter((o) => !counts || counts[o.value] || chosen.includes(o.value))
         .map((o) => (
           <Chip
             key={o.value}
             label={o.label}
-            count={counts[o.value] ?? 0}
+            count={counts ? counts[o.value] ?? 0 : undefined}
             active={chosen.includes(o.value)}
             onClick={() => list.setValues(name, [o.value])}
           />
@@ -197,7 +197,7 @@ export function FilterChips<V extends string>({
   );
 }
 
-function Chip({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick(): void }) {
+function Chip({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick(): void }) {
   return (
     <button
       type="button"
@@ -207,7 +207,7 @@ function Chip({ label, count, active, onClick }: { label: string; count: number;
         active ? "border-cyan bg-cyan/10 text-cyan" : "border-white/15 text-white/70 hover:border-cyan hover:text-cyan"
       }`}
     >
-      {label} ({count.toLocaleString("en-US")})
+      {label}{count !== undefined && ` (${count.toLocaleString("en-US")})`}
     </button>
   );
 }

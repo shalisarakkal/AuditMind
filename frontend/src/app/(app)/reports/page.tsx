@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { GenerateReportModal } from "@/components/GenerateReportModal";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import { FilterChips } from "@/components/FilterChips";
@@ -33,7 +33,7 @@ import { useApp } from "@/context/AppContext";
 import { apiClient } from "@/lib/apiClient";
 import { formatDateTime } from "@/lib/domain";
 import { downloadReport, downloadReportsZip, reportErrorMessage } from "@/lib/report";
-import type { AuditReport, Page, UserRole } from "@/lib/types";
+import type { AuditReport, Page, ReportFacets, UserRole } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useSelection } from "@/lib/useSelection";
@@ -59,7 +59,7 @@ function Reports() {
   const admin = org.role === "admin";
   const list = useListState(PAGE_SIZE, org.id);
   const { data: page, error, loading, reload } = useApi<Page<AuditReport>>(`/orgs/${org.id}/reports?${list.apiQuery}`);
-  const facets = useApi<{ status: string[] }>(`/orgs/${org.id}/reports/facets`);
+  const facets = useApi<ReportFacets>(`/orgs/${org.id}/reports/facets`);
   const capabilities = useApi<{ rule_based_test_enabled: boolean }>(`/orgs/${org.id}/reports/capabilities`);
   const selection = useSelection(list, org.id);
   const [modalMode, setModalMode] = useState<"ai" | "rule_based_test" | null>(null);
@@ -104,9 +104,17 @@ function Reports() {
     return () => clearInterval(interval);
   }, [page, reload]);
 
+  const generationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+
   async function handleGenerate(payload: { title: string; frameworks: string[] }, mode: "ai" | "rule_based_test") {
     const endpoint = mode === "ai" ? "generate" : "rule-based-test";
-    await apiClient.post(`/orgs/${org.id}/reports/${endpoint}`, payload);
+    const fingerprint = JSON.stringify([org.id, mode, payload]);
+    if (generationAttempt.current?.fingerprint !== fingerprint) {
+      generationAttempt.current = { fingerprint, key: crypto.randomUUID() };
+    }
+    await apiClient.post(`/orgs/${org.id}/reports/${endpoint}`, payload,
+      mode === "ai" ? { headers: { "Idempotency-Key": generationAttempt.current.key } } : undefined);
+    generationAttempt.current = null;
     reload();
   }
 
@@ -235,15 +243,15 @@ function Reports() {
 
       {!selectedReport && (
         <div className="space-y-4">
+          <FilterChips
+            name="frameworks"
+            label="Frameworks"
+            options={facetOptions(facets.data?.frameworks)}
+            list={list}
+          />
           <ListToolbar list={list} label="reports">
-  <DateRangeFilter list={list} label="Created" />
-</ListToolbar>
-<FilterChips
-  name="frameworks"
-  label="Frameworks"
-  options={facetOptions(facets.data?.frameworks, {})}
-  list={list}
-/>
+            <DateRangeFilter list={list} label="Created" />
+          </ListToolbar>
 
           <SelectionBar selection={selection}>
             <SelectionAction onClick={() => void handleBulkDownload()} disabled={bulkDownloadBusy}>

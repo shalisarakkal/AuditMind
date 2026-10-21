@@ -15,6 +15,11 @@ export type UserRole = "admin" | "auditor" | "viewer";
 export type ScanStatus = "pending" | "running" | "completed" | "failed";
 export type ReportStatus = "pending" | "running" | "completed" | "generated" | "failed";
 
+export type ReportFacets = {
+  status: ReportStatus[];
+  frameworks: string[];
+};
+
 export type DomainScoreAI = {
   domain: Domain;
   score: number;

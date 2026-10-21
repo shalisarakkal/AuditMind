@@ -102,13 +102,14 @@ export function refreshAccessToken(background = false): Promise<Token | null> {
   return refreshing;
 }
 
-type RequestOptions = { background?: boolean };
+type RequestOptions = { background?: boolean; headers?: Record<string, string> };
 
 async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
   let payload: BodyInit | undefined;
   const headers: Record<string, string> = {
     Accept: "application/json",
     ...APP_HEADER,
+    ...options.headers,
     ...(options.background ? BACKGROUND_HEADER : {}),
   };
   if (body instanceof FormData) {
@@ -189,7 +190,7 @@ function errorMessage(data: unknown, fallback: string): string {
 
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>("GET", path, undefined, options),
-  post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("POST", path, body, options),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
   put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
   delete: (path: string) => request<void>("DELETE", path),

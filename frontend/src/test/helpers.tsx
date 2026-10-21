@@ -105,7 +105,7 @@ export async function renderSignedIn(
     "GET /worker-status": () => ({ running: true, last_seen: "2026-09-29T10:00:00Z" }),
     "GET /orgs/org-1/assets/facets": () => ({ type: [], subtype: [], environment: [], criticality: [] }),
     "GET /orgs/org-1/findings/facets": () => ({ source: [] }),
-    "GET /orgs/org-1/reports/facets": () => ({ status: [] }),
+    "GET /orgs/org-1/reports/facets": () => ({ status: [], frameworks: [] }),
     "GET /orgs/org-1/reports/capabilities": () => ({ rule_based_test_enabled: false }),
     ...routes,
   });
