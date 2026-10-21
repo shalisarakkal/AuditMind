@@ -20,7 +20,7 @@ class Scan(Base):
     )
     scan_type: Mapped[str] = mapped_column(String(100), nullable=False)
     scope: Mapped[str | None] = mapped_column(String(255))
-    status: Mapped[ScanStatus] = mapped_column(str_enum(ScanStatus), default=ScanStatus.pending, nullable=False)
+    status: Mapped[ScanStatus] = mapped_column(str_enum(ScanStatus, length=50), default=ScanStatus.pending, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source: Mapped[str | None] = mapped_column(String(100))

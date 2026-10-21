@@ -53,9 +53,17 @@ class Settings(BaseSettings):
     CLAUDE_MODEL: str = "claude-sonnet-5"
     # Exposes a local-only rule-based report workflow for UI/download testing.
     RULE_BASED_TEST_REPORTS_ENABLED: bool = False
-    # How long one Claude request may take (seconds); the SDK retries a
-    # timed-out or failed request twice more before giving up.
+    # How long one Claude attempt may take (seconds); application retries
+    # transient failures within its budget, with SDK retries disabled.
     CLAUDE_TIMEOUT_SECONDS: float = Field(60.0, gt=0)
+    CLAUDE_MAX_RETRIES: int = Field(3, ge=1, le=5)
+    CLAUDE_ORG_CALLS_PER_HOUR: int = Field(100, ge=1)
+    CLAUDE_ORG_MAX_COST_PER_HOUR_USD: float = Field(50.0, gt=0)
+    # Minimum per-attempt reservation. Confirmed SDK token usage replaces
+    # reservations with estimated cost; unknown outcomes keep their reservation.
+    CLAUDE_ATTEMPT_RESERVE_USD: float = Field(1.0, gt=0)
+    # Finished reports only; active jobs are never removed by housekeeping.
+    REPORT_RETENTION_DAYS: int = Field(365, ge=1)
 
     # --- Embeddings & RAG Knowledge Base ---
     OPENAI_API_KEY: str = ""

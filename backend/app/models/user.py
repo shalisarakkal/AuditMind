@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,10 +16,13 @@ class User(Base):
     __tablename__ = "users"
     # Emails are stored lower-cased (schemas lower-case them on the way in),
     # so one address can't become two accounts.
-    __table_args__ = (CheckConstraint("email = lower(email)", name="ck_users_email_lower"),)
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="ck_users_email_lower"),
+        UniqueConstraint("email", name="users_email_key"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255))
     auth_provider: Mapped[str] = mapped_column(String(50), default="local", nullable=False)
     # A hash, the same length whatever the password (services/accounts.py).

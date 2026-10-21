@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
+from app.core.observability import increment_metric, set_metric, alert
 from sqlalchemy.orm import Session
 
 from app.api.uploads import upload_path
@@ -195,7 +196,10 @@ def run_once(db: Session) -> bool:
             archive_service.run_job(db, job_id)
     except Exception:
         # Each runner has recorded its failure (and its event) already.
-        logger.exception("%s job %s failed", kind, job_id)
+        if kind in {"report", "document"}:
+            logger.error("%s job %s failed; see its recorded status", kind, job_id)
+        else:
+            logger.exception("%s job %s failed", kind, job_id)
         db.rollback()
     finally:
         current.set(None)
@@ -357,6 +361,7 @@ def housekeeping(db: Session) -> None:
     """Purge archived items and Activity events past their retention (each
     recorded in Activity), delete old ended sign-in sessions, and delete
     uploaded files and staging nothing is waiting for."""
+    logger.info("Report retention: %d expired report(s) deleted", report_service.purge_expired_reports(db))
     if settings.ARCHIVE_AUTO_PURGE:
         queued = archive_service.purge_expired(db, queue=True)
         logger.info("Auto-purge: %d archived item(s) queued (run when nothing else waits)", queued)
@@ -426,6 +431,9 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
                     db.execute(update(model).where(model.id == job[1]).values(heartbeat_at=now))
                 db.commit()
 
+                # ADD THIS: Increment worker heartbeat metric
+                increment_metric("worker_heartbeats")
+
         except Exception:
             logger.warning("Couldn't check in", exc_info=True)
 
@@ -459,6 +467,7 @@ def main() -> None:
 
     next_reap = _now()
     next_housekeeping = _now() + FIRST_HOUSEKEEPING_AFTER
+    last_queue_check = _now()
     failures = 0
     try:
         while not stop.is_set():
@@ -479,7 +488,22 @@ def main() -> None:
                 wait = min(60, 2**failures)
                 logger.exception("Worker loop failed; trying again in %d s", wait)
                 stop.wait(wait)
+                # ADD THIS: Track worker failures
+                increment_metric("worker_failures")
                 continue
+            # ADD THIS: Check queue depth metrics periodically
+            if _now() >= last_queue_check + timedelta(minutes=1):
+                try:
+                    pending_imports = db.scalar(select(func.count(Scan.id)).where(Scan.status == ScanStatus.pending))
+                    pending_archives = db.scalar(select(func.count(ArchiveJob.id)).where(ArchiveJob.status == "pending"))
+                    pending_reports = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.pending))
+                    set_metric("queue_imports_pending", pending_imports or 0)
+                    set_metric("queue_archives_pending", pending_archives or 0)
+                    set_metric("queue_reports_pending", pending_reports or 0)
+                    set_metric("queue_total_pending", (pending_imports or 0) + (pending_archives or 0) + (pending_reports or 0))
+                except Exception:
+                    logger.warning("Failed to check queue depth", exc_info=True)
+                last_queue_check = _now()
             if not ran:
                 stop.wait(settings.WORKER_POLL_SECONDS)
     finally:

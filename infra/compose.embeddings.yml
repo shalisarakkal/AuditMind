@@ -1,0 +1,35 @@
+# Backend/worker packaging only. Supply an externally managed PostgreSQL URL.
+# Run migrations once as a release task, not from every API replica.
+services:
+  api:
+    build:
+      context: ../backend
+      args:
+        INSTALL_EMBEDDINGS: "true"
+    image: auditmind-backend:embeddings
+    env_file: ../backend/.env
+    environment:
+      AUDITMIND_MODEL_CACHE: /models
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      UPLOAD_DIR: /app/uploads
+    ports: ["8000:8000"]
+    volumes:
+      - ${AUDITMIND_MODEL_CACHE_HOST:?Set a prepopulated model cache path}:/models:ro
+      - uploads:/app/uploads
+    restart: unless-stopped
+  worker:
+    image: auditmind-backend:embeddings
+    command: ["python", "-m", "app.worker"]
+    env_file: ../backend/.env
+    environment:
+      AUDITMIND_MODEL_CACHE: /models
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ${AUDITMIND_MODEL_CACHE_HOST:?Set a prepopulated model cache path}:/models:ro
+      - uploads:/app/uploads
+    restart: unless-stopped
+volumes:
+  uploads:

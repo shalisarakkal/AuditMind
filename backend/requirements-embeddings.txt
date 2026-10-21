@@ -1,0 +1,5 @@
+# Optional semantic retrieval runtime; install in the backend virtual environment.
+-r requirements.txt
+sentence-transformers==3.4.1
+openai==1.68.2
+voyageai==0.3.2

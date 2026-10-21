@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,17 +13,24 @@ from app.models.enums import ReportStatus
 
 class Report(Base):
     __tablename__ = "reports"
+    __table_args__ = (
+        UniqueConstraint("org_id", "idempotency_key", name="uq_reports_org_idempotency"),
+        Index("ix_reports_org_created", "org_id", "created_at"),
+        Index("ix_reports_org_status", "org_id", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128))
+    request_hash: Mapped[str | None] = mapped_column(String(64))
     period_start: Mapped[date | None] = mapped_column(Date)
     period_end: Mapped[date | None] = mapped_column(Date)
     frameworks: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[ReportStatus] = mapped_column(
-        str_enum(ReportStatus), default=ReportStatus.pending, nullable=False
+        str_enum(ReportStatus, length=50), default=ReportStatus.pending, nullable=False
     )
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     format: Mapped[str | None] = mapped_column(String(20), default="json")

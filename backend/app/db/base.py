@@ -7,6 +7,7 @@ from app.models.scan import Scan
 from app.models.finding import Finding
 from app.models.risk_score import RiskScore
 from app.models.report import Report
+from app.models.ai_usage import AIUsage
 from app.models.document import Document
 from app.models.knowledge import (
     KnowledgeDocument, KnowledgeVersion, EmbeddingProfile, KnowledgeIndex,

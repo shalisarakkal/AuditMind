@@ -22,7 +22,7 @@ class OrgMembership(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True, index=True
     )
-    role: Mapped[UserRole] = mapped_column(str_enum(UserRole), default=UserRole.viewer, nullable=False)
+    role: Mapped[UserRole] = mapped_column(str_enum(UserRole, length=50), default=UserRole.viewer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

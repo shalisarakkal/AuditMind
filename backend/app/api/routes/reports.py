@@ -6,7 +6,7 @@ import zipfile
 from tempfile import SpooledTemporaryFile
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Integer, String, case, cast, func, select
@@ -50,6 +50,7 @@ _REPORT_STATUS = cast(Report.status, String)
 
 class ReportFacets(BaseModel):
     status: list[ReportStatus]
+    frameworks: list[str]
 
 
 class ReportBulkDeleteRequest(BaseModel):
@@ -121,11 +122,15 @@ def report_facets(
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_member),
 ) -> ReportFacets:
-    """Statuses currently available to the report status filter."""
+    """Organization-scoped values for status and framework filters."""
     statuses = db.scalars(
         select(Report.status).where(Report.org_id == org_id).distinct().order_by(Report.status)
     ).all()
-    return ReportFacets(status=list(statuses))
+    labels = db.scalars(
+        select(_REPORT_FRAMEWORKS_DISPLAY).where(Report.org_id == org_id).distinct()
+    ).all()
+    frameworks = sorted({value.strip() for label in labels for value in label.split(",") if value.strip()})
+    return ReportFacets(status=list(statuses), frameworks=frameworks)
 
 
 @router.post("/bulk-download")
@@ -226,6 +231,7 @@ def bulk_delete_reports(
 def generate_report(
     org_id: uuid.UUID,
     payload: ReportCreate,
+    idempotency_key: str | None = Header(None, min_length=1, max_length=128),
     membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> Report:
@@ -236,15 +242,20 @@ def generate_report(
         require_report_consent(db, org_id)
     except KnowledgeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    report = report_service.queue_report_generation(
-        db=db,
-        org_id=org_id,
-        title=payload.title,
-        user_id=membership.user_id,
-        frameworks=payload.frameworks,
-        period_start=payload.period_start,
-        period_end=payload.period_end,
-    )
+    try:
+        report = report_service.queue_report_generation(
+            db=db,
+            org_id=org_id,
+            title=payload.title,
+            user_id=membership.user_id,
+            frameworks=payload.frameworks,
+            period_start=payload.period_start,
+            period_end=payload.period_end,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return report
 
 

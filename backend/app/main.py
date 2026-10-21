@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,6 +22,11 @@ from app.api.routes import (
 )
 from app.core.config import check_secret_key, settings
 from app.core.middleware import SecurityHeadersMiddleware, UploadSizeLimitMiddleware
+from app.core.observability import (
+    ObservabilityMiddleware,
+    log_structured,
+    register_alert_handler,
+)
 
 check_secret_key(settings.SECRET_KEY)
 
@@ -28,6 +35,14 @@ check_secret_key(settings.SECRET_KEY)
 # the background worker, python -m app.worker, not here.
 app = FastAPI(title=settings.PROJECT_NAME)
 
+# Register alert handler - logs alerts as structured messages
+def _alert_handler(alert_data: dict) -> None:
+    log_structured("WARNING", f"ALERT: {alert_data['title']}", extra=alert_data)
+
+register_alert_handler(_alert_handler)
+
+
+app.add_middleware(ObservabilityMiddleware)
 # Added first so CORS wraps it: its 413s still carry CORS headers.
 app.add_middleware(UploadSizeLimitMiddleware)
 app.add_middleware(
@@ -58,6 +73,24 @@ app.include_router(events.router, prefix=api_router_prefix)
 app.include_router(documents.router, prefix=api_router_prefix)
 
 
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> dict[str, Any]:
+    """Expose process-local counters as JSON for internal monitoring.
+
+    This is intentionally simple and in-memory; for production deployment,
+    integrate with Prometheus, Datadog, or similar.
+    """
+    from app.core.observability import get_metrics
+    return get_metrics()
+
+
+def get_current_metrics() -> dict[str, Any]:
+    """Return a snapshot of current metrics from the observability module."""
+    from app.core.observability import get_metrics
+    return get_metrics()
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Cheap liveness probe; dependency readiness is a separate concern."""
     return {"status": "ok"}

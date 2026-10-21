@@ -20,9 +20,9 @@ class RiskScore(Base):
     asset_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE")
     )
-    dimension: Mapped[Domain] = mapped_column(str_enum(Domain), nullable=False)
+    dimension: Mapped[Domain] = mapped_column(str_enum(Domain, length=50), nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
-    tier: Mapped[RiskTier] = mapped_column(str_enum(RiskTier), nullable=False)
+    tier: Mapped[RiskTier] = mapped_column(str_enum(RiskTier, length=50), nullable=False)
     justification: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
