@@ -88,7 +88,7 @@ def _status_error(cls, code):
 
 def test_the_claude_smoke_test_is_for_admins(client, admin, monkeypatch, db_session):
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "sk-test")
-    monkeypatch.setattr(ai, "ask_claude", lambda prompt, system=None: "Hello")
+    monkeypatch.setattr(ai, "ask_claude", lambda prompt, system=None, **kwargs: "Hello")
     auditor = member(client, admin[0], admin[1], "auditor")
     # Signing up makes them admin of an org of their own (until Phase 2e
     # turns sign-up off): made auditor there too, they're admin nowhere.
@@ -120,13 +120,26 @@ def test_the_claude_smoke_test_without_a_key(client, admin, monkeypatch):
 def test_claude_problems_come_back_as_clear_errors(client, admin, monkeypatch, error, code):
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "sk-test")
 
-    def fail(prompt, system=None):
+    def fail(prompt, system=None, **kwargs):
         raise error
 
     monkeypatch.setattr(ai, "ask_claude", fail)
     resp = client.post("/api/v1/ai/claude/test", headers=admin[0], json={"prompt": "Hi"})
     assert resp.status_code == code, resp.text
     assert "Claude" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("code", [502, 503, 504])
+def test_normalized_claude_failures_preserve_http_status(client, admin, monkeypatch, code):
+    from app.services.claude_service import ClaudeOperationalError
+
+    monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "sk-test")
+    def fail(*args, **kwargs):
+        raise ClaudeOperationalError("Claude is unavailable", status_code=code)
+    monkeypatch.setattr(ai, "ask_claude", fail)
+    response = client.post("/api/v1/ai/claude/test", headers=admin[0], json={"prompt": "Hi"})
+    assert response.status_code == code
+    assert response.json()["detail"] == "Claude is unavailable"
 
 
 # --- Retry a failed upload -------------------------------------------------------

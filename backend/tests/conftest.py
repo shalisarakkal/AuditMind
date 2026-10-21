@@ -4,8 +4,9 @@ from contextlib import nullcontext
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import sessionmaker
 
 # The app refuses to start with the built-in signing key (check_secret_key);
@@ -25,19 +26,28 @@ from app.services.rate_limit import login_limiter  # noqa: E402
 TEST_DB_URL = settings.TEST_DATABASE_URL
 
 
-def _is_test_db(url: str | None) -> bool:
-    return bool(url) and (make_url(url).database or "").endswith("_test")
+def _is_test_db(url: str | URL | None) -> bool:
+    if not url:
+        return False
+    try:
+        parsed = make_url(url)
+    except (ArgumentError, ValueError):
+        return False
+    return parsed.get_backend_name() == "postgresql" and (parsed.database or "").endswith("_test")
 
 
 def _db_available(url: str) -> bool:
+    engine = None
     try:
         engine = create_engine(url)
         with engine.connect():
             pass
-        engine.dispose()
         return True
     except Exception:
         return False
+    finally:
+        if engine is not None:
+            engine.dispose()
 
 
 DB_AVAILABLE = _is_test_db(TEST_DB_URL) and _db_available(TEST_DB_URL)
@@ -47,7 +57,7 @@ requires_db = pytest.mark.skipif(
     reason=(
         f"Postgres test database {make_url(TEST_DB_URL).render_as_string(hide_password=True)} is not reachable"
         if _is_test_db(TEST_DB_URL)
-        else "TEST_DATABASE_URL must name a database ending in _test (see backend/.env.example)"
+        else "TEST_DATABASE_URL must name a PostgreSQL database ending in _test (see backend/.env.example)"
     )
     + "; skipping DB-backed test.",
 )
@@ -71,7 +81,7 @@ def db_session():
     # (see scripts/create_databases.sql). Dropped first too: a run that was
     # cut off, or a copy of real data loaded for measuring, leaves tables
     # behind that create_all would keep.
-    Base.metadata.drop_all(engine)
+    _drop_test_schema(engine)
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     session = SessionLocal()
@@ -80,8 +90,17 @@ def db_session():
     finally:
         session.rollback()
         session.close()
-        Base.metadata.drop_all(engine)
+        _drop_test_schema(engine)
         engine.dispose()
+
+
+def _drop_test_schema(engine) -> None:
+    assert _is_test_db(engine.url), "refusing schema cleanup outside a PostgreSQL *_test database"
+    Base.metadata.drop_all(engine)
+    # create_all/drop_all do not manage Alembic's table. A leftover revision
+    # otherwise tells migrations that absent application tables already exist.
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
 
 
 @pytest.fixture
