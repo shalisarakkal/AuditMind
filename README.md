@@ -97,16 +97,20 @@ npm run dev
 
 ## Status
 
-Phases 1-2 are done: multi-organization accounts and roles; asset and findings uploads
-(CSV, JSON, Nessus, and tool exports through import profiles) with per-row reports;
-large uploads processed by the background worker with progress, recovery and Retry;
-archive, restore and purge with retention; an Activity log; paged, searchable lists;
-rule-based risk scores on the Dashboard. Phase 2e: sign-in sessions checked on every
-request, lockout, the Simple/Complex password rule and Change password; People (admins
-add people with a temporary password, change roles, reset passwords, unlock); the
-Sysadmin's Platform section (organizations created, archived and purged; accounts;
-platform activity; security defaults) and each org's Settings > Security.
+Phases 1-2 complete, Phase 2d complete: multi-organization accounts and roles; asset and findings uploads
+(CSV, JSON, Nessus, and tool exports through import profiles) with per-row reports; large uploads processed
+by the background worker with progress, recovery and Retry; archive, restore and purge with retention;
+an Activity log; paged, searchable lists; rule-based risk scores on the Dashboard. Security fixes verified:
+SECRET_KEY rejected at startup, archived scans return 404, and asset discovery returns 501.
+Phase 3 report generation is worker-backed and requires external-processing consent.
+Phase 2e: sign-in sessions checked on every request, lockout, the Simple/Complex
+password rule and Change password; People (admins add people with a temporary password, change roles,
+reset passwords, unlock); the Sysadmin's Platform section (organizations created, archived and purged;
+accounts; platform activity; security defaults) and each org's Settings > Security.
 
-Next: activity and audit log sources (Phase 2f), then the AI audit and reports (Phase 3). `PLAN.md` tracks every
-phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the
-original roadmap.
+Phase 3 documents, evidence-backed reports, observability and operational controls
+are implemented; final acceptance/sign-off remains pending. Operational contracts,
+migration `0021`, quotas, idempotency, retention and embedding deployment instructions:
+[Phase 3 operations](docs/PHASE3_OPERATIONS.md). Container validation requires a
+Docker-capable staging host. `PLAN.md` tracks every
+phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the original roadmap.

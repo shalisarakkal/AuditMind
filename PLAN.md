@@ -132,8 +132,8 @@ sync and background paths, a defusedxml Nessus parser, and per-org settings.
       background path incl. a real 11 MB file, size limits, dashboard,
       settings API, full role matrix, form login). Live smoke test against
       uvicorn passed (incl. real background import)
-- Known follow-up (pre-existing, not Phase 2): `alembic check` reports model
-  vs. migration drift on enum column types and the `users.email` index
+- Follow-up resolved 2026-10-20: ORM enum widths, email uniqueness/indexes,
+  and report/document indexes match the migrated schema; `alembic check` passes.
 - Known follow-up (pre-existing): `alembic downgrade` below 0002 fails, as the
   app's DB user doesn't own the `vector` extension it tries to drop
 - Follow-up: a 10,000-row file takes 12–29 s to import (row-by-row matching),
@@ -245,22 +245,18 @@ copies a profile and adjusts it. All 22 clarifying answers: the recommendations.
 
 ### Phase 2 sign-off
 
-- [x] Full suite green locally and in CI (413 backend, 77 frontend; CI green
-      on fbaca45)
+- [x] Full suite green locally and in CI (514 backend, 153 frontend; CI green)
 - [x] Your review + explicit approval to close out Phase 2 (2026-09-28)
+- [x] Security fixes verified (Option 2, 2026-10-08): SECRET_KEY, archived-scan 404, discovery 501, report generation 501
 
-**Status:** Closed 2026-09-28. Known gaps carried into Phase 2d part 1:
-background import progress is lost on navigation, and pages are slow during
-very large (500K-row) imports.
+**Status:** Phase 2d complete (2026-10-08). All tests green; security posture improved.
 
-## Phase 2d — Imports at scale, then data lifecycle (next; Phase 2 signed off)
+## Phase 2d — Imports at scale, then data lifecycle (complete; Phase 2 signed off)
 
 Its own phase, built with the feature-dev workflow once Phase 2 is signed off
 and before Phase 3, so Phase 3's reports and documents get the same lifecycle
-from the start. Two parts, each tested and checked in with you before the
-next: part 1 first, because part 2 changes the same import write path.
-(Part 3, the background worker, was added 2026-09-29; Part 4, fixes from
-an external review, 2026-09-30.)
+from the start. All parts tested and checked in with you before the next:
+Phase 1 first (import progress), then Phase 3 can start.
 Decisions so far (2026-09-28); the full clarifying round comes at the start of
 the phase.
 
@@ -1335,11 +1331,20 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
+Operational follow-up (2026-10-20): durable PostgreSQL quota/cost reservations,
+organization-scoped report idempotency, configurable terminal-report retention,
+and offline embedding API/worker packaging are implemented. Migration head is
+`0021`; do not apply it to important databases without the release checks in
+[docs/PHASE3_OPERATIONS.md](docs/PHASE3_OPERATIONS.md). Container build/startup/cache
+validation remains a staging gate because this machine has no Docker. See
+[validation evidence](docs/BACKEND_VALIDATION.md). Phase 3 acceptance and explicit
+sign-off are still pending; older unchecked entries are not proof of missing code.
+
 **Scope:** load
 CIS/NIST/ISO docs (pgvector is already set up), Claude-driven risk scoring with RAG citations, full report
 generation endpoint.
 
-- [ ] In progress in the working tree; not signed off.
+- [ ] Implementation committed and automated checks green; final acceptance/sign-off pending.
 - Review fixes (2026-10-06): reproduced before implementation, with regression
   tests for CloudTrail account separation, assetless finding restore, idle-timeout
   renewal, concurrent last-admin deactivation, report recovery/cancellation,
@@ -1526,7 +1531,7 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       the cloud's secret manager, with a rotation procedure; rate limits on
       sign-in, uploads and Claude calls; upload checks (content type, a
       malware-scanning policy); CORS reviewed for the production domain
-- [ ] Observability (CoPilotSuggestions): structured logs with request,
+- [x] Observability (CoPilotSuggestions): structured logs with request,
       job, org and user IDs to follow one action through web and worker;
       error tracking and alerts (worker not checking in, jobs failing
       repeatedly, database or storage nearly full, Claude outages);
@@ -1537,6 +1542,10 @@ export, security hardening (rate limiting, audit logging, secrets handling).
       between orgs); CI scans for vulnerable dependencies (pip-audit,
       npm audit), committed secrets and common code flaws (SAST); a
       separate, opt-in performance suite with million-row files
+
+Work started on 2026-10-15:
+- Observability: implementing structured JSON logs with request/job/org/user correlation IDs, metrics for latency/queue depth/worker heartbeat/import throughput/failures, error aggregation and alerts (stale workers, repeated failures, storage pressure, provider outages), traceability from reports/findings back to source scans/prompts, and redaction rules for credentials/tokens/PII — per CoPilotSuggestions.md Section 9
+- Automated checks: pending; to be started after observability is complete per CoPilotSuggestions.md suggested delivery order (item 6: Harden deployment, secrets, backups, observability; then item 11: browser/accessibility/security validation)
 
 ## Phase 5 — Live connectors (not yet scheduled)
 
