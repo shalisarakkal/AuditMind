@@ -72,6 +72,13 @@ def main():
                 'priority': 'Medium', 'domain': Domain.identity_access.value, 'estimated_effort': 'Moderate',
                 'expected_impact': 'Improve evidence quality', 'confidence': .5,
                 'affected_finding_ids': [], 'affected_asset_ids': [], 'citation_ids': citation_ids}]}
+        if payload and settings.REPORT_EVIDENCE_V3_ENABLED:
+            payload.pop('overall_score')
+            payload.pop('overall_tier')
+            for domain in payload['domains']:
+                domain.update(score=None, tier=None, evidence_status='insufficient',
+                    evidence_reason='Synthetic policy alone does not establish operational coverage.',
+                    evidence_finding_ids=[], strengths=[], weaknesses=[])
         return SimpleNamespace(content=[SimpleNamespace(type='text', text=json.dumps(payload))],
             usage=SimpleNamespace(input_tokens=100, output_tokens=200))
     claude_service.get_client = lambda: SimpleNamespace(messages=SimpleNamespace(create=complete))

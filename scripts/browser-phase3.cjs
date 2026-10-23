@@ -22,7 +22,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const seed = JSON.parse(cli('prepare')); prepared = true;
     for (const action of ['api','worker']) {
       const log=fs.openSync(path.join(output,`${action}.log`),'w');
-      children.push(spawn(python,[fixture,action,'--schema',schema],{cwd:path.join(root,'backend'),windowsHide:true,stdio:['ignore',log,log]}));fs.closeSync(log);
+      children.push(spawn(python,[fixture,action,'--schema',schema],{cwd:path.join(root,'backend'),env:{...process.env,REPORT_EVIDENCE_V3_ENABLED:process.env.AUDITMIND_BROWSER_EVIDENCE_V3==='1'?'true':'false',REPORT_EVIDENCE_QUALIFICATIONS_FILE:''},windowsHide:true,stdio:['ignore',log,log]}));fs.closeSync(log);
     }
     await expect.poll(async()=>{try{return (await fetch(api+'/health')).status;}catch{return 0;}},{timeout:30000}).toBe(200);
     browser=await chromium.launch({channel:'chrome',headless:true}); evidence.browser=browser.version();
@@ -97,11 +97,25 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(snapshot.data.provenance.rule_based.overall_score,100);
     assert.equal(snapshot.data.provenance.model,'claude-browser-fixture');
     assert.ok(snapshot.data.compliance_citations.length);
+    if(process.env.AUDITMIND_BROWSER_EVIDENCE_V3==='1') {
+      assert.equal(snapshot.data.assessment_status,'partial');assert.equal(snapshot.data.overall_score,null);
+      assert.equal(snapshot.data.provenance.schema_version,3);
+    }
     check('UI queues real asynchronous report; worker validates mock AI domains/remediation and captures provenance');
     await p.goto(base+'/reports');const row=p.getByRole('row').filter({hasText:'Fixture success'});
+    if(process.env.AUDITMIND_BROWSER_EVIDENCE_V3==='1') {
+      await p.getByLabel('Assessment completeness',{exact:true}).selectOption('partial');
+      await expect(row.getByText('Partial AI assessment — overall score unavailable',{exact:true})).toBeVisible();
+      await p.getByLabel('Assessment completeness',{exact:true}).selectOption('complete');
+      await expect(row).toHaveCount(0);
+      await p.getByLabel('Assessment completeness',{exact:true}).selectOption('');
+      await expect(row).toHaveCount(1);
+      check('Assessment completeness filter includes partial reports without inventing a numeric score');
+    }
     await row.getByRole('button',{name:'View',exact:true}).click();
     await expect(p.getByText('Mock inference; synthetic evidence only.',{exact:true})).toBeVisible();
     await expect(p.getByText('AI resilience score (advisory)',{exact:true})).toBeVisible();
+    if(process.env.AUDITMIND_BROWSER_EVIDENCE_V3==='1') await expect(p.getByText('Partial AI assessment — overall score unavailable',{exact:true})).toBeVisible();
     await expect(p.getByText(/Captured deterministic baseline: 100\/100/)).toBeVisible();
     await expect(p.getByText(/not a calibrated probability of compliance/)).toBeVisible();
     const sourceLink=p.getByRole('link',{name:snapshot.data.compliance_citations[0].citation_id,exact:true}).first();
