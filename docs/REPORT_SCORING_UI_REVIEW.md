@@ -1,5 +1,12 @@
 # Report scoring and confidence: review before changes
 
+23 October design follow-up: [evidence-aware assessment proposal](EVIDENCE_ASSESSMENT_DESIGN.md)
+defines unscored states, overall eligibility, compatibility and acceptance tests.
+User approved the contract on23October2026 and authorized profiles/implementation.
+The new schema is implemented behind an off-by-default rollout flag; see
+[profile/workflow definitions](EVIDENCE_COVERAGE_PROFILES.md). Verification of the
+new implementation is recorded separately from the historical presentation runs.
+
 23 October 2026. Initial scope: document saved manual evaluation and review current source
 and existing component tests. At that initial review no behavior was changed or
 new Chrome session run. See the subsequently approved implementation below.
@@ -78,8 +85,9 @@ sources are explicitly unavailable. Related-control text is labeled descriptive.
 HTML/PDF include advisory/baseline/sampling/confidence explanations and evidence IDs.
 No saved scores, tiers, snapshots, provider requests, consent targets or backend
 schemas were changed. Optional TypeScript citation fields mirror existing stored
-fields. Insufficient-evidence scoring/aggregation remains a **separate unimplemented
-contract decision**, requiring the design and verification described above.
+fields. At that presentation-only checkpoint, insufficient-evidence scoring was a
+separate unimplemented contract decision. The subsequent opt-in implementation and
+verification are recorded in [current validation](EVIDENCE_ASSESSMENT_VALIDATION.md).
 
 Implementation verification: all **307 frontend tests** passed; **43 focused backend
 unit/export regressions** and **20 PostgreSQL integration regressions** passed,

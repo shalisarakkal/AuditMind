@@ -1,5 +1,10 @@
 # AuditMind user manual
 
+For the opt-in evidence-aware reporting changes, use the
+[step-by-step verification guide](EVIDENCE_USER_VERIFICATION.md). It separates
+normal-demo checks, saved screenshots/exports and isolated mocked Chrome tests;
+no real inference or credential changes are needed.
+
 Report prompt update: **audit-evidence-v3** adds explicit input limits and omission
 disclosures. Existing reports are unchanged. Before any separately approved real
 AI use, an organization admin must review/reapprove the new processing target in
@@ -349,4 +354,11 @@ probability of compliance or successful remediation, nor evidence completeness.
 Evidence-reference links navigate to the captured source; unavailable legacy
 sources are identified. Related-control descriptions are not independently verified
 official control identifiers. HTML/PDF exports carry the same interpretation notes.
-An explicit insufficient-evidence scoring state is not implemented in this contract.
+An opt-in evidence-aware report contract is available for controlled rollout.
+When enabled, insufficient/limited/conflicting domains are not scored; partial
+reports can complete successfully without an overall AI score. Existing legacy
+scores are preserved and their evidence status shown as not recorded. Default
+reporting remains unchanged until operators enable the new contract and review
+its [qualification rules](EVIDENCE_COVERAGE_PROFILES.md). Deterministic baseline
+remains separate. The Reports page can filter complete/partial new assessments;
+legacy reports are included under All. Null scores sort last, not as zero.

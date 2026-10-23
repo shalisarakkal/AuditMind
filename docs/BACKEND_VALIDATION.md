@@ -1,5 +1,21 @@
 # Backend validation — 2026-10-20
 
+## Evidence-aware contract — 2026-10-23 final checkpoint
+
+Subsequent check-in review: final-delimiter prompt fix prevents source/title markers
+from truncating captured evidence; one regression added. **130 focused tests passed**
+afterward, PostgreSQL required/warnings as errors. Test target restored/checked.
+The full1,115-test run below precedes this narrow fix; no1,116 full-run claim.
+[Verification steps](EVIDENCE_USER_VERIFICATION.md).
+
+**1,115 full-run tests passed in560.82s**, PostgreSQL required, warnings as errors,
+zero failures/errors/skips confirmed by `temp/testing/evidence-v3-final-junit.xml`.
+**312 frontend tests**, lint/TypeScript/production build, **18 new-contract and17
+legacy Chrome checks** passed. Empty→0021→0020→0021 test restore, drift check and
+head no-op passed;29 tables, zero browser schemas left. New mode is opt-in/off by
+default; no inference, paid calls or overall coverage measurement. Earlier1,106
+run superseded after final hardening. [Scope/failure history](EVIDENCE_ASSESSMENT_VALIDATION.md).
+
 ## Presentation follow-up — 2026-10-23
 
 - **71 focused backend tests passed**:43 unit/export,20 PostgreSQL integration,

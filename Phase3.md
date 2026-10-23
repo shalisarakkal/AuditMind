@@ -465,8 +465,15 @@ acceptance. Docker deployment and optional browser date fields are Future scope.
 - [ ] Obtain Phase 3 sign-off.
 # Local milestone decision — 23 October 2026
 
+Post-milestone evidence-aware scoring is implemented opt-in/off by default. See
+[profiles](docs/EVIDENCE_COVERAGE_PROFILES.md) and
+[final verification](docs/EVIDENCE_ASSESSMENT_VALIDATION.md):1,115 backend and312
+frontend tests,18 new-contract +17 legacy Chrome checks, build/migrations passed.
+No whole-project coverage update or real-provider acceptance is implied.
+
 The user approved closing the local-testing milestone with a scoped development-
 tool risk exception. See [decision and expiry](docs/LOCAL_TESTING_MILESTONE.md).
-This is not a production/live-AI release. Insufficient-evidence scoring remains
-a separate design task; Docker/report-date UI remain Future. Older pending local
+This is not a production/live-AI release. Evidence-aware scoring now has the opt-in
+implementation described above; operator adoption remains separate. Docker/report-date
+UI remain Future. Older pending local
 sign-off statements below are historical; live-provider acceptance remains open.

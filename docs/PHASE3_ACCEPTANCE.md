@@ -1,6 +1,24 @@
 # Phase 3 native browser acceptance — 22 October 2026
 
-## Latest presentation acceptance — 23 October 2026
+## Evidence-aware/legacy acceptance — 23 October 2026
+
+Subsequent check-in marker fix: **18/18 new-mode checks passed again** in
+`temp/auditmind-demo/browser/phase3/phase3_browser_50059684831c/`, zero page errors,
+cleanup verified. [User verification guide](EVIDENCE_USER_VERIFICATION.md) points
+to these latest artifacts. Prior full/backend and legacy checkpoints below are
+not represented as newly rerun for the one-line marker fix.
+
+Final code: **18/18 new-contract checks** (`phase3_browser_918c9c81d764`) and
+**17/17 legacy checks** (`phase3_browser_f4f98dc451ce`), under
+`temp/auditmind-demo/browser/phase3/`. Both have zero page errors and verified cleanup.
+Real installed Chrome, production frontend, API/worker/PostgreSQL; inference and
+embeddings mocked. New mode verifies partial/null-score rendering and completeness
+filter; existing source links/downloads/roles/lifecycle/retry/cancel checks retained.
+One prior filter-label attempt failed and was corrected; only final complete runs
+count. See [implementation and verification](EVIDENCE_ASSESSMENT_VALIDATION.md).
+No real-model quality or production/live-AI release approval implied.
+
+## Earlier presentation acceptance — 23 October 2026
 
 **17/17 passed**, including advisory score/baseline/confidence explanations,
 keyboard citation navigation, mobile/print presentation, downloads and lifecycle
@@ -12,7 +30,7 @@ worker/PostgreSQL real; embeddings/inference mocked, external provider HTTP bloc
 [Scope and regressions](REPORT_SCORING_UI_REVIEW.md). Prior16-check runs below
 are historical, not latest acceptance. No real-provider/release approval implied.
 
-Latest prompt-budget/v3 rerun: **16/16 passed**, Chrome 155.0.8059.85, real isolated
+Earlier prompt-budget/v3 rerun: **16/16 passed**, Chrome 155.0.8059.85, real isolated
 PostgreSQL/API/worker with mocked embeddings/inference. Latest artifacts:
 `temp/auditmind-demo/browser/phase3/phase3_browser_87c7b5fb0631/` (`result.json`,
 report screenshot/HTML/PDF and logs). Zero page errors, cleanup verified.

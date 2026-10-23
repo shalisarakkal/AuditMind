@@ -1,5 +1,11 @@
 # AuditMind AI
 
+Evidence-aware AI assessment is available **opt-in/off by default**: explicit
+unscored evidence states, reviewed coverage qualification and server aggregation.
+See [profiles/operator workflow](docs/EVIDENCE_COVERAGE_PROFILES.md) and
+[verification](docs/EVIDENCE_ASSESSMENT_VALIDATION.md). Legacy reports and the
+deterministic baseline remain unchanged; no real inference is enabled.
+
 Phase 3 technical/open/deferred status: [closure checklist](docs/PHASE3_CLOSURE.md).
 Report prompt v3 adds explicit input budgets and requires approval of its updated
 processing target; existing reports are unchanged. Live inference remains disabled

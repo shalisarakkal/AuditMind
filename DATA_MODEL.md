@@ -1,5 +1,12 @@
 # Data Model – AI Cyber Resilience Auditor
 
+Opt-in evidence-aware schema3 retains explicit domain evidence status/reason and
+finding references, nullable AI scores/tiers, and server-owned complete/partial
+assessment status with qualification/aggregation provenance. Provider contract
+cannot supply overall/provenance fields. Existing schema1/2 JSONB reports are not
+rewritten. No new SQL table/column is introduced; see
+[coverage workflow](docs/EVIDENCE_COVERAGE_PROFILES.md).
+
 Prompt-v3 snapshots retain `provenance.input_budget` (policy/limits, actual input
 bytes, sampling and omitted IDs) and per-finding `text_limits` (original/included
 byte counts and original SHA-256). Source rows are unchanged; schema version 2

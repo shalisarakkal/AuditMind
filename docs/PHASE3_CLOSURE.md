@@ -1,5 +1,17 @@
 # Phase 3 closure checklist
 
+Latest post-milestone verification: **1,115 full PostgreSQL backend tests,312 frontend
+tests,18 new-mode +17 legacy Chrome checks**, lint/TypeScript/build and test migration
+round-trip/drift passed. [Final evidence](EVIDENCE_ASSESSMENT_VALIDATION.md). The new
+evidence-aware mode is opt-in/off by default; qualification/adoption and live-model
+acceptance are separate. Local milestone/risk exception remain unchanged.
+
+Separate post-milestone work: [approved evidence-aware scoring contract](EVIDENCE_ASSESSMENT_DESIGN.md).
+User approved23October2026 and authorized profiles/implementation. The new contract
+is implemented opt-in, with [reviewed-coverage rules](EVIDENCE_COVERAGE_PROFILES.md).
+Default and deterministic scoring/local milestone closure remain unchanged;
+adoption and live-provider acceptance are separate decisions.
+
 **23 October decision: local-testing milestone approved and closed**, with a
 temporary development-tool risk exception restricted to that scope.
 See [decision, controls and expiry](LOCAL_TESTING_MILESTONE.md).
@@ -58,7 +70,7 @@ paused; Phase 3b OpenAI generation is a proposal.
 
 ## Still required for release closure
 
-Latest23October presentation checkpoint: **307 frontend /71 focused backend tests,
+Earlier23October presentation checkpoint: **307 frontend /71 focused backend tests,
 17 Chrome checks**, lint/TypeScript/build passed; test DB restored with clean drift.
 This is not a fresh full backend suite/coverage run. The full verification section
 below retains22October results; see [latest evidence](REPORT_SCORING_UI_REVIEW.md).
@@ -72,8 +84,9 @@ real provider/model/pricing gate below or authorize proposed UI/schema changes.
 The user subsequently approved presentation-only changes, implemented and tested
 as recorded in that review. Advisory score labels, baseline visibility, confidence
 explanations and evidence references are improved without changing saved scores
-or the assessment schema. Insufficient-evidence scoring remains a separate design
-decision; real provider/quality acceptance remains open.
+or the assessment schema. Evidence-aware scoring was separate at that checkpoint;
+the subsequent opt-in implementation is described above. Real provider/quality
+acceptance remains open.
 
 - [x] **Local-testing development-tool advisory disposition:** explicitly accepted
   by the user on23October, scoped controls and review/expiry22November2026 recorded

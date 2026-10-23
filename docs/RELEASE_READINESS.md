@@ -1,5 +1,20 @@
 # Release readiness and code review
 
+## Latest implementation checkpoint — 23 October 2026
+
+Check-in review added a prompt-marker preservation fix/regression;130 focused
+tests passed afterward. The full1,115-test result below is the earlier checkpoint,
+not a fresh full run of the marker fix. [Verification guide](EVIDENCE_USER_VERIFICATION.md).
+
+Evidence-aware contract implemented **opt-in/off by default**: seven coverage
+profiles, trusted operator qualification, explicit unscored states, server overall
+aggregation, APIs, UI and exports. **1,115 full PostgreSQL backend tests**, **312
+frontend tests**, lint/TypeScript/build and **18 new-mode +17 legacy Chrome checks**
+passed; test DB restore/round-trip/drift clean. [Final verification](EVIDENCE_ASSESSMENT_VALIDATION.md).
+No new coverage measurement. Local milestone remains closed; scoped risk exception
+unchanged. New policy adoption is an operator decision, not live-provider acceptance.
+No real inference, paid calls, qualification file installation or release sign-off.
+
 ## Approved local milestone — 23 October 2026
 
 **Local-testing milestone closed by explicit user approval**, with a scoped,
@@ -9,7 +24,7 @@ no inference/paid calls. Insufficient-evidence scoring remains separate; Docker
 and report-date UI remain Future. Historical open-advisory statements below are
 superseded only for this local scope, not a fix or production risk acceptance.
 
-## Latest presentation follow-up — 23 October 2026
+## Earlier presentation follow-up — 23 October 2026
 
 Presentation-only improvements are complete; scores, schemas and saved snapshots
 are unchanged. [Implementation evidence](REPORT_SCORING_UI_REVIEW.md): **307 frontend

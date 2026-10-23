@@ -1338,6 +1338,21 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
+- [x] Evidence-status/scoring contract approved by user (23 October 2026):
+  [proposed contract and acceptance specification](docs/EVIDENCE_ASSESSMENT_DESIGN.md).
+- [x] Define seven coverage profiles and trusted qualification rules:
+  [profiles and operator workflow](docs/EVIDENCE_COVERAGE_PROFILES.md).
+- [x] Implement opt-in schema3/prompt-v4 provider contract, partial scores, server
+  aggregation, API/filter/export/UI handling and source-bound qualification.
+- [x] Complete verification:1,115 full PostgreSQL backend tests,312 frontend tests,
+  18 new-mode +17 legacy Chrome checks; lint/TypeScript/build and migration checks
+  pass. [Evidence](docs/EVIDENCE_ASSESSMENT_VALIDATION.md). No new coverage measured.
+- [x] Check-in review: untrusted prompt-marker preservation fix and one regression;
+  130 focused tests passed afterward, not a new1,116-test full-suite claim.
+  [Manual/automated verification guide](docs/EVIDENCE_USER_VERIFICATION.md).
+- [ ] Controlled-rollout adoption of profiles/operator qualification. Flag remains
+  off by default; no live-AI approval, credentials or consent changes implied.
+
 - [x] Local-testing milestone closed by explicit user approval,23October2026.
   Scoped development-tool risk exception recorded in
   [decision record](docs/LOCAL_TESTING_MILESTONE.md), review/expiry22November2026.
@@ -1349,7 +1364,8 @@ sampling explanations, complete domain text and evidence references implemented.
 307 frontend /71 focused backend tests and17 Chrome checks, lint/TypeScript/build
 passed. Latest full backend checkpoint remains1,035 tests (22October); no new
 coverage measured. [Details](docs/REPORT_SCORING_UI_REVIEW.md). Insufficient-evidence
-scoring is a separate pending contract decision; live-provider release gates open.
+scoring was a separate pending decision at that checkpoint; the approved opt-in
+implementation above supersedes it. Live-provider release gates remain open.
 
 Closure authority: [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). Prompt/context limits
 and omission provenance are implemented under **audit-evidence-v3**. Fresh target

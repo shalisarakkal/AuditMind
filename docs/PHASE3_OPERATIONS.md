@@ -228,6 +228,19 @@ covers navigation, sessions, worker readiness and HTML/PDF reports; it is not fu
 Phase 3 browser acceptance, real-provider testing or a production deployment.
 # Local-testing approval — 23 October 2026
 
+## Evidence-aware contract rollout (opt-in)
+
+`REPORT_EVIDENCE_V3_ENABLED=false` preserves the current schema2/prompt-v3
+generation. True selects schema3/prompt-v4, requires fresh processing-target
+approval, and enables null-score partial assessments. The trusted operator file
+`REPORT_EVIDENCE_QUALIFICATIONS_FILE` is blank by default: no eligible sufficient
+domains. See [seven profiles and qualification procedure](EVIDENCE_COVERAGE_PROFILES.md).
+Policy/pack changes invalidate target pins; never use organization uploads as
+trusted qualification packs. No DDL migration is added: JSONB snapshots retain
+both versions; APIs/filter/sorting and exporters handle null scores explicitly.
+This setting alone does not authorize or configure inference. Production/live-AI
+approval is still absent; ordinary/demo credentials and consent are unchanged.
+
 Local-testing milestone is closed with the user-approved temporary development-
 tool risk exception. Follow [scope, controls and expiry](LOCAL_TESTING_MILESTONE.md).
 No production/live-AI approval, inference or paid calls are authorized. Insufficient-

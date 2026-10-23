@@ -1,6 +1,20 @@
 # Testing strategy and measured coverage
 
-## Latest presentation regressions — 23 October 2026
+## Latest evidence-aware contract acceptance — 23 October 2026
+
+Check-in review subsequently fixed untrusted prompt-marker truncation and added
+one regression: **130 focused tests passed** afterward. The full1,115-test
+checkpoint below precedes that narrow fix; a fresh1,116-test run is not claimed.
+[Reproduction/user checklist](EVIDENCE_USER_VERIFICATION.md).
+
+**1,115 full backend tests passed**, PostgreSQL required, warnings as errors, zero
+failures/errors/skips. **312 frontend tests**, lint/TypeScript/build passed. Chrome:
+**18 new-contract +17 legacy** checks passed with mocked inference and isolated
+schemas. Test DB restored to0021; migration round-trip/drift check clean. No new
+overall coverage measured. [Final evidence](EVIDENCE_ASSESSMENT_VALIDATION.md).
+Earlier full/focused checkpoints below are historical, not current test counts.
+
+## Earlier presentation regressions — 23 October 2026
 
 **307 frontend tests** across27files, **71 focused backend tests** (43 unit/export,
 20 PostgreSQL integration,8 browser-fixture), lint/TypeScript/build and **17 native
