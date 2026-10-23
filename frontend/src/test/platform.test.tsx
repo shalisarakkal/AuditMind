@@ -5,6 +5,7 @@ import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
 import AccountsPage from "@/app/(app)/platform/accounts/page";
 import OrganizationsPage from "@/app/(app)/platform/organizations/page";
+import SharedDocumentsPage from "@/app/(app)/platform/documents/page";
 import OrgGate from "@/components/OrgGate";
 import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import Sidebar from "@/components/Sidebar";
@@ -60,6 +61,14 @@ describe("sign-up", () => {
 });
 
 describe("archived orgs and the Sysadmin's pages", () => {
+  it("does not mount shared-standards tools for a non-sysadmin", async () => {
+    const { fetchMock } = await renderSignedIn(<SharedDocumentsPage />, "admin", {
+      "GET /auth/me": () => ({ ...ROOT, is_sysadmin: false }),
+    });
+    expect(await screen.findByText("This page is for the Sysadmin.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload document" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/platform/documents"))).toBe(false);
+  });
   it("shows a read-only banner in an archived org", async () => {
     setToken("tok");
     mockApi({ "GET /orgs": () => [org({ archived: true })] });

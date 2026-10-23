@@ -30,6 +30,16 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
 
   const overallScore = data.overall_score ?? 0;
   const overallTier = (data.overall_tier || "medium").toUpperCase();
+  const baseline = data.provenance?.rule_based;
+  const sampleCount = data.provenance?.sampled_findings?.length;
+  function citationLinks(ids?: string[]) {
+    return ids?.length ? <p className="mt-2 text-xs">Evidence references: {ids.map((id, index) => {
+      const target = data?.compliance_citations?.findIndex(c => c.citation_id === id) ?? -1;
+      return <span key={id}>{index > 0 && ", "}{target >= 0
+        ? <a className="text-cyan-400 underline" href={`#report-evidence-${target}`}>{id}</a>
+        : <span>{id} (captured source unavailable)</span>}</span>;
+    })}</p> : null;
+  }
 
   const tierColors: Record<string, { bg: string; text: string; border: string }> = {
     LOW: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30" },
@@ -106,8 +116,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           <p>Model: {data.provenance.model} · Prompt: {data.provenance.prompt_version}</p>
           <p>Captured: {data.provenance.captured_at}</p>
           <p>{data.provenance.period_semantics}</p>
-          <p>Rule-based score: {data.provenance.rule_based?.overall_score} ({data.provenance.rule_based?.overall_tier}); AI score: {data.overall_score}. These are separate assessments.</p>
-          <p>Sampled findings: {data.provenance.sampled_findings?.length ?? 0}, limit {data.provenance.sample_limit}. The model did not receive every finding.</p>
+          <p>Sampled findings: {sampleCount ?? "not recorded"} of {data.total_findings}. {sampleCount == null ? "Sampling coverage is not recorded." : sampleCount < data.total_findings ? "The model did not receive every finding." : sampleCount === data.total_findings ? "All counted findings were included; text may still be limited." : "Sampling counts are inconsistent; inspect captured evidence."}</p>
           {data.provenance.evidence_limitation && <p role="status" className="text-amber-300">{data.provenance.evidence_limitation}</p>}
           <details><summary>Captured evidence details</summary><pre className="max-h-96 overflow-auto whitespace-pre-wrap">{JSON.stringify(data.provenance, null, 2)}</pre></details>
         </> : <p>Legacy report: full evidence provenance was not captured.</p>}
@@ -117,7 +126,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
         <div className={`flex flex-col justify-between rounded-xl border ${currentTierStyle.border} ${currentTierStyle.bg} p-6`}>
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-white/60">
-              Overall Resilience Index
+              {ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
             </span>
             <div className="mt-3 flex items-baseline gap-3">
               <span className={`text-5xl font-extrabold ${currentTierStyle.text}`}>{overallScore}</span>
@@ -131,8 +140,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
             <p className="mt-1 text-xs text-white/50">
               {ruleBasedTest
                 ? `Deterministic scoring from ${data.total_findings} active findings; framework controls were not evaluated.`
-                : `Based on ${data.total_assets} assets and ${data.total_findings} active findings evaluated against standards.`}
+                : `Inventory totals: ${data.total_assets} assets and ${data.total_findings} active findings; not proof of complete control assessment.`}
             </p>
+            <p className="mt-2 text-xs">Higher scores mean greater resilience; neither score proves compliance.</p>
+            {!ruleBasedTest && <>
+              <p className="mt-2 text-xs">Captured deterministic baseline: {baseline?.overall_score != null ? `${baseline.overall_score}/100 (${baseline.overall_tier})` : "not recorded"}.</p>
+              <p className="mt-2 text-xs">AI and deterministic scores are separate assessments. AI variation is not a measured change in security posture.</p>
+            </>}
           </div>
         </div>
 
@@ -153,6 +167,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       {/* Domain Breakdown */}
       <div className="rounded-xl border border-white/10 bg-[#0e1626] p-6">
         <h2 className="text-base font-semibold text-white mb-4">Domain Resilience Breakdown</h2>
+        {!ruleBasedTest && <p className="mb-4 text-xs text-white/70">Domain scores are advisory AI judgments. Read the complete justification for evidence limitations.</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.domains?.map((d) => {
             const domainName = d.domain.replace("_", " ").toUpperCase();
@@ -165,16 +180,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                       {d.score}/100
                     </span>
                   </div>
-                  <p className="mt-2.5 text-xs text-white/70 line-clamp-3">{d.justification}</p>
+                  <p className="mt-2.5 text-xs text-white/70">{d.justification}</p>
+                  {citationLinks(d.citation_ids)}
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-white/5 space-y-1 text-[11px]">
-                  {d.strengths?.[0] && (
-                    <div className="text-emerald-400/90 truncate">✓ {d.strengths[0]}</div>
-                  )}
-                  {d.weaknesses?.[0] && (
-                    <div className="text-amber-400/90 truncate">⚠ {d.weaknesses[0]}</div>
-                  )}
+                  {d.strengths?.map((text, i) => <p key={`s-${i}`} className="text-emerald-400/90">Strength: {text}</p>)}
+                  {d.weaknesses?.map((text, i) => <p key={`w-${i}`} className="text-amber-400/90">Limitation/weakness: {text}</p>)}
                 </div>
               </div>
             );
@@ -188,6 +200,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           <div>
             <h2 className="text-base font-semibold text-white">Prioritized Remediation Roadmap</h2>
             <p className="text-xs text-white/50">Actions ranked by security impact and mitigation value</p>
+            {!ruleBasedTest && <p className="mt-2 text-xs text-white/70">Confidence is model-estimated evidential support, not a calibrated probability of compliance or remediation success, and not evidence completeness.</p>}
           </div>
 
           <div className="flex items-center gap-1.5 bg-white/5 rounded-lg p-1 border border-white/10">
@@ -241,6 +254,12 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                   </div>
 
                   <p className="mt-2 text-xs leading-relaxed text-white/70">{r.description}</p>
+                  {citationLinks(r.citation_ids)}
+                  <div className="mt-2 space-y-1 break-all text-xs text-white/60">
+                    <p>{r.confidence == null ? "Confidence: not recorded" : `Model-estimated confidence: ${Math.round(r.confidence * 100)}% (not calibrated)`}</p>
+                    <p>Affected findings: {r.affected_finding_ids?.join(", ") || "No specific finding references recorded"}</p>
+                    <p>Affected assets: {r.affected_asset_ids?.join(", ") || "No specific asset references recorded"}</p>
+                  </div>
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2 text-[11px] text-white/50">
                     <div>
@@ -248,7 +267,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                     </div>
                     {r.related_controls?.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <span>Standards:</span>
+                        <span>Related controls (descriptive):</span>
                         {r.related_controls.map((ctrl) => (
                           <span
                             key={ctrl}
@@ -275,13 +294,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {data.compliance_citations.map((c, idx) => (
-              <div key={idx} className="rounded-lg border border-white/5 bg-white/[0.015] p-3.5">
+              <div key={idx} id={`report-evidence-${idx}`} className="rounded-lg border border-white/5 bg-white/[0.015] p-3.5">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-mono text-xs font-bold text-cyan-400">{c.control_id}</span>
                   <span className="text-[11px] text-white/50">{c.framework} {c.version || ""}</span>
                 </div>
                 <div className="text-xs font-medium text-white/90">{c.title}</div>
-                <p className="mt-1 text-[11px] text-white/60 line-clamp-3 leading-relaxed">{c.content}</p>
+                <p className="mt-1 text-[11px] text-white/60 leading-relaxed">{c.content}</p>
               </div>
             ))}
           </div>

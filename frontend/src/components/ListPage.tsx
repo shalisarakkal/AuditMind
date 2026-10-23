@@ -106,8 +106,8 @@ const STATUS_BADGES: Record<string, string> = {
   pending: "bg-white/10 text-white/70",
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  return <Badge className={STATUS_BADGES[status] ?? STATUS_BADGES.pending}>{status}</Badge>;
+export function StatusBadge({ status, label = status }: { status: string; label?: string }) {
+  return <Badge className={STATUS_BADGES[status] ?? STATUS_BADGES.pending}>{label}</Badge>;
 }
 
 const CRITICALITY_BADGES: Record<Criticality, string> = {

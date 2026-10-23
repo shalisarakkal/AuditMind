@@ -74,6 +74,9 @@ const SAMPLE_REPORT: AuditReport = {
         expected_impact: "Prevents credential interception attacks.",
         related_controls: ["CIS-5.2", "NIST-PR.AC-01"],
         affected_asset_types: ["cloud_resource", "server"],
+        confidence: 0.8,
+        affected_finding_ids: ["11111111-1111-4111-8111-111111111111"],
+        affected_asset_ids: ["22222222-2222-4222-8222-222222222222"],
       },
     ],
     compliance_citations: [
@@ -310,9 +313,10 @@ describe("ReportsPage", () => {
 
     fireEvent.click(screen.getByText("+ Generate report"));
 
-    expect(screen.getByText("Generate AI Cyber Resilience Audit Report")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Generate AI audit report" })).toBeInTheDocument();
 
     const submitBtn = screen.getByRole("button", { name: "Generate Report" });
+    await waitFor(() => expect(submitBtn).toBeEnabled());
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -331,8 +335,10 @@ describe("ReportsPage", () => {
       },
     });
     fireEvent.click(await screen.findByText("+ Generate report"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Generate Report" }));
     await screen.findByText(/Cannot reach the AuditMind API/);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Generate Report" }));
     await waitFor(() => expect(keys).toHaveLength(2));
     expect(keys[0]).toBeTruthy();
@@ -379,10 +385,10 @@ describe("ReportsPage", () => {
     });
 
     fireEvent.click(await screen.findByRole("button", { name: "+ Rule-based test report" }));
-    expect(screen.getByText("Generate Rule-Based Test Report")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Generate rule-based test report" })).toBeInTheDocument();
     expect(screen.getByRole("note")).toHaveTextContent("does not evaluate CIS, NIST, or ISO controls");
     expect(screen.queryByText("Compliance Frameworks (RAG Standards)")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Report Title"), { target: { value: "Rule-based preview" } });
+    fireEvent.change(screen.getByLabelText("Report title"), { target: { value: "Rule-based preview" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate Test Report" }));
 
     await waitFor(() => expect(generated).toBe(true));
@@ -434,6 +440,25 @@ describe("ReportsPage", () => {
     expect(screen.getByText("IDENTITY ACCESS")).toBeInTheDocument();
     expect(screen.getByText("Enforce Hardware-backed MFA for Cloud Admins")).toBeInTheDocument();
     expect(screen.getAllByText("CIS-5.2").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Model-estimated confidence: 80% (not calibrated)")).toBeInTheDocument();
+    expect(screen.getByText(/Affected findings: 11111111/)).toBeInTheDocument();
+    expect(screen.getByText(/Affected assets: 22222222/)).toBeInTheDocument();
+  });
+
+  it("keeps legacy reports readable without reinterpreting their saved tier", () => {
+    const data = SAMPLE_REPORT.data!;
+    const remediations = data.remediations.map((action) => {
+      const legacy = { ...action };
+      delete legacy.confidence;
+      delete legacy.affected_finding_ids;
+      delete legacy.affected_asset_ids;
+      return legacy;
+    });
+    render(<ReportViewer report={{ ...SAMPLE_REPORT, data: { ...data,
+      overall_score: 35, overall_tier: "high", remediations } }} />);
+    expect(screen.getByText("HIGH Risk Tier")).toBeInTheDocument();
+    expect(screen.getByText("Confidence: not recorded")).toBeInTheDocument();
+    expect(screen.getByText(/No specific finding references recorded/)).toBeInTheDocument();
   });
 
   it("shows a direct PDF download action separately from browser printing", () => {

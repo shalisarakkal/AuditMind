@@ -390,7 +390,7 @@ function Reports() {
                       </td>
                       <td className={TD}>
                         {score != null ? (
-                          <span className="font-semibold text-cyan-400">{score}/100</span>
+                          <span className="font-semibold text-cyan-400">{score}/100 <span className="block text-xs font-normal">{r.assessment_type === "rule_based_test" ? "Deterministic test" : "AI advisory"}</span></span>
                         ) : isRunning ? (
                           <span className="text-xs text-white/40">Evaluating...</span>
                         ) : (
@@ -459,6 +459,10 @@ function Reports() {
       )}
 
       <GenerateReportModal
+        key={org.id}
+        orgId={org.id}
+        orgName={org.name}
+        canApprove={admin}
         isOpen={modalMode !== null}
         mode={modalMode ?? "ai"}
         onClose={() => setModalMode(null)}

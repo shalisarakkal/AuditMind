@@ -112,8 +112,28 @@ export function PickFilter({
   name: string;
   label: string;
   options: PickOption[];
-  list: ListState;
+  list: Pick<ListState, "values" | "setValues">;
 }) {
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const clickOutside = (event: MouseEvent) => {
+      if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
+        menu.current.open = false;
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !menu.current?.open) return;
+      const restoreFocus = menu.current.contains(document.activeElement);
+      menu.current.open = false;
+      if (restoreFocus) menu.current.querySelector("summary")?.focus();
+    };
+    document.addEventListener("click", clickOutside, true);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("click", clickOutside, true);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
   const chosen = list.values(name);
   const labelOf = (value: string) => options.find((o) => o.value === value)?.label ?? value;
   const summary = chosen.length === 0 ? "All" : chosen.length === 1 ? labelOf(chosen[0]) : `${labelOf(chosen[0])} +${chosen.length - 1}`;
@@ -121,7 +141,7 @@ export function PickFilter({
     list.setValues(name, chosen.includes(value) ? chosen.filter((v) => v !== value) : [...chosen, value]);
 
   return (
-    <details className="relative font-normal normal-case tracking-normal">
+    <details ref={menu} className="relative font-normal normal-case tracking-normal">
       <summary
         aria-label={`Filter ${label}: ${summary}`}
         className={`${input} cursor-pointer list-none truncate ${chosen.length ? "border-cyan text-cyan" : "text-white/60"}`}

@@ -107,6 +107,7 @@ export async function renderSignedIn(
     "GET /orgs/org-1/findings/facets": () => ({ source: [] }),
     "GET /orgs/org-1/reports/facets": () => ({ status: [], frameworks: [] }),
     "GET /orgs/org-1/reports/capabilities": () => ({ rule_based_test_enabled: false }),
+    "GET /orgs/org-1/documents/settings": () => ({ report_granted: true, report_target: "anthropic:test-model:test-prompt" }),
     ...routes,
   });
   const result = render(

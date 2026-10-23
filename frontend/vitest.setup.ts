@@ -10,6 +10,11 @@ import { clearToken } from "@/lib/apiClient";
 // different tests miss the 1 s now and then.
 configure({ asyncUtilTimeout: 3000 });
 
+// jsdom does not implement the browser top layer/focus containment. Component
+// tests model open/close only; installed Chrome verifies native modal behavior.
+HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+HTMLDialogElement.prototype.close = function () { this.open = false; };
+
 afterEach(() => {
   cleanup();
   clearToken();

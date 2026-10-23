@@ -135,9 +135,10 @@ async function request<T>(method: string, path: string, body?: unknown, options:
   const token = getToken();
   let res = await send(token);
   // Signed in, and refused: the access token ran out (renew it and try once
-  // more) or the session ended. Not for /auth itself: a wrong password is a
-  // 401 too.
-  if (res.status === 401 && token && !path.startsWith("/auth/")) {
+  // more) or the session ended. Only session-establishing/ending endpoints
+  // are exempt: /auth/me, sessions and password changes are protected too.
+  const sessionEndpoint = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"].includes(path.split("?")[0]);
+  if (res.status === 401 && token && !sessionEndpoint) {
     // Another request may have renewed it meanwhile.
     const latest = getToken();
     const next =

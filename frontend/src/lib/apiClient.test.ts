@@ -107,6 +107,41 @@ describe("apiClient", () => {
     expect(callsTo(fetchMock, "POST /auth/refresh")).toHaveLength(1);
   });
 
+  it.each(["/auth/me?v=3", "/auth/sessions", "/auth/change-password"])("renews protected account request %s", async (path) => {
+    setToken("old");
+    const fetchMock = mockApi({
+      [`GET ${path}`]: init => (init.headers as Record<string, string>).Authorization === "Bearer new"
+        ? { ok: true } : json({ detail: "Expired token" }, 401),
+      "POST /auth/refresh": () => ({ access_token: "new", ...TOKEN }),
+    });
+    await expect(api.get(path)).resolves.toEqual({ ok: true });
+    expect(callsTo(fetchMock, "POST /auth/refresh")).toHaveLength(1);
+    expect(callsTo(fetchMock, `GET ${path}`)).toHaveLength(2);
+  });
+
+  it.each(["/auth/login?source=test", "/auth/register", "/auth/refresh", "/auth/logout"])("does not renew session endpoint %s", async path => {
+    setToken("old");
+    const fetchMock = mockApi({ [`POST ${path}`]: () => json({ detail: "Refused" }, 401) });
+    await expect(api.post(path)).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getToken()).toBe("old");
+  });
+
+  it("signs out on repeated protected account refusal without a retry loop", async () => {
+    setToken("old");
+    const onSessionEnded = vi.fn();
+    setSessionHandlers({ onSessionEnded, onPasswordChangeRequired: vi.fn() });
+    const fetchMock = mockApi({
+      "GET /auth/me": () => json({ detail: "Session ended" }, 401),
+      "POST /auth/refresh": () => ({ access_token: "new", ...TOKEN }),
+    });
+    await expect(api.get("/auth/me")).rejects.toMatchObject({ status: 401 });
+    expect(callsTo(fetchMock, "GET /auth/me")).toHaveLength(2);
+    expect(callsTo(fetchMock, "POST /auth/refresh")).toHaveLength(1);
+    expect(onSessionEnded).toHaveBeenCalledTimes(1);
+    expect(getToken()).toBeNull();
+  });
+
   it("an ended session signs the app out, saying why", async () => {
     setToken("old");
     const onSessionEnded = vi.fn();

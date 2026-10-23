@@ -21,6 +21,7 @@ export type ReportFacets = {
 };
 
 export type DomainScoreAI = {
+  citation_ids?: string[];
   domain: Domain;
   score: number;
   tier: RiskTier;
@@ -30,6 +31,7 @@ export type DomainScoreAI = {
 };
 
 export type RemediationActionAI = {
+  citation_ids?: string[];
   title: string;
   description: string;
   priority: "Critical" | "High" | "Medium" | "Low";
@@ -38,6 +40,10 @@ export type RemediationActionAI = {
   expected_impact: string;
   related_controls: string[];
   affected_asset_types: string[];
+  // Optional for retained reports generated before the v2 assessment contract.
+  confidence?: number | null;
+  affected_finding_ids?: string[];
+  affected_asset_ids?: string[];
 };
 
 export type ComplianceCitation = {
