@@ -1,4 +1,16 @@
 # System architecture diagram (text blueprint)
+
+Review synchronization (2026-10-22): The diagram includes proposed OAuth/SSO, connector and standalone AI routes. These are not a runtime API inventory. Use asynchronous report jobs for AI; dashboard scoring stays deterministic.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
+Current release decision (2026-10-21): this document's original Claude-backed
+`/risk/score` examples are superseded. That endpoint and dashboard scoring remain
+deterministic; Claude/RAG assessments run as report jobs and retain a separate
+rule-based baseline. Phase 3a local report generation ships separately. Shared
+80/60/40 tier boundaries are implemented for new assessments; remediation
+confidence and captured-evidence finding/asset UUIDs use the v2 report contract.
+Old reports retain their saved values.
+See [Phase3.md](Phase3.md) for release gates and implementation status.
 ## Layers:
 
 ### Client (UI):
@@ -93,7 +105,7 @@
 
 ### GET /orgs/:orgId/assets/:assetId/findings
 
-### POST /orgs/:orgId/risk/score (triggers Claude reasoning)
+### POST /orgs/:orgId/risk/score (deterministic; no Claude call)
 
 ## Reports:
 
@@ -103,11 +115,11 @@
 
 ## AI/RAG:
 
-### POST /ai/claude/analyze-config
+### Proposed only: POST /ai/claude/analyze-config (not implemented)
 
-### POST /ai/claude/generate-report
+### Proposed only: POST /ai/claude/generate-report (use organization report jobs instead)
 
-### POST /ai/claude/risk-score
+### Proposed only: POST /ai/claude/risk-score (not implemented)
 
 # AI reasoning workflow (Claude)
 ## Inputs:

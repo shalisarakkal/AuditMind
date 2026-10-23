@@ -1,4 +1,7 @@
 # MASTER PROMPT FOR CLAUDE (Copy & Paste)
+
+Review synchronization (2026-10-22): Historical/design record: original dates, results and proposals are preserved. This is not fresh test evidence or current release sign-off.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
 Project: AuditMind AI — an intelligent auditing, risk‑scoring, and compliance automation platform.
 
 ## Brand Assets:  

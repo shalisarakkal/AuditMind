@@ -1,5 +1,8 @@
 # AuditMind - Additional Support Required
 
+Review synchronization (2026-10-22): Historical/design record: original dates, results and proposals are preserved. This is not fresh test evidence or current release sign-off.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
 **Review date:** 2026-09-30
 **Scope:** Review of the current repository, roadmap, API surface, frontend pages, tests, and architecture documents.
 

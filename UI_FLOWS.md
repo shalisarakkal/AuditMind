@@ -1,84 +1,44 @@
-# UI Flows – AI Cyber Resilience Auditor
+# Current UI flows
 
-## 1. Overview
-Describes key user journeys and screens in the web application.
+Reviewed 22 October 2026. See the [manual](docs/USER_MANUAL.md) for browser
+instructions and [release readiness](docs/RELEASE_READINESS.md) for open gates.
+This replaces the original aspirational flows, not final acceptance evidence.
 
----
+## Data and scoring
 
-## 2. Main Flows
+Sign in with an existing account and select an authorized organization. Browse
+Assets, Findings and Scans with shared filters/pagination. Import supported files
+using configured ingestion profiles. Profile mapping is not a live scanner
+connection or a universal native Qualys parser. Dashboard scores are deterministic;
+there is no dashboard action that silently sends evidence to Claude.
 
-### 2.1 Onboarding Flow
-1. User signs up or is invited.
-2. Selects or creates organization.
-3. Configures basic settings (timezone, industry).
-4. Guided setup to add first connectors (cloud, IAM, scanner).
+## Documents
 
-### 2.2 Connector Setup Flow
-1. Navigate to **Settings → Integrations**.
-2. Choose connector type (AWS, Azure AD, Nessus, etc.).
-3. Enter credentials and scope.
-4. Test connection.
-5. Save and trigger initial discovery.
+Authorized organization administrators manage organization text/Markdown
+documents, versions and indexing. Shared standards are inherited read-only.
+Upload, publication, indexing, retirement and deletion are distinct lifecycle
+states; upload alone does not make a document retrievable. Review the external
+processing disclosure before approving report consent. Framework checkboxes do
+not download standards or grant licensing rights. Platform administration and
+organization write authority are distinct; read-only access cannot approve consent.
 
-### 2.3 Discovery & Scan Flow
-1. Go to **Assets** page.
-2. Click **Run Discovery** or **Import Scan Results**.
-3. Select scope (all, environment, tags).
-4. Monitor progress via **Scans** status.
-5. Assets and findings populate tables.
+## Reports
 
-### 2.4 Risk Assessment Flow
-1. Navigate to **Dashboard**.
-2. Click **Run AI Risk Assessment**.
-3. Backend aggregates data and calls Claude.
-4. User sees updated scores and risk tiers.
-5. Drill down into each domain for details.
+Open Reports and select generation mode. The local rule-based test is not an AI
+assessment. AI mode requires current organization consent, a configured enabled
+provider, usable indexed evidence, healthy worker and quota headroom. Enter title
+and frameworks. The current dialog lacks date controls although the API supports dates.
 
-### 2.5 Report Generation Flow
-1. Go to **Reports**.
-2. Click **Generate New Report**.
-3. Choose period and scope.
-4. Claude generates executive + technical sections.
-5. User reviews, edits if needed, and exports PDF/HTML.
+Generation is asynchronous: inspect status and failure details. Cancellation
+prevents publication but cannot abort an issued request. Live job status and
+cancellation are refreshed before each provider attempt/reservation. Completed reports are saved snapshots, not editable
+live dashboards. Authorized members can view and download HTML/PDF subject to retention.
 
-### 2.6 Findings Remediation Flow
-1. Open **Findings** page.
-2. Filter by severity/domain.
-3. Click a finding to view AI explanation and remediation.
-4. Mark as accepted, in-progress, or resolved.
-5. Changes reflected in future risk assessments.
+Provider credentials are server configuration, not browser Settings fields.
+Demo mode disables real inference: consent alone cannot enable it.
 
----
+## Proposed, not current promises
 
-## 3. Key Screens
-
-### 3.1 Dashboard
-- Overall resilience score.
-- Domain scores (radar chart).
-- Top 5 critical issues.
-- Recent scans and connector status.
-
-### 3.2 Assets
-- Table: asset type, environment, criticality, risk score.
-- Filters: type, environment, domain, severity.
-
-### 3.3 Findings
-- Grouped by domain.
-- Columns: severity, asset, description, AI explanation, remediation.
-
-### 3.4 Reports
-- List of reports with status and date.
-- View report details.
-- Export options.
-
-### 3.5 Settings / Integrations
-- Connector list with status.
-- Add/edit connector forms.
-- AI settings (Claude API key, RAG options).
-
----
-
-## 4. Roles & Permissions (UI)
-- **Admin:** full access, connector management, org settings.
-- **Auditor:** run scans, risk assessments, generate reports.
-- **Viewer:** read-only access to dashboard, findings, reports.
+Live cloud/scanner discovery, general SSO onboarding, complete remediation
+assignment/approval workflows and local generative reporting are not established
+by these flows. Consult the plan before treating proposed screens as implemented.

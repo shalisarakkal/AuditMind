@@ -1,5 +1,8 @@
 # AuditMind Code Review
 
+Review synchronization (2026-10-22): Historical/design record: original dates, results and proposals are preserved. This is not fresh test evidence or current release sign-off.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
 **Review date:** 2026-09-30
 **Review target:** Current repository plus the uncommitted change set shown by `git status`. The change set adds skipped/duplicate row details to import reports and lets users open a past upload report from the Uploads page.
 

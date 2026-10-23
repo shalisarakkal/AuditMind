@@ -1,5 +1,8 @@
 # Acquired standards source archive
 
+Review synchronization (2026-10-22): Source acquisition does not establish complete framework coverage. Current installed NIST content is distinct from CIS/ISO reference-only entries. Vendored license text is unchanged; its upstream-relative CONTRIBUTING link is not a missing local product file.
+See [current code review and release gates](../RELEASE_READINESS.md).
+
 Keep original acquired standards here, with source, version, hash, and licensing information. Do not add credentials, private organization documents, or licensed standards whose terms do not permit repository storage/distribution.
 
 ## NIST CSF 2.0

@@ -1,7 +1,20 @@
 # AuditMind AI
 
-AI-powered cyber resilience auditing platform. Claude reasons over asset/finding data plus CIS/NIST/ISO
-standards (via pgvector RAG) to produce per-domain risk scores, remediation guidance, and audit reports.
+Phase 3 technical/open/deferred status: [closure checklist](docs/PHASE3_CLOSURE.md).
+Report prompt v3 adds explicit input budgets and requires approval of its updated
+processing target; existing reports are unchanged. Live inference remains disabled
+in the demo and is not authorized by the automated test results.
+
+Regression verification: [testing strategy and coverage](docs/TESTING.md).
+Acceptance tests require PostgreSQL/pgvector (`--require-postgres`); frontend
+coverage runs with `npm run test:coverage`. Real inference remains mocked.
+
+Cyber resilience auditing platform with deterministic dashboard scoring and
+separate Claude/RAG reports over installed, authorized documents. Selecting a
+framework does not install licensed full-text CIS/ISO standards.
+
+**Phase 3 preview, not release-approved:** see the current
+[code review and release gates](docs/RELEASE_READINESS.md).
 
 See the planning docs in the repo root for full specs:
 `Architecture.md`, `Blueprint.md`, `DATA_MODEL.md`, `CONNECTORS_SPEC.md`, `RISK_SCORING.md`,
@@ -12,7 +25,7 @@ See the planning docs in the repo root for full specs:
 - **Frontend**: Next.js (App Router) + TypeScript + Tailwind CSS
 - **Backend**: FastAPI (Python 3.12)
 - **Database**: PostgreSQL + pgvector (structured data + RAG embeddings, one datastore)
-- **AI**: Claude (Anthropic API)
+- **AI**: Claude (Anthropic API; optional OpenRouter adapter disabled by default)
 - **Deployment target**: AWS (Docker locally for now)
 
 ## Repo layout
@@ -26,13 +39,18 @@ docs/       Database performance guide, UI conventions
 
 ## Local development
 
+For an isolated browser tour with synthetic data and no external AI calls, see the
+[user manual](docs/USER_MANUAL.md) and run `start-demo.ps1`. This preserves the
+regular application's tables and uses its own local PostgreSQL schema.
+
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
 In `backend/.env`, set `SECRET_KEY` (required: the backend and worker refuse to start
-without a random one of 32+ characters) and `ANTHROPIC_API_KEY`:
+without a random one of 32+ characters). `ANTHROPIC_API_KEY` is needed only for
+approved live Anthropic inference, not the no-inference browser demo:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -111,6 +129,7 @@ accounts; platform activity; security defaults) and each org's Settings > Securi
 Phase 3 documents, evidence-backed reports, observability and operational controls
 are implemented; final acceptance/sign-off remains pending. Operational contracts,
 migration `0021`, quotas, idempotency, retention and embedding deployment instructions:
-[Phase 3 operations](docs/PHASE3_OPERATIONS.md). Container validation requires a
-Docker-capable staging host. `PLAN.md` tracks every
+[Phase 3 operations](docs/PHASE3_OPERATIONS.md). Docker deployment and container
+validation are user-deferred to [Future phase](PLAN.md#future-phase--deferred-delivery),
+not core Phase 3 blockers. Reporting-period browser fields are also deferred. `PLAN.md` tracks every
 phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the original roadmap.

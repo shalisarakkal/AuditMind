@@ -1,5 +1,8 @@
 # UI conventions: list pages
 
+Review synchronization (2026-10-22): These conventions remain normative. Passing component tests does not replace full Chrome accessibility/lifecycle acceptance; release findings and remaining gates are tracked separately.
+See [current code review and release gates](RELEASE_READINESS.md).
+
 Every page that lists things (Assets, Findings, Imports, Archived, Activity,
 Reports, Documents, and any new one) looks and behaves the same. Build new list pages from the
 shared pieces in `frontend/src/components/ListPage.tsx` and
@@ -126,6 +129,46 @@ Agreed 2026-09-30:
 - [ ] backend: `q`, per-column filters, `since`/`until` on the date
       column, `sort`/`order`, paging, facets
 - [ ] tests: filters reach the API, sorting, the empty and filtered messages
+
+## Document libraries
+
+- Organization Documents and Platform Shared standards use the same library
+  controls. Show the real organization name and put Upload document in the header.
+  Upload metadata uses a labelled inline form with primary/secondary actions.
+- Hide mutation selections, bulk controls and forms in read-only mode. Organization
+  admins manage only their own documents, not shared sources. Shared standards and
+  provider configuration are restricted to the Sysadmin. Backend authorization
+  remains authoritative; hiding controls is not a security boundary.
+- Use shared status badges with readable labels. Initial publication is Queued /
+  Processing, not Reactivating. Reactivating applies only to retained retired
+  versions awaiting republication; do not offer removal during that operation.
+- Keep version metadata compact behind Version details: source, rights and content
+  hash remain available without filling every row. Read-only preview stays available.
+- Separate AI-report and embedding consent into named sections with explicit
+  status, target details and descriptions. Approve/revoke actions require an inline
+  confirmation; local embedding targets do not offer unnecessary external approval.
+- Keep permitted-evidence search distinct from document-list filtering. Announce
+  search progress, counts, empty results and errors; do not show stale excerpts as
+  the result of a failed new search.
+
+## Report-generation forms
+
+- AI and rule-based preview modes use the same application-owned dialog. This is
+  not a browser `alert`/`confirm` prompt. Use named navy/cyan tokens, consistent
+  borders, input styling and primary/secondary actions; avoid custom hex colours.
+- Show the selected organization explicitly. Fetch AI report approval on each
+  opening and organization change; missing, loading or failed approval checks
+  disable AI submission. Offer an organization-scoped Documents link, and Retry
+  for failed checks. Do not grant consent or imply that approval configures a
+  provider, evidence index or worker.
+- Use a named dialog, a labelled close action, initial focus, contained Tab/
+  Shift+Tab navigation, Escape dismissal and focus restoration. Do not dismiss
+  while submission is in flight. Ensure scrolling and actions remain usable on
+  short/narrow viewports.
+- Frameworks use fieldset/legend and labelled checkboxes. Use plain language;
+  framework selection does not install licensed material or certify compliance.
+- Announce submission/check errors through alerts. Keep rule-based previews
+  explicitly non-AI and independent of external-processing consent.
 
 ## Accessibility
 

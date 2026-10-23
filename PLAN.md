@@ -472,38 +472,38 @@ the report only to its uploader, until they dismiss it (for good).
 Decisions (2026-09-28; all as recommended). Organization archive and purge
 moved to Phase 2e, since only the Sysadmin will create and remove orgs.
 
-- [ ] Archive manually (never automatically): an upload (its scan, report and
+- [x] Archive manually (never automatically): an upload (its scan, report and
       findings, and the assets only it uses), an asset (with all its
       findings), or a manually added finding. Imported findings aren't
       archived one by one (a re-import would re-create them). Archived data
       leaves every list, count, score, search and import match
-- [ ] Record which uploads touched each asset, from now on (an asset-upload
+- [x] Record which uploads touched each asset, from now on (an asset-upload
       link written by every import). Existing data is linked backwards through
       findings where possible; assets from earlier asset-only imports stay
       unlinked (archive them individually, or with the org)
-- [ ] Changes an upload made to assets it shares with other uploads (e.g. an
+- [x] Changes an upload made to assets it shares with other uploads (e.g. an
       environment or details) stay when it's archived: they can't be reliably
       undone
-- [ ] Each archive action is a batch: restoring brings back exactly what it
+- [x] Each archive action is a batch: restoring brings back exactly what it
       archived. Restore any time until purged. Archived findings don't count
       for duplicate checks; on restore, one that now duplicates an active
       finding is purged instead (the restore report says how many)
-- [ ] Purge (permanent) only from the archive, admins only; a purge log keeps
+- [x] Purge (permanent) only from the archive, admins only; a purge log keeps
       what, who, when and how many rows
-- [ ] Auto-purge `ARCHIVE_RETENTION_DAYS` (default 180) after archiving, set
+- [x] Auto-purge `ARCHIVE_RETENTION_DAYS` (default 180) after archiving, set
       in `.env` and overridable per organization; each archived item shows a
-      countdown ("Deleted in 173 days"). Runs daily in the app, plus a
+      countdown ("Deleted in 173 days"). Runs daily in the worker, plus a
       command for Task Scheduler/cron
-- [ ] Large archives, restores and purges run in the background with progress
+- [x] Large archives, restores and purges run in the background with progress
       in the import tracker ("Archiving… 120,000 / 500,000"); set-based SQL
       throughout (1.5M assets / 2.15M findings on the dev HDD)
-- [ ] Who: archive and restore, admins and auditors; purge, retention and the
+- [x] Who: archive and restore, admins and auditors; purge, retention and the
       purge log, admins; everyone sees the Imports and Archived pages
-- [ ] Pages: a new Imports page (every upload, with Archive); Archive on asset
+- [x] Pages: a new Imports page (every upload, with Archive); Archive on asset
       and manual-finding rows; a new Archived page (tabs: Uploads, Assets,
       Findings) with the countdown, Restore and (admins) Purge; retention and
       the purge log under Settings
-- [ ] Repeat-upload warning: store each upload's SHA-256 content hash;
+- [x] Repeat-upload warning: store each upload's SHA-256 content hash;
       uploading a byte-identical file (from anyone in the org; failed and
       archived uploads don't count) warns "already imported on <date> by
       <user>" and only proceeds when the user confirms. Warn, never block
@@ -546,8 +546,8 @@ Review (3 reviewers, every finding reproduced; 2026-09-29):
       rows still archived
 - [x] Medium: Undo of a large stopped archive was sized at 1 row and ran in
       the request. Fixed: sized by counting its archived rows
-- [ ] Low: startup marks every running archive job failed, wrong once
-      several processes run: moved to Part 3 (a per-job heartbeat)
+- [x] Low: startup marked every running archive job failed, wrong once
+      several processes run: resolved in Part 3 with per-job heartbeat/ownership checks
 - [x] Low: a restore's "findings kept with their asset" count is now shown;
       the empty-list row spans the viewer's columns; one polling helper for
       both trackers; retention field edit/save/reset tested
@@ -871,38 +871,47 @@ one goes:
 - **Signed off 2026-10-01** after your verification (guide Part 4 steps
   1-5). Next: Phase 2e (users and organizations)
 
-## Phase 2e — Users and organizations (signed off 2026-10-01, not fully verified)
+## Phase 2e — Users and organizations (implemented; verification refreshed 2026-10-21)
 
 Signed off by the user on 2026-10-01 without completing the verification
 guide's Phase 2e checks; parts were checked while verifying (the security
-settings form, Activity, lockout and reset, adding people). Anything found
-later is fixed as it comes up. Commits: c9a4239, bad7799, eaedd46, 232c28a.
+settings form, Activity, lockout and reset, adding people).
+Historical commits: c9a4239, bad7799, eaedd46, 232c28a.
+
+Verification refreshed 2026-10-21: requirements traced to code, backend regression
+tests and 25 real-Chrome acceptance checks against an isolated real API/worker and
+PostgreSQL schema. The later Phase 3 archive/job admission gap is fixed, including
+concurrent admission versus archiving. See the scope, checklist, evidence and
+production-only qualifications in [docs/PHASE2E_ACCEPTANCE.md](docs/PHASE2E_ACCEPTANCE.md).
+This records engineering verification, not a new user sign-off or production approval.
+Only organization lifecycle moved here from Phase 2d Part 2; uploads/assets/findings
+lifecycle remained implemented in that part. Its stale checkboxes are reconciled.
 
 Requested 2026-09-28: a platform Sysadmin creates organizations and their
 admins; each org's admins create its users. Decisions (all as recommended,
 plus self-service password change):
 
-- [ ] Roles: Sysadmin (platform-wide) above the per-org Admin, Auditor and
+- [x] Roles: Sysadmin (platform-wide) above the per-org Admin, Auditor and
       Viewer. A user can belong to several orgs, with a role in each
-- [ ] Public sign-up turned off: only the Sysadmin creates organizations
+- [x] Public sign-up turned off: only the Sysadmin creates organizations
       (and their first admin); only an org's admins create its users
-- [ ] Creating a user: the admin enters email, name and role; the app
+- [x] Creating a user: the admin enters email, name and role; the app
       generates a one-time temporary password, shown once, which the user
       must change at first login (no email server yet; email invitations
       later). An email that already has an account gets a new membership
-- [ ] Every user can change their own password (knowing the current one).
+- [x] Every user can change their own password (knowing the current one).
       A forgotten password is reset by their org's admin or the Sysadmin (a
       temporary one again) until email is set up; then self-service reset by
       emailed link
-- [ ] Admins manage their org's people: change a role, remove a member,
+- [x] Admins manage their org's people: change a role, remove a member,
       reset a password. The Sysadmin can also deactivate a user entirely
-- [ ] The Sysadmin manages organizations and their admins, and can see every
+- [x] The Sysadmin manages organizations and their admins, and can see every
       organization and its details (members, uploads, assets, findings,
       dashboard) read-only; changing an org's data stays with its members. It
       can act in an emergency (e.g. reset an org's admin)
-- [ ] The first Sysadmin is created by a command on the server
+- [x] The first Sysadmin is created by a command on the server
       (scripts/create_sysadmin.py), never through the website
-- [ ] Organization archive and purge (moved from Phase 2d Part 2): by the
+- [x] Organization archive and purge (moved from Phase 2d Part 2): by the
       Sysadmin. An archived org is read-only for its members and shown as
       "Archived" in the picker; the Sysadmin can restore it, or purge it after
       typing its name; the purge log records it
@@ -912,7 +921,7 @@ plus self-service password change):
       script can't read it; signing out, a password change or a reset ends
       the user's other sessions. Plus security headers (CSP). Done in
       Part 1 (below)
-- [ ] From CoPilotSuggestions (2026-09-30): an org can never lose its last
+- [x] From CoPilotSuggestions (2026-09-30): an org can never lose its last
       admin (removing, demoting or deactivating them is refused); a role
       change, removal or deactivation also ends that user's sessions; tests
       that each admin action stays inside its own org
@@ -973,7 +982,7 @@ platform defaults, then each org's changes. Part 3 adds the screens.
 - A per-IP limit on sign-in attempts (20 a minute) is a fixed server
   setting, not per org
 
-### Part 1: sessions and accounts (built 2026-10-01, signed off unverified)
+### Part 1: sessions and accounts (built 2026-10-01; verification refreshed 2026-10-21)
 
 - [x] Sessions stored and checked on every request (`user_sessions`): sign-out,
       idle and longest sign-in end them at once; the access token (15 min)
@@ -1009,12 +1018,10 @@ platform defaults, then each org's changes. Part 3 adds the screens.
   signs people out; Change password locks the account row like sign-in
   (guesses sent together each count); the rules name each org asking for
   a kind of character; .env.example gaps
-- Left for Part 3: when an admin lengthens the longest sign-in, the
-  browser's cookie keeps its old expiry until the next sign-in (renew it
-  on refresh); the sign-up page says "Email already registered" (public
-  sign-up goes in Part 3)
+- Resolved in Part 3: refresh renews the browser cookie's expiry when an
+  admin changes the longest sign-in; public sign-up is closed by default.
 
-### Part 2: people (built 2026-10-01, signed off unverified)
+### Part 2: people (built 2026-10-01; verification refreshed 2026-10-21)
 
 - [x] People page (sidebar), a list page like the others: name, email,
       role, status (Active, Locked, Must change password, Deactivated),
@@ -1048,13 +1055,12 @@ platform defaults, then each org's changes. Part 3 adds the screens.
       unlocked; renames and unlocks show in each of the person's orgs
 - [x] Tests that each admin action stays inside its own org (an admin of
       another org gets 404 or 403)
-- Until Part 3, someone in several orgs can't have their password reset
-  or be renamed by anyone but themselves: that's the Sysadmin's, who
-  doesn't exist yet
+- Resolved in Part 3: the Sysadmin can reset passwords and rename multi-org
+  accounts; organization admins remain restricted to single-org accounts.
 - No schema change (no migration). GET /orgs/{id}/users became
   GET /orgs/{id}/members (paged)
 
-### Part 3: Sysadmin, organizations, security settings screens (built 2026-10-01, signed off unverified)
+### Part 3: Sysadmin, organizations, security settings screens (built 2026-10-01; verification refreshed 2026-10-21)
 
 - [x] The Sysadmin: an account of its own, in no org, created only on the
       server (`scripts/create_sysadmin.py --email … --name …`, a temporary
@@ -1096,8 +1102,9 @@ platform defaults, then each org's changes. Part 3 adds the screens.
 - [x] Part 1 leftovers: the session cookie's expiry is renewed on every
       refresh (follows the longest sign-in if an admin changes it); sign-up
       enumeration answered by closing sign-up
-- After upgrading: run `alembic upgrade head` (0016) and restart the
-  background worker (it purges orgs)
+- Historical Part 3 deployment required migration 0016 and a worker restart
+  for organization purge. For the current migration head and release procedure,
+  use [docs/PHASE3_OPERATIONS.md](docs/PHASE3_OPERATIONS.md); do not target 0016 today.
 - Found while verifying (2026-10-01), done: the security settings form
   checks each value as it's typed (red border and the range; Save
   disabled until fixed); an org's Activity shows the worker's events only
@@ -1331,12 +1338,65 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
+23October presentation follow-up: advisory score labels, baseline/confidence and
+sampling explanations, complete domain text and evidence references implemented.
+307 frontend /71 focused backend tests and17 Chrome checks, lint/TypeScript/build
+passed. Latest full backend checkpoint remains1,035 tests (22October); no new
+coverage measured. [Details](docs/REPORT_SCORING_UI_REVIEW.md). Insufficient-evidence
+scoring is a separate pending contract decision; live-provider release gates open.
+
+Closure authority: [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). Prompt/context limits
+and omission provenance are implemented under **audit-evidence-v3**. Fresh target
+approval is required; existing reports remain unchanged. Remaining release gates
+are the development-tool advisory decision, genuine provider/model/pricing/quality
+acceptance and explicit sign-off—not Docker or browser date fields.
+
+Expanded verification (2026-10-22): PostgreSQL-required full backend **1,005 passed**,
+zero skips/failures; coverage-driven follow-up **19 passed** (11 new cases).
+Cumulative backend coverage 94.19% lines/85.34% branches. Frontend **300 passed**,
+91.98% lines/84.85% branches; lint/TypeScript/build pass. Native Chrome Phase 2e
+25 and Phase 3 16 checks rerun successfully. See [testing strategy](docs/TESTING.md)
+for scope, artifacts and remaining measured gaps; no exhaustive/production claim.
+
+- [x] Native/mock Chrome acceptance (2026-10-22): 16 real-stack checks, 3 document
+  roles and 2 report-dialog viewport scenarios; disposable schema cleaned. See
+  [acceptance evidence](docs/PHASE3_ACCEPTANCE.md). No genuine model or production certification.
+
+Scope decision (2026-10-22, user-approved): reporting-period browser fields are
+a deferred enhancement, not a Phase 3 blocker. Docker/container deployment and
+its staging/cache/restart validation move to the **Future phase** below. Current
+acceptance targets native local execution with mocked AI only; it is not
+production/cloud/container or live-provider certification.
+
+Current review (2026-10-22): [release readiness](docs/RELEASE_READINESS.md)
+supersedes older completion assumptions. Production dependency audit and cancellation
+retry authorization are remediated; development-tool audit disposition remains open. Automated implementation checks below
+are not full Chrome/staging/live-provider acceptance or sign-off.
+
+Release decision (2026-10-21): retain deterministic `/risk/score` and dashboard
+scores; provide Claude/RAG assessments through asynchronous reports with separate
+captured rule-based scores. Shared score tiers are approved (80/60/40 boundaries),
+and new AI assessments now share deterministic tier logic. Remediation confidence
+and finding/asset UUID allowlists are implemented under `audit-evidence-v2`;
+updated admin consent is required, and retained snapshots are unchanged.
+Phase 3a is a separate delivery and
+does not block core Phase 3. Phase 3b remains a future proposal. See the current
+release-scope decision in [Phase3.md](Phase3.md).
+
+Evidence capture (2026-10-21): independent PostgreSQL repeatable-read capture
+keeps counts, samples, rule scores and retrieved sources coherent. Source-use
+registration is atomic; serialization/deadlock conflicts retry the complete
+capture at most three times. Authorization remains live and the snapshot session
+closes before Claude generation. See operations for query-embedding lifetime
+and SDK retry limitations. Native/mock Chrome acceptance passed on 2026-10-22;
+Docker/container staging is Future scope, not a current core gate.
+
 Operational follow-up (2026-10-20): durable PostgreSQL quota/cost reservations,
 organization-scoped report idempotency, configurable terminal-report retention,
 and offline embedding API/worker packaging are implemented. Migration head is
 `0021`; do not apply it to important databases without the release checks in
 [docs/PHASE3_OPERATIONS.md](docs/PHASE3_OPERATIONS.md). Container build/startup/cache
-validation remains a staging gate because this machine has no Docker. See
+validation is deferred to the Future phase by the user's 2026-10-22 decision. See
 [validation evidence](docs/BACKEND_VALIDATION.md). Phase 3 acceptance and explicit
 sign-off are still pending; older unchecked entries are not proof of missing code.
 
@@ -1344,7 +1404,8 @@ sign-off are still pending; older unchecked entries are not proof of missing cod
 CIS/NIST/ISO docs (pgvector is already set up), Claude-driven risk scoring with RAG citations, full report
 generation endpoint.
 
-- [ ] Implementation committed and automated checks green; final acceptance/sign-off pending.
+- [x] Working-tree implementation has passing automated suites (987 backend/274 frontend on 2026-10-22), plus 24 final focused regressions after adding two direct-provider cases. Production build passes.
+- [ ] Reviewable commits, development-tool audit disposition and final release acceptance/sign-off.
 - Review fixes (2026-10-06): reproduced before implementation, with regression
   tests for CloudTrail account separation, assetless finding restore, idle-timeout
   renewal, concurrent last-admin deactivation, report recovery/cancellation,
@@ -1366,37 +1427,43 @@ generation endpoint.
   region to distinguish findings. Logs without account fields retain the old
   region-only behavior; already imported collisions cannot recover discarded
   evidence automatically. Reimport source logs containing account identifiers.
-- The separate unfinished requirements below (idempotency, per-org quotas/cost
-  accounting, document-ingestion jobs, evidence provenance and retention/PDF)
-  were explicitly excluded from this defect-fix pass.
+- Historical October 6 defect-fix scope excluded idempotency, quotas/costs,
+  ingestion, provenance and retention/PDF. Subsequent implementation covers these;
+  that old exclusion is not a current missing-feature list.
 - Claude auth: keep `ANTHROPIC_API_KEY` in `backend/.env` for local dev, and
   keep every Claude call going through `app/services/claude_service.py`, so the
   auth method can change in one place later (see Phase 4).
-- [ ] Claude calls bounded (CoPilot review, finding 6), in
+- [x] Claude operational controls implemented and mock-tested (CoPilot review, finding 6), in
       `claude_service.py`: timeouts, a few retries for temporary errors,
       per-org limits, token and cost recorded per call, provider errors
       mapped to clear messages, and the model's output checked before any
       score or report is saved. Tests with a mocked provider (timeout, rate
       limit, bad output, outage)
-- [ ] Report generation is a real job (findings 3 and 8): queued for the
+- [x] Report generation is a real job (findings 3 and 8): queued for the
       worker like imports, with status, failure details and retries;
       `GET /reports` paged, newest first, full report only by ID
 - Scope in detail (from CoPilotSuggestions, 2026-09-30; to settle at the
   start of the phase):
-  - [ ] Standards documents (CIS, NIST, ISO, and the org's own) loaded as a
+  - [x] Document pipeline for installed/licensed standards and organization documents, loaded as a
         worker job: chunked, embedded, with source and version, each org
         seeing only its own documents plus the shared standards
-  - [ ] Retrieval with citations that reach the API response and the report
-  - [ ] Claude answers in a fixed structure, checked (Pydantic) before use
-  - [ ] AI scoring never replaces the rule-based score: both are kept,
+  - [x] Retrieval with validated citations reaching API responses and reports (automated coverage; live acceptance open)
+  - [x] Claude answers in a fixed structure, checked (Pydantic) before use
+  - [x] AI scoring never replaces the rule-based score: both are kept,
         with the evidence, model, prompt version and period they came from
-  - [ ] Remediation recommendations: priority, affected assets/findings,
-        why, confidence
-  - [ ] A finished report is a snapshot that doesn't change afterwards;
+  - [x] Remediation recommendations: priority, captured-evidence finding/asset
+        UUID references, rationale, bounded model-estimated confidence. Schema/
+        prompt v2 rejects invalid references; UI/HTML/PDF preserve the fields.
+  - [x] A finished report is a saved snapshot (automated coverage);
         HTML and PDF download for org members only; kept per a retention
         setting
-  - [ ] A report can be cancelled while it runs; asking twice doesn't
-        create two
+  - [x] Cancellation prevents publication; keyed organization-scoped idempotency avoids duplicate creation.
+  - [x] Refresh live job ownership/status/cancellation before each application-level provider attempt/reservation.
+  - Deferred to Future: reporting-period UI; API date semantics already implemented. Not a core Phase 3 gate.
+  - [x] Resolve production dependency audit; frontend build passes on Next 16.4.2.
+  - [x] Complete scoped native/mock browser acceptance; see recorded limits and evidence.
+  - [x] Add explicit full-request byte budget, bounded source excerpts and omission provenance; reject references to excluded evidence. Prompt v3 requires fresh approval.
+  - [ ] Resolve development-tool audit disposition and genuine provider/model/pricing/quality acceptance. Container staging is Future scope.
 
 ## Phase 3a — Local and Claude report providers
 
@@ -1404,14 +1471,16 @@ generation endpoint.
 with the same validation and evidence requirements. Start with one local runtime
 and one evaluated model, not unrestricted model compatibility.
 
-**Status:** planned, not implemented. Complete and verify the Phase 3 ingestion,
-retrieval, and provenance foundation before integrating this extension. Hardware
-assessment and design can proceed first; runtime/model selection requires approval.
+**Status (2026-10-22):** separate delivery, paused after hardware and Ollama/Qwen/Phi
+experiments. No model or local report adapter accepted. The implemented optional
+OpenRouter Claude transport is not local generation. See dated evaluation records
+in [local reporting plan](docs/LOCAL_REPORTING_PLAN.md).
 See [Phase3.md — Phase 3a](Phase3.md#phase-3a--local-and-claude-report-generation)
 for decisions, dependencies, implementation steps, and acceptance criteria.
 
-- [ ] Assess deployment hardware, concurrency, acceptable latency, and model license.
-- [ ] Select and approve one local runtime, model, quantization, and pinned version.
+- [x] Assess development hardware and review candidate licenses/evaluation criteria; production sizing remains separate.
+- [x] Select approved Ollama/model artifacts for experiments (not production acceptance).
+- [ ] Accept a generative model against all agreed quality/resource gates.
 - [ ] Introduce a report-provider interface; retain Claude and add a local adapter.
 - [ ] Keep report-provider selection independent of embedding-provider selection.
 - [ ] Preserve schema/score/citation validation, separate rule scores, and immutable evidence.
@@ -1428,7 +1497,12 @@ for decisions, dependencies, implementation steps, and acceptance criteria.
 
 **Request recorded (2026-10-08):** support customers whose only hosted-model credential is an OpenAI API key. This is a documented future extension, not an implementation approval or model selection.
 
-The current report-generation path uses Anthropic; `OPENAI_API_KEY` currently configures embeddings only. A key alone does not switch report providers. Coordinate this work with the Phase 3a provider boundary; keep report and embedding provider/model configuration distinct, and do not require an Anthropic key for an OpenAI-selected report.
+Current report generation supports direct Anthropic and the optional disabled-by-default
+OpenRouter Claude transport; neither is an OpenAI report adapter. `OPENAI_API_KEY`
+configures embeddings only. A key alone does not switch report providers.
+Coordinate this extension with the provider boundary; keep report/embedding
+configuration distinct and do not require Anthropic credentials for a future
+explicitly selected OpenAI report path.
 
 - [ ] Approve the provider interface, OpenAI model/structured-output approach, and cost limits.
 - [ ] Add OpenAI report generation with the existing snapshot validation and evidence protections; never call Anthropic on the OpenAI path.
@@ -1441,8 +1515,9 @@ See [Phase3.md — Phase 3b](Phase3.md#phase-3b--openai-hosted-report-generation
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
-**Scope:** per-domain scoring refinement, remediation generation, PDF/HTML
-export, security hardening (rate limiting, audit logging, secrets handling).
+**Scope:** per-domain scoring refinement, remediation workflow/lifecycle and
+export refinements beyond Phase 3's implemented generated recommendations and
+HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets handling).
 
 - [ ] Not started
 - [ ] UI polish (requested 2026-09-28; can be done any time, needs no other
@@ -1607,3 +1682,23 @@ implemented now.
   dashboard data (Phase 2).
 - New backend logic ships with a unit test in the same change. New endpoints
   that touch the DB ship with an integration test in the same change.
+
+## Future phase — Deferred delivery
+
+User-approved deferrals (2026-10-22); not core Phase 3 release gates:
+
+- [ ] **Docker/container deployment:** review/update deployment packaging; build
+  API and worker images; verify non-root permissions, secrets, network/health
+  configuration and database migration readiness on the deployment host.
+- [ ] **Persistent embedding/model cache:** provision the pinned model separately,
+  mount it read-only, verify offline startup/retrieval and persistence across
+  container replacement; prove no implicit model download or provider fallback.
+- [ ] **Container operations/staging acceptance:** verify worker restart/recovery,
+  logs/readiness, retained uploads, backups, rollback and browser behavior against
+  the deployed stack before any container/production release claim.
+- [ ] **Reporting-period browser controls:** optionally expose existing API date
+  filters with clear UTC/current-inventory semantics and corresponding tests.
+
+Existing Docker/cache instructions remain reference material for this phase,
+not evidence of execution or approval to deploy. Current Phase 3 browser checks
+use native local services, isolated synthetic data and mocked inference only.

@@ -1,5 +1,18 @@
 #   AI-Powered Cyber Resilience Auditor – System Architecture
 
+Review synchronization (2026-10-22): Runtime clarification: FastAPI/Python, PostgreSQL/pgvector and a separate worker are implemented; Node microservices, general automated discovery and standalone AI analysis routes below are design context, not current endpoints. Dashboard scoring is deterministic; AI runs through report jobs.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
+## Current release decision — 2026-10-21
+
+Core Phase 3 keeps `/risk/score` and dashboard scores deterministic. Claude/RAG
+assessments run through asynchronous reports, preserving the captured baseline
+separately from AI output. Phase 3a local report generation is a separate delivery;
+Phase 3b remains a future proposal. Approved shared tier boundaries are 80/60/40;
+new AI assessments use the deterministic tier function. Prompt/schema v2 adds
+model-estimated confidence and captured-evidence finding/asset UUID validation.
+Legacy reports are not rewritten. See [Phase3.md](Phase3.md) for acceptance.
+
 ##  1. Overview
 
 This document defines the full architecture for an AI-driven cyber resilience auditing platform. The system automates asset discovery, configuration analysis, vulnerability review, IAM assessment, backup validation, monitoring evaluation, incident readiness scoring, and report generation using Claude AI.
@@ -10,7 +23,7 @@ This document defines the full architecture for an AI-driven cyber resilience au
 
 Frontend (Web Application): Next.js/React interface for dashboards, reports, and configuration.
 
-Backend API Layer: FastAPI/Node.js microservices handling ingestion, scoring, and orchestration.
+Backend API Layer: FastAPI/Python handling ingestion, scoring and orchestration, with a separate worker.
 
 AI Layer (Claude): Reasoning engine for risk scoring, remediation guidance, and report generation.
 
@@ -62,7 +75,7 @@ GET /orgs/:orgId/users
 
 GET /orgs/:orgId/assets
 
-POST /orgs/:orgId/assets/discover
+Proposed only: POST /orgs/:orgId/assets/discover (not a current live discovery endpoint)
 
 POST /orgs/:orgId/scans
 
@@ -78,13 +91,17 @@ POST /orgs/:orgId/reports/generate
 
 GET /orgs/:orgId/reports/:reportId
 
-### AI Operations
+### Proposed AI Operations (not runtime endpoints)
 
 POST /ai/analyze-config
 
 POST /ai/generate-report
 
 POST /ai/risk-score
+
+Current implementation uses organization-scoped asynchronous report jobs instead.
+Runtime paths carry the `/api/v1` prefix; the separate administrator-only Claude
+smoke endpoint is `/api/v1/ai/claude/test`, not a report generation workflow.
 
 ##  5. AI Reasoning Workflow
 

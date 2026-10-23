@@ -1,15 +1,80 @@
 # Phase 3 — Completion Checklist
 
-**Status:** Implementation committed; acceptance/sign-off pending.
+**Status:** Working-tree implementation present; release blockers and acceptance/sign-off pending.
 
-**Status reviewed:** 2026-10-20.
+Current follow-up (2026-10-22): production dependency audit is clean and live
+cancellation/status authorization before provider attempts is repaired. The
+development-tool audit disposition and explicit release sign-off remain open;
+the scoped native/mock browser checklist passed;
+date UI and Docker/container staging are deferred to Future. See
+[release readiness](docs/RELEASE_READINESS.md). Implementation is not proof of a commit or release.
+
+**Status reviewed:** 2026-10-22.
+
+Closure follow-up: [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md) is the current
+technical/open/deferred matrix. Input budgets and omission provenance are
+implemented under audit-evidence-v3; new target approval is required. Prior v2
+implementation/evaluation notes remain historical; saved reports are unchanged.
+
+Native browser follow-up: [acceptance record](docs/PHASE3_ACCEPTANCE.md) reports
+16 real-stack Chrome checks passed with inference/embeddings mocked, plus 3
+document-role and 2 dialog-viewport fixture scenarios. No paid calls. This closes
+the scoped native/mock browser checklist, not model-quality or release sign-off.
+
+User-approved scope update (2026-10-22): date fields are a deferred browser
+enhancement. Docker deployment, container staging, persistent cache mounts and
+container restart/recovery acceptance are tracked in [PLAN.md — Future phase](PLAN.md#future-phase--deferred-delivery).
+Neither is a core Phase 3 release blocker. Current browser acceptance uses native
+local services and mocked AI, not genuine provider or production certification.
+
+## Approved release scope — 2026-10-21
+
+Core Phase 3 keeps `/risk/score` deterministic. Claude/RAG assessments are
+asynchronous report jobs, with captured rule-based scores retained separately;
+AI results never replace dashboard baseline scores. The report's captured
+baseline and the dashboard's current score may differ as findings change.
+
+The user approved shared tier boundaries: Low 80–100, Medium 60–79, High 40–59,
+Critical 0–39. New AI prompts, domain/overall validation and rule-based test
+reports now use the deterministic tier function. Existing saved reports retain
+their original scores/tiers and remain readable; no backfill is performed.
+
+Phase 3a local report generation is a separately delivered milestone and does
+not block core Phase 3. Phase 3b remains a future proposal. If standalone AI
+assessment is needed later, design a separate asynchronous assessment resource
+rather than changing the deterministic endpoint's cost/privacy/latency contract.
+
+Consent-retry follow-up: report generation now rechecks consent before every
+provider attempt, including retries. Authorization failure propagates without a
+new quota reservation or provider call. Read transactions end before provider I/O.
+Focused unit/integration/regression validation: 36 passed on 2026-10-21.
+
+Remediation follow-up: new AI assessments include numeric model-estimated
+confidence and UUID finding/asset references validated against the captured sample.
+Asset IDs must belong to the findings referenced by that action. General guidance
+and assetless findings may have empty lists; the UI and exports disclose missing
+references. Confidence is not a calibrated probability. Prompt/consent target is
+originally changed to `audit-evidence-v2`; the current bounded-input prompt is
+`audit-evidence-v3` and requires approval of its updated budget-aware target.
+
+Evidence-capture follow-up: inventory, finding counts/samples, rule scores and
+retrieved citations now share an independent repeatable-read transaction. Source
+usage is registered atomically; serialization conflicts restart the entire capture
+up to three times. Snapshot metadata is retained in provenance. Live authorization
+is checked independently, and capture transactions close before Claude generation.
+
+Remaining release work: development-tool dependency audit disposition,
+genuine provider/model/pricing/quality readiness
+and explicit release sign-off. Native/mock Chrome acceptance passed; date fields
+and Docker staging are deferred. Scoring/remediation contracts
+are reconciled in code; final sign-off and live inference remain unapproved.
 
 Current operational status supersedes older implementation-gap notes below:
 PostgreSQL-backed quota/cost reservations, report idempotency, terminal-report
 retention and offline embedding deployment files are implemented. See
 [operational contracts and deployment gates](docs/PHASE3_OPERATIONS.md) and
 [validation results](docs/BACKEND_VALIDATION.md). Container startup/cache validation
-requires a Docker-capable staging host. This is not full Phase 3 sign-off.
+is now a Future-phase deliverable, not a core Phase 3 gate. This is not full Phase 3 sign-off.
 **Prerequisites:** All Phase 2d prerequisites complete (imports at scale, archive/restore/purge, background worker).
 
 ## Feature-development record — 2026-10-08
@@ -208,7 +273,9 @@ The plan records the following behavior as implemented:
 - Report lists expose `overall_score` without including the full snapshot. An open running report refreshes until it reaches a terminal state.
 - The October 6 fixes include regression coverage for report recovery/cancellation, severity ordering, structured output, reporting dates, and report-list/viewer behavior. The existing organization-change state reset also passed its regression test.
 
-The Phase 3 checklist in the plan remains unchecked. Those checkboxes need reconciliation with implemented and verified behavior; they do not mean that every listed feature is unbuilt.
+Implementation checkboxes below distinguish automated coverage from final
+acceptance. Historical checkpoints above retain their original dates and do not
+supersede the current release-readiness review.
 
 ## Remaining completion requirements
 
@@ -225,48 +292,49 @@ Keep Claude calls centralized in [claude_service.py](backend/app/services/claude
 
 ### 2. Standards and organization-document ingestion
 
-- [ ] Load CIS, NIST, ISO, and organization documents through worker jobs.
-- [ ] Chunk and embed document content.
-- [ ] Preserve document source and version metadata.
-- [ ] Ensure each organization can access only its own documents and shared standards.
-- [ ] Verify ingestion job completion and failure behavior.
+- [x] Implement worker ingestion for standards and organization documents; installed/licensed content governs coverage, not framework labels.
+- [x] Chunk and embed document content.
+- [x] Preserve document source and version metadata.
+- [x] Ensure each organization can access only its own documents and shared standards (automated coverage).
+- [x] Verify ingestion completion/failure with automated tests; staging acceptance remains open.
 
 ### 3. Retrieval and citations
 
-- [ ] Verify retrieval uses only documents the organization is permitted to access.
-- [ ] Preserve citations through assessment generation.
-- [ ] Include citations in the API response and finished report.
-- [ ] Verify citations identify the supporting source material.
+- [x] Verify retrieval permission filtering with automated tests.
+- [x] Preserve citations through assessment generation.
+- [x] Include citations in the API response and finished report.
+- [x] Validate citations against captured source material; real-provider acceptance remains open.
 
 ### 4. Scoring and evidence provenance
 
-- [ ] Retain rule-based scores separately from AI scores; AI scoring must not replace the rule-based result.
-- [ ] Preserve the supporting evidence for the assessment.
-- [ ] Record model identity, prompt version, and reporting period with the assessment.
-- [ ] Verify saved scores and provenance remain consistent with the finished report.
+- [x] Retain rule-based scores separately from AI scores; AI scoring must not replace the rule-based result.
+- [x] Preserve supporting evidence using consistent snapshot capture.
+- [x] Record model identity, prompt version, and reporting period; browser date controls remain missing.
+- [x] Verify saved scores/provenance consistency through automated tests.
 
 ### 5. Remediation recommendations
 
-- [ ] Include recommendation priority.
-- [ ] Identify affected assets and findings.
-- [ ] Explain why the recommendation is needed.
-- [ ] Include confidence.
+- [x] Include recommendation priority.
+- [x] Identify affected assets and findings using captured-evidence UUID allowlists.
+- [x] Explain why the recommendation is needed in its description.
+- [x] Include bounded, model-estimated confidence (not calibrated probability).
 
 ### 6. Report snapshots, downloads, and retention
 
-- [ ] Verify a finished report is an immutable snapshot.
-- [ ] Provide HTML and PDF downloads.
-- [ ] Restrict report access and downloads to authorized organization members.
+- [x] Verify saved snapshot behavior with automated tests.
+- [x] Provide HTML and PDF downloads.
+- [x] Restrict report access and downloads to authorized organization members.
 - [x] Apply a configurable report-retention setting.
 - [x] Verify retention and download behavior with automated tests.
 
 ### 7. Report job and API guarantees
 
 - [x] Add organization-scoped idempotency for keyed generation requests, including concurrency tests.
-- [ ] Verify worker queue integration, status transitions, failure details, and retries.
-- [ ] Verify report lists are paginated and ordered newest first.
-- [ ] Return full report content only through the report-by-ID endpoint, not list responses.
-- [ ] Preserve and verify the recorded recovery and cancellation behavior.
+- [x] Verify queue integration, transitions, failure details and bounded retries with automated tests.
+- [x] Verify report lists are paginated and ordered newest first.
+- [x] Return full report content only through report-by-ID, not list responses.
+- [x] Preserve recovery and cancellation publication guards.
+- [x] Refresh live job ownership/status/cancellation before application-level provider attempts and reservations (2026-10-22 fix; issued requests cannot be aborted).
 
 ## Historical gaps after the October 6 defect-fix pass
 
@@ -285,24 +353,28 @@ being classified as missing or signed off.
 
 ## Scope decision before sign-off
 
-Remediation and HTML/PDF export appear in both the detailed Phase 3 checklist and the Phase 4 scope in [PLAN.md](PLAN.md).
-
-Under the current detailed Phase 3 checklist, these are required for Phase 3 completion. If they are intended for Phase 4 instead, explicitly agree on that deferral and update both phase descriptions before sign-off. Do not silently treat them as completed or out of scope.
+Generated remediation and HTML/PDF snapshots remain implemented core Phase 3
+deliverables. Phase 4 covers workflow/refinement beyond these features, not an
+implicit deferral. Acceptance and sign-off remain separate release gates.
 
 ## Recommended implementation order
 
-1. **Document ingestion, retrieval, and provenance:** complete the evidence pipeline and citation flow.
-2. **Provider controls and job guarantees:** finish limits, usage/cost accounting, and report idempotency.
-3. **Report deliverables:** complete remediation output, snapshot guarantees, exports, and retention, subject to the scope decision above.
-4. **Acceptance and sign-off:** run targeted regression and end-to-end validation, reconcile the plan, and obtain sign-off.
+1. Resolve the remaining development-tool dependency advisory without unsupported substitutions; production audit is clean and cancellation authorization repaired.
+2. Prompt/context budget implementation is complete; retain its regressions and review model-specific capacity before live use. Browser reporting-period fields are deferred.
+3. Validate deployment/cache packaging and full Phase 3 Chrome flows.
+4. Separately approve live provider/model/pricing acceptance; obtain release sign-off.
 
 ## Phase 3a — Local and Claude report generation
 
 **Decision (2026-10-08):** the user approved adding Phase 3a to support both local and Claude report providers with identical validation and evidence requirements. Start with one local runtime and one evaluated instruction-following model. This approves the scope, not a runtime/model, hardware purchase, implementation design, or live external evaluation calls.
 
-**Status:** planned; not implemented. The existing local BGE-M3 embedding model does not generate reports. Phase 3a requires a separate generative model. The current Claude report consent gate remains unchanged until the provider-aware implementation is approved and tested.
+**Status (2026-10-22):** separate delivery, paused after hardware and Ollama/Qwen/Phi evaluations; no model or local report adapter accepted. See [local reporting plan](docs/LOCAL_REPORTING_PLAN.md) and dated evaluation records. BGE-M3 embeddings do not generate reports. The optional OpenRouter Claude adapter is not a local generative adapter.
 
 ### What to do now
+
+The sequence below is the original implementation guidance. Hardware assessment
+and candidate evaluation have since run; further local work is paused, with no
+model accepted. It is not authorization to repeat downloads or experiments.
 
 1. Finish and verify the Phase 3 ingestion, retrieval, evidence-provenance, and consent foundation. It is still in progress; passing targeted tests does not establish full feature completion.
 2. Assess the intended deployment host: operating system, CPU, available RAM, GPU/VRAM, free disk, expected concurrent users/jobs, languages, and acceptable report latency. A development workstation may differ from the production host.
@@ -322,15 +394,16 @@ Under the current detailed Phase 3 checklist, these are required for Phase 3 com
 
 ### Implementation checklist
 
-- [ ] Approve hardware/workload requirements and acceptance thresholds.
-- [ ] Approve one local runtime and one model artifact/quantization after license review.
+- [x] Review development hardware, candidate licenses and experimental acceptance thresholds; production sizing remains open.
+- [x] Approve Ollama and pinned candidate artifacts for evaluation, not production acceptance.
+- [ ] Accept a local generative model after all quality/resource gates pass.
 - [ ] Refactor report generation behind a provider interface without weakening existing Claude checks.
 - [ ] Add the local provider adapter and explicit configuration/readiness checks.
 - [ ] Add provider-aware job configuration, consent/routing, and administration UI.
 - [ ] Enforce common evidence/schema validation and provider-specific context budgets.
 - [ ] Extend snapshots with provider/model/runtime provenance while preserving legacy reports.
 - [ ] Add worker resource limits and provider-specific timeout/cancellation/recovery tests.
-- [ ] Evaluate on a fixed, non-sensitive or synthetic evidence set; external comparisons require explicit approval.
+- [x] Run synthetic Qwen/Phi candidate experiments; results did not establish acceptance. Further evaluation paused.
 - [ ] Publish installation/operations documentation and obtain sign-off.
 
 ### Acceptance criteria
@@ -376,13 +449,17 @@ Target deployment hardware; runtime/model/quantization; provider default and sel
 
 ## Final acceptance checklist
 
-- [ ] Demonstrate the full flow: document ingestion and findings selection → retrieval → validated assessment → saved report → authorized download.
-- [ ] Verify report citations and scoring provenance against the source evidence.
-- [ ] Verify organization isolation for documents, retrieval, reports, and downloads.
-- [ ] Verify provider failure, invalid output, cancellation, interrupted-job recovery, and duplicate-request behavior.
-- [ ] Verify reporting-date semantics and preservation of existing rule-based scores.
-- [ ] Run the smallest relevant existing test suites covering each change, followed by end-to-end acceptance validation.
-- [ ] Reconcile implemented and verified work with the Phase 3 checkboxes in [PLAN.md](PLAN.md).
-- [ ] Update directly related API, configuration, and user-facing documentation.
-- [ ] Record any agreed Phase 4 deferrals explicitly.
+Technical/mock native acceptance is recorded in [PHASE3_ACCEPTANCE.md](docs/PHASE3_ACCEPTANCE.md).
+The broad sign-off items below must not be interpreted as genuine model-quality
+acceptance. Docker deployment and optional browser date fields are Future scope.
+
+- [x] Demonstrate technical flow with synthetic evidence and mocked AI: ingestion/retrieval → validated assessment → snapshot → authorized download; native Chrome and PostgreSQL tests.
+- [x] Verify technical citation allowlists, captured source identities and scoring provenance against captured evidence; model semantic correctness still requires real-provider acceptance.
+- [x] Verify organization isolation for documents, retrieval, reports and downloads through PostgreSQL/API regressions and Chrome roles.
+- [x] Verify mocked provider failure/invalid output, cancellation, recovery and concurrent keyed idempotency through automated tests; cancellation cannot abort issued requests.
+- [x] Verify API reporting-date semantics and preservation of deterministic scores; browser date inputs are deferred, not missing core work.
+- [x] Run relevant regressions and scoped native/mock end-to-end acceptance: 54 API/worker regressions, 8 fixture guards, 16 real-stack Chrome checks plus 3 role/2 viewport fixture scenarios.
+- [x] Reconcile implemented and verified work with Phase 3 checkboxes in [PLAN.md](PLAN.md), preserving unapproved sign-off gates.
+- [x] Update related operational, roadmap and user-facing documentation.
+- [x] Record user-approved Future-phase deferrals explicitly (Docker deployment and browser date fields).
 - [ ] Obtain Phase 3 sign-off.

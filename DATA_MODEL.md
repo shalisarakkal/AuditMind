@@ -1,5 +1,13 @@
 # Data Model – AI Cyber Resilience Auditor
 
+Prompt-v3 snapshots retain `provenance.input_budget` (policy/limits, actual input
+bytes, sampling and omitted IDs) and per-finding `text_limits` (original/included
+byte counts and original SHA-256). Source rows are unchanged; schema version 2
+remains compatible. See [budget contract](docs/PHASE3_CLOSURE.md#budget-contract).
+
+Review synchronization (2026-10-22): This is a conceptual summary, not a complete schema dump. SQLAlchemy models and Alembic 0021 govern exact columns. Reports retain JSONB evidence/provenance and queued processing-target pins; keyed organization idempotency and the separate ai_usage ledger are implemented. Versioned knowledge documents/chunks/index jobs supersede legacy vector_id sketches.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
 ## 1. Overview
 This document defines the core data entities and relationships for the cyber resilience auditing platform.
 
@@ -43,10 +51,21 @@ This document defines the core data entities and relationships for the cyber res
 ### 2.7 reports
 - **Fields:** `id`, `org_id`, `title`, `period_start`, `period_end`, `status`, `generated_at`, `format`, `location`
 - **Purpose:** Generated audit reports.
+- **Snapshots:** `data` is a retained JSON snapshot, not regenerated on read.
+  Assessment schema v2 records the AI score separately from the captured rule
+  baseline in provenance, prompt/rubric versions, and remediation confidence plus
+  `affected_finding_ids` / `affected_asset_ids`. References are validated against
+  captured finding/asset evidence before persistence. Confidence is model-estimated
+  support, not a calibrated probability. Older reports may omit these fields;
+  their saved scores and tiers are preserved. See [operations](docs/PHASE3_OPERATIONS.md).
+  `provenance.evidence_capture` records capture isolation, attempt count and
+  database-clock timestamps; `provenance.inventory` preserves the captured total
+  and asset-category counts. These describe one repeatable-read evidence view,
+  not the inventory at the reporting period's historical endpoint.
 
 ### 2.8 documents
-- **Fields:** `id`, `org_id` (nullable), `type`, `source`, `title`, `content_ref`, `vector_id`, `created_at`
-- **Purpose:** Standards (CIS/NIST/ISO), policies, configs for RAG.
+- **Legacy fields:** `id`, `org_id` (nullable), `type`, `source`, `title`, `content`, `content_ref`, `framework`, `control_id`, `version`, `embedding` (1536-dimensional vector), `created_at`.
+- **Purpose:** Legacy document storage, not the complete versioned knowledge schema. Current ingestion/retrieval uses knowledge documents, versions, chunks, index jobs, embedding profiles and usage records. Migration/model definitions govern those entities; local BGE-M3 profiles use 1024 dimensions independently of the legacy vector column.
 
 ### 2.9 org_memberships
 - **Fields:** `user_id`, `org_id` (composite primary key), `role` (`admin` | `auditor` | `viewer`), `created_at`

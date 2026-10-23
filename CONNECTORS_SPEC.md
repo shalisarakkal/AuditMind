@@ -1,5 +1,8 @@
 # Connectors Specification – AI Cyber Resilience Auditor
 
+Review synchronization (2026-10-22): Live connector designs below are proposals. Current ingestion supports implemented upload parsers and configurable profiles, not every native scanner export. Native Qualys expansion is deferred; no new integration is approved by this documentation sync.
+See [current code review and release gates](docs/RELEASE_READINESS.md).
+
 ## 1. Overview
 Defines connectors used to ingest data from external systems.
 
