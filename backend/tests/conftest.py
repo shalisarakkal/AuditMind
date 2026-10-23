@@ -63,6 +63,42 @@ requires_db = pytest.mark.skipif(
 )
 
 
+def pytest_addoption(parser):
+    parser.addoption("--require-postgres", action="store_true", default=False,
+        help="Require a reachable PostgreSQL test target; fail acceptance runs with skipped tests.")
+
+
+def pytest_sessionstart(session):
+    if session.config.getoption("--require-postgres") and not DB_AVAILABLE:
+        raise pytest.UsageError("PostgreSQL test database is required and must be reachable; no SQLite fallback or DB skips allowed")
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if session.config.getoption("--require-postgres"):
+        reporter = session.config.pluginmanager.getplugin("terminalreporter")
+        if reporter is not None and reporter.stats.get("skipped"):
+            session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+@pytest.fixture(autouse=True)
+def _no_real_http(monkeypatch):
+    """Keep regression runs offline; SDK tests must supply a mocked transport.
+
+    FastAPI TestClient's in-process transport is unaffected. PostgreSQL uses its
+    native driver, not HTTP. This also prevents accidental paid inference.
+    """
+    import httpx
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Real HTTP forbidden in tests; use a mocked transport")
+
+    async def forbidden_async(*args, **kwargs):
+        raise AssertionError("Real HTTP forbidden in tests; use a mocked transport")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", forbidden)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", forbidden_async)
+
+
 @pytest.fixture(autouse=True)
 def _sign_in_defaults(monkeypatch):
     """The test client talks plain http, so the session cookie mustn't be

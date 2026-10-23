@@ -73,6 +73,11 @@ async def start_import(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     received = await _receive(file, settings.IMPORT_MAX_BYTES, settings.IMPORT_SYNC_MAX_BYTES)
     try:
+        from app.services.knowledge_service import KnowledgeError, require_active_org
+        try:
+            require_active_org(db, org_id, lock=True)
+        except KnowledgeError as exc:
+            raise HTTPException(409, str(exc)) from exc
         previous = _previous_import(db, org_id, received.sha256)
         if previous is not None and not confirm:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=previous)

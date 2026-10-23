@@ -294,6 +294,10 @@ def preview_shared(version_id: uuid.UUID, db: Session = Depends(get_db), _: User
 
 
 def change_version(db, org_id, version_id, action, actor_id):
+    try:
+        service.require_active_org(db, org_id, lock=True)
+    except service.KnowledgeError as exc:
+        raise HTTPException(409, str(exc)) from exc
     version = scoped_version(db, version_id, org_id)
     document = db.get(KnowledgeDocument, version.document_id)
     try:

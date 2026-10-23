@@ -148,6 +148,11 @@ def start_batch_job(
 
 
 def _new_job(db: Session, batch: ArchiveBatch, action: ArchiveAction, user_id: uuid.UUID | None) -> ArchiveJob:
+    from app.services.knowledge_service import KnowledgeError, require_active_org
+    try:
+        require_active_org(db, batch.org_id, lock=True)
+    except KnowledgeError as exc:
+        raise ArchiveError(str(exc)) from exc
     lock_org_jobs(db, batch.org_id)  # already held by the callers; taken again is a no-op
     busy = db.scalars(
         select(ArchiveJob.id).where(ArchiveJob.batch_id == batch.id, ArchiveJob.status.in_(_ACTIVE_JOB))

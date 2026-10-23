@@ -1,4 +1,4 @@
-# Last updated: 2026-10-08
+# Last updated: 2026-10-21
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
@@ -8,7 +8,11 @@ pgvector==0.3.6
 pydantic==2.10.4
 pydantic-settings==2.7.1
 email-validator==2.2.0
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0
+# Starlette 0.41.x imports BlockingPortal from anyio.abc; AnyIO 4.15
+# deprecates that alias. Keep the compatible release until the FastAPI/
+# Starlette stack is upgraded together; do not suppress the warning.
+anyio==4.14.1
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.20

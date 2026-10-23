@@ -39,6 +39,8 @@ def test_claude(payload: ClaudeTestRequest, user: User = Depends(_admin_somewher
                 db: Session = Depends(get_db)) -> ClaudeTestResponse:
     """Smoke test: confirms the Claude API key and SDK wiring work. Admins
     only; provider problems come back as 502/503/504 with a plain message."""
+    if settings.REPORT_AI_PROVIDER != "anthropic":
+        raise HTTPException(status_code=503, detail="Use the consent-controlled report workflow for OpenRouter")
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Claude isn't configured (no API key)")
     try:

@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Self
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import ReportStatus
 
@@ -48,6 +48,13 @@ class ReportRead(BaseModel):
 
 class ReportDetail(ReportRead):
     data: dict[str, Any] | None = None
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def hide_internal_job_metadata(cls, value):
+        if isinstance(value, dict) and "_processing_target" in value:
+            return None
+        return value
 
 
 class ReportListResponse(BaseModel):

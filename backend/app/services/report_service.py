@@ -3,6 +3,7 @@
 import logging
 import json
 import hashlib
+import math
 import uuid
 from io import BytesIO
 from datetime import date, datetime, time, timedelta, timezone
@@ -35,13 +36,47 @@ logger = logging.getLogger("app.reports")
 
 
 def _snapshot_tier(score: int) -> RiskTier:
-    if score >= 80:
-        return RiskTier.low
-    if score >= 60:
-        return RiskTier.medium
-    if score >= 30:
-        return RiskTier.high
-    return RiskTier.critical
+    return scoring_service.tier_for_score(score)
+
+
+def _remediation_evidence_lines(action: dict) -> list[str]:
+    confidence = action.get("confidence")
+    if (isinstance(confidence, (int, float)) and not isinstance(confidence, bool)
+            and math.isfinite(confidence) and 0 <= confidence <= 1):
+        confidence_text = f"Model-estimated confidence: {confidence * 100:.0f}% (not calibrated)"
+    else:
+        confidence_text = "Confidence: not recorded"
+    return [confidence_text,
+        "Evidence references: " + (", ".join(map(str, action.get("citation_ids") or [])) or "Not recorded"),
+        "Affected findings: " + (", ".join(map(str, action.get("affected_finding_ids") or [])) or "No specific finding references recorded"),
+        "Affected assets: " + (", ".join(map(str, action.get("affected_asset_ids") or [])) or "No specific asset references recorded")]
+
+
+def _assessment_display_lines(data: dict) -> list[str]:
+    """Presentation only: never infer evidence sufficiency or rewrite saved scores."""
+    provenance = data.get("provenance") or {}
+    if provenance.get("assessment_type") == "rule_based_test":
+        return ["Deterministic test score; no AI or framework control assessment.",
+                "Higher scores mean greater resilience; this is not proof of compliance."]
+    baseline = provenance.get("rule_based") or {}
+    score = baseline.get("overall_score")
+    lines = ["AI resilience score (advisory). Higher scores mean greater resilience.",
+             "AI and deterministic scores are separate assessments. AI variation is not a measured change in security posture.",
+             f"Captured deterministic baseline: {str(score) + '/100 (' + str(baseline.get('overall_tier', 'not recorded')) + ')' if score is not None else 'not recorded'}.",
+             "Inventory totals are not proof of complete control assessment or compliance.",
+             "Confidence is model-estimated evidential support, not a calibrated probability of compliance or remediation success, and not evidence completeness."]
+    sample = provenance.get("sampled_findings")
+    if isinstance(sample, list):
+        count, total = len(sample), data.get("total_findings")
+        lines.append(f"Sampled findings: {count} of {total}. " + (
+            "All counted findings were included; text may still be limited." if count == total else
+            "The model did not receive every finding." if isinstance(total, int) and count < total else
+            "Sampling counts cannot be reconciled; inspect captured evidence."))
+    else:
+        lines.append("Sampling coverage is not recorded.")
+    if provenance.get("evidence_limitation"):
+        lines.append(str(provenance["evidence_limitation"]))
+    return lines
 
 
 def _report_error_message(exc: Exception) -> str:
@@ -67,10 +102,12 @@ def queue_report_generation(
     idempotency_key: str | None = None,
 ) -> Report:
     """Queues a new audit report generation job for the background worker."""
+    from app.services.knowledge_service import require_active_org, report_target
+    require_active_org(db, org_id, lock=True)
     require_report_consent(db, org_id)
     fw_str = ",".join(f.strip().upper() for f in (frameworks or ["CIS", "NIST", "ISO"]))
     fingerprint = hashlib.sha256(json.dumps([title, sorted(fw_str.split(",")),
-        str(period_start), str(period_end)], separators=(",", ":")).encode()).hexdigest()
+        str(period_start), str(period_end), report_target()], separators=(",", ":")).encode()).hexdigest()
     if idempotency_key is not None:
         if not 1 <= len(idempotency_key) <= 128 or not idempotency_key.strip():
             raise ValueError("Idempotency-Key must contain 1 to 128 characters")
@@ -88,6 +125,7 @@ def queue_report_generation(
         title=title,
         idempotency_key=idempotency_key,
         request_hash=fingerprint if idempotency_key is not None else None,
+        data={"_processing_target": report_target()},
         frameworks=fw_str,
         status=ReportStatus.pending,
         started_by=user_id,
@@ -188,6 +226,7 @@ def create_rule_based_test_report(
                 domain=domain,
                 estimated_effort="Moderate",
                 expected_impact="Reduce the active finding count and improve the rule-based score.",
+                confidence=None, affected_finding_ids=[], affected_asset_ids=[],
             )
         )
 
@@ -289,6 +328,12 @@ def process_report_job(db: Session, report_id: uuid.UUID) -> Report:
     start_time = datetime.now(timezone.utc)
 
     try:
+        from app.services.knowledge_service import report_target
+        from app.services.report_provider import identity
+        pinned = (report.data or {}).get("_processing_target")
+        if pinned != report_target() and (pinned is not None or identity()["provider"] != "anthropic"):
+            raise ValueError("Queued report processing target changed; queue a new report")
+        processing_target = report_target()
         require_report_consent(db, report.org_id)
         fw_list = [f.strip() for f in (report.frameworks or "CIS,NIST,ISO").split(",") if f.strip()]
         snapshot = generate_ai_audit_snapshot(
@@ -302,6 +347,8 @@ def process_report_job(db: Session, report_id: uuid.UUID) -> Report:
         )
 
         db.refresh(report, with_for_update=True)
+        if report_target() != processing_target:
+            raise ValueError("Report processing target changed before publication")
         if report.cancel_requested_at or report.status != ReportStatus.running:
             db.commit()
             return report
@@ -344,6 +391,8 @@ def process_report_job(db: Session, report_id: uuid.UUID) -> Report:
         report.status = ReportStatus.failed
         report.heartbeat_at = datetime.now(timezone.utc)
         report.error_message = _report_error_message(exc)
+        if report.data and "_processing_target" in report.data:
+            report.data = None
 
         actor = db.get(User, report.started_by) if report.started_by else None
         record_event(
@@ -436,6 +485,7 @@ def render_report_html(report: Report) -> str:
                 <span class="badge" style="background-color:#1e293b; color:#38bdf8; font-weight:bold; font-size:16px;">{d_score}/100 ({d_tier})</span>
             </div>
             <p style="color:#cbd5e1; font-size:14px; margin-bottom:12px;">{d_just}</p>
+            <p>Evidence references: {escape_html(', '.join(map(str, d.get('citation_ids') or [])) or 'Not recorded', quote=True)}</p>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:13px;">
                 <div>
                     <strong style="color:#4ade80;">Strengths:</strong>
@@ -451,6 +501,7 @@ def render_report_html(report: Report) -> str:
 
     remed_html = ""
     for r in remediations:
+        evidence_html = "<br/>".join(escape_html(line, quote=True) for line in _remediation_evidence_lines(r))
         prio = r.get("priority", "Medium")
         prio_color = "#ef4444" if prio == "Critical" else "#f97316" if prio == "High" else "#38bdf8"
         ctrls = ", ".join(escape_html(str(control), quote=True) for control in r.get("related_controls", []))
@@ -466,7 +517,8 @@ def render_report_html(report: Report) -> str:
             <p style="color:#cbd5e1; font-size:14px; margin:8px 0;">{escape_html(str(r.get('description', '')), quote=True)}</p>
             <div style="font-size:12px; color:#64748b;">
                 <strong>Expected Impact:</strong> {escape_html(str(r.get('expected_impact', '')), quote=True)}<br/>
-                <strong>Related Standards:</strong> <span style="color:#38bdf8;">{ctrls or 'General'}</span>
+                <strong>Related controls (descriptive):</strong> <span style="color:#38bdf8;">{ctrls or 'General'}</span><br/>
+                {evidence_html}
             </div>
         </div>
         """
@@ -477,6 +529,7 @@ def render_report_html(report: Report) -> str:
         <div style="background:#0f172a; border:1px solid #1e293b; border-radius:6px; padding:12px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <strong style="color:#38bdf8;">{escape_html(str(c.get('control_id', '')), quote=True)} ({escape_html(str(c.get('framework', '')), quote=True)})</strong>
+                <p>Evidence ID: {escape_html(str(c.get('citation_id', 'Not recorded')), quote=True)}</p>
                 <span style="font-size:11px; color:#64748b;">{escape_html(str(c.get('content_ref', '')), quote=True)}</span>
             </div>
             <div style="font-size:13px; color:#e2e8f0; font-weight:600;">{escape_html(str(c.get('title', '')), quote=True)}</div>
@@ -523,6 +576,9 @@ def render_report_html(report: Report) -> str:
         </div>
     </div>
 
+    <section aria-label="Assessment interpretation">
+        {''.join('<p>' + escape_html(line, quote=True) + '</p>' for line in _assessment_display_lines(data))}
+    </section>
     <h2>Executive Summary</h2>
     <div class="card">
         <p style="font-size:15px; line-height:1.6; color:#e2e8f0; margin-top:0;">{escape_html(str(exec_summary), quote=True)}</p>
@@ -629,6 +685,7 @@ def render_report_pdf(report: Report) -> bytes:
                 )
             )
             story.append(paragraph(domain.get("justification") or "No justification provided."))
+            story.append(paragraph("Evidence references: " + (", ".join(map(str, domain.get("citation_ids") or [])) or "Not recorded"), small_style))
             for label, items in (
                 ("Strengths", domain.get("strengths") or []),
                 ("Key gaps", domain.get("weaknesses") or []),
@@ -637,6 +694,7 @@ def render_report_pdf(report: Report) -> bytes:
                     story.append(paragraph(label, base_styles["Heading4"]))
                     story.extend(paragraph(f"• {item}") for item in items)
 
+    story[2:2] = [paragraph(line, small_style) for line in _assessment_display_lines(data)]
     remediations = data.get("remediations") or []
     if remediations:
         story.append(paragraph("Recommended Remediations", section_style))
@@ -650,10 +708,12 @@ def render_report_pdf(report: Report) -> bytes:
                 )
             )
             story.append(paragraph(remediation.get("description") or "No description provided."))
+            for line in _remediation_evidence_lines(remediation):
+                story.append(paragraph(line, small_style))
             if remediation.get("expected_impact"):
                 story.append(paragraph(f"Expected impact: {remediation['expected_impact']}"))
             if remediation.get("related_controls"):
-                story.append(paragraph(f"Related standards: {', '.join(map(str, remediation['related_controls']))}"))
+                story.append(paragraph(f"Related controls (descriptive): {', '.join(map(str, remediation['related_controls']))}"))
 
     citations = data.get("compliance_citations") or []
     if citations:
@@ -664,6 +724,7 @@ def render_report_pdf(report: Report) -> bytes:
                 f"({citation.get('framework', 'Standard')}) — {citation.get('title', '')}"
             )
             story.append(paragraph(heading, base_styles["Heading3"]))
+            story.append(paragraph(f"Evidence ID: {citation.get('citation_id', 'Not recorded')}", small_style))
             for key in ("source", "version", "content_ref", "content"):
                 if citation.get(key):
                     story.append(paragraph(f"{key.replace('_', ' ').title()}: {citation[key]}"))
@@ -681,7 +742,9 @@ def render_report_pdf(report: Report) -> bytes:
             [paragraph(safe_text(key), small_style), paragraph(value, small_style)]
             for key, value in provenance.items()
         ]
-        table = Table(provenance_rows, colWidths=[1.65 * inch, 4.9 * inch], repeatRows=0)
+        # A bounded evidence sample can still exceed one PDF page. Allow
+        # Paragraph cells to split rather than rejecting a tall provenance row.
+        table = Table(provenance_rows, colWidths=[1.65 * inch, 4.9 * inch], repeatRows=0, splitInRow=1)
         table.setStyle(
             TableStyle(
                 [

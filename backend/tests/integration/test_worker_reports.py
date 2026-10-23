@@ -30,7 +30,8 @@ def test_worker_processes_report_job(client, admin, db_session, monkeypatch):
         title="Mock", executive_summary="Mocked provider evidence", overall_score=70, overall_tier="medium",
         resilience_summary="Mocked evidence", domains=[DomainScoreAI(domain=d, score=70, tier="medium", justification="Mock") for d in Domain],
         remediations=[RemediationActionAI(title="Patch", description="Apply updates", priority="High",
-            domain=Domain.vulnerability_management, estimated_effort="Moderate", expected_impact="Reduce exposure")],
+            domain=Domain.vulnerability_management, estimated_effort="Moderate", expected_impact="Reduce exposure",
+            confidence=0.8, affected_finding_ids=[], affected_asset_ids=[])],
     ))
     headers, org_id = admin
 

@@ -12,11 +12,13 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models.archive import ArchiveJob
-from app.models.enums import ScanStatus, UserRole
+from app.models.enums import ReportStatus, ScanStatus, UserRole
+from app.models.knowledge import KnowledgeDocument, KnowledgeIndex, KnowledgeVersion
+from app.models.report import Report
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.models.scan import Scan
@@ -104,9 +106,15 @@ def create_org(
 
 def running_jobs(db: Session, org_id: uuid.UUID) -> int:
     active = (ScanStatus.pending, ScanStatus.running)
-    scans = db.scalars(select(Scan.id).where(Scan.org_id == org_id, Scan.status.in_(active))).all()
-    jobs = db.scalars(select(ArchiveJob.id).where(ArchiveJob.org_id == org_id, ArchiveJob.status.in_(active))).all()
-    return len(scans) + len(jobs)
+    scans = db.scalar(select(func.count()).select_from(Scan).where(Scan.org_id == org_id, Scan.status.in_(active)))
+    jobs = db.scalar(select(func.count()).select_from(ArchiveJob).where(ArchiveJob.org_id == org_id, ArchiveJob.status.in_(active)))
+    reports = db.scalar(select(func.count()).select_from(Report).where(
+        Report.org_id == org_id, Report.status.in_((ReportStatus.pending, ReportStatus.running))))
+    indexes = db.scalar(select(func.count()).select_from(KnowledgeIndex)
+        .join(KnowledgeVersion, KnowledgeVersion.id == KnowledgeIndex.version_id)
+        .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeVersion.document_id)
+        .where(KnowledgeDocument.org_id == org_id, KnowledgeIndex.status.in_(("pending", "running"))))
+    return scans + jobs + reports + indexes
 
 
 def _lock(db: Session, org: Organization) -> None:
@@ -116,8 +124,7 @@ def _lock(db: Session, org: Organization) -> None:
 
 
 def archive_org(db: Session, org: Organization, actor: User) -> None:
-    """Read-only for everyone until restored. Refused while uploads or
-    archive jobs are waiting or running."""
+    """Read-only for everyone until restored. All org-owned active jobs block it."""
     _lock(db, org)
     if org.archived_at is not None:
         raise PeopleError(409, "already_archived", f"{org.name} is already archived.")
@@ -126,8 +133,8 @@ def archive_org(db: Session, org: Organization, actor: User) -> None:
         raise PeopleError(
             409,
             "jobs_running",
-            f"{org.name} has {busy} upload{'s' if busy != 1 else ''} or archive job{'s' if busy != 1 else ''} "
-            "waiting or running. Archive it when they've finished.",
+            f"{org.name} has {busy} background job{'s' if busy != 1 else ''} waiting or running "
+            "(uploads, archive jobs, reports or document indexing). Archive it when they've finished.",
         )
     org.archived_at, org.archived_by = _now(), actor.id
     _org_event(db, "org_archived", org, actor)

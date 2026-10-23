@@ -7,7 +7,11 @@ from app.schemas.report_ai import (
     RemediationActionAI,
 )
 import uuid
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 
 from app.services.report_ai_service import generate_ai_audit_snapshot
 
@@ -37,6 +41,7 @@ def test_audit_report_snapshot_schema():
                 domain=Domain.vulnerability_management,
                 estimated_effort="Quick Win",
                 expected_impact="Reduces RCE risk",
+                confidence=0.8, affected_finding_ids=[], affected_asset_ids=[],
                 related_controls=["CIS-7.1"],
                 affected_asset_types=["server"],
             )
@@ -77,3 +82,40 @@ def test_generate_report_preserves_server_metadata(monkeypatch):
     assert snapshot.remediations == []
     assert snapshot.overall_score <= 100
     assert snapshot.overall_tier in [RiskTier.low, RiskTier.medium, RiskTier.high, RiskTier.critical]
+
+
+@pytest.mark.parametrize("change", ["cancelled", "failed", "pending", "completed", "missing", "foreign-org"])
+def test_attempt_authorization_refreshes_live_report(monkeypatch, change):
+    from app.models.enums import ReportStatus
+    from app.models.report import Report
+    from app.services import knowledge_service, report_provider, report_ai_service
+
+    org_id, report_id = uuid.uuid4(), uuid.uuid4()
+    target = knowledge_service.report_target()
+    report = SimpleNamespace(org_id=org_id, status=ReportStatus.running,
+        cancel_requested_at=None, data={"_processing_target": target})
+    db = Mock()
+    db.get.return_value = report
+    monkeypatch.setattr(report_provider, "require_configured", lambda: None)
+    monkeypatch.setattr(knowledge_service, "require_report_consent", lambda *a: None)
+    monkeypatch.setattr(report_ai_service, "_gather_org_audit_context", lambda *a, **k: {})
+    monkeypatch.setattr(report_ai_service, "_build_audit_prompt", lambda *a: "Synthetic only")
+
+    def provider(*args, before_attempt, **kwargs):
+        before_attempt()  # The first attempt is authorized.
+        db.get.assert_called_with(Report, report_id, populate_existing=True)
+        if change == "cancelled":
+            report.cancel_requested_at = datetime.now(timezone.utc)
+        elif change == "missing":
+            db.get.return_value = None
+        elif change == "foreign-org":
+            report.org_id = uuid.uuid4()
+        else:
+            report.status = ReportStatus(change)
+        before_attempt()  # Must fail outside provider retry/error handling.
+        pytest.fail("A second attempt was authorized")
+
+    monkeypatch.setattr(report_ai_service, "ask_claude_structured", provider)
+    with pytest.raises(ValueError, match="no longer authorized"):
+        generate_ai_audit_snapshot(db, org_id, "Synthetic", report_id=report_id)
+    assert db.rollback.call_count == 2

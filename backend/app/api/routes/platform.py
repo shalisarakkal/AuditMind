@@ -186,8 +186,7 @@ def _org_action(db: Session, org_id: uuid.UUID, act) -> PlatformOrgRead:
 def archive_org(
     org_id: uuid.UUID, db: Session = Depends(get_db), sysadmin: User = Depends(require_sysadmin)
 ) -> PlatformOrgRead:
-    """Make the org read-only for everyone, until restored. Refused while
-    its uploads or archive jobs wait or run."""
+    """Make the org read-only; refused while any org-owned background jobs are active."""
     return _org_action(db, org_id, lambda org: platform.archive_org(db, org, sysadmin))
 
 

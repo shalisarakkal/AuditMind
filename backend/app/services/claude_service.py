@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from contextlib import contextmanager
+from collections.abc import Callable
 from threading import Lock
 from typing import Any, Type, TypeVar
 
@@ -13,6 +14,7 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthr
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.services import report_provider
 
 logger = logging.getLogger("app.claude")
 
@@ -203,6 +205,8 @@ def estimate_cost_usd(tokens_in: int, tokens_out: int, model: str | None = None)
 
 
 def provider_error_status(exc: Exception) -> int:
+    if isinstance(exc, report_provider.OpenRouterError):
+        return 504 if exc.status_code == 504 else 503 if exc.status_code in (401, 402, 403, 429, 503, 529) else 502
     if isinstance(exc, APITimeoutError):
         return 504
     if isinstance(exc, APIConnectionError):
@@ -214,6 +218,8 @@ def provider_error_status(exc: Exception) -> int:
 
 def provider_error_message(exc: Exception) -> str:
     """Map provider exceptions to clear user-facing messages."""
+    if isinstance(exc, report_provider.OpenRouterError):
+        return "OpenRouter request failed or returned an invalid response. Check configuration, credits and provider availability."
     if isinstance(exc, APITimeoutError):
         return "Claude request timed out. Please try again with a shorter prompt or fewer findings."
     if isinstance(exc, APIConnectionError):
@@ -258,6 +264,8 @@ def ask_claude(
     org_id: uuid.UUID | None = None,
     operation: str = "claude_call",
     usage_bind=None,
+    before_attempt: Callable[[], None] | None = None,
+    max_input_bytes: int | None = None,
 ) -> str:
     """Invokes Claude with operational controls: retries, timeouts, error mapping, cost tracking.
 
@@ -268,27 +276,53 @@ def ask_claude(
         org_id: Organization ID for per-org usage tracking and limits.
         operation: Operation name for logging context.
     """
-    client = get_client()
     system_prompt = system or SYSTEM_PROMPT
+    if max_input_bytes is not None and len((prompt + system_prompt).encode('utf-8')) > max_input_bytes:
+        raise ValueError('Report model input exceeds the configured byte budget')
+    route = report_provider.identity()
+    is_openrouter = route["provider"] == "openrouter"
+    if is_openrouter:
+        try:
+            report_provider.require_configured()
+        except ValueError as exc:
+            raise ClaudeOperationalError(str(exc)) from exc
+    client = None if is_openrouter else get_client()
+    model = route["model"]
     last_error: Exception | None = None
     if org_id is not None and usage_bind is None:
         from app.db.session import engine
         usage_bind = engine
 
     for attempt in range(1, MAX_RETRIES + 1):
+        if report_provider.identity() != route:
+            raise ClaudeOperationalError("Report provider configuration changed; queue a new report")
+        if is_openrouter:
+            try:
+                report_provider.require_configured()
+            except ValueError as exc:
+                raise ClaudeOperationalError(str(exc)) from exc
+        # Run outside provider exception mapping: authorization failures must
+        # stop retries, not become retryable provider failures or consume quota.
+        if before_attempt is not None:
+            before_attempt()
+        if report_provider.identity() != route:
+            raise ClaudeOperationalError("Report provider configuration changed; queue a new report")
         ledger_id = None
         if org_id is not None:
             from app.services import ai_accounting
             # UTF-8 bytes conservatively upper-bound normal tokenizer counts.
-            estimate = estimate_cost_usd(len((prompt + system_prompt).encode("utf-8")), max_tokens)
-            ledger_id = ai_accounting.reserve(usage_bind, org_id, settings.CLAUDE_MODEL, estimate)
+            estimate = (len((prompt + system_prompt).encode("utf-8")) * route["price_caps"]["prompt"]
+                        + max_tokens * route["price_caps"]["completion"]) / 1_000_000 if is_openrouter else estimate_cost_usd(len((prompt + system_prompt).encode("utf-8")), max_tokens)
+            ledger_id = ai_accounting.reserve(usage_bind, org_id, f"openrouter:{model}" if is_openrouter else model, estimate)
         with claude_call_context(org_id, operation) as ctx:
             try:
-                message = client.messages.create(
-                    model=settings.CLAUDE_MODEL,
+                create = report_provider.complete if is_openrouter else client.messages.create
+                message = create(
+                    model=model,
                     max_tokens=max_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
+                    **({"expected_route": route} if is_openrouter else {}),
                 )
 
                 # Extract usage info if available
@@ -298,7 +332,7 @@ def ask_claude(
                 if tokens_in:
                     input_tokens = getattr(tokens_in, "input_tokens", 0) or 0
                     output_tokens = getattr(tokens_in, "output_tokens", 0) or 0
-                    cost = estimate_cost_usd(input_tokens, output_tokens, settings.CLAUDE_MODEL)
+                    cost = tokens_in.actual_cost_usd if is_openrouter else estimate_cost_usd(input_tokens, output_tokens, model)
                     if ledger_id is not None:
                         ai_accounting.finish(usage_bind, ledger_id, input_tokens=input_tokens,
                             output_tokens=output_tokens, cost_usd=cost, success=True)
@@ -329,6 +363,8 @@ def ask_claude(
                 if isinstance(exc, APIStatusError) and exc.status_code in RETRYABLE_STATUS_CODES:
                     is_retryable = True
                 elif isinstance(exc, (APITimeoutError, APIConnectionError)):
+                    is_retryable = True
+                elif isinstance(exc, report_provider.OpenRouterError) and exc.status_code in RETRYABLE_STATUS_CODES | {500}:
                     is_retryable = True
 
                 if attempt < MAX_RETRIES and is_retryable:
@@ -366,6 +402,14 @@ def _extract_json_substring(text: str) -> str:
     return text
 
 
+def structured_prompt(prompt: str, response_model: Type[T]) -> str:
+    return f"{prompt}\n\nRequired JSON schema:\n{json.dumps(response_model.model_json_schema())}"
+
+
+def structured_input_bytes(prompt: str, response_model: Type[T], system: str | None = None) -> int:
+    return len((structured_prompt(prompt, response_model) + (system or SYSTEM_PROMPT)).encode('utf-8'))
+
+
 def ask_claude_structured(
     prompt: str,
     response_model: Type[T],
@@ -373,12 +417,15 @@ def ask_claude_structured(
     max_tokens: int = 4096,
     org_id: uuid.UUID | None = None,
     usage_bind=None,
+    before_attempt: Callable[[], None] | None = None,
+    max_input_bytes: int | None = None,
 ) -> T:
     """Invokes Claude and validates the structured JSON response against `response_model`."""
-    schema = json.dumps(response_model.model_json_schema())
     raw_response = ask_claude(
-        f"{prompt}\n\nRequired JSON schema:\n{schema}", system=system, max_tokens=max_tokens,
+        structured_prompt(prompt, response_model), system=system, max_tokens=max_tokens,
         org_id=org_id, usage_bind=usage_bind,
+        before_attempt=before_attempt,
+        **({'max_input_bytes': max_input_bytes} if max_input_bytes is not None else {}),
     )
     json_text = _extract_json_substring(raw_response)
 

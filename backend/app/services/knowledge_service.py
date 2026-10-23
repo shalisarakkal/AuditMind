@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.assessment_contract import REPORT_PROMPT_VERSION
 from app.models.enums import ReportStatus
 from app.models.knowledge import (
     EmbeddingProfile, KnowledgeChunk, KnowledgeConsent, KnowledgeDocument,
@@ -20,6 +21,22 @@ from app.services import knowledge_embeddings as embeddings
 
 class KnowledgeError(ValueError):
     pass
+
+
+def require_active_org(db: Session, org_id: uuid.UUID | None, *, lock: bool = False) -> None:
+    """Job admission shares the org row lock; archive takes an exclusive lock.
+
+    Re-read state after waiting: the caller's identity map may predate an archive.
+    Shared standards have no organization lifecycle.
+    """
+    if org_id is None:
+        return
+    query = select(Organization.archived_at, Organization.purge_requested_at).where(Organization.id == org_id)
+    if lock:
+        query = query.with_for_update(read=True)
+    state = db.execute(query).first()
+    if state is None or state.archived_at or state.purge_requested_at:
+        raise KnowledgeError("Organization is archived, being removed, or unavailable")
 
 
 def digest(text: str) -> str:
@@ -49,7 +66,8 @@ def consent_target(profile: EmbeddingProfile) -> str:
 
 
 def report_target() -> str:
-    return f"anthropic:{settings.CLAUDE_MODEL}:audit-evidence-v1"
+    from app.services.report_provider import target
+    return target(REPORT_PROMPT_VERSION)
 
 
 def consented(db: Session, org_id: uuid.UUID, purpose: str, target: str) -> bool:
@@ -58,6 +76,7 @@ def consented(db: Session, org_id: uuid.UUID, purpose: str, target: str) -> bool
 
 
 def require_report_consent(db: Session, org_id: uuid.UUID) -> None:
+    require_active_org(db, org_id)
     if not consented(db, org_id, "report", report_target()):
         raise KnowledgeError("An organization admin must approve external AI report processing in Documents settings")
 
@@ -92,6 +111,7 @@ def selected_profile(db: Session, org_id: uuid.UUID | None) -> EmbeddingProfile:
 
 
 def queue_reindex(db: Session, profile: EmbeddingProfile, org_id: uuid.UUID | None, actor_id: uuid.UUID) -> None:
+    require_active_org(db, org_id, lock=True)
     scope = KnowledgeDocument.org_id.is_(None) if org_id is None else KnowledgeDocument.org_id == org_id
     for version in db.scalars(select(KnowledgeVersion).join(KnowledgeDocument).where(
             scope, KnowledgeVersion.current.is_(True), KnowledgeVersion.retired_at.is_(None))):
@@ -106,6 +126,14 @@ def queue_reindex(db: Session, profile: EmbeddingProfile, org_id: uuid.UUID | No
 def require_embedding_consent(db: Session, org_id: uuid.UUID | None, profile: EmbeddingProfile) -> None:
     if profile.provider == "local":
         return
+    live_bind = db.info.get("evidence_capture_live_bind")
+    if live_bind is not None:
+        # Evidence is historical within its MVCC snapshot; authorization is not.
+        with Session(live_bind.execution_options(isolation_level="READ COMMITTED")) as live:
+            if configured_profile(live).id != profile.id:
+                raise KnowledgeError("Embedding profile changed during evidence capture; retry generation")
+            require_embedding_consent(live, org_id, profile)
+        return
     if org_id is None:
         selected = configured_profile(db)
         if selected.id != profile.id:
@@ -118,6 +146,7 @@ def queue_version(db: Session, *, org_id: uuid.UUID | None, actor_id: uuid.UUID,
                   title: str, framework: str | None, edition: str, source: str,
                   content_kind: str, rights: str, content: str,
                   document_id: uuid.UUID | None = None) -> KnowledgeVersion:
+    require_active_org(db, org_id, lock=True)
     if not content.strip():
         raise KnowledgeError("Document contains no text")
     if document_id:
@@ -171,9 +200,11 @@ def process_index(db: Session, index_id: uuid.UUID) -> None:
         db.commit()
         vectors = []
         for offset in range(0, len(parts), 8):
+            require_active_org(db, org_id)
             require_embedding_consent(db, org_id, profile)
             db.commit()
             vectors.extend(embeddings.embed(profile, [part[2] for part in parts[offset:offset + 8]]))
+        require_active_org(db, org_id, lock=True)
         document = db.scalar(select(KnowledgeDocument).where(KnowledgeDocument.id == document_id).with_for_update())
         version = db.get(KnowledgeVersion, version_id, populate_existing=True, with_for_update=True)
         job = db.get(KnowledgeIndex, index_id, populate_existing=True, with_for_update=True)
@@ -227,6 +258,8 @@ def retire_version(db: Session, version: KnowledgeVersion) -> None:
 
 
 def queue_reactivation(db: Session, version: KnowledgeVersion, actor_id: uuid.UUID) -> None:
+    document = db.get(KnowledgeDocument, version.document_id)
+    require_active_org(db, document.org_id, lock=True)
     if not version.retired_at or version.purged_at or not version.content:
         raise KnowledgeError("Only retained, retired versions can be reactivated")
     newer_current = db.scalar(

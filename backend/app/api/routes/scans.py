@@ -21,6 +21,14 @@ router = APIRouter(prefix="/orgs/{org_id}/scans", tags=["scans"])
 _ACTIVE = (ScanStatus.pending, ScanStatus.running)
 
 
+def _admit_scan(db: Session, org_id: uuid.UUID) -> None:
+    from app.services.knowledge_service import KnowledgeError, require_active_org
+    try:
+        require_active_org(db, org_id, lock=True)
+    except KnowledgeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
 @router.get(
     "",
     response_model=list[ScanRead],
@@ -66,6 +74,7 @@ def create_scan(
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> Scan:
+    _admit_scan(db, org_id)
     scan = Scan(
         org_id=org_id,
         status=ScanStatus.pending,
@@ -127,6 +136,7 @@ def retry_scan(
     ScanRead.retryable), without uploading it again: a new upload, queued
     for the background worker; the failed one's report is dismissed for
     the caller. The uploader or an admin."""
+    _admit_scan(db, org_id)
     old = _active_scan(db, org_id, scan_id)
     if old.started_by != membership.user_id and membership.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the uploader or an admin can retry this")

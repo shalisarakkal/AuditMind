@@ -63,7 +63,8 @@ def test_snapshot_rejects_inconsistent_scores_and_missing_domains(change):
 @pytest.mark.parametrize('field,value', [('priority', 'Urgent-ish'), ('estimated_effort', 'Unknown')])
 def test_remediation_rejects_unknown_labels(field, value):
     data = dict(title='Patch', description='Updates', priority='High', domain='vulnerability_management',
-                estimated_effort='Moderate', expected_impact='Reduced exposure')
+                estimated_effort='Moderate', expected_impact='Reduced exposure',
+                confidence=0.8, affected_finding_ids=[], affected_asset_ids=[])
     data[field] = value
     with pytest.raises(ValidationError):
         RemediationActionAI.model_validate(data)

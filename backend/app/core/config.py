@@ -51,6 +51,13 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-5"
+    REPORT_AI_PROVIDER: Literal["anthropic", "openrouter"] = "anthropic"
+    OPENROUTER_INFERENCE_ENABLED: bool = False
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = Field("", max_length=160)
+    # Explicit operator-approved price ceilings, USD per million tokens.
+    OPENROUTER_INPUT_USD_PER_MILLION: float | None = Field(None, gt=0, allow_inf_nan=False)
+    OPENROUTER_OUTPUT_USD_PER_MILLION: float | None = Field(None, gt=0, allow_inf_nan=False)
     # Exposes a local-only rule-based report workflow for UI/download testing.
     RULE_BASED_TEST_REPORTS_ENABLED: bool = False
     # How long one Claude attempt may take (seconds); application retries
@@ -64,6 +71,8 @@ class Settings(BaseSettings):
     CLAUDE_ATTEMPT_RESERVE_USD: float = Field(1.0, gt=0)
     # Finished reports only; active jobs are never removed by housekeeping.
     REPORT_RETENTION_DAYS: int = Field(365, ge=1)
+    REPORT_AI_MAX_INPUT_BYTES: int = Field(65536, ge=16384, le=262144)
+    REPORT_AI_FINDING_TEXT_BYTES: int = Field(2048, ge=128, le=8192)
 
     # --- Embeddings & RAG Knowledge Base ---
     OPENAI_API_KEY: str = ""

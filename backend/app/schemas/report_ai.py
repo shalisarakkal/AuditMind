@@ -1,19 +1,15 @@
 """Pydantic schemas for structured Claude AI audit reasoning, scoring, and report generation."""
 
 from typing import Any, Literal, Self
+from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import Domain, RiskTier
+from app.services.scoring_service import tier_for_score
 
 
 def _tier_for_score(score: int) -> RiskTier:
-    if score >= 80:
-        return RiskTier.low
-    if score >= 60:
-        return RiskTier.medium
-    if score >= 30:
-        return RiskTier.high
-    return RiskTier.critical
+    return tier_for_score(score)
 
 
 class DomainScoreAI(BaseModel):
@@ -39,9 +35,20 @@ class RemediationActionAI(BaseModel):
     domain: Domain
     estimated_effort: Literal["Quick Win", "Moderate", "Major Project"]
     expected_impact: str
+    # Null is reserved for explicitly non-AI test snapshots; generation rejects it.
+    confidence: float | None = Field(ge=0, le=1, allow_inf_nan=False, strict=True)
+    affected_finding_ids: list[UUID]
+    affected_asset_ids: list[UUID]
     related_controls: list[str] = Field(default_factory=list)
     affected_asset_types: list[str] = Field(default_factory=list)
     citation_ids: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def unique_references(self) -> Self:
+        for ids in (self.affected_finding_ids, self.affected_asset_ids):
+            if len(ids) != len(set(ids)):
+                raise ValueError("Remediation references must be unique")
+        return self
 
 
 class ComplianceCitation(BaseModel):
