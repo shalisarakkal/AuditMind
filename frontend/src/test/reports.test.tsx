@@ -95,6 +95,15 @@ const SAMPLE_REPORT: AuditReport = {
 };
 
 describe("ReportsPage", () => {
+  it("labels the assessment completeness filter and changes its selection", async () => {
+    await renderSignedIn(<ReportsPage />, "admin", {
+      "GET /orgs/org-1/reports": () => ({ items: [], total: 0 }),
+    });
+    const filter = await screen.findByRole("combobox", { name: /^Assessment completeness$/ });
+    expect(filter).toHaveValue("");
+    fireEvent.change(filter, { target: { value: "partial" } });
+    await waitFor(() => expect(filter).toHaveValue("partial"));
+  });
   it("lists reports and shows generate button for admins", async () => {
     await renderSignedIn(<ReportsPage />, "admin", {
       "GET /orgs/org-1/reports": () => ({

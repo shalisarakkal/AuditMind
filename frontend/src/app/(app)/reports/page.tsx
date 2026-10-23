@@ -250,6 +250,15 @@ function Reports() {
             list={list}
           />
           <ListToolbar list={list} label="reports">
+            <label className="text-xs text-white/70">Assessment completeness
+              <select aria-label="Assessment completeness" className="ml-2 rounded border border-white/20 bg-[#0e1626] p-2"
+                value={list.values("assessment_status")[0] ?? ""}
+                onChange={event => list.setValues("assessment_status", event.target.value ? [event.target.value] : [])}>
+                <option value="">All assessments (including legacy)</option>
+                <option value="complete">Complete AI assessment</option>
+                <option value="partial">Partial AI assessment</option>
+              </select>
+            </label>
             <DateRangeFilter list={list} label="Created" />
           </ListToolbar>
 
@@ -391,6 +400,8 @@ function Reports() {
                       <td className={TD}>
                         {score != null ? (
                           <span className="font-semibold text-cyan-400">{score}/100 <span className="block text-xs font-normal">{r.assessment_type === "rule_based_test" ? "Deterministic test" : "AI advisory"}</span></span>
+                        ) : r.assessment_status === "partial" ? (
+                          <span className="text-xs text-white/70">Partial AI assessment — overall score unavailable</span>
                         ) : isRunning ? (
                           <span className="text-xs text-white/40">Evaluating...</span>
                         ) : (

@@ -21,10 +21,13 @@ export type ReportFacets = {
 };
 
 export type DomainScoreAI = {
+  evidence_status?: "sufficient" | "limited" | "insufficient" | "conflicting";
+  evidence_reason?: string;
+  evidence_finding_ids?: string[];
   citation_ids?: string[];
   domain: Domain;
-  score: number;
-  tier: RiskTier;
+  score: number | null;
+  tier: RiskTier | null;
   justification: string;
   strengths: string[];
   weaknesses: string[];
@@ -62,7 +65,9 @@ export type ComplianceCitation = {
 };
 
 export type AuditReportSnapshot = {
+  assessment_status?: "complete" | "partial";
   provenance?: {
+    schema_version?: number;
     model?: string; prompt_version?: string; prompt_hash?: string; captured_at?: string;
     period_semantics?: string; evidence_limitation?: string | null; sample_limit?: number;
     assessment_type?: "rule_based_test" | string;
@@ -73,8 +78,8 @@ export type AuditReportSnapshot = {
   };
   title: string;
   executive_summary: string;
-  overall_score: number;
-  overall_tier: RiskTier;
+  overall_score: number | null;
+  overall_tier: RiskTier | null;
   resilience_summary: string;
   domains: DomainScoreAI[];
   remediations: RemediationActionAI[];
@@ -86,6 +91,7 @@ export type AuditReportSnapshot = {
 };
 
 export type AuditReport = {
+  assessment_status?: "complete" | "partial" | null;
   id: string;
   org_id: string;
   title: string;

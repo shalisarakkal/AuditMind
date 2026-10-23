@@ -28,8 +28,18 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
     );
   }
 
-  const overallScore = data.overall_score ?? 0;
-  const overallTier = (data.overall_tier || "medium").toUpperCase();
+  if (data.provenance?.schema_version != null && ![1, 2, 3].includes(data.provenance.schema_version)) {
+    return <p role="alert">Unsupported assessment schema. Update the application to view this report.</p>;
+  }
+  const overallScore = data.overall_score;
+  const overallTier = data.overall_tier?.toUpperCase();
+  const partial = data.assessment_status === "partial";
+  const evidenceLabels = {
+    sufficient: "Sufficient evidence — scoped advisory score",
+    limited: "Limited evidence — domain not scored",
+    insufficient: "Not assessed — insufficient evidence",
+    conflicting: "Assessment unresolved — conflicting evidence",
+  };
   const baseline = data.provenance?.rule_based;
   const sampleCount = data.provenance?.sampled_findings?.length;
   function citationLinks(ids?: string[]) {
@@ -48,7 +58,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
     CRITICAL: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/30" },
   };
 
-  const currentTierStyle = tierColors[overallTier] || tierColors.MEDIUM;
+  const currentTierStyle = (overallTier ? tierColors[overallTier] : null) || { bg: "bg-white/5", text: "text-white/70", border: "border-white/20" };
 
   const filteredRemediations = data.remediations?.filter((r) => {
     if (activePriority === "ALL") return true;
@@ -129,13 +139,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
               {ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
             </span>
             <div className="mt-3 flex items-baseline gap-3">
-              <span className={`text-5xl font-extrabold ${currentTierStyle.text}`}>{overallScore}</span>
-              <span className="text-base font-semibold text-white/60">/ 100</span>
+              <span className={`text-2xl font-extrabold ${currentTierStyle.text}`}>{overallScore == null ? (partial ? "Partial AI assessment — overall score unavailable" : "Score not recorded") : overallScore}</span>
+              {overallScore != null && <span className="text-base font-semibold text-white/60">/ 100</span>}
             </div>
           </div>
           <div className="mt-4 border-t border-white/10 pt-3">
             <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-bold ${currentTierStyle.text}`}>
-              {overallTier} Risk Tier
+              {overallTier ? `${overallTier} Risk Tier` : "No overall risk tier assigned"}
             </span>
             <p className="mt-1 text-xs text-white/50">
               {ruleBasedTest
@@ -177,10 +187,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white/80">{domainName}</span>
                     <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-cyan-400">
-                      {d.score}/100
+                      {d.score == null ? "Not scored" : `${d.score}/100`}
                     </span>
                   </div>
                   <p className="mt-2.5 text-xs text-white/70">{d.justification}</p>
+                  {!ruleBasedTest && <p className="mt-2 text-xs">{d.evidence_status ? evidenceLabels[d.evidence_status] : "Evidence status not recorded (legacy assessment)"}</p>}
+                  {d.evidence_reason && <p className="mt-2 text-xs">{d.evidence_reason}</p>}
+                  {!!d.evidence_finding_ids?.length && <p className="mt-2 break-all text-xs">Evidence findings: {d.evidence_finding_ids.join(", ")}</p>}
                   {citationLinks(d.citation_ids)}
                 </div>
 

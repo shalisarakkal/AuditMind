@@ -22,6 +22,26 @@ function report(count?: number, baseline?: number): AuditReport {
 }
 
 describe("assessment interpretation", () => {
+  it.each(["limited", "insufficient", "conflicting"] as const)("renders partial %s evidence without a score or fabricated tier", status => {
+    const value = report();
+    const data = value.data!;
+    data.overall_score = null; data.overall_tier = null; data.assessment_status = "partial";
+    data.provenance!.schema_version = 3;
+    data.domains[0] = { ...data.domains[0], score: null, tier: null, evidence_status: status,
+      evidence_reason: "Specific coverage explanation" };
+    render(<ReportViewer report={value} />);
+    expect(screen.getByText("Partial AI assessment — overall score unavailable")).toBeVisible();
+    expect(screen.getByText("Not scored")).toBeVisible();
+    expect(screen.getByText("Specific coverage explanation")).toBeVisible();
+    expect(screen.queryByText("HIGH Risk Tier")).not.toBeInTheDocument();
+    expect(screen.queryByText("0/100")).not.toBeInTheDocument();
+    expect(screen.queryByText(/legacy assessment/)).not.toBeInTheDocument();
+  });
+  it("rejects unknown future snapshot versions without guessing scores", () => {
+    const value = report(); value.data!.provenance!.schema_version = 99;
+    render(<ReportViewer report={value} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Unsupported assessment schema");
+  });
   it.each([undefined, 0, 1, 2, 3])("handles sample count %s without assuming omitted evidence", count => {
     render(<ReportViewer report={report(count, 0)} />);
     expect(screen.getByText("AI resilience score (advisory)")).toBeVisible();
