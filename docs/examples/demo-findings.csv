@@ -1,0 +1,3 @@
+hostname,ip,domain,severity,category,description,source
+demo-import-web-02,192.0.2.30,vulnerability_management,high,Synthetic patch gap,Synthetic training example - patch review overdue,synthetic-demo-upload
+demo-import-laptop-02,192.0.2.31,monitoring_detection,medium,Synthetic monitoring gap,Synthetic training example - monitoring review overdue,synthetic-demo-upload

@@ -5,6 +5,8 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+backend/.coverage*
+backend/htmlcov/
 .mypy_cache/
 
 # Node / Next.js

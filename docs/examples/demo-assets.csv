@@ -1,0 +1,3 @@
+Type,Hostname,IP,Environment,Criticality,Tags
+server,demo-import-web-02,192.0.2.30,demo,high,synthetic;training
+workstation,demo-import-laptop-02,192.0.2.31,demo,low,synthetic;training
