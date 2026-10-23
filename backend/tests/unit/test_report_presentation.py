@@ -35,3 +35,18 @@ def test_export_interpretation_escaping_and_pdf(monkeypatch):
     assert any("not a calibrated probability" in text for text in seen)
     data["provenance"] = {"assessment_type": "rule_based_test"}
     assert "AI resilience score (advisory)" not in service.render_report_html(report)
+
+
+def test_unknown_snapshot_exports_do_not_guess_scores(monkeypatch):
+    report = SimpleNamespace(title='Future',frameworks=None,generated_at=None,
+        data={'overall_score':100,'provenance':{'schema_version':99}})
+    assert 'Unsupported assessment schema' in service.render_report_html(report)
+    assert '100' not in service.render_report_html(report)
+    seen=[]
+    original=service.Paragraph
+    def capture(text, style):
+        seen.append(text)
+        return original(text,style)
+    monkeypatch.setattr(service,'Paragraph',capture)
+    assert service.render_report_pdf(report).startswith(b'%PDF')
+    assert len(seen)==1 and 'Unsupported assessment schema' in seen[0]

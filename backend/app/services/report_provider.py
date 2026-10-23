@@ -22,11 +22,14 @@ class OpenRouterError(Exception):
 
 
 def identity():
+    from app.services.evidence_policy import identity as evidence_identity
+    evidence = evidence_identity()
     if settings.REPORT_AI_PROVIDER == "anthropic":
-        return {"provider": "anthropic", "model": settings.CLAUDE_MODEL}
+        return {"provider": "anthropic", "model": settings.CLAUDE_MODEL, **({'evidence_policy': evidence} if evidence else {})}
     if settings.REPORT_AI_PROVIDER != "openrouter":
         raise ValueError("Unsupported report provider")
     return {"provider": "openrouter", "model": settings.OPENROUTER_MODEL,
+            **({'evidence_policy': evidence} if evidence else {}),
             "routing": ROUTING, "price_caps": {
                 "prompt": settings.OPENROUTER_INPUT_USD_PER_MILLION,
                 "completion": settings.OPENROUTER_OUTPUT_USD_PER_MILLION}}
@@ -36,6 +39,8 @@ def target(prompt_version):
     route = identity()
     budget = {'policy': POLICY_VERSION, 'input_bytes': settings.REPORT_AI_MAX_INPUT_BYTES,
               'finding_text_bytes': settings.REPORT_AI_FINDING_TEXT_BYTES}
+    if route.get('evidence_policy'):
+        budget['evidence_policy'] = route['evidence_policy']
     if route["provider"] == "anthropic":
         budget_hash = hashlib.sha256(json.dumps(budget, sort_keys=True).encode()).hexdigest()[:16]
         return f"anthropic:{route['model']}:budget-{budget_hash}:{prompt_version}"

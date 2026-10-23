@@ -85,6 +85,7 @@ def list_reports(
     frameworks: str | None = Query(None, description="Displayed framework label contains this"),
     status: list[ReportStatus] | None = Query(None, description="Status is one of these"),
     score: str | None = Query(None, description="Score contains this"),
+    assessment_status: Literal['complete', 'partial'] | None = Query(None),
     dates: DateRange = Depends(date_range),
     sort: ReportSort = Query("created", description="Column to sort by"),
     order: SortOrder = Query("desc"),
@@ -102,6 +103,7 @@ def list_reports(
         contains(frameworks, _REPORT_FRAMEWORKS_DISPLAY),
         one_of(Report.status, [item.value for item in status] if status else None),
         contains(score, _REPORT_SCORE),
+        Report.data['assessment_status'].astext == assessment_status if assessment_status else None,
     ]
     conditions = [condition for condition in conditions if condition is not None]
     conditions.extend(dates.conditions(Report.created_at))

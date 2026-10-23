@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     # Finished reports only; active jobs are never removed by housekeeping.
     REPORT_RETENTION_DAYS: int = Field(365, ge=1)
     REPORT_AI_MAX_INPUT_BYTES: int = Field(65536, ge=16384, le=262144)
+    REPORT_EVIDENCE_V3_ENABLED: bool = False
+    REPORT_EVIDENCE_QUALIFICATIONS_FILE: str = ''
     REPORT_AI_FINDING_TEXT_BYTES: int = Field(2048, ge=128, le=8192)
 
     # --- Embeddings & RAG Knowledge Base ---

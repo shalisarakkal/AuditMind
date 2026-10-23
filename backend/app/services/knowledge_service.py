@@ -67,7 +67,8 @@ def consent_target(profile: EmbeddingProfile) -> str:
 
 def report_target() -> str:
     from app.services.report_provider import target
-    return target(REPORT_PROMPT_VERSION)
+    from app.core.assessment_contract import active_prompt_version
+    return target(active_prompt_version())
 
 
 def consented(db: Session, org_id: uuid.UUID, purpose: str, target: str) -> bool:

@@ -44,6 +44,7 @@ class ReportRead(BaseModel):
     started_by: uuid.UUID | None = None
     created_at: datetime
     overall_score: int | None = Field(default=None, validation_alias=AliasPath("data", "overall_score"))
+    assessment_status: str | None = Field(default=None, validation_alias=AliasPath('data', 'assessment_status'))
 
 
 class ReportDetail(ReportRead):

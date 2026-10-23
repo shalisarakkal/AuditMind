@@ -35,6 +35,11 @@ from app.services import scoring_service
 logger = logging.getLogger("app.reports")
 
 
+def _unsupported_snapshot(data: dict) -> bool:
+    version = (data.get('provenance') or {}).get('schema_version')
+    return version is not None and (type(version) is not int or version not in (1, 2, 3))
+
+
 def _snapshot_tier(score: int) -> RiskTier:
     return scoring_service.tier_for_score(score)
 
@@ -65,6 +70,10 @@ def _assessment_display_lines(data: dict) -> list[str]:
              f"Captured deterministic baseline: {str(score) + '/100 (' + str(baseline.get('overall_tier', 'not recorded')) + ')' if score is not None else 'not recorded'}.",
              "Inventory totals are not proof of complete control assessment or compliance.",
              "Confidence is model-estimated evidential support, not a calibrated probability of compliance or remediation success, and not evidence completeness."]
+    if data.get('assessment_status') == 'partial':
+        lines.insert(0, 'Partial AI assessment — overall score unavailable; no overall risk tier assigned.')
+    if provenance.get('schema_version') not in (3,):
+        lines.append('Evidence status not recorded (legacy assessment).')
     sample = provenance.get("sampled_findings")
     if isinstance(sample, list):
         count, total = len(sample), data.get("total_findings")
@@ -370,7 +379,7 @@ def process_report_job(db: Session, report_id: uuid.UUID) -> Report:
             criticality=Criticality.info,
             details={
                 "overall_score": snapshot.overall_score,
-                "tier": snapshot.overall_tier.value,
+                "tier": snapshot.overall_tier.value if snapshot.overall_tier is not None else None,
                 "frameworks": fw_list,
                 "duration_seconds": duration_s,
             },
@@ -445,11 +454,13 @@ def render_report_html(report: Report) -> str:
         )
 
     data = report.data
+    if _unsupported_snapshot(data):
+        return '<html><body><p>Unsupported assessment schema. Update the application to view this report.</p></body></html>'
     domains = data.get("domains", [])
     remediations = data.get("remediations", [])
     citations = data.get("compliance_citations", [])
-    overall_score = escape_html(str(data.get("overall_score", 0)), quote=True)
-    overall_tier = str(data.get("overall_tier", "Unknown")).title()
+    overall_score = escape_html(str(data.get('overall_score') if data.get('overall_score') is not None else 'Not scored'), quote=True)
+    overall_tier = str(data.get('overall_tier') or 'No tier assigned').title()
     overall_tier_label = escape_html(overall_tier, quote=True)
     exec_summary = data.get("executive_summary", "")
     resilience_summary = data.get("resilience_summary", "")
@@ -469,8 +480,8 @@ def render_report_html(report: Report) -> str:
     domains_html = ""
     for d in domains:
         d_name = escape_html(str(d.get("domain", "")).replace("_", " ").title(), quote=True)
-        d_score = escape_html(str(d.get("score", 0)), quote=True)
-        d_tier = escape_html(str(d.get("tier", "")).title(), quote=True)
+        d_score = escape_html(str(d.get('score')) + '/100' if d.get('score') is not None else 'Not scored', quote=True)
+        d_tier = escape_html(str(d.get('tier') or 'No tier assigned').title(), quote=True)
         d_just = escape_html(str(d.get("justification", "")), quote=True)
         strengths_li = "".join(
             f"<li>{escape_html(str(strength), quote=True)}</li>" for strength in d.get("strengths", [])
@@ -482,9 +493,10 @@ def render_report_html(report: Report) -> str:
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:12px;">
                 <h3 style="margin:0; color:#f8fafc;">{d_name}</h3>
-                <span class="badge" style="background-color:#1e293b; color:#38bdf8; font-weight:bold; font-size:16px;">{d_score}/100 ({d_tier})</span>
+                <span class="badge" style="background-color:#1e293b; color:#38bdf8; font-weight:bold; font-size:16px;">{d_score} ({d_tier})</span>
             </div>
             <p style="color:#cbd5e1; font-size:14px; margin-bottom:12px;">{d_just}</p>
+            <p>{escape_html(str(d.get('evidence_status') or 'Evidence status not recorded (legacy assessment)'), quote=True)}: {escape_html(str(d.get('evidence_reason') or ''), quote=True)}</p>
             <p>Evidence references: {escape_html(', '.join(map(str, d.get('citation_ids') or [])) or 'Not recorded', quote=True)}</p>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:13px;">
                 <div>
@@ -646,6 +658,9 @@ def render_report_pdf(report: Report) -> bytes:
         return Paragraph(safe_text(value), style)
 
     data = report.data or {}
+    if _unsupported_snapshot(data):
+        document.build([paragraph('Unsupported assessment schema. Update the application to view this report.')])
+        return buffer.getvalue()
     provenance = data.get("provenance") or {}
     is_test_report = provenance.get("assessment_type") == "rule_based_test"
     story = [
@@ -663,8 +678,8 @@ def render_report_pdf(report: Report) -> bytes:
         ),
         Spacer(1, 0.12 * inch),
         paragraph(
-            f"Overall resilience score: {data.get('overall_score', 'Not available')} / 100 "
-            f"({str(data.get('overall_tier', 'Unknown')).title()} risk tier)",
+            (f"Overall resilience score: {data['overall_score']} / 100 ({str(data.get('overall_tier') or 'Unknown').title()} risk tier)"
+             if data.get('overall_score') is not None else 'Overall resilience score unavailable; no overall risk tier assigned'),
             section_style,
         ),
         paragraph("Executive Summary", section_style),
@@ -679,12 +694,13 @@ def render_report_pdf(report: Report) -> bytes:
         for domain in domains:
             story.append(
                 paragraph(
-                    f"{str(domain.get('domain', 'Domain')).replace('_', ' ').title()} — "
-                    f"{domain.get('score', 'N/A')}/100 · {str(domain.get('tier', 'Unknown')).title()}",
+                    f"{str(domain.get('domain', 'Domain')).replace('_', ' ').title()} — " +
+                    (f"{domain['score']}/100 · {str(domain.get('tier') or 'Unknown').title()}" if domain.get('score') is not None else 'Not scored — no tier assigned'),
                     base_styles["Heading3"],
                 )
             )
             story.append(paragraph(domain.get("justification") or "No justification provided."))
+            story.append(paragraph(f"{domain.get('evidence_status') or 'Evidence status not recorded (legacy assessment)'}: {domain.get('evidence_reason') or ''}", small_style))
             story.append(paragraph("Evidence references: " + (", ".join(map(str, domain.get("citation_ids") or [])) or "Not recorded"), small_style))
             for label, items in (
                 ("Strengths", domain.get("strengths") or []),
