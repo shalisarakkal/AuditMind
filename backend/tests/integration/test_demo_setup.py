@@ -34,13 +34,17 @@ def test_demo_disables_external_credentials_and_keeps_public_signup_closed(monke
         monkeypatch.setattr(settings, field, getattr(settings, field))
     for key in ("DATABASE_URL", "COOKIE_SECURE", "PUBLIC_SIGNUP", "RULE_BASED_TEST_REPORTS_ENABLED",
                 "ARCHIVE_AUTO_PURGE", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "VOYAGE_API_KEY",
-                "CORS_ORIGINS", "UPLOAD_DIR", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+                "CORS_ORIGINS", "UPLOAD_DIR", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE",
+                "OPENROUTER_API_KEY", "OPENROUTER_INFERENCE_ENABLED",
+                "REPORT_EVIDENCE_V3_ENABLED", "REPORT_EVIDENCE_QUALIFICATIONS_FILE"):
         monkeypatch.setenv(key, os.environ.get(key, ""))
     monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+psycopg://u:p@localhost/auditmind")
     configure_demo()
     assert not settings.ANTHROPIC_API_KEY and not settings.OPENAI_API_KEY and not settings.VOYAGE_API_KEY
     assert not settings.PUBLIC_SIGNUP and not settings.COOKIE_SECURE
     assert settings.RULE_BASED_TEST_REPORTS_ENABLED
+    assert not settings.REPORT_EVIDENCE_V3_ENABLED
+    assert not settings.REPORT_EVIDENCE_QUALIFICATIONS_FILE
     assert make_url(os.environ["DATABASE_URL"]).query["options"] == "-csearch_path=auditmind_demo,public"
 
 

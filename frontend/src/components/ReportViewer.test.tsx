@@ -22,6 +22,15 @@ function report(count?: number, baseline?: number): AuditReport {
 }
 
 describe("assessment interpretation", () => {
+  it("clearly labels synthetic fixtures without implying real AI assessment", () => {
+    const value = report();
+    value.assessment_type = "synthetic_mock";
+    render(<ReportViewer report={value} />);
+    expect(screen.getByText("Synthetic mock · No AI calls")).toBeVisible();
+    expect(screen.getByRole("note")).toHaveTextContent("Not a real audit or operational evidence qualification");
+    expect(screen.getByText("Simulated score (not a real assessment)")).toBeVisible();
+    expect(screen.queryByText("AI Audit")).not.toBeInTheDocument();
+  });
   it.each(["limited", "insufficient", "conflicting"] as const)("renders partial %s evidence without a score or fabricated tier", status => {
     const value = report();
     const data = value.data!;

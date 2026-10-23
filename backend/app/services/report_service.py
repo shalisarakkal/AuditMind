@@ -60,6 +60,8 @@ def _remediation_evidence_lines(action: dict) -> list[str]:
 def _assessment_display_lines(data: dict) -> list[str]:
     """Presentation only: never infer evidence sufficiency or rewrite saved scores."""
     provenance = data.get("provenance") or {}
+    if provenance.get("assessment_type") == "synthetic_mock":
+        return ["SYNTHETIC MOCK - no AI calls. Fixed example evidence and scores; not a real audit or operational evidence qualification."]
     if provenance.get("assessment_type") == "rule_based_test":
         return ["Deterministic test score; no AI or framework control assessment.",
                 "Higher scores mean greater resilience; this is not proof of compliance."]
@@ -468,6 +470,9 @@ def render_report_html(report: Report) -> str:
     test_report = (data.get("provenance") or {}).get("assessment_type") == "rule_based_test"
     report_kind = "Rule-based test report — no external AI" if test_report else "AI Audit"
     document_brand = "AuditMind Rule-Based Test Report" if test_report else "AuditMind AI"
+    if (data.get("provenance") or {}).get("assessment_type") == "synthetic_mock":
+        report_kind = "Synthetic mock - no AI calls"
+        document_brand = "AuditMind Synthetic Example"
     tier_colors = {
         "Optimal": "#22c55e",
         "Good": "#3b82f6",
@@ -668,7 +673,7 @@ def render_report_pdf(report: Report) -> bytes:
         paragraph(
             "Rule-based test report — no external AI"
             if is_test_report
-            else "AI Audit Report",
+            else ("Synthetic mock - no AI calls" if provenance.get("assessment_type") == "synthetic_mock" else "AI Audit Report"),
             small_style,
         ),
         paragraph(

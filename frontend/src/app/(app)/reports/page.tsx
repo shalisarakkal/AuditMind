@@ -391,7 +391,7 @@ function Reports() {
                       </td>
                       <td className={TD}>
                         <span className="font-mono text-xs text-white/70">
-                          {r.assessment_type === "rule_based_test" ? "Rule-based test · no framework assessment" : r.frameworks || "CIS, NIST, ISO"}
+                          {r.assessment_type === "synthetic_mock" ? "Synthetic mock · No AI calls" : r.assessment_type === "rule_based_test" ? "Rule-based test · no framework assessment" : r.frameworks || "CIS, NIST, ISO"}
                         </span>
                       </td>
                       <td className={TD}>
@@ -399,7 +399,7 @@ function Reports() {
                       </td>
                       <td className={TD}>
                         {score != null ? (
-                          <span className="font-semibold text-cyan-400">{score}/100 <span className="block text-xs font-normal">{r.assessment_type === "rule_based_test" ? "Deterministic test" : "AI advisory"}</span></span>
+                          <span className="font-semibold text-cyan-400">{score}/100 <span className="block text-xs font-normal">{r.assessment_type === "synthetic_mock" ? "Simulated score" : r.assessment_type === "rule_based_test" ? "Deterministic test" : "AI advisory"}</span></span>
                         ) : r.assessment_status === "partial" ? (
                           <span className="text-xs text-white/70">Partial AI assessment — overall score unavailable</span>
                         ) : isRunning ? (

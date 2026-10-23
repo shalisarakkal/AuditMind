@@ -39,6 +39,7 @@ def configure_demo():
         RULE_BASED_TEST_REPORTS_ENABLED="true", ARCHIVE_AUTO_PURGE="false",
         ANTHROPIC_API_KEY="", OPENAI_API_KEY="", VOYAGE_API_KEY="",
         OPENROUTER_API_KEY="", OPENROUTER_INFERENCE_ENABLED="false",
+        REPORT_EVIDENCE_V3_ENABLED="false", REPORT_EVIDENCE_QUALIFICATIONS_FILE="",
         CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000",
         UPLOAD_DIR=str(Path(__file__).resolve().parents[2] / "temp" / "auditmind-demo" / "uploads"),
         HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
@@ -153,11 +154,20 @@ def prepare(url):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "api", "worker"])
+    parser.add_argument("action", choices=["prepare", "seed-evidence-examples", "api", "worker"])
     args = parser.parse_args()
     url = configure_demo()
     if args.action == "prepare":
         prepare(url)
+    elif args.action == "seed-evidence-examples":
+        from scripts.evidence_examples import seed_examples
+        engine = create_engine(url)
+        try:
+            with Session(engine) as db:
+                count = seed_examples(db)
+            print(f"Created {count} synthetic example reports. No inference or consent changes.")
+        finally:
+            engine.dispose()
     elif args.action == "api":
         import uvicorn
         uvicorn.run("app.main:app", host="127.0.0.1", port=8000)

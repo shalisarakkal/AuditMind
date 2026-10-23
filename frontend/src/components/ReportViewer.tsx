@@ -13,6 +13,7 @@ type Props = {
 export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
   const [activePriority, setActivePriority] = useState<string>("ALL");
   const data: AuditReportSnapshot | null = report.data || null;
+  const syntheticMock = report.assessment_type === "synthetic_mock" || data?.provenance?.assessment_type === "synthetic_mock";
   const ruleBasedTest = report.assessment_type === "rule_based_test" || data?.provenance?.assessment_type === "rule_based_test";
 
   if (!data) {
@@ -73,7 +74,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold text-white tracking-tight">{report.title}</h1>
             <span className="rounded-full bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 text-xs font-semibold text-cyan-400">
-              {ruleBasedTest ? "Rule-based test · No AI" : "AI Audit"}
+              {syntheticMock ? "Synthetic mock · No AI calls" : ruleBasedTest ? "Rule-based test · No AI" : "AI Audit"}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-white/60">
@@ -112,6 +113,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       </div>
 
       <section className="rounded-xl border border-white/10 p-4 text-sm">
+        {syntheticMock && <p role="note" className="mb-3 text-amber-300">Synthetic mock: fixed example evidence and scores. No model was called. Not a real audit or operational evidence qualification.</p>}
         <h2 className="font-semibold">Evidence provenance</h2>
         {ruleBasedTest ? (
           <div>
@@ -136,7 +138,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
         <div className={`flex flex-col justify-between rounded-xl border ${currentTierStyle.border} ${currentTierStyle.bg} p-6`}>
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-white/60">
-              {ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
+              {syntheticMock ? "Simulated score (not a real assessment)" : ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
             </span>
             <div className="mt-3 flex items-baseline gap-3">
               <span className={`text-2xl font-extrabold ${currentTierStyle.text}`}>{overallScore == null ? (partial ? "Partial AI assessment — overall score unavailable" : "Score not recorded") : overallScore}</span>
