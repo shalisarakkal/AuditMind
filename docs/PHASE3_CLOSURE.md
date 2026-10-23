@@ -1,5 +1,11 @@
 # Phase 3 closure checklist
 
+**23 October decision: local-testing milestone approved and closed**, with a
+temporary development-tool risk exception restricted to that scope.
+See [decision, controls and expiry](LOCAL_TESTING_MILESTONE.md).
+Production/live-AI release remains unapproved; insufficient-evidence scoring is
+separate, and Docker/report-date UI remain Future.
+
 22 October 2026. This separates technical completion from release approval.
 **No production/live-AI release sign-off is recorded.** Docker deployment and
 browser date fields are user-approved [Future-phase](../PLAN.md#future-phase--deferred-delivery)
@@ -69,15 +75,16 @@ explanations and evidence references are improved without changing saved scores
 or the assessment schema. Insufficient-evidence scoring remains a separate design
 decision; real provider/quality acceptance remains open.
 
-- [ ] **Development-tool advisory disposition:** resolve the unpatched braces
-  dependency or obtain an explicit scoped risk decision. Seven development-only
-  audit entries remain; production dependency audit is clean. No acceptance inferred.
+- [x] **Local-testing development-tool advisory disposition:** explicitly accepted
+  by the user on23October, scoped controls and review/expiry22November2026 recorded
+  in the decision above. Vulnerability is not fixed; no production acceptance.
 - [ ] **Genuine provider/model/pricing and assessment-quality acceptance:** verify
   configured model/account access, model-specific pricing, context capacity and
   actual supported outputs. Any inference/budget requires separate approval.
   Mock reports are not evidence that real Claude produces acceptable audits.
-- [ ] **Explicit Phase 3 sign-off:** decide approved release scope after the above
-  items. Working-tree implementation is not proof of reviewable commits or a release.
+- [x] **Local-testing milestone sign-off:** user approved closure on23October2026.
+- [ ] **Production/live-AI sign-off:** not granted; provider acceptance and broader
+  deployment risk disposition remain required. Local commits are not a release.
 
 Coverage gaps and load/soak work remain visible in [TESTING.md](TESTING.md). They
 must be assessed by risk, not hidden by a blanket "100% tested" statement. No

@@ -1338,6 +1338,12 @@ balance); chosen: the pragmatic one plus the clean one's seam for Part 2.
 
 ## Phase 3 — AI audit & reporting (Week 3 of the roadmap)
 
+- [x] Local-testing milestone closed by explicit user approval,23October2026.
+  Scoped development-tool risk exception recorded in
+  [decision record](docs/LOCAL_TESTING_MILESTONE.md), review/expiry22November2026.
+  No production/live-AI sign-off. Insufficient-evidence scoring stays separate;
+  Docker and report-date UI remain Future.
+
 23October presentation follow-up: advisory score labels, baseline/confidence and
 sampling explanations, complete domain text and evidence references implemented.
 307 frontend /71 focused backend tests and17 Chrome checks, lint/TypeScript/build
@@ -1348,8 +1354,9 @@ scoring is a separate pending contract decision; live-provider release gates ope
 Closure authority: [PHASE3_CLOSURE.md](docs/PHASE3_CLOSURE.md). Prompt/context limits
 and omission provenance are implemented under **audit-evidence-v3**. Fresh target
 approval is required; existing reports remain unchanged. Remaining release gates
-are the development-tool advisory decision, genuine provider/model/pricing/quality
-acceptance and explicit sign-off—not Docker or browser date fields.
+are genuine provider/model/pricing/quality acceptance and production/live-AI
+sign-off, with separate broader advisory disposition required for that scope—not
+Docker or browser date fields. Local-testing advisory disposition is recorded above.
 
 Expanded verification (2026-10-22): PostgreSQL-required full backend **1,005 passed**,
 zero skips/failures; coverage-driven follow-up **19 passed** (11 new cases).

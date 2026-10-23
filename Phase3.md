@@ -463,3 +463,10 @@ acceptance. Docker deployment and optional browser date fields are Future scope.
 - [x] Update related operational, roadmap and user-facing documentation.
 - [x] Record user-approved Future-phase deferrals explicitly (Docker deployment and browser date fields).
 - [ ] Obtain Phase 3 sign-off.
+# Local milestone decision — 23 October 2026
+
+The user approved closing the local-testing milestone with a scoped development-
+tool risk exception. See [decision and expiry](docs/LOCAL_TESTING_MILESTONE.md).
+This is not a production/live-AI release. Insufficient-evidence scoring remains
+a separate design task; Docker/report-date UI remain Future. Older pending local
+sign-off statements below are historical; live-provider acceptance remains open.

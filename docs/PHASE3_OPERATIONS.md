@@ -226,3 +226,9 @@ leaves ordinary application tables/revision untouched, disables external provide
 credentials and enables explicitly non-AI test reports. Local Chrome smoke testing
 covers navigation, sessions, worker readiness and HTML/PDF reports; it is not full
 Phase 3 browser acceptance, real-provider testing or a production deployment.
+# Local-testing approval — 23 October 2026
+
+Local-testing milestone is closed with the user-approved temporary development-
+tool risk exception. Follow [scope, controls and expiry](LOCAL_TESTING_MILESTONE.md).
+No production/live-AI approval, inference or paid calls are authorized. Insufficient-
+evidence scoring stays separate; Docker/report-date UI stay Future.

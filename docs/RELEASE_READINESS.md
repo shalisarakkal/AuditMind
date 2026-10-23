@@ -1,5 +1,14 @@
 # Release readiness and code review
 
+## Approved local milestone — 23 October 2026
+
+**Local-testing milestone closed by explicit user approval**, with a scoped,
+temporary development-tool risk exception. Controls and22November2026 review/expiry:
+[decision record](LOCAL_TESTING_MILESTONE.md). No production/live-AI release approval,
+no inference/paid calls. Insufficient-evidence scoring remains separate; Docker
+and report-date UI remain Future. Historical open-advisory statements below are
+superseded only for this local scope, not a fix or production risk acceptance.
+
 ## Latest presentation follow-up — 23 October 2026
 
 Presentation-only improvements are complete; scores, schemas and saved snapshots
@@ -18,8 +27,8 @@ The synthetic browser demo remains usable with real inference disabled.
 Current closure authority: [Phase 3 closure checklist](PHASE3_CLOSURE.md).
 Explicit prompt/context budgets are implemented under **audit-evidence-v3**;
 the original P2 prompt-size finding below is remediated, not still unbuilt.
-Technical/mock acceptance does not replace the remaining development-tool advisory
-decision, genuine provider/model/pricing/quality acceptance and explicit sign-off.
+Technical/mock acceptance and the local exception do not replace genuine provider/
+model/pricing/quality acceptance or explicit production/live-AI sign-off.
 Budget implementation verification: **1,035 full-run PostgreSQL tests passed**,
 zero skips/failures/errors; 94.24% backend lines and 85.53% branches. Frontend
 300 tests, lint/TypeScript and production build passed. Prior run counts below
