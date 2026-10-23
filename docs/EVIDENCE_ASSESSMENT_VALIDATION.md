@@ -95,3 +95,9 @@ branch figures belong to the earlier measured run, not these new modules.
 - Demo rebuilt/restarted with existing credentials/data retained, loopback only.
   New flag remains off in normal configuration; no qualification pack installed.
   No new commit/push or production release performed by this implementation task.
+# Persistent demonstration follow-up
+
+See [Synthetic evidence examples](SYNTHETIC_EVIDENCE_EXAMPLES.md) for the 23 October
+follow-up: 14 demo/example tests, 112 focused regression tests, 313 frontend tests,
+14 Chrome checks, lint/build and PostgreSQL migration restoration. These are not
+a replacement full-backend run or a live-provider evaluation.

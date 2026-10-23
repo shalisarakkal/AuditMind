@@ -362,3 +362,8 @@ reporting remains unchanged until operators enable the new contract and review
 its [qualification rules](EVIDENCE_COVERAGE_PROFILES.md). Deterministic baseline
 remains separate. The Reports page can filter complete/partial new assessments;
 legacy reports are included under All. Null scores sort last, not as zero.
+# Synthetic evidence-state demonstration
+
+Four persistent mocked report examples are available in the separate
+**Evidence examples - SYNTHETIC ONLY** organization. See
+[the demonstration guide](SYNTHETIC_EVIDENCE_EXAMPLES.md) for access and limitations.

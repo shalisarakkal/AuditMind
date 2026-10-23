@@ -17,8 +17,9 @@ change backend/.env just to perform these checks.**
    one exists, evidence status should say **not recorded (legacy assessment)**;
    captured baseline appears only when it was actually recorded.
 5. Choosing Complete or Partial filters **new-contract** assessments only. An empty
-   list in the ordinary demo is expected: the new mode is off by default and the
-   isolated test records are cleaned up. Do not enable real generation to fill it.
+   list in the original demo organization is expected: the new mode is off by default.
+   Select **Evidence examples - SYNTHETIC ONLY** for the persistent mocked examples
+   described below. Do not enable real generation to fill it.
 
 The new mode is not a global rescore of existing reports. Opening Documents or
 approving external processing alone does not activate it.
@@ -162,3 +163,20 @@ unexpected results before enabling anything. Adopting real operator qualificatio
 and enabling a controlled rollout is a separate decision described in
 [coverage profiles](EVIDENCE_COVERAGE_PROFILES.md); production/live-AI acceptance
 remains open.
+# Persistent synthetic demonstration reports
+
+Sign in at http://localhost:3000 using the existing demo organization-admin account.
+In **Organization**, select **Evidence examples - SYNTHETIC ONLY**, then open **Reports**.
+Four saved examples show sufficient, limited, insufficient and conflicting evidence.
+Use **View**, **Download HTML** and **Download PDF**. The sufficient example has a
+simulated score of 70; the other three deliberately have no numeric overall score
+or risk tier. The completeness filter shows one Complete and three Partial reports.
+
+These are fixed mocked snapshots, not model output or operational evidence approvals.
+No consent, real inference, embeddings, qualifications or paid calls are enabled.
+The original demo organization and its credentials are retained. Examples persist
+across restarts; seeding does not overwrite existing reports or user edits.
+
+To deliberately create missing examples, run from `backend`:
+`.\.venv\Scripts\python.exe scripts/demo.py seed-evidence-examples`.
+This command refuses ordinary application schemas and remote demo targets.
