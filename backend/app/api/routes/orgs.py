@@ -93,7 +93,9 @@ def update_ingestion_settings(
     """Admins only. Send a value to override a setting, null to clear the
     override; omitted fields are unchanged. Recorded in Activity (the old
     and new values; null = back to the default)."""
-    org = db.get(Organization, org_id)
+    # Dependencies may already have cached this row. Lock AND refresh before
+    # merging JSON overrides, otherwise concurrent edits lose omitted fields.
+    org = db.get(Organization, org_id, with_for_update=True, populate_existing=True)
     changes = payload.model_dump(mode="json", exclude_unset=True)
     before = dict(org.ingestion_overrides or {})
     apply_overrides(org, changes)
@@ -129,7 +131,7 @@ def update_security_settings(
     null to follow the platform default again; settings left out are
     unchanged. For someone in several orgs the strictest applies. Recorded
     in Activity."""
-    org = db.get(Organization, org_id, with_for_update=True)
+    org = db.get(Organization, org_id, with_for_update=True, populate_existing=True)
     platform = resolve_platform_security(db)
     before = resolve_org_security(db, org, platform)
     try:

@@ -303,6 +303,18 @@ def test_unlocking(client, db_session, acme):
 # --- The list -----------------------------------------------------------------
 
 
+def test_identity_search_matches_names_not_roles_and_remains_tenant_scoped(client, acme):
+    _, ann, url = acme
+    shali = add(client, acme, "shali@acme.io", "admin", name="Shali Arakkal")
+    owner = add(client, acme, "owner@acme.io", "viewer", name="Active Admin")
+    register(client, "admin@foreign.io", "Foreign")
+    response = client.get(url, params={"q": "admin", "search_scope": "identity"}, headers=ann)
+    assert response.status_code == 200
+    assert [m["id"] for m in response.json()["items"]] == [owner["id"]]
+    broad = client.get(url, params={"q": "admin"}, headers=ann).json()
+    assert {m["id"] for m in broad["items"]} >= {shali["id"], owner["id"]}
+
+
 def test_the_list_searches_filters_and_sorts(client, acme):
     _, ann, url = acme
     add(client, acme, "bob@acme.io", "auditor", name="Bob")
@@ -317,6 +329,13 @@ def test_the_list_searches_filters_and_sorts(client, acme):
     assert emails(q="auditor") == ["bob@acme.io"]
     assert emails(q="must change") == ["bob@acme.io", "cara@acme.io"]
     assert emails(q="car") == ["cara@acme.io"]
+    assert emails(q="auditor", search_scope="identity") == []
+    assert emails(q="must change", search_scope="identity") == []
+    assert emails(q="BOB", search_scope="identity") == ["bob@acme.io"]
+    assert emails(q="cara@acme.io", search_scope="identity") == ["cara@acme.io"]
+    assert emails(q="admin", search_scope="identity") == []
+    assert emails(q="admin") == ["ann@acme.io"]
+    assert client.get(url, params={"search_scope": "invalid"}, headers=ann).status_code == 422
     assert emails(role=["admin", "viewer"]) == ["ann@acme.io", "cara@acme.io"]
     assert emails(status="active") == ["ann@acme.io"]
     assert emails(name="b") == ["bob@acme.io"]

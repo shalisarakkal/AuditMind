@@ -1,8 +1,9 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import and_, case, func
+from sqlalchemy import DateTime, String, and_, case, cast, func, or_, select, union
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
@@ -26,12 +27,46 @@ from app.models.enums import Domain, Severity, UserRole
 from app.models.finding import Finding
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
-from app.schemas.finding import FindingCreate, FindingFacets, FindingListItem, FindingPage, FindingRead
+from app.models.user import User
+from app.schemas.finding import FindingAssigneeFacet, FindingCreate, FindingFacets, FindingListItem, FindingPage, FindingRead
 from app.schemas.ingestion import ImportResponse
 from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.events import record_event
+from app.schemas.finding_workflow import HistoryRead, WorkflowBulk, WorkflowRead, WorkflowStatus, WorkflowTarget, WorkflowUpdate
+from app.models.finding_history import FindingHistory
+from app.services.finding_workflow import get_finding, read_history, read_workflow, update_workflows
+from app.services.workflow_deadlines import deadline_now
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
+
+
+@router.get("/findings/{finding_id}/workflow", response_model=WorkflowRead)
+def finding_workflow(org_id: uuid.UUID, finding_id: uuid.UUID, db: Session = Depends(get_db),
+        _: OrgMembership = Depends(require_org_member)):
+    return read_workflow(db, get_finding(db, org_id, finding_id))
+
+
+@router.get("/findings/{finding_id}/workflow/history", response_model=list[HistoryRead])
+def finding_workflow_history(org_id: uuid.UUID, finding_id: uuid.UUID,
+        offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100),
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    get_finding(db, org_id, finding_id)
+    rows = db.query(FindingHistory).filter(FindingHistory.org_id == org_id,
+        FindingHistory.finding_id == finding_id).order_by(FindingHistory.version.desc()).offset(offset).limit(limit).all()
+    return [read_history(db, row) for row in rows]
+
+
+@router.patch("/findings/{finding_id}/workflow", response_model=WorkflowRead)
+def patch_finding_workflow(org_id: uuid.UUID, finding_id: uuid.UUID, payload: WorkflowUpdate,
+        db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    return update_workflows(db, org_id, membership,
+        [WorkflowTarget(finding_id=finding_id, expected_version=payload.expected_version)], payload)[0]
+
+
+@router.post("/findings/workflow/bulk", response_model=list[WorkflowRead])
+def bulk_finding_workflow(org_id: uuid.UUID, payload: WorkflowBulk,
+        db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    return update_workflows(db, org_id, membership, payload.targets, payload.patch)
 
 
 # Most severe first (critical = 0).
@@ -52,7 +87,14 @@ _DOMAIN_LABELS = {
 _SEVERITY_LABELS = {severity: severity.value.capitalize() for severity in Severity}
 
 # Sortable columns; "severity" (the default) puts the most severe first.
-FindingSort = Literal["severity", "domain", "finding", "category", "asset", "source", "created"]
+_WORKFLOW_LABELS = {"open": "Open", "accepted_risk": "Accepted risk", "mitigated": "Mitigated",
+    "resolved": "Resolved", "false_positive": "False positive"}
+_ASSIGNEE_LABEL = (select(func.coalesce(User.name, User.email)).join(OrgMembership, OrgMembership.user_id == User.id)
+    .where(User.id == Finding.assignee_id, OrgMembership.org_id == Finding.org_id, User.is_active.is_(True))
+    .correlate(Finding).scalar_subquery())
+_DUE_EXPIRY = func.coalesce(Finding.due_expires_at, func.timezone("America/New_York", cast(Finding.due_date + 1, DateTime)))
+_REVIEW_EXPIRY = func.coalesce(Finding.risk_review_expires_at, func.timezone("America/New_York", cast(Finding.risk_review_date + 1, DateTime)))
+FindingSort = Literal["severity", "domain", "finding", "category", "asset", "source", "created", "workflow_status", "assignee", "due_date", "risk_review_date"]
 _SORT_COLUMNS = {
     "severity": _SEVERITY_RANK,
     "domain": _DOMAIN_RANK,
@@ -61,6 +103,10 @@ _SORT_COLUMNS = {
     "asset": func.lower(func.coalesce(Asset.hostname, Asset.ip, Asset.cloud_id)),
     "source": func.lower(Finding.source),
     "created": Finding.created_at,
+    "workflow_status": func.lower(case(*((Finding.workflow_status == key, value) for key, value in _WORKFLOW_LABELS.items()))),
+    "assignee": func.lower(_ASSIGNEE_LABEL),
+    "due_date": _DUE_EXPIRY,
+    "risk_review_date": _REVIEW_EXPIRY,
 }
 
 
@@ -73,10 +119,14 @@ def list_findings(
         "IP or cloud ID, source, severity or domain contains this",
     ),
     finding: str | None = Query(None, description="Description or category contains this"),
+    finding_id: uuid.UUID | None = Query(None, description="Exact internal finding ID"),
     asset: str | None = Query(None, description="The asset's hostname, IP or cloud ID contains this"),
     domain: list[Domain] | None = Query(None, description="Domain is one of these"),
     severity: list[Severity] | None = Query(None, description="Severity is one of these"),
     source: list[str] | None = Query(None, description='Source is one of these ("" for none)'),
+    workflow_status: list[WorkflowStatus] | None = Query(None),
+    assignee: list[uuid.UUID | Literal["unassigned"]] | None = Query(None),
+    overdue: Literal["due", "risk_review"] | None = Query(None),
     dates: DateRange = Depends(date_range),
     sort: FindingSort = Query("severity", description="Column to sort by"),
     order: SortOrder = Query("asc"),
@@ -91,19 +141,64 @@ def list_findings(
     # The asset must be the org's own too, so a finding pointing elsewhere
     # (create_finding rejects that now) can't show another org's host.
     asset_join = and_(Finding.asset_id == Asset.id, Asset.org_id == org_id)
+    q = (q or "").strip() or None
+    try:
+        query_id = uuid.UUID(q.strip()) if q else None
+    except ValueError:
+        query_id = None
+    # Search small/independent lookup sets once, rather than joining assets and
+    # evaluating a correlated assignee lookup for each matching finding.
+    search_asset_ids = select(Asset.id).where(
+        Asset.org_id == org_id, contains(q, Asset.hostname, Asset.ip, Asset.cloud_id)
+    )
+    search_assignee_ids = select(User.id).join(OrgMembership, OrgMembership.user_id == User.id).where(
+        OrgMembership.org_id == org_id, User.is_active.is_(True),
+        contains(q, func.coalesce(User.name, User.email)),
+    )
+    search_condition = Finding.id == query_id if query_id else None
+    label_conditions = [labelled(q, column, labels) for column, labels in (
+        (Finding.severity, _SEVERITY_LABELS), (Finding.domain, _DOMAIN_LABELS),
+        (Finding.workflow_status, _WORKFLOW_LABELS))]
+    if q and not query_id and (len(q) < 3 or any(value is not None for value in label_conditions)):
+        # Short trigrams and broad display labels can match millions of rows.
+        # Avoid constructing/deduplicating a huge candidate-ID set for these.
+        search_condition = any_of(*label_conditions,
+            contains(q, Finding.description, Finding.category, Finding.source),
+            Finding.asset_id.in_(search_asset_ids), Finding.assignee_id.in_(search_assignee_ids),
+            contains(q, cast(Finding.due_date, String), cast(Finding.risk_review_date, String)))
+    elif q and not query_id:
+        # Separate indexed branches: an OR containing asset/assignee subqueries
+        # prevents PostgreSQL from using selective text indexes effectively.
+        # UNION removes duplicate IDs before counts, facets and pagination.
+        active = (Finding.org_id == org_id, Finding.archived_at.is_(None))
+        branches = [select(Finding.id).where(*active, predicate) for predicate in (
+            contains(q, Finding.description, Finding.category, Finding.source),
+            Finding.asset_id.in_(search_asset_ids),
+            Finding.assignee_id.in_(search_assignee_ids),
+        )]
+        for column in (Finding.due_date, Finding.risk_review_date):
+            branches.append(select(Finding.id).where(*active, column.is_not(None), contains(q, cast(column, String))))
+        matches = union(*branches).subquery()
+        search_condition = Finding.id.in_(select(matches.c.id))
     conditions = [
-        any_of(
-            contains(
-                q, Finding.description, Finding.category, Asset.hostname, Asset.ip, Asset.cloud_id, Finding.source
-            ),
-            labelled(q, Finding.severity, _SEVERITY_LABELS),
-            labelled(q, Finding.domain, _DOMAIN_LABELS),
-        ),
+        search_condition,
+        Finding.id == finding_id if finding_id else None,
         contains(finding, Finding.description, Finding.category),
         contains(asset, Asset.hostname, Asset.ip, Asset.cloud_id),
         one_of(Finding.severity, severity),
         one_of(Finding.source, source),
+        one_of(Finding.workflow_status, workflow_status),
     ]
+    if assignee:
+        assigned_ids = [value for value in assignee if value != "unassigned"]
+        conditions.append(or_(Finding.assignee_id.in_(assigned_ids),
+            Finding.assignee_id.is_(None) if "unassigned" in assignee else False))
+    now = deadline_now()
+    # Unmigrated/direct legacy inserts have no author-zone metadata; retain their Eastern meaning.
+    if overdue == "due":
+        conditions.append(and_(_DUE_EXPIRY <= now, Finding.workflow_status.in_(["open", "accepted_risk", "mitigated"])))
+    elif overdue == "risk_review":
+        conditions.append(and_(_REVIEW_EXPIRY <= now, Finding.workflow_status == "accepted_risk"))
     # archived_at IS NULL also lets the paging below use the partial indexes.
     filters = [
         Finding.org_id == org_id,
@@ -113,7 +208,7 @@ def list_findings(
     ]
     # The asset is only needed to search or sort by it; joining it into a
     # query over every finding is costly.
-    needs_asset = bool(q or asset) or sort == "asset"
+    needs_asset = bool(asset) or sort == "asset"
 
     def matching(*columns):
         query = db.query(*columns)
@@ -135,7 +230,7 @@ def list_findings(
 
     ids = _page_ids(matching, filters, sort, order, page, severity_counts)
     rows = (
-        db.query(Finding, Asset.hostname, Asset.ip, Asset.cloud_id)
+        db.query(Finding, Asset.hostname, Asset.ip, Asset.cloud_id, _ASSIGNEE_LABEL)
         .outerjoin(Asset, asset_join)
         .filter(Finding.id.in_(ids))
         .all()
@@ -151,9 +246,10 @@ def list_findings(
             asset_hostname=hostname,
             asset_ip=ip,
             asset_cloud_id=cloud_id,
+            assignee_label=assignee_label,
             **archiving_fields(unfinished, finding.id),
         )
-        for finding, hostname, ip, cloud_id in rows
+        for finding, hostname, ip, cloud_id, assignee_label in rows
     ]
     return FindingPage(items=items, total=total, domain_counts=domain_counts)
 
@@ -204,7 +300,17 @@ def finding_facets(
     """The values the source pick-list can offer ("" first when some
     findings have none). Severity and domain are fixed lists."""
     findings = db.query(Finding).filter(Finding.org_id == org_id, Finding.archived_at.is_(None))
-    return FindingFacets(source=distinct_values(findings, Finding.source))
+    owners = db.scalars(select(Finding.assignee_id).where(
+        Finding.org_id == org_id, Finding.archived_at.is_(None)).distinct()).all()
+    labels = dict(db.execute(select(User.id, func.coalesce(User.name, User.email))
+        .join(OrgMembership, OrgMembership.user_id == User.id).where(OrgMembership.org_id == org_id,
+            User.is_active.is_(True), User.id.in_([identifier for identifier in owners if identifier]))).all())
+    return FindingFacets(has_manual_findings=findings.with_entities(Finding.id).filter(Finding.scan_id.is_(None)).first() is not None,
+        source=distinct_values(findings, Finding.source),
+        workflow_status=distinct_values(findings, Finding.workflow_status),
+        assignee=sorted([FindingAssigneeFacet(value=str(identifier) if identifier else "unassigned",
+            label=labels.get(identifier) or ("Assignee unavailable" if identifier else "Unassigned")) for identifier in owners],
+            key=lambda item: (item.label.casefold(), item.value)))
 
 
 @router.post("/findings", response_model=FindingRead, status_code=status.HTTP_201_CREATED)
@@ -215,9 +321,14 @@ def create_finding(
     membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor)),
 ) -> Finding:
     """The asset and scan, if given, must belong to the org and not be archived."""
+    from app.services.org_lock import lock_org
+    lock_org(db, org_id)
+    references = [value for value in (payload.asset_id, payload.scan_id) if value is not None]
+    if unfinished_archives(db, org_id, references):
+        raise HTTPException(409, "An affected asset or upload is being archived")
     for model, ref_id, name in ((Asset, payload.asset_id, "asset_id"), (Scan, payload.scan_id, "scan_id")):
         if ref_id is not None:
-            ref = db.get(model, ref_id)
+            ref = db.get(model, ref_id, populate_existing=True)
             if ref is None or ref.org_id != org_id or ref.archived_at is not None:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -5,6 +5,7 @@ from app.models.membership import OrgMembership
 from app.models.asset import Asset
 from app.models.scan import Scan
 from app.models.finding import Finding
+from app.models.finding_history import FindingHistory
 from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.ai_usage import AIUsage
@@ -29,6 +30,7 @@ __all__ = [
     "Asset",
     "Scan",
     "Finding",
+    "FindingHistory",
     "RiskScore",
     "Report",
     "Document",

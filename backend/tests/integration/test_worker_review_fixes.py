@@ -34,6 +34,25 @@ pytestmark = requires_db
 ASSETS = b"type,hostname\nserver,web-01\nserver,web-02\n"
 
 
+def test_queue_metrics_close_their_own_read_transaction(db_session, monkeypatch):
+    from contextlib import contextmanager
+    sessions = []
+    values = {}
+    factory = sessionmaker(bind=db_session.get_bind())
+    @contextmanager
+    def open_metrics():
+        with factory() as session:
+            sessions.append(session)
+            yield session
+    monkeypatch.setattr(runner.ingestion_background, "open_session", open_metrics)
+    monkeypatch.setattr(runner, "set_metric", lambda key, value: values.update({key: value}))
+    runner._update_queue_metrics()
+    assert len(sessions) == 1
+    assert sessions[0].in_transaction() is False
+    assert values == {"queue_imports_pending": 0, "queue_archives_pending": 0,
+        "queue_reports_pending": 0, "queue_total_pending": 0}
+
+
 @pytest.fixture
 def admin(client):
     headers = register(client, "owner@acmecorp.io")

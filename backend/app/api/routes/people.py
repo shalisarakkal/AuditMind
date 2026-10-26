@@ -86,6 +86,9 @@ def _no_store(response: Response) -> None:
 def list_members(
     org_id: uuid.UUID,
     q: str | None = Query(None, description="Search the shown columns: name, email, role or status contains this"),
+    search_scope: Literal["all", "identity"] = Query(
+        "all", description="identity searches name/email only; all also searches role/status"
+    ),
     name: str | None = Query(None, description="The name contains this"),
     email: str | None = Query(None, description="The email contains this"),
     role: list[UserRole] | None = Query(None, description="Role is one of these"),
@@ -107,8 +110,8 @@ def list_members(
     for match in (
         any_of(
             contains(q, User.name, User.email),
-            labelled(q, OrgMembership.role, _ROLE_LABELS),
-            labelled(q, state, _STATUS_LABELS),
+            labelled(q, OrgMembership.role, _ROLE_LABELS) if search_scope == "all" else None,
+            labelled(q, state, _STATUS_LABELS) if search_scope == "all" else None,
         ),
         contains(name, User.name),
         contains(email, User.email),

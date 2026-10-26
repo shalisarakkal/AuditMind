@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import ArchiveProgress, Domain, Severity
 from app.schemas.paging import Page
+from app.schemas.finding_workflow import WorkflowStatus
 
 
 class FindingCreate(BaseModel):
@@ -30,6 +31,15 @@ class FindingRead(BaseModel):
     severity: Severity
     description: str | None
     source: str | None
+    workflow_status: WorkflowStatus = "open"
+    workflow_version: int = 0
+    assignee_id: uuid.UUID | None = None
+    due_date: date | None = None
+    risk_review_date: date | None = None
+    due_timezone: str | None = None
+    due_expires_at: datetime | None = None
+    risk_review_timezone: str | None = None
+    risk_review_expires_at: datetime | None = None
     created_at: datetime
     # An event log's finding: the events it sums up (else null).
     event_count: int | None = None
@@ -43,6 +53,7 @@ class FindingListItem(FindingRead):
     (a cloud resource may have only a cloud ID)."""
 
     asset_hostname: str | None = None
+    assignee_label: str | None = None
     asset_ip: str | None = None
     asset_cloud_id: str | None = None
     # A manual finding whose archive hasn't finished: running now, or stopped
@@ -57,8 +68,16 @@ class FindingPage(Page[FindingListItem]):
     domain_counts: dict[Domain, int]
 
 
+class FindingAssigneeFacet(BaseModel):
+    value: str
+    label: str
+
+
 class FindingFacets(BaseModel):
     """The values the findings list's source pick-list can offer; "" stands
     for "no source"."""
 
     source: list[str]
+    has_manual_findings: bool = False
+    workflow_status: list[WorkflowStatus] = []
+    assignee: list[FindingAssigneeFacet] = []

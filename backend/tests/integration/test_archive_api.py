@@ -187,6 +187,35 @@ def test_a_restored_finding_that_duplicates_an_active_one_is_purged(client, admi
     assert event["criticality"] == "warning" and event["counts"]["duplicates_purged"] == 2
 
 
+def test_restore_preserves_duplicate_with_remediation_history(client, admin, db_session):
+    _, findings, _ = _setup(client, admin)
+    original = next(f for f in _get(client, admin, "/findings")["items"] if f["category"] == "CVE-1")
+    workflow_url = _url(admin, f"/findings/{original['id']}/workflow")
+    response = client.patch(workflow_url, headers=admin[0], json=dict(expected_version=0,
+        status="mitigated", rationale="Applied compensating control", verification="Synthetic control retest"))
+    assert response.status_code == 200, response.text
+    upload(client, _url(admin, "/findings/import"), admin[0], "duplicate.csv", FINDINGS)
+    assert client.get(workflow_url, headers=admin[0]).json()["version"] == 1
+    assert client.get(workflow_url, headers=admin[0]).json()["status"] == "mitigated"
+    _post(client, admin, f"/scans/{findings}/archive")
+    upload(client, _url(admin, "/findings/import"), admin[0], "again.csv", FINDINGS)
+    [item] = _archived(client, admin, "upload")
+    job = _post(client, admin, f"/archive/{item['id']}/restore").json()
+    # The extra duplicate import keeps all original assets shared/active, so
+    # two untouched duplicates are purged; the edited third one must survive.
+    assert job["summary"]["duplicates_purged"] == 2
+    restored = client.get(workflow_url, headers=admin[0])
+    assert restored.status_code == 200
+    assert restored.json()["status"] == "mitigated"
+    assert len(client.get(workflow_url + "/history", headers=admin[0]).json()) == 1
+    # Purge is deliberately destructive and cascades history, not restore.
+    from app.models.finding_history import FindingHistory
+    _post(client, admin, f"/scans/{findings}/archive")
+    [item] = _archived(client, admin, "upload")
+    assert _post(client, admin, f"/archive/{item['id']}/purge").status_code == 200
+    assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 0
+
+
 def test_archiving_an_asset_takes_all_its_findings(client, admin):
     _setup(client, admin)
     own_02 = next(a for a in _get(client, admin, "/assets")["items"] if a["hostname"] == "own-02")

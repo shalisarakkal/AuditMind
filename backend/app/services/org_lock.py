@@ -51,6 +51,16 @@ def lock_org_jobs(db: Session, org_id: uuid.UUID) -> None:
     db.execute(select(func.pg_advisory_xact_lock(1, org_key)))
 
 
+def lock_org_configuration(db: Session, org_id: uuid.UUID) -> None:
+    """Serialize configuration read/merge/create, including absent consent rows.
+
+    Separate from import/job locks: configuration must not take them in reverse
+    order. Colliding truncated keys only cause extra serialization, not data loss.
+    """
+    org_key = int.from_bytes(org_id.bytes[:4], "big", signed=True)
+    db.execute(select(func.pg_advisory_xact_lock(7, org_key)))
+
+
 # Job kinds for job_running (the first key of the lock).
 IMPORT_JOB = 2
 ARCHIVE_JOB = 3

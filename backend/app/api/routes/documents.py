@@ -18,6 +18,7 @@ from app.models.session import PlatformSetting
 from app.models.user import User
 from app.services import knowledge_service as service
 from app.services.events import record_event
+from app.services.org_lock import lock_org_configuration
 
 router = APIRouter(tags=["documents"])
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
@@ -461,10 +462,11 @@ def get_settings(org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembers
 @router.put("/orgs/{org_id}/documents/settings/consent")
 def set_consent(org_id: uuid.UUID, payload: ConsentChange, db: Session = Depends(get_db),
                 member: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    lock_org_configuration(db, org_id)
     expected = service.report_target() if payload.purpose == "report" else service.consent_target(service.configured_profile(db))
     if payload.target != expected:
         raise HTTPException(409, "Provider changed; reload the disclosure before approving")
-    row = db.get(KnowledgeConsent, (org_id, payload.purpose))
+    row = db.get(KnowledgeConsent, (org_id, payload.purpose), populate_existing=True)
     previous_grant = row.granted if row else False
     previous_target = row.target if row else None
     if row is None:

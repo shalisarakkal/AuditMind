@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import refuse_if_archived, require_org_member, require_org_role
+from app.api.deps import authorize_org_write, refuse_if_archived, require_org_member, require_org_role
 from app.api.paging import (
     DateRange,
     PageParams,
@@ -223,12 +223,21 @@ def start_bulk(
     if body.action == ArchiveAction.archive and body.item_type is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Say which item_type the ids are")
     jobs, refused = [], []
+    actor_id = membership.user_id
     for item_id in dict.fromkeys(body.ids):  # each once, in order
         try:
+            # Each job commits independently; reauthorize every new transaction.
+            authorize_org_write(db, org_id, actor_id, allowed)
             if body.action == ArchiveAction.archive:
-                job = archive_service.start_archive(db, org_id, body.item_type, item_id, membership.user_id)
+                job = archive_service.start_archive(db, org_id, body.item_type, item_id, actor_id)
             else:
-                job = archive_service.start_batch_job(db, org_id, item_id, body.action, membership.user_id)
+                job = archive_service.start_batch_job(db, org_id, item_id, body.action, actor_id)
+        except HTTPException as exc:
+            db.rollback()
+            if not jobs:
+                raise
+            refused.append(BulkRefused(id=item_id, detail=str(exc.detail)))
+            continue
         except ArchiveError as exc:
             db.rollback()
             refused.append(BulkRefused(id=item_id, detail=str(exc)))

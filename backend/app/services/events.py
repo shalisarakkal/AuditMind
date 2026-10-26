@@ -38,6 +38,7 @@ TYPES: dict[str, Criticality] = {
     "purge": Criticality.critical,
     "asset_added": Criticality.info,
     "finding_added": Criticality.info,
+    "finding_workflow_changed": Criticality.info,
     "settings_changed": Criticality.info,
     "profile_created": Criticality.info,
     "profile_updated": Criticality.info,

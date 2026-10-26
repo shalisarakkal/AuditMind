@@ -438,6 +438,19 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
             logger.warning("Couldn't check in", exc_info=True)
 
 
+def _update_queue_metrics() -> None:
+    # Never reuse the loop's already-closed Session: SQLAlchemy would reopen it
+    # and leave this SELECT transaction alive, blocking concurrent index builds.
+    with ingestion_background.open_session() as metrics_db:
+        pending_imports = metrics_db.scalar(select(func.count(Scan.id)).where(Scan.status == ScanStatus.pending)) or 0
+        pending_archives = metrics_db.scalar(select(func.count(ArchiveJob.id)).where(ArchiveJob.status == "pending")) or 0
+        pending_reports = metrics_db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.pending)) or 0
+        set_metric("queue_imports_pending", pending_imports)
+        set_metric("queue_archives_pending", pending_archives)
+        set_metric("queue_reports_pending", pending_reports)
+        set_metric("queue_total_pending", pending_imports + pending_archives + pending_reports)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     check_secret_key(settings.SECRET_KEY)
@@ -494,13 +507,7 @@ def main() -> None:
             # ADD THIS: Check queue depth metrics periodically
             if _now() >= last_queue_check + timedelta(minutes=1):
                 try:
-                    pending_imports = db.scalar(select(func.count(Scan.id)).where(Scan.status == ScanStatus.pending))
-                    pending_archives = db.scalar(select(func.count(ArchiveJob.id)).where(ArchiveJob.status == "pending"))
-                    pending_reports = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.pending))
-                    set_metric("queue_imports_pending", pending_imports or 0)
-                    set_metric("queue_archives_pending", pending_archives or 0)
-                    set_metric("queue_reports_pending", pending_reports or 0)
-                    set_metric("queue_total_pending", (pending_imports or 0) + (pending_archives or 0) + (pending_reports or 0))
+                    _update_queue_metrics()
                 except Exception:
                     logger.warning("Failed to check queue depth", exc_info=True)
                 last_queue_check = _now()

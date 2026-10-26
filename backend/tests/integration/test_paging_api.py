@@ -31,6 +31,22 @@ def _upload(client, admin, kind, content):
     assert upload(client, f"/api/v1/orgs/{org_id}/{kind}/import", headers, "a.csv", content).status_code == 201
 
 
+def test_date_filter_includes_entire_browser_day(client, admin, db_session):
+    from datetime import datetime
+    _,org=admin
+    times=['2026-10-24T18:29:59.999999+00:00','2026-10-24T18:30:00+00:00',
+        '2026-10-25T18:29:59.999999+00:00','2026-10-25T18:30:00+00:00']
+    for i,stamp in enumerate(times):
+        db_session.add(Finding(org_id=uuid.UUID(org),domain=Domain.network_config,severity=Severity.high,
+            description=f'Boundary {i}',created_at=datetime.fromisoformat(stamp)))
+    db_session.commit()
+    result=_get(client,admin,'findings',since='2026-10-25',until='2026-10-25',filter_timezone='Asia/Kolkata')
+    assert {row['description'] for row in result['items']}=={'Boundary 1','Boundary 2'}
+    h,_=admin
+    for params in ({'since':'2026-10-26','until':'2026-10-25'}, {'filter_timezone':'Invalid/Zone'}):
+        assert client.get(f'/api/v1/orgs/{org}/findings',headers=h,params=params).status_code==422
+
+
 def test_assets_come_a_page_at_a_time_oldest_first(client, admin):
     _upload(client, admin, "assets", b"type,hostname\n" + b"".join(b"server,host-%02d\n" % i for i in range(5)))
 
@@ -141,6 +157,7 @@ def test_finding_search_also_matches_the_assets_hostname_or_ip(client, admin):
     assert by_host["domain_counts"] == {"network_config": 2}
 
     assert sorted(f["category"] for f in _get(client, admin, "findings", q="10.20.30")["items"]) == ["C3", "C4"]
+    assert _get(client, admin, "findings", q="   ")["total"] == _get(client, admin, "findings")["total"]
 
 
 ASSETS = (
@@ -214,7 +231,10 @@ def test_findings_sort_and_filter_by_column(client, admin):
 
     assert _get(client, admin, "findings", source="manual")["total"] == 4  # the CSV's default source
     assert _get(client, admin, "findings", source="")["total"] == 0
-    assert _get(client, admin, "findings/facets") == {"source": ["manual"]}
+    facets = _get(client, admin, "findings/facets")
+    assert facets["source"] == ["manual"]
+    assert facets["workflow_status"] == ["open"]
+    assert facets["assignee"] == [{"value": "unassigned", "label": "Unassigned"}]
 
 
 def test_asset_search_covers_every_shown_column(client, admin):

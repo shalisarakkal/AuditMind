@@ -2,12 +2,14 @@
 one-column sorting, "contains" filters and pick-list filters."""
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timezone
 from typing import Literal
 
-from fastapi import Query
+from fastapi import HTTPException, Query
 from sqlalchemy import ColumnElement, false, or_
 from sqlalchemy.orm import Query as OrmQuery
+from zoneinfo import ZoneInfo
+from app.services.workflow_deadlines import deadline_expiry, validate_deadline_zone
 
 SortOrder = Literal["asc", "desc"]
 
@@ -97,21 +99,36 @@ def any_of(*conditions: ColumnElement[bool] | None) -> ColumnElement[bool] | Non
 class DateRange:
     since: date | None
     until: date | None
+    timezone_name: str = "UTC"
+
+    def __post_init__(self):
+        validate_deadline_zone(self.timezone_name)
+        if self.since and self.until and self.since > self.until:
+            raise ValueError("From date must not be after To date")
+        # Validate before building a query, including skipped days and date overflow.
+        for day in (self.since, self.until):
+            if day:
+                deadline_expiry(day, self.timezone_name)
+                datetime.combine(day, time.min, ZoneInfo(self.timezone_name)).astimezone(timezone.utc)
 
     def conditions(self, column) -> list[ColumnElement[bool]]:
         """`column` (a timestamp) on or after `since` and on or before
-        `until`, whole days in UTC."""
+        `until`, inclusive whole days in the requesting browser's timezone."""
         found = []
         if self.since:
-            found.append(column >= datetime.combine(self.since, time.min, timezone.utc))
+            found.append(column >= datetime.combine(self.since, time.min, ZoneInfo(self.timezone_name)).astimezone(timezone.utc))
         if self.until:
-            found.append(column < datetime.combine(self.until + timedelta(days=1), time.min, timezone.utc))
+            found.append(column < deadline_expiry(self.until, self.timezone_name))
         return found
 
 
 def date_range(
-    since: date | None = Query(None, description="On or after this day (UTC)"),
-    until: date | None = Query(None, description="On or before this day (UTC)"),
+    since: date | None = Query(None, description="From day, inclusive at local midnight"),
+    until: date | None = Query(None, description="To day, inclusive through the entire local day"),
+    filter_timezone: str = Query("UTC", max_length=100, description="Browser IANA timezone; omitted API clients default to UTC"),
 ) -> DateRange:
     """A list's From/To filter on its date column."""
-    return DateRange(since=since, until=until)
+    try:
+        return DateRange(since=since, until=until, timezone_name=filter_timezone)
+    except (ValueError, OverflowError) as exc:
+        raise HTTPException(422, str(exc)) from exc

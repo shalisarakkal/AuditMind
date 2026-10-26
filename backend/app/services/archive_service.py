@@ -488,6 +488,7 @@ class _Runner:
             duplicates += self.db.execute(
                 text(
                     "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
+                    "AND f.workflow_version = 0 "
                     "AND f.source IS NOT NULL AND EXISTS (SELECT 1 FROM findings g "
                     "WHERE g.org_id = f.org_id AND g.asset_id IS NOT DISTINCT FROM f.asset_id "
                     "AND g.archived_at IS NULL AND g.source = f.source "

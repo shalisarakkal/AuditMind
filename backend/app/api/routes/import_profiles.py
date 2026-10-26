@@ -23,6 +23,7 @@ from app.services.import_profiles import (
     validate_profile_parts,
 )
 from app.services.events import record_event
+from app.services.org_lock import lock_org_configuration
 from app.services.ingestion_service import IngestionError
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["imports"])
@@ -73,12 +74,15 @@ def _read_row(row: ImportProfile) -> ImportProfileRead:
 
 
 def _own_profile(db: Session, org_id: uuid.UUID, key: str) -> ImportProfile:
+    lock_org_configuration(db, org_id)
     if key in FAMILIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Built-in profiles can't be changed; make a copy and change that instead",
         )
     profile = find_custom_profile(db, org_id, key)
+    if profile is not None:
+        profile = db.get(ImportProfile, profile.id, populate_existing=True)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import profile not found")
     return profile
@@ -133,6 +137,7 @@ def create_import_profile(
     """Admins only. Copies `copy_from` (a built-in key or one of the org's
     profile ids) under a new name; column_map/params, when given, replace the
     copied ones."""
+    lock_org_configuration(db, org_id)
     try:
         source = resolve_profile(db, org_id, payload.copy_from)
     except IngestionError as exc:

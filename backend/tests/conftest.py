@@ -118,6 +118,8 @@ def db_session():
     # cut off, or a copy of real data loaded for measuring, leaves tables
     # behind that create_all would keep.
     _drop_test_schema(engine)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"))
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     session = SessionLocal()

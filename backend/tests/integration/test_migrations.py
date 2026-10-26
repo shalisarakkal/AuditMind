@@ -49,6 +49,13 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
             assert {"reports", "knowledge_versions", "knowledge_chunks", "report_evidence_uses"} <= set(
                 inspect(connection).get_table_names(schema=schema)
             )
+            assert {index["name"] for index in inspect(connection).get_indexes("findings", schema=schema)} >= {
+                "ix_findings_description_trgm", "ix_findings_category_trgm", "ix_findings_source_trgm",
+                "ix_findings_active_assignee", "ix_findings_active_due_search", "ix_findings_active_review_search",
+            }
+            assert connection.scalar(text("""SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
+                JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=:schema AND NOT i.indisvalid"""),
+                {"schema": schema}) == 0
             connection.commit()
             command.downgrade(config, "0018")
             assert "knowledge_versions" not in inspect(connection).get_table_names(schema=schema)

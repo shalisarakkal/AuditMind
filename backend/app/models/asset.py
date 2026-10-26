@@ -15,6 +15,8 @@ ACTIVE = text("archived_at IS NULL")
 class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
+        *[Index(f"ix_assets_{column}_trgm", column, postgresql_using="gin",
+                postgresql_ops={column: "gin_trgm_ops"}) for column in ("hostname", "ip", "cloud_id")],
         # Import matching: by cloud ID, else hostname (case-insensitive) and
         # category, else IP (see import_matching.py). Active assets only.
         Index("ix_assets_org_hostname", "org_id", text("lower(hostname)"), postgresql_where=ACTIVE),

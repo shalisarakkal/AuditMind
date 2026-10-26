@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
@@ -130,16 +131,35 @@ def refuse_if_archived(membership: OrgMembership | SysadminView) -> None:
 
 def require_org_role(*roles: UserRole):
     """Like require_org_member, but also checks the caller's role in that
-    org. Every change to an org's data goes through here, so an archived
-    org (read-only) is refused here too."""
+    org. Privileged organization mutations use this transactional admission
+    fence; per-user notification dismissals and read-only routes do not."""
 
-    def checker(membership: OrgMembership = Depends(require_org_member)) -> OrgMembership:
+    def checker(membership: OrgMembership = Depends(require_org_member), db: Session = Depends(get_db)) -> OrgMembership:
         if membership.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-        refuse_if_archived(membership)
-        return membership
+        return authorize_org_write(db, membership.org_id, membership.user_id, roles)
 
     return checker
+
+
+def authorize_org_write(db: Session, org_id: uuid.UUID, user_id: uuid.UUID, roles: tuple[UserRole, ...]) -> OrgMembership:
+    """Revalidate after waiting; fence lifecycle/role changes until commit.
+
+    Job admission precedes the organization row, as in archive/workflow services.
+    NO KEY UPDATE serializes writers/lifecycle changes without blocking inventory
+    foreign-key KEY SHARE locks held by publishing background workers.
+    """
+    from app.services.org_lock import lock_org_jobs
+    lock_org_jobs(db, org_id)
+    org = db.scalar(select(Organization).where(Organization.id == org_id)
+        .with_for_update(key_share=True).execution_options(populate_existing=True))
+    current = db.scalar(select(OrgMembership).where(OrgMembership.org_id == org_id,
+        OrgMembership.user_id == user_id).execution_options(populate_existing=True))
+    active = db.scalar(select(User.is_active).where(User.id == user_id))
+    if org is None or org.purge_requested_at is not None or current is None or not active or current.role not in roles:
+        raise HTTPException(status_code=403, detail="Organization access or permissions changed; reload before retrying")
+    refuse_if_archived(current)
+    return current
 
 
 def require_sysadmin(user: User = Depends(get_current_user)) -> User:
