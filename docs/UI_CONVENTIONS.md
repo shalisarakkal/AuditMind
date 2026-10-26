@@ -33,6 +33,21 @@ Agreed 2026-09-30.
 
 ## Table
 
+Findings action layout (25 October 2026): one selection, no **Select for** mode.
+Keep Workflow and eligible manual Archive together in a labelled sticky-right
+Actions column, with an opaque application background and narrow-screen wrapping.
+Viewers retain row Workflow for read-only inspection, without archive/selection.
+The selected-findings bar exposes both bulk actions: workflow up to 100; archive
+up to 500 only when every target is manual/available. Explain disabled actions,
+and disable individual row Workflow/Archive/Undo whenever any selection exists;
+show Clear selection guidance. Selection is local, not a cross-user reservation.
+never silently skip imported rows. Preserve eligibility metadata across pages;
+it is UI guidance, not authorization. Confirm exact targets/counts, preserve the
+confirmation target snapshot and retain server validation/refusal reporting.
+Use an application-styled native modal for Findings archive confirmation (not
+window.confirm): inert background, initial Cancel focus, restored trigger focus,
+explicit row/bulk target counts, and no cancellation/repeated submission while busy.
+
 - **Every column that has values is sortable** (`SortHeader`): click for
   ascending, again for descending, again for the default order. A list that
   defaults to newest first passes `defaultSort` and `defaultOrder="desc"`.
@@ -169,6 +184,32 @@ Agreed 2026-09-30:
   framework selection does not install licensed material or certify compliance.
 - Announce submission/check errors through alerts. Keep rule-based previews
   explicitly non-AI and independent of external-processing consent.
+
+## Job-result notifications and Settings width (24 October 2026)
+
+Document previews (25 October 2026) follow the Uploads report pattern: expand
+directly below the owning row, span the correct visible columns, show title/version
+and edition, and toggle Preview/Hide preview. One preview at a time. Keep loading,
+errors/retry and Close inside the panel; Close restores focus to its row toggle.
+Scope changes close previews, late responses cannot replace another version's text,
+and long text wraps/scrolls inside the panel without widening the page. Preview
+uses existing read permissions and is not an indexing or mutation action.
+
+- Successful archive/restore/purge notices auto-dismiss after 10 seconds of visible
+  time on the current screen. Pause for hover, keyboard focus, a hidden browser tab,
+  or scrolling the notice out of view. A newly mounted notice starts its countdown;
+  once dismissed, the existing server dismissal keeps it gone across screens/refresh.
+- Running/queued/interrupted jobs, failures and outcomes requiring review remain
+  visible. Restore outcomes that kept findings archived or purged duplicates require
+  manual dismissal. A grouped result containing any such outcome stays visible.
+- Keep Dismiss/Dismiss all available. Automatic dismissal is background activity
+  and must not renew idle activity. If it fails, show the error and require manual
+  retry; do not loop. Do not delete jobs, Activity events, uploads or archived data.
+- Full upload reports and their warnings/errors keep their existing manual review
+  and dismissal behavior. Do not apply a blanket timer to all messages.
+- Organization Settings uses the same available content width and shared page
+  header as other screens. Keep forms usable on narrow viewports and horizontally
+  scroll wide tables inside their own containers, not the page body.
 
 ## Accessibility
 

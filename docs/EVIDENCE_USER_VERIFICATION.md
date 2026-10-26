@@ -1,10 +1,50 @@
 # Verify the evidence-aware reporting changes
 
+For the newly committed Phase 4 changes, start with the detailed
+[Chrome walkthrough and phase summary](PHASE4_USER_VERIFICATION.md). It covers
+workflow, selection/archive, dates, search, shared UI and two-user conflicts.
+
 23 October 2026. Synthetic/mocked testing only. **Do not enable real inference,
 enter credentials, grant ordinary-organization external processing consent, or
 change backend/.env just to perform these checks.**
 
 ## 1. What you can check in the normal demo
+
+Archive confirmation (25 October follow-up): select several rows; row Workflow,
+Archive and Undo must be disabled, while eligible selected actions remain enabled.
+Clear selection, then click a row's Archive.
+The modal identifies exactly one finding/UUID; other checked rows are excluded.
+Background selection/actions are blocked. Cancel or Escape returns without a
+write; Archive 1 finding submits only that row. Archive selected instead confirms
+the frozen names/count and Archive N findings. Cancellation is blocked while busy.
+Selective substring search is now indexed (migration 0024). In SA01, searching
+`ssss` should still show two findings; a live Chrome check completed in 1.13s.
+One/two-character or very broad terms can still be slow. Full timings, cold/warm
+distinctions and limits: [search performance](FINDING_SEARCH_PERFORMANCE.md).
+
+Lifecycle/access follow-up: privileged writes recheck organization lifecycle,
+membership, role and active account after waiting for locks. A waiting write is
+refused if archive/removal/demotion/deactivation committed first; an already
+admitted transaction is fenced until commit. Manual finding references cannot
+target pending/stopped archives or already archived assets/uploads. Automated
+PostgreSQL tests in `test_write_admission.py` verify the blocked waits and both
+outcomes without needing destructive manual tests against demo data.
+
+Finding traceability (24 October 2026): expand **Finding ID** under a finding's
+description and use **Copy ID**. Paste the complete UUID into **Search findings**
+to locate the exact active finding. Workflow technical IDs, report evidence and
+remediation finding references, and organization Activity workflow-event IDs link
+to an exact Findings filter in the referenced organization. Links require access;
+archived/purged/missing or synthetic-only references can show no active findings.
+They do not alter saved reports or workflow state. See [the user manual](USER_MANUAL.md)
+for identifier distinctions and clipboard behavior.
+
+Findings actions (25 October 2026): Workflow and eligible manual Archive are
+together in the sticky-right **Actions** column. There is no selection mode.
+Checking rows shows both **Update selected workflow** (up to 100) and **Archive
+selected** (up to 500, all targets must be manual/available). Mixed selections
+disable archive with an explanation. Row actions remain independent. Selection
+and its eligibility persist across pages; confirmations identify the exact targets.
 
 1. Open Chrome at **http://localhost:3000/login** and use your existing local demo
    sign-in. Do not paste credentials into chats, screenshots or Git commits.

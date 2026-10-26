@@ -1,5 +1,171 @@
 # Release readiness and code review
 
+26 October dependency blocker **resolved**: approved transitive-only updates to
+`undici@8.12.3` / `zod@4.6.7`; only the lockfile changed, not package.json or
+application source. Full/production npm audits both **zero**. Fresh **367 frontend
+tests** (51.92s), lint, TypeScript/isolated production build, **35 workflow Chrome
+checks** (`phase3_browser_f712c790a5e4`) and **6 grouped Documents checks** passed.
+Separate browser scopes, not 41 equivalent checks. No new risk accepted.
+[Audit resolution](DEPENDENCY_AUDIT_2026-10-26.md).
+
+26 October check-in preparation: [explicit scope/groups and exclusions](CHECKIN_PREPARATION.md).
+The **1,203 full backend tests** below remain 25 October evidence, not rerun for
+this dependency-only change. User-authorized commits: backend **86a1c2e**, frontend
+**c995e5e**; the acceptance/docs commit contains this record and the
+[Chrome walkthrough](PHASE4_USER_VERIFICATION.md). No push. Local-testing
+check-in only, not production/live-AI release acceptance.
+
+
+Step 3 search performance (25 October): migration **0024** adds six trigram and
+three supporting indexes, built concurrently. Selective search uses deduplicated
+indexed branches; broad labels/short terms use a scan fallback. Literal matching,
+counts, tenant boundaries and exact UUID lookup are preserved. Queue-metric
+polling now closes its own session, fixing an idle-transaction leak that delayed
+index creation. Demo schema migrated/restarted; normal application schema untouched.
+
+SA01 end-to-end HTTP `ssss`: 12.472–16.241s before, 2.299s first post-restart and
+0.031s repeated after. Live Chrome including debounce/render: 1.127s. `Open`
+(2,309,326 matches): 1.230–1.327s. Two-character `ss` remains 7.496–7.601s; short/
+broad queries are not universally fast. Details and migration retry/rollback:
+[search performance](FINDING_SEARCH_PERFORMANCE.md).
+
+Frontend 367 tests/lint and normal production build passed; 35 Chrome checks
+passed (`phase3_browser_cd6dcb1ec3c4`). Focused paging/workflow 39 passed (37.14s),
+final paging/filter 27 passed (24.40s), migration/worker 14 passed (15.67s): these
+are overlapping scopes, not additive totals. Final full PostgreSQL regression:
+**1,203 passed in 607.28s**, warnings as errors. Test DB restored to **0024**, 30
+tables, no leftover browser schemas and clean Alembic drift check. All nine demo
+indexes valid; no idle transactions older than 30s at the post-restart check.
+No paid calls, password changes, commit or push.
+
+
+
+Lifecycle/authorization fencing follow-up (25 October): privileged organization
+mutations now acquire job admission then an Organization NO KEY UPDATE fence,
+refresh organization/membership/active-user state and reject stale permissions
+before writing. Manual finding creation locks inventory, refreshes references and
+rejects pending/stopped or completed reference archives. Bulk archive reauthorizes
+per independently committed item, preserving prior jobs and explicit refusals.
+Ten targeted PostgreSQL race tests passed in 6.71s; 76 existing focused regressions
+passed in 91.03s (overlapping scopes; not additive full coverage). Frontend 367
+tests/lint/isolated build passed; 35 Chrome checks passed
+(`phase3_browser_95ae93ed5925`). Final full PostgreSQL regression: **1,201 passed
+in 604.85s**, warnings as errors; includes all 10 new race cases. Focused runs
+overlap this full run and are not additive. Normal demo production rebuild and
+cancel-only live Chrome smoke passed; existing data/passwords retained. Test DB
+restored to 0023/30 tables, no leftover browser schemas, clean Alembic check.
+No migration or paid inference; Findings common-search optimization remains step 3.
+See [concurrency contract](MULTIUSER_CONCURRENCY.md) for boundaries and lock costs.
+
+
+25 October multi-user follow-up: individual Findings Workflow/Archive/Undo are
+disabled whenever selection exists; Clear selection restores them. Settings merge
+uses a locked fresh Organization; profile mutations and consent creation/updates
+are serialized per organization. Frontend 367 tests, lint and production builds
+passed; 35 Chrome checks passed (`phase3_browser_ea1eb15a3a45`), plus live-demo
+cancel-only smoke. Backend: **1,187 full tests passed in 563.87s**, then final
+**7 focused concurrency tests passed in 4.34s** (four cases added after full-run
+collection; overlapping results, not additive). PostgreSQL required, warnings as
+errors. See [multi-user contract and remaining audit
+boundaries](MULTIUSER_CONCURRENCY.md); this is not universal concurrency acceptance.
+
+
+25 October archive-confirmation/search follow-up: **367 frontend tests**, lint and
+isolated production build passed; **84 focused PostgreSQL tests** passed in
+109.79s with warnings as errors, then **17 paging tests** passed in 23.24s after
+a whitespace-query regression addition (overlapping runs, not 101 unique tests).
+**35 installed Chrome checks** passed (`phase3_browser_6266c82a3ae4`), including
+real pointer attempts against the inert archive-modal background. Row confirmation
+names one finding/UUID; bulk confirmation freezes selected names/count/IDs. Cancel
+is initially focused; cancellation and repeated submission are blocked while busy.
+No schema or inference changes. Earlier full backend results were not rerun.
+
+**Search performance remains open:** a local SA01 substring count-phase benchmark
+improved from 14.419s to 8.052s after replacing the outer asset join and correlated
+assignee search with independent match sets. This is one count-only measurement,
+not end-to-end latency or performance acceptance. PostgreSQL indexed-search work
+is still needed; no index migration was applied.
+
+
+25 October unified Findings actions: **365 frontend tests, 67 focused PostgreSQL
+archive/workflow tests and 35 installed Chrome checks**, lint/build passed.
+Removed selection mode; shared selection supports workflow up to 100 and all-manual
+archive up to 500. Sticky row Actions group Workflow/Archive; confirmations freeze
+targets and cross-page eligibility is retained. No backend/schema/inference changes.
+Earlier full backend and document-specific browser evidence remains historical.
+
+25 October document-preview follow-up: **362 frontend tests, 6 focused PostgreSQL
+document tests, 6 grouped Chrome checks across viewer/admin/platform**, lint and
+build passed. Preview now expands below its row with local loading/error/retry,
+single-version toggle, keyboard scrolling/focus restoration and mobile containment.
+Chrome fixtures use intercepted responses; an additional live-demo saved-preview
+smoke passed without writes. No backend/schema, consent or inference changes.
+Earlier full backend and workflow Chrome evidence remains historical, not rerun here.
+
+24 October notification/Settings follow-up: **357 frontend tests, 45 focused
+PostgreSQL archive tests, 34 installed Chrome checks**, lint and build passed.
+Routine successful job notices auto-dismiss after 10 visible seconds, with
+interaction/visibility pauses and persisted background dismissal; failures and
+warnings remain manual. Settings uses full content width with mobile wrapping.
+No backend behavior/schema or production approval changed; earlier full backend
+evidence remains historical rather than a new full run.
+
+24 October Finding-ID traceability: **344 frontend tests, 39 focused PostgreSQL
+tests, 32 installed Chrome checks**, lint and TypeScript/build passed. Expand/copy
+Finding IDs, exact-ID search, report/workflow/Activity links and organization-access
+resolution are implemented. No new migration, inference or production sign-off.
+The earlier full 1,182-test backend run is historical, not rerun for this increment.
+
+24 October assignee-search follow-up: **337 frontend tests, 38 focused PostgreSQL
+tests, 28 installed Chrome checks**, lint and build passed. Assignee search now
+matches name/email only; People search retains role/status matching. No migration.
+The earlier 1,182-test full backend result remains historical, not rerun here.
+
+Latest assignee-history/search correction: **337 frontend tests, 37 focused
+PostgreSQL integration tests and 28 installed Chrome checks passed**, plus lint
+and production build. Unchanged assignees/raw user IDs are omitted from history;
+search, empty results, retained selection and explicit-save behavior are covered.
+The 37-test run is focused, not a replacement for the earlier full 1,182-test run.
+
+Latest compact-time/full-day-filter checkpoint: **1,182 full PostgreSQL tests,
+334 frontend tests and 26 Chrome checks passed**, plus lint, TypeScript/build.
+Shared date-only filters cover complete browser-local days without new controls;
+zone/expiry metadata stays stored but detailed zone labels are removed from normal
+UI. No migration or production/live-AI approval. Earlier checkpoints retain their scopes.
+
+Latest browser-timezone correction: **1,173 full PostgreSQL backend tests, 331
+frontend tests and 25 Chrome checks passed**, plus lint, TypeScript/build and
+populated migration 0023 round trips. New deadlines require the author's IANA
+timezone and retain a fixed expiry; Eastern is a legacy backfill rule only.
+Prior counts below are historical. Reconciliation/suppression remains separately
+approved but not yet implemented; no production/live-AI release is implied.
+
+Latest manual-entry/Eastern-deadline checkpoint (23 October): **1,164 full
+PostgreSQL backend tests, 330 frontend tests and 24 installed Chrome checks passed**;
+lint, TypeScript and production build passed. This supersedes the full 1,153-test
+checkpoint below. Imported-finding archive/reconciliation remains design only,
+and mandatory rationale is unchanged by user choice. No production/live-AI release.
+
+Latest saved-note/history follow-up: **327 frontend tests, 30 focused PostgreSQL
+tests and 21 Chrome checks passed**, plus lint, TypeScript and production build.
+No new full backend run is claimed; the checkpoints below retain their scopes.
+
+Phase 4 remediation checkpoint (23 October): **1,153 full PostgreSQL backend tests,
+323 frontend tests, lint, TypeScript and isolated production build passed**.
+Migration 0022 empty/populated round trips and drift checks passed on the disposable
+test target only. [Scope and evidence](PHASE4_VALIDATION.md). Remediation UI/filter
+delivery passed 19 installed Chrome checks and scoped automated accessibility checks;
+other Phase 4 work remains pending. No Phase 4 closure or
+production/live-provider approval is implied. Historical Phase 3 checkpoints below
+remain unchanged.
+
+Presentation follow-up: **326 frontend tests**, lint, TypeScript, isolated build,
+**21 installed Chrome checks** and **29 focused PostgreSQL backend tests** passed.
+The 1,153-test full backend run above is earlier evidence, not rerun for this
+frontend-only follow-up. Saved-note navigation and mixed-selection risk-date
+guidance are improved; mandatory-rationale policy remains unchanged. Approved
+demo schema rollout to 0022 is separate from test round trips; normal schema untouched.
+
 ## Latest implementation checkpoint — 23 October 2026
 
 Check-in review added a prompt-marker preservation fix/regression;130 focused

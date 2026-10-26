@@ -1,5 +1,10 @@
 # Data Model – AI Cyber Resilience Auditor
 
+Migration 0024 adds nine search indexes, not data columns: six pg_trgm GIN indexes
+(finding description/category/source, asset hostname/IP/cloud ID), an active
+assignee index and two sparse active deadline-search indexes. Concurrent creation,
+extension prerequisites and measured costs: [search operations](docs/FINDING_SEARCH_PERFORMANCE.md).
+
 Opt-in evidence-aware schema3 retains explicit domain evidence status/reason and
 finding references, nullable AI scores/tiers, and server-owned complete/partial
 assessment status with qualification/aggregation provenance. Provider contract

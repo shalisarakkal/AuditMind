@@ -1,5 +1,9 @@
 # Phase 3 operational controls
 
+Phase 4 search follow-up: migration 0024 requires `pg_trgm` and builds nine indexes
+concurrently. See [deployment/retry/rollback and timing limits](FINDING_SEARCH_PERFORMANCE.md).
+It does not change report consent, scoring, inference settings or provider costs.
+
 ## Report input limits — audit-evidence-v3
 
 See [closure/budget contract](PHASE3_CLOSURE.md#budget-contract) for exact selection

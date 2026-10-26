@@ -4,6 +4,45 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 ## How this works
 
+Step 3 (25 October): selective Findings search indexed in migration 0024; local
+SA01 warm HTTP search `ssss` fell from 12.472s to 0.031s, with the first post-restart
+request 2.299s; live Chrome including debounce/render 1.127s. Literal semantics,
+counts and tenant isolation unchanged. Short/broad terms remain costly. Worker
+metrics read-transaction leak fixed. See search performance/Phase 4 validation;
+earlier "search pending" entries below are historical. Full PostgreSQL regression:
+1,203 passed in 607.28s; frontend 367/lint/build and Chrome 35 passed. Demo/test
+targets are at 0024 with clean checks; normal application schema not migrated.
+Step 4 prepared on 26 October: [explicit check-in groups](docs/CHECKIN_PREPARATION.md),
+with backend **86a1c2e** and frontend **c995e5e** committed after explicit user
+approval; the third commit contains acceptance/docs and the
+[Chrome walkthrough](docs/PHASE4_USER_VERIFICATION.md). Full backend
+validation remains 25 October. On 26 October, approved targeted transitive
+updates changed only the frontend lockfile (undici 8.12.3, zod 4.6.7). Fresh
+367 frontend tests/lint/TypeScript/build, 35 workflow Chrome checks and 6 grouped
+Documents checks passed; full/production npm audits zero. The dependency blocker
+is fixed, not risk-accepted. No push. [Audit](docs/DEPENDENCY_AUDIT_2026-10-26.md).
+
+Lifecycle/authorization follow-up (25 October): privileged organization writes
+use transactional admission fencing with fresh role/account/lifecycle checks;
+manual findings reject archiving/archived references, and bulk archives reauthorize
+every committed job admission. Ten targeted real-wait PostgreSQL cases pass.
+Full PostgreSQL regression: 1,201 passed in 604.85s, warnings as errors, including
+all 10 new race tests. Frontend 367/lint/build and Chrome 35 passed. Search remains step 3;
+documentation/check-in readiness remains step 4. No migration or real inference.
+
+25 October multi-user increment: selected Findings disable individual row actions;
+settings/profile/consent concurrency hardening added. Review/tests and remaining
+cross-operation requirements: [multi-user audit](docs/MULTIUSER_CONCURRENCY.md).
+This is not blanket acceptance of every multi-user operation; see Phase 4
+validation for actual test counts and remaining lifecycle/authorization coverage.
+
+25 October Findings follow-up: modal archive confirmation locks background
+interaction and distinguishes one-row versus frozen bulk targets. Verified with
+367 frontend tests, 84 focused PostgreSQL tests plus 17 overlapping paging rerun
+tests, and 35 Chrome checks; lint/build passed. Common search query improved, but
+SA01 count-phase profiling still takes about 8 seconds: indexed-search performance
+work remains pending. No schema migration or paid inference was performed.
+
 - Each phase below must have **all its tests green** before work starts on the next phase.
 - "Green" means: unit tests pass, and integration tests pass (or are correctly
   skipped with a documented, agreed-upon reason — never silently broken).
@@ -1538,11 +1577,49 @@ See [Phase3.md — Phase 3b](Phase3.md#phase-3b--openai-hosted-report-generation
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
+Kickoff design prepared 23 October 2026:
+[remediation workflow contract and acceptance gates](docs/PHASE4_REMEDIATION_DESIGN.md).
+The remediation backend, Findings workflow controls and list filters are implemented;
+broader Phase 4 acceptance remains pending. The increment
+preserves existing scoring and report snapshots; status-aware scoring needs a
+separate approved policy. Historical backlog entries below require verification
+against current code before being treated as outstanding implementation work.
+
 **Scope:** per-domain scoring refinement, remediation workflow/lifecycle and
 export refinements beyond Phase 3's implemented generated recommendations and
 HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets handling).
 
-- [ ] Not started
+- [x] Kickoff: targeted code inspection and proposed remediation contract documented (2026-10-23).
+- [x] First backend workflow increment: single/bulk mutations, paged history,
+      role/version checks and preservation of edited restore duplicates. See
+      [validation and delivery limits](docs/PHASE4_VALIDATION.md).
+- [x] Findings workflow UI: role-aware single/bulk editor, assignee/history
+      paging, URL-backed status/assignee/overdue filters and workflow sorting.
+- [x] Manual finding entry UI; contextual manual-archive availability and clearer
+      horizontal sort headings. Finding deadlines use inclusive US Eastern dates
+      (`America/New_York`, EST/EDT); existing dates reinterpreted without rewriting.
+- [x] Browser-timezone correction: persist author zone and fixed UTC expiry;
+      legacy dates migrate as Eastern (0023). Full verification and demo rollout;
+      supersedes the application-wide Eastern rule above for new deadline writes.
+- [x] Record [imported-finding archive/reconciliation design](docs/FINDING_RECONCILIATION_DESIGN.md).
+- [ ] Approve and implement stable identity, individual imported suppression and
+      comparable-scan absence review. Design-first only; no automatic resolution.
+- [x] Shared full-day date-filter processing in browser timezone without new time
+      controls; compact local-time display and one general signed-in notice.
+- [x] Finding-ID traceability: expandable/copyable IDs, exact UUID search and
+      organization-scoped workflow/report/Activity finding links; no snapshot changes.
+- [x] Shared routine job-success auto-dismiss after 10 visible seconds with
+      interaction/visibility pauses; warnings/failures remain manual. Full-width Settings.
+- [x] Documents/Shared standards preview aligned with Uploads reports: inline row
+      panel, version toggle, local loading/retry, keyboard scrolling and focus restoration.
+- [x] Unified Findings selection with both bulk actions, 100-workflow/500-archive
+      limits, all-manual archive eligibility, frozen confirmations and sticky row Actions.
+- [x] Local remediation verification: earlier 1,182 full PostgreSQL backend tests, 365
+      frontend tests, lint/TypeScript/isolated production build, migration round
+      trips/drift and 35 Chrome workflow/action checks; latest action follow-up has
+      67 focused PostgreSQL archive/workflow tests. The separate 6 grouped document
+      Chrome checks remain historical; no new full backend run. Assignee search now matches
+      name/email only; People search is unchanged. No production/global Phase 4 sign-off.
 - [ ] UI polish (requested 2026-09-28; can be done any time, needs no other
       phase):
   - File upload: drag and drop, and several files at once (each gets its own

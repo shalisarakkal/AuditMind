@@ -12,8 +12,10 @@ processing target; existing reports are unchanged. Live inference remains disabl
 in the demo and is not authorized by the automated test results.
 
 Regression verification: [testing strategy and coverage](docs/TESTING.md).
-Acceptance tests require PostgreSQL/pgvector (`--require-postgres`); frontend
+Acceptance tests require PostgreSQL/pgvector/pg_trgm (`--require-postgres`); frontend
 coverage runs with `npm run test:coverage`. Real inference remains mocked.
+Migration 0024 provides indexed Findings substring search; see
+[measurements and concurrent-migration requirements](docs/FINDING_SEARCH_PERFORMANCE.md).
 
 Cyber resilience auditing platform with deterministic dashboard scoring and
 separate Claude/RAG reports over installed, authorized documents. Selecting a

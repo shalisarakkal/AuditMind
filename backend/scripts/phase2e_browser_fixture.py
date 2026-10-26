@@ -55,6 +55,7 @@ def main():
     if args.action == 'prepare':
         with engine.begin() as conn:
             assert conn.scalar(text('SELECT current_database()')) == 'auditmind_test'
+            conn.execute(text('CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public'))
             conn.execute(text(f'CREATE SCHEMA "{args.schema}"'))  # refuses reuse
         Base.metadata.create_all(engine.execution_options(schema_translate_map={None: args.schema}))
         password = secrets.token_urlsafe(24)

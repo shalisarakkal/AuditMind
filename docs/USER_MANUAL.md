@@ -1,5 +1,207 @@
 # AuditMind user manual
 
+New Phase 4 functionality: [what changed and how to verify it in Chrome](PHASE4_USER_VERIFICATION.md).
+
+Search performance (25 October): specific Findings text/IP searches now use
+PostgreSQL indexes. Matching semantics and filters are unchanged. Prefer at least
+three specific characters; one/two-character terms and broad matches can still
+take several seconds. Full Finding IDs use exact lookup. See
+[measured results and limitations](FINDING_SEARCH_PERFORMANCE.md).
+
+Phase 4 remediation tracking now includes the Findings workflow UI and filters.
+See [the workflow contract](PHASE4_REMEDIATION_DESIGN.md) and
+[validation/delivery limits](PHASE4_VALIDATION.md). Running the updated backend
+against an existing database requires migration 0023 first; do not restart or
+deploy it against an unmigrated database. On 23 October 2026 the isolated
+`auditmind_demo` schema was upgraded to 0023 for timezone-aware deadlines. The normal application
+schema is not migrated automatically. Scoring and existing report snapshots remain unchanged.
+
+### Manage a finding's workflow
+
+#### Job notifications
+
+Routine successful archive, restore and purge confirmations clear automatically
+after 10 visible seconds on the current screen. Hovering the message, focusing
+its controls, hiding the browser tab or scrolling it out of view pauses the timer.
+**Dismiss** remains available. Once dismissed, the confirmation stays dismissed
+on other screens and after refresh; the job, Activity history and archived data
+are not deleted. Automatic dismissal does not count as sign-in activity.
+
+Running/queued/interrupted jobs and failures remain visible. Restore messages
+about findings kept archived or duplicates purged require manual dismissal, as
+do grouped results containing any failure or warning. A dismissal failure shows
+an error and allows manual retry; it does not retry in a loop. Detailed upload
+reports and their warnings/errors retain their existing manual review behavior.
+
+Organization **Settings** now uses the full available content width, like the
+other screens, with wrapping controls and locally scrollable tables on narrow
+viewports. Setting values, permissions and save actions are unchanged.
+
+#### Locate a finding by its ID
+
+- In **Findings**, expand **Finding ID** below a finding's description to see its
+  internal UUID. **Copy ID** copies that identifier; a message reports success or
+  clipboard refusal. Success disappears after 3 seconds; copying again restarts
+  that timer. Failure messages remain visible. No extra table column is added.
+- Paste a complete Finding ID into **Search findings**. Complete UUID searches
+  match the ID exactly (case-insensitively), not descriptions mentioning it.
+  Partial UUID text is an ordinary text search, not an ID-prefix lookup.
+- Workflow dialogs' **Technical finding IDs**, report evidence/remediation
+  finding references, and organization Activity workflow-event IDs are links.
+  A link verifies organization access, selects that organization, then opens
+  **Findings** filtered to the exact ID. Save or discard an editing draft before
+  following a link; a link does not save it.
+- These links show current active data, not historical report snapshots. Archived,
+  purged, missing or synthetic-only IDs can return no active findings. Existing
+  reports and audit history are not changed. **Clear filters** returns to the list.
+- Finding IDs are not Asset IDs, Upload IDs, scanner IDs/QIDs or CVE identifiers.
+  Asset/upload references are not interpreted as finding links. Organization
+  access remains enforced by the API, including when an address is edited.
+
+#### Edit workflow
+
+Admins/auditors can use **Findings → Add finding** to enter a description, domain,
+severity and optional category. It creates an organization-level manual finding
+with source `manual` and no scan association. Existing filters/sorting may hide
+the new row; clear filters and search its description if necessary. Use **Archive**
+in the row's sticky **Actions** column, or select manual findings and use
+**Archive selected** above the table. There is no **Select for** mode. Bulk archive
+is enabled only when every selected finding is manual and available. Imported findings remain
+archivable with their upload/asset, not individually. See the
+[design-only reconciliation proposal](FINDING_RECONCILIATION_DESIGN.md).
+
+1. Select your organization and open **Findings**, then **Workflow** in the
+   finding's sticky **Actions** column, beside Archive for eligible manual findings.
+   Row actions are independent of checked rows. The dialog identifies its organization and exact targets.
+   Use **Saved notes and history** near the top to jump directly to saved entries.
+   Each entry labels its rationale and verification note; the empty editing fields
+   create a new entry, not replace a saved one. The shortcut count is for the
+   current history page, not a total count.
+   The current-details area also shows **Latest rationale or note** and **Latest
+   verification note**, each with its own author/time. A later note does not erase
+   an earlier verification note. History displays only changed workflow fields;
+   note-only entries say no workflow fields changed. Assignee changes show saved
+   names/email (safe same-org lookup for older entries), not raw IDs. Expand
+   **Technical finding IDs** to see internal finding UUIDs, not CVE/scanner IDs.
+   Raw assignee IDs are retained in audit data but are not displayed in the dialog.
+2. Choose **New status**, or keep the current state to add a note. Organization
+   admins and auditors can make ordinary changes; viewers can read current state
+   and paged history without receiving edit controls.
+3. Use **Find assignee** to filter organization members by name/email only, not
+   role or account status. The People-page search still includes role/status.
+   Results appear in **Assignee** after a short
+   pause; **More assignees** pages through 50 results at a time. Searching alone
+   does not assign anyone: select a member, enter a rationale, then **Save workflow**.
+   An empty result is explicitly reported; clearing search restores the choices.
+   The selected name/email remains visible when searching another page.
+   Choose **Keep current assignee** to preserve the owner or **Unassigned** to clear it.
+   Deactivated members are excluded. Assignment grants no
+   additional permissions. A removed/deactivated owner is shown as unavailable.
+4. Date actions distinguish **Keep**, **Set** and **Clear**. Remediation due dates
+   may be in the past. New dates use the entering browser's timezone internally.
+   Risk acceptance requires an admin and a future calendar date in that
+   deadline's recorded timezone. Auditors may add notes on accepted-risk findings,
+   not change their fields. Keep preserves each existing date, timezone and expiry;
+   explicitly setting a date records your browser's timezone even if the date text
+   matches the old one. Clear removes the date and its timezone/expiry metadata.
+5. Enter **Rationale or note**. Transitions to Mitigated, Resolved or False positive
+   also require a **Verification note**. These are user assertions, not automated
+   verification or proof of compliance. **Save workflow** records state and history.
+6. Select findings with the checkboxes; the bar labelled **Actions for selected
+   findings** offers both **Update selected workflow** and **Archive selected**.
+   While any findings are selected, individual row Workflow/Archive/Undo actions
+   are disabled. Use **Clear selection** before operating on a single row.
+   Selection persists across pages, up to 500. Workflow updates support at most
+   100 selected findings; reduce a larger selection to enable that action.
+   Imported findings are eligible for workflow, but bulk archive requires all
+   selected findings to be eligible manual rows. Mixed/imported selections disable
+   Archive selected with an explanation; no imported rows are silently skipped.
+   Archive confirmation shows the count and names (first ten for long lists) and
+   freezes the selected target IDs. Server-side validation still applies; explicit
+   refusals are shown if concurrent changes prevent an item from starting.
+   Archive confirmation is modal: background selection/actions are unavailable
+   until confirm/cancel. Row Archive identifies one finding and its UUID and says
+   **Archive 1 finding**; other checked rows are excluded. Bulk Archive shows its
+   frozen names/count with **Archive N findings**. Cancel receives initial focus;
+   Escape cancels before submission. Cancellation is blocked while submitting.
+
+   Multiple organization members may work concurrently. Workflow conflicts require
+   reloading before retry; a bulk workflow conflict rolls back every target.
+   Archive bulk jobs instead report per-item refusals. Settings/profile/consent
+   writes are serialized, but the same explicitly edited field is last-writer-wins.
+   Other users' changes may require a reload to appear. See
+   [multi-user behavior and review limits](MULTIUSER_CONCURRENCY.md).
+   Privileged writes now wait for an organization transaction fence and recheck
+   current access before proceeding. If an admin archives the organization or
+   removes/demotes/deactivates the caller first, the waiting write is refused.
+   A write admitted first finishes its transaction before the competing change.
+   Findings cannot be added against an asset/upload with an unfinished archive;
+   archived references are rejected after refreshing current database state.
+   Previously committed background jobs are not retroactively cancelled by a
+   later role change. Bulk archive reports committed jobs and refuses later items
+   if access changes between its independently committed admissions.
+   Review workflow's exact targets before **Apply to N findings**.
+   The bulk dialog lists current status counts. **Keep** preserves individual
+   values; explicit changes apply to every target, with no silent skipping.
+   Setting a risk-review date requires every resulting status to be Accepted risk;
+   clearing it is unavailable while any resulting status remains Accepted risk.
+   An incompatible retained date action blocks saving until corrected. Read saved
+   notes by opening each individual finding's workflow. Successful actions clear
+   selection; completed background jobs also clear stale selections. Filter or
+   organization changes reset selection.
+7. Filter with the Status/Assignee column pickers and **Overdue**. Deadlines become
+   overdue at their persisted expiry instant (start of the next day in the entering
+   user's timezone); resolved/false-positive findings
+   are excluded from remediation-overdue results. Risk-review overdue applies to
+   accepted risk only. Dates remain unchanged automatically when they become overdue.
+   Column headers sort; filters/sort/page are kept in the URL across refresh.
+   Changing filter scope or organization clears selection.
+
+8. On a conflict or uncertain network/server result, the draft stays visible and
+   saving is blocked. Use **Reload latest state**, inspect current state/history,
+   and review your retained draft before submitting again. There is no automatic
+   write retry. A stale bulk update changes none of its targets.
+
+Migration 0023 retains existing dates and assigns them their agreed legacy Eastern
+interpretation (`America/New_York`, including DST), storing their UTC expiry. New
+dates are **not** forced to Eastern: the browser supplies its timezone and the
+backend calculates a fixed UTC boundary. For October 25, 2026, Eastern expiry is
+October 26 04:00 UTC, while Kolkata expiry is October 25 18:30 UTC. Other viewers
+see the deadline date/time in their own browser timezone, without technical zone
+details; changing
+machines or travelling does not move a saved deadline. Deadline sorting uses actual
+expiry instants. Other timestamp displays continue using the browser timezone.
+API clients must supply `deadline_timezone` with any explicitly set deadline date;
+timezone-only edits are rejected. Bulk setting uses one entering timezone for those
+explicit changes, while Keep preserves each target's individual deadline metadata.
+
+### Time display and date filters — all screens
+
+All displayed times use the accessing browser's timezone. A single shared notice
+states this; table cells and workflow summaries do not repeat timezone names,
+origin-zone metadata or UTC conversion explanations. Original timezone/expiry
+metadata remains stored for correct processing and audit, not removed from records.
+
+Existing date-only From/To controls remain unchanged. Processing defaults are:
+
+- **From:** 12:00 AM at the start of the selected browser-local day, inclusive.
+- **To:** the entire selected day through 11:59 PM, including its seconds/fractions.
+  Internally the query is strictly before the next local midnight, so no records in
+  the final minute are lost. DST days may contain 23 or 25 hours, not always 24.
+- A blank endpoint is unbounded. Invalid timezones, reversed ranges and impossible
+  local days are rejected. Changing/share-opening a date-filter link uses the new
+  viewer's browser timezone; it does not move stored finding deadlines.
+
+This shared rule covers the existing Findings, Uploads, Archived, Reports, Documents,
+People and organization/platform Activity date filters. It adds no time selectors
+or new date filters to screens that do not already have them. Web requests supply
+`filter_timezone` automatically; direct API clients omitting it retain UTC behavior.
+
+Workflow status does **not** reduce deterministic scores or rewrite reports in this
+delivery. Matching re-imports preserve decisions. Restore preserves edited duplicate
+findings and their history; both remain independently counted until an explicit
+consolidation policy is implemented. Purge intentionally removes associated history.
+
 For the opt-in evidence-aware reporting changes, use the
 [step-by-step verification guide](EVIDENCE_USER_VERIFICATION.md). It separates
 normal-demo checks, saved screenshots/exports and isolated mocked Chrome tests;
@@ -210,6 +412,16 @@ An organization admin can upload authorized document text with title, edition,
 source and rights information, add versions and request indexing/retry. Use the
 supported text formats shown by the upload form; this is not a general PDF/OCR
 ingestion system. Uploading a version does not instantly make it searchable.
+
+**Preview vN** opens the saved text directly beneath that document's row, like
+**Uploads → Report**. The panel identifies the title, version and edition; only
+one version preview is open at a time. Use **Hide preview vN** or **Close preview**
+to collapse it. Closing from the panel returns keyboard focus to its toggle.
+Loading, permission/network errors and **Retry preview** stay inside the panel.
+The text area can receive keyboard focus for scrolling long documents.
+Changing filters, sorting, page or organization closes the old preview. Removed
+versions cannot be previewed. Preview is read-only and does not index documents,
+approve processing, execute embedded HTML, or modify saved reports.
 
 The worker creates an index and publishes the version when processing succeeds.
 Inspect processing status and errors. **Queued** / **Processing** describe new work;

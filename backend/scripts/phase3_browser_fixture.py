@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['prepare', 'api', 'worker', 'inspect', 'cleanup'])
     parser.add_argument('--schema', required=True)
+    parser.add_argument('--workflow', action='store_true', help='Enable isolated Phase 4 acceptance organization switching')
     args = parser.parse_args()
     if not re.fullmatch(r'phase3_browser_[a-f0-9]{12}', args.schema):
         raise SystemExit('Invalid isolated fixture schema')
@@ -32,7 +33,7 @@ def main():
         ANTHROPIC_API_KEY='', OPENAI_API_KEY='', VOYAGE_API_KEY='', OPENROUTER_API_KEY='',
         OPENROUTER_INFERENCE_ENABLED='false', REPORT_AI_PROVIDER='anthropic',
         CLAUDE_MODEL='claude-browser-fixture', ARCHIVE_AUTO_PURGE='false', WORKER_POLL_SECONDS='0.2',
-        CORS_ORIGINS='http://localhost:3000', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
+        CORS_ORIGINS='http://localhost:3000,http://localhost:3014' if args.workflow else 'http://localhost:3000', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
         UPLOAD_DIR=str(Path(__file__).resolve().parents[2] / 'temp' / args.schema))
     refreshed = Settings()
     for name in Settings.model_fields:
@@ -99,6 +100,7 @@ def main():
         if args.action == 'prepare':
             with engine.begin() as connection:
                 assert connection.scalar(text('select current_database()')) == 'auditmind_test'
+                connection.execute(text('CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public'))
                 connection.execute(text(f'CREATE SCHEMA "{args.schema}"'))
             created_schema = True
             Base.metadata.create_all(engine.execution_options(schema_translate_map={None: args.schema}))
@@ -111,6 +113,8 @@ def main():
                     db.add(user); db.flush(); accounts.set_password(db, user, password)
                     db.add(OrgMembership(user_id=user.id, org_id=beta.id if role == 'other' else alpha.id,
                         role=UserRole.admin if role == 'other' else UserRole(role)))
+                    if args.workflow and role == 'admin':
+                        db.add(OrgMembership(user_id=user.id, org_id=beta.id, role=UserRole.admin))
                 db.commit()
                 print(json.dumps({'password': password, 'org': str(alpha.id), 'other_org': str(beta.id)}))
         elif args.action == 'inspect':

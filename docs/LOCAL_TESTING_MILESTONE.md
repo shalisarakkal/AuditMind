@@ -1,5 +1,11 @@
 # Local-testing milestone — approved and closed
 
+26 October audit update: the original braces-only decision below is unchanged.
+The `undici`/`zod` development findings were **fixed**, not accepted under that
+exception; see [audit resolution](DEPENDENCY_AUDIT_2026-10-26.md). Full and
+production-only npm audits now report zero. Fresh frontend/browser validation
+supports local check-in readiness, not a production/live-AI release.
+
 **Decision date: 23 October 2026 (America/New_York).** The user explicitly approved
 the scoped development-tool risk exception and closure of the local-testing
 milestone. This records that decision, not a production/live-AI release.

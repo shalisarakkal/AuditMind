@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { chromium } = require('../frontend/node_modules/playwright');
+const { chromium, expect } = require('../frontend/node_modules/playwright/test');
 const AxeBuilder = require('../frontend/node_modules/@axe-core/playwright').default;
 
 (async () => {
@@ -16,6 +16,7 @@ const AxeBuilder = require('../frontend/node_modules/@axe-core/playwright').defa
       let granted = false;
       let consentWrites = 0;
       let uploads = 0;
+      let previewFails = false;
       const errors = [];
       const version = { id: 'v1', number: 1, edition: 'Demo', source: 'Synthetic policy', content_kind: 'organization_policy', rights: 'Synthetic training material', content_hash: 'a'.repeat(64), current: false, retired_at: null, purged_at: null, indexes: [{ id: 'i1', status: 'pending', publish_version: true, error_message: null }] };
       const document = { id: 'd1', org_id: scenario === 'platform' ? null : 'sa01', title: 'Synthetic access policy', framework: null, created_at: '2026-10-21T12:00:00Z', versions: [version] };
@@ -36,6 +37,8 @@ const AxeBuilder = require('../frontend/node_modules/@axe-core/playwright').defa
         }
         if (endpoint.endsWith('/documents/search')) return send({ items: [] });
         if (endpoint.endsWith('/documents/facets')) return send({ framework: [] });
+        if (endpoint.endsWith('/documents/versions/v1')) return previewFails ? send({detail:'Preview temporarily unavailable'},503) : send({content:'Synthetic preview text '+ 'x'.repeat(5000)});
+        if (endpoint.endsWith('/documents/versions/v-shared')) return send({content:'Shared reference preview'});
         if (endpoint.endsWith('/documents') && req.method() === 'POST') {
           uploads++; assert.match(req.postData(), /browser-policy\.txt/); return send({ ok: true });
         }
@@ -52,6 +55,34 @@ const AxeBuilder = require('../frontend/node_modules/@axe-core/playwright').defa
       assert.ok(await page.getByText('Queued', { exact: true }).count());
       const details = page.getByText('Version details v1', { exact: true }).first();
       assert.equal(await details.evaluate(element => element.parentElement.open), false);
+      const documentRow=page.getByRole('row').filter({has:page.getByRole('cell').filter({hasText:'Synthetic access policy'})});
+      const previewButton=documentRow.getByRole('button',{name:'Preview v1',exact:true});
+      await previewButton.click();
+      const preview=page.getByRole('region',{name:'Preview of Synthetic access policy · v1',exact:true});
+      await expect(preview.locator('pre')).toContainText('Synthetic preview text');
+      assert.equal(await preview.locator('..').getAttribute('colspan'),scenario==='viewer'?'5':'6');
+      assert.equal(await preview.evaluate(el=>el.closest('tr').previousElementSibling.textContent.includes('Synthetic access policy')),true);
+      await expect(documentRow.getByRole('button',{name:'Hide preview v1',exact:true})).toHaveAttribute('aria-expanded','true');
+      const previewAudit=await new AxeBuilder({page}).include('main').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+      assert.deepEqual(previewAudit.violations.map(v=>v.id),[]);
+      await page.screenshot({path:path.join(output,`documents-${scenario}-preview.png`),fullPage:true});
+      await page.setViewportSize({width:390,height:844});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Preview must stay inside page width');
+      await page.screenshot({path:path.join(output,`documents-${scenario}-preview-mobile.png`),fullPage:true});
+      await page.setViewportSize({width:1440,height:1000});
+      await preview.getByRole('button',{name:'Close preview',exact:true}).click();
+      await expect(previewButton).toBeFocused();
+      previewFails=true; await previewButton.click();
+      await expect(preview.getByRole('alert')).toContainText('Preview temporarily unavailable');
+      previewFails=false; await preview.getByRole('button',{name:'Retry preview',exact:true}).click();
+      await expect(preview.locator('pre')).toContainText('Synthetic preview text');
+      if(scenario!=='platform') {
+        await page.getByRole('row').filter({has:page.getByRole('cell').filter({hasText:'Shared synthetic reference'})}).getByRole('button',{name:'Preview v1',exact:true}).click();
+        await expect(page.getByText('Shared reference preview',{exact:true})).toBeVisible();
+        await expect(preview).toHaveCount(0);
+        await page.getByRole('button',{name:'Hide preview v1',exact:true}).click();
+      } else await documentRow.getByRole('button',{name:'Hide preview v1',exact:true}).click();
+      result.checks.push(`${scenario}: inline preview placement/column span, toggle, focus restoration, retry, single preview and mobile long-text containment`);
       if (scenario === 'viewer') {
         assert.equal(await page.getByRole('button', { name: 'Upload document', exact: true }).count(), 0);
         assert.equal(await page.getByRole('button', { name: 'Retire', exact: true }).count(), 0);
