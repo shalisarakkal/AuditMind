@@ -6,7 +6,7 @@ const {spawn, execFileSync} = require('node:child_process');
 const {chromium, expect} = require('../frontend/node_modules/playwright/test');
 const {default: AxeBuilder} = require('../frontend/node_modules/@axe-core/playwright');
 const root = path.resolve(__dirname, '..');
-const python = path.join(root, 'backend/.venv/Scripts/python.exe');
+const python = process.env.AUDITMIND_BROWSER_PYTHON || path.join(root, process.platform==='win32' ? 'backend/.venv/Scripts/python.exe' : 'backend/.venv/bin/python');
 const fixture = path.join(root, 'backend/scripts/phase3_browser_fixture.py');
 const schema = `phase3_browser_${require('node:crypto').randomBytes(6).toString('hex')}`;
 const output = path.join(root, 'temp/testing/finding-workflow', schema);
@@ -21,12 +21,12 @@ async function free(port) { await new Promise((resolve,reject) => { const server
   try {
     await free(3014); await free(8012);
     const seed=JSON.parse(cli('prepare')); prepared=true;
-    function start(executable,args,name,env={}) { const log=fs.openSync(path.join(output,name+'.log'),'w'); children.push(spawn(executable,args,{cwd:path.join(root,name==='frontend'?'frontend':'backend'),env:{...process.env,...env},windowsHide:true,stdio:['ignore',log,log]})); fs.closeSync(log); }
+    function start(executable,args,name,env={}) { const log=fs.openSync(path.join(output,name+'.log'),'w'); children.push(spawn(executable,args,{cwd:path.join(root,name==='frontend'?'frontend':'backend'),env:{...process.env,...env},windowsHide:true,detached:process.platform!=='win32',stdio:['ignore',log,log]})); fs.closeSync(log); }
     start(python,[fixture,'api','--schema',schema,'--workflow'],'api');
     start(python,[fixture,'worker','--schema',schema,'--workflow'],'worker');
     start(process.execPath,[path.join(root,'frontend/node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3014'],'frontend',{AUDITMIND_ISOLATED_BUILD:'1',BACKEND_URL:'http://127.0.0.1:8012',NEXT_PUBLIC_API_URL:'/api/v1'});
     await expect.poll(async()=>{try{return (await fetch(base+'/api/v1/auth/options')).status;}catch{return 0;}},{timeout:45000}).toBe(200);
-    browser=await chromium.launch({channel:'chrome',headless:true}); evidence.browser=browser.version();
+    browser=await chromium.launch({...(process.env.AUDITMIND_BROWSER_CHANNEL==='chromium'?{}:{channel:'chrome'}),headless:true}); evidence.browser=browser.version();
     async function session(role, timezoneId) {
       const context=await browser.newContext({viewport:{width:1440,height:1000},...(timezoneId?{timezoneId}:{})}), page=await context.newPage(); let token;
       page.on('pageerror',error=>evidence.errors.push(error.message));
@@ -42,6 +42,39 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       return {page,request,context};
     }
     const admin=await session('admin'), p=admin.page, org=`/orgs/${seed.org}`, list=org+'/findings';
+    await expect(p.getByRole('region',{name:'Security summary',exact:true})).toBeVisible();
+    const card=p.getByRole('link',{name:/^Members added /});
+    await expect(card).toBeVisible();
+    const summaryAxe=await new AxeBuilder({page:p}).include('[aria-label="Security summary"]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(summaryAxe.violations.map(v=>v.id),[]);
+    await p.screenshot({path:path.join(output,'dashboard-summary-desktop.png'),fullPage:true});
+    await p.setViewportSize({width:390,height:844});
+    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Dashboard must not overflow on mobile');
+    await p.screenshot({path:path.join(output,'dashboard-summary-mobile.png'),fullPage:true});
+    await p.setViewportSize({width:1440,height:1000});
+    const summaryQuery=new URL(await card.getAttribute('href'),base).searchParams;
+    assert.ok(summaryQuery.get('window_start') && summaryQuery.get('window_end'));
+    await card.click(); await expect(p.getByText(/Exact summary period:/)).toBeVisible();
+    await p.getByRole('button',{name:'Clear filters',exact:true}).click();
+    await expect(p.getByText(/Exact summary period:/)).toHaveCount(0);
+    const probe=await fetch('http://127.0.0.1:8012/ready');
+    assert.ok([200,503].includes(probe.status));
+    assert.deepEqual(Object.keys(await probe.json()).sort(),['checks','status']);
+    check('Dashboard security counts deep-link to the exact Activity window; clear removes it; readiness response is redacted');
+    await p.goto(base+'/assets');
+    await p.locator('input[type="file"]').setInputFiles([
+      {name:'browser-batch-a.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-a\n')},
+      {name:'browser-batch-b.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-b\n')},
+    ]);
+    for(const name of ['browser-batch-a.csv','browser-batch-b.csv']) {
+      const source=p.getByLabel('Source for '+name,{exact:true});
+      await expect(source).toBeVisible();
+      await source.locator('xpath=ancestor::*[@role="group"]').getByRole('button',{name:'Upload',exact:true}).click();
+      await expect(source).toHaveCount(0);
+    }
+    await expect(p.getByText('browser-batch-a',{exact:true})).toBeVisible();
+    await expect(p.getByText('browser-batch-b',{exact:true})).toBeVisible();
+    check('Multi-file input preserves independent source confirmations and imports both files through real PostgreSQL/API');
     async function create(description) {const response=await admin.request(list,'POST',{domain:'network_config',severity:'high',description,source:'synthetic-workflow'}); assert.equal(response.status,201); return response.body.id;}
     const a=await create('Manual workflow A'), b=await create('Manual workflow B');
     // Seed one genuinely imported finding through the real upload endpoint.
@@ -359,5 +392,5 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     check('Assets and Uploads disable row archive during selection and use cancellable native bulk modals');
     const stats=JSON.parse(cli('inspect')); assert.equal(stats.usage_count,0); assert.deepEqual(evidence.errors,[]); check('No AI usage or browser page errors');
   } catch(error) { evidence.failure=error.message; if(browser)try{await browser.contexts()[0]?.pages()[0]?.screenshot({path:path.join(output,'failure.png'),fullPage:true});}catch{} throw error; }
-  finally { if(browser)await browser.close(); for(const child of children) {if(!child.pid||child.exitCode!==null)continue;try{execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});}catch{}} if(prepared)cli('cleanup'); fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(evidence,null,2)); console.log(`${evidence.checks.length} checks; artifacts: ${output}`); }
+  finally { if(browser)await browser.close(); for(const child of children) {if(!child.pid||child.exitCode!==null)continue;try{if(process.platform==='win32')execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});else process.kill(-child.pid,'SIGTERM');}catch{}} if(prepared)cli('cleanup'); fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(evidence,null,2)); console.log(`${evidence.checks.length} checks; artifacts: ${output}`); }
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

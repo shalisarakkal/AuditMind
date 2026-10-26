@@ -23,8 +23,8 @@ def _deterministic_embedding(text: str, dim: int = EMBEDDING_DIM) -> list[float]
     vector = [0.0] * dim
 
     for i, word in enumerate(words):
-        # Hash individual words and pairs
-        h1 = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
+        # Non-security feature bucketing; preserve existing deterministic vectors.
+        h1 = int(hashlib.md5(word.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
         idx1 = h1 % dim
         vector[idx1] += 1.0 / (1.0 + i * 0.05)
 
