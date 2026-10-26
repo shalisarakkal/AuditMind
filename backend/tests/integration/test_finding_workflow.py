@@ -16,7 +16,7 @@ pytestmark = requires_db
 
 
 @pytest.fixture
-def setup(client):
+def setup(client, db_session):
     headers = register(client, "workflow@example.com")
     org = first_org_id(client, headers)
     base = f"/api/v1/orgs/{org}/findings"
@@ -24,7 +24,12 @@ def setup(client):
         response = client.post(base, headers=headers,
             json=dict(domain="network_config", severity="high", description="Synthetic workflow finding"))
         assert response.status_code == 201, response.text
-        return response.json()["id"]
+        identifier = response.json()["id"]
+        # Historical fixtures exercise fixed calendar/DST deadlines below.
+        from uuid import UUID
+        db_session.get(Finding, UUID(identifier)).created_at = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        db_session.commit()
+        return identifier
     finding = create()
     return headers, org, base, finding, create
 
@@ -127,7 +132,7 @@ def test_risk_acceptance_admin_and_review_date(client, setup):
     tomorrow = (deadline_today() + timedelta(days=1)).isoformat()
     assert change(client, base, f, auditor, status="accepted_risk", risk_review_date=tomorrow).status_code == 403
     assert change(client, base, f, h, status="accepted_risk").status_code == 422
-    assert change(client, base, f, h, status="accepted_risk", risk_review_date=deadline_today().isoformat()).status_code == 422
+    assert change(client, base, f, h, status="accepted_risk", risk_review_date=(deadline_today() - timedelta(days=1)).isoformat()).status_code == 422
     assert change(client, base, f, h, status="accepted_risk", risk_review_date=tomorrow).status_code == 200
     response = client.patch(f"{base}/{f}/workflow", headers=auditor,
         json=dict(expected_version=1, status="open", rationale="Reopen"))
@@ -155,6 +160,58 @@ def test_roles_isolation_and_archive(client, db_session, setup):
     organization.archived_at = datetime.now(timezone.utc)
     db_session.commit()
     assert change(client, base, f, h, status="open").status_code == 409
+
+
+@pytest.mark.parametrize("zone", ["America/New_York", "Asia/Kolkata", "America/Los_Angeles"])
+@pytest.mark.parametrize("offset,expected", [(-1, 200), (0, 422), (1, 422)])
+def test_review_today_until_exclusive_midnight(client, setup, monkeypatch, zone, offset, expected):
+    from datetime import date
+    from app.services import finding_workflow as service
+    from app.services.workflow_deadlines import deadline_expiry
+    h, _, base, f, _ = setup
+    expiry = deadline_expiry(date(2026, 10, 25), zone)
+    monkeypatch.setattr(service, "deadline_now", lambda: expiry + timedelta(microseconds=offset))
+    response = change(client, base, f, h, status="accepted_risk",
+        risk_review_date="2026-10-25", due_date="2026-10-25", deadline_timezone=zone)
+    assert response.status_code == expected, response.text
+
+
+@pytest.mark.parametrize("field", ["due_date", "risk_review_date"])
+@pytest.mark.parametrize("zone", ["America/New_York", "Asia/Kolkata"])
+def test_creation_day_allowed_previous_day_rejected(client, db_session, setup, field, zone, monkeypatch):
+    from uuid import UUID
+    from app.services import finding_workflow as service
+    h, _, base, f, _ = setup
+    # UTC October 26 is still October 25 in New York, but October 26 in Kolkata.
+    created = datetime(2026, 10, 26, 2, tzinfo=timezone.utc)
+    db_session.get(Finding, UUID(f)).created_at = created
+    db_session.commit()
+    monkeypatch.setattr(service, "deadline_now", lambda: created)
+    from zoneinfo import ZoneInfo
+    day = created.astimezone(ZoneInfo(zone)).date()
+    fields = {"status": "accepted_risk"} if field == "risk_review_date" else {}
+    response = change(client, base, f, h, **fields, **{field: (day - timedelta(days=1)).isoformat()}, deadline_timezone=zone)
+    assert response.status_code == 422, response.text
+    response = change(client, base, f, h, **fields, **{field: day.isoformat()}, deadline_timezone=zone)
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize("field", ["due_date", "risk_review_date"])
+def test_bulk_creation_boundary_is_atomic(client, db_session, setup, field):
+    from uuid import UUID
+    h, _, base, f, create = setup
+    second = create()
+    db_session.get(Finding, UUID(second)).created_at = datetime(2099, 1, 2, tzinfo=timezone.utc)
+    db_session.commit()
+    patch = dict(rationale="Boundary review", deadline_timezone="UTC", **{field: "2099-01-01"})
+    if field == "risk_review_date":
+        patch["status"] = "accepted_risk"
+    response = client.post(base + "/workflow/bulk", headers=h, json=dict(
+        targets=[dict(finding_id=identifier, expected_version=0) for identifier in (f, second)], patch=patch))
+    assert response.status_code == 422, response.text
+    assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 0
+    for identifier in (f, second):
+        assert client.get(f"{base}/{identifier}/workflow", headers=h).json()["version"] == 0
 
 
 def test_bulk_atomic_stale_and_foreign_targets(client, db_session, setup):

@@ -13,7 +13,7 @@ from app.schemas.finding_workflow import HistoryRead, SavedWorkflowNote, Workflo
 from app.services.events import actor_label, record_event
 from app.services.knowledge_service import KnowledgeError, require_active_org
 from app.services.org_lock import lock_org, lock_org_jobs
-from app.services.workflow_deadlines import DEADLINE_TIMEZONE, deadline_expiry, deadline_today
+from app.services.workflow_deadlines import DEADLINE_TIMEZONE, deadline_expiry, deadline_now
 
 
 def get_finding(db, org_id, finding_id):
@@ -123,6 +123,11 @@ def update_workflows(db, org_id, membership, targets, patch):
                     expires = deadline_expiry(changes[key], zone) if changes[key] else None
                 except ValueError as exc:
                     raise HTTPException(422, str(exc)) from exc
+                # Compare instants: an inclusive local day must contain or follow
+                # creation, even when the author's timezone differs from UTC.
+                if expires is not None and expires <= finding.created_at:
+                    label = "Due date" if prefix == "due" else "Risk review date"
+                    raise HTTPException(422, f"{label} cannot be earlier than the finding creation date")
                 after[f"{prefix}_timezone"] = zone
                 after[f"{prefix}_expires_at"] = expires.isoformat() if expires else None
         changed = before != after
@@ -130,8 +135,8 @@ def update_workflows(db, org_id, membership, targets, patch):
             if current.role != UserRole.admin:
                 raise HTTPException(403, "Risk acceptance changes require an organization admin")
         accepting = after["status"] == "accepted_risk" and (changed or "status" in changes)
-        if accepting and (not after["risk_review_date"] or date.fromisoformat(after["risk_review_date"]) <= deadline_today(zone=after["risk_review_timezone"])):
-            raise HTTPException(422, "Accepted risk requires a future review date")
+        if accepting and (not after["risk_review_expires_at"] or datetime.fromisoformat(after["risk_review_expires_at"]) <= deadline_now()):
+            raise HTTPException(422, "Accepted risk requires a review date whose end-of-day deadline has not passed")
         if after["status"] != "accepted_risk" and after["risk_review_date"] is not None:
             if "risk_review_date" in changes and changes["risk_review_date"] is not None:
                 raise HTTPException(422, "Risk review date only applies to accepted risk")

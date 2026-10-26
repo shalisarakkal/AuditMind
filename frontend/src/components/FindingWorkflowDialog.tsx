@@ -44,7 +44,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
   const anyAccepted = snapshots.some(row => (status || row.status) === "accepted_risk");
   const reviewError = !notesOnly && ((reviewMode === "set" && !allAccepted)
     ? "To set a risk review date, every selected finding must remain or become Accepted risk. Narrow your selection or explicitly change their status."
-    : reviewMode === "clear" && anyAccepted ? "Accepted-risk findings must retain a future review date. Keep or set that date, or change their status." : null);
+    : reviewMode === "clear" && anyAccepted ? "Accepted-risk findings must retain an unexpired review deadline. Keep or set that date, or change their status." : null);
   const members = useApi<{ items: Member[]; total: number }>(writer && !notesOnly
     ? `/orgs/${orgId}/members?limit=50&offset=${memberOffset}&q=${encodeURIComponent(settledMemberSearch)}&search_scope=identity&status=active&status=locked&status=must_change_password` : null);
   const history = useApi<WorkflowHistory[]>(ids.length === 1
@@ -167,7 +167,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
         <label className="block text-sm">Add rationale or note<textarea aria-label="Rationale or note" className={control} required maxLength={2000} value={rationale} onChange={e => setRationale(e.target.value)} /></label>
         <p className="text-xs text-white/70">Required for audit traceability. These empty fields add a new entry; saved notes are in Workflow history.</p>
         <label className="block text-sm">Add verification note<textarea aria-label="Verification note" className={control} maxLength={2000} value={verification} onChange={e => setVerification(e.target.value)} /></label>
-        <p className="text-xs text-white/70">Deadline dates include the entire selected day. Keep preserves saved deadlines. Accepted risk requires an admin and a future review date. Mitigated, Resolved and False positive transitions require verification.</p>
+        <p className="text-xs text-white/70">Deadline dates include the entire selected day and cannot precede the finding's creation date. Keep preserves saved deadlines. Accepted risk requires an admin and an unexpired review deadline; today is allowed. Mitigated, Resolved and False positive transitions require verification.</p>
         <button type="submit" disabled={!!reviewError} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-navy disabled:opacity-50">{busy ? "Saving…" : ids.length === 1 ? "Save workflow" : `Apply to ${ids.length} findings`}</button>
       </fieldset>
     </form>}

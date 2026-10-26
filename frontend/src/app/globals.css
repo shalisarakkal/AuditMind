@@ -11,3 +11,8 @@ body {
   background-color: var(--color-navy);
   color: #ffffff;
 }
+
+/* Keep native calendar indicators and picker chrome legible on our dark inputs. */
+input[type="date"] {
+  color-scheme: dark;
+}

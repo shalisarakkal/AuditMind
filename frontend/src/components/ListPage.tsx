@@ -138,7 +138,7 @@ export const ROW_ACTION_DANGER = "text-xs text-red-300 hover:underline";
 export const ACTIONS_CELL = "whitespace-nowrap px-4 py-2 text-right space-x-3";
 
 const DATE_INPUT =
-  "min-w-0 max-w-full rounded-md border border-white/15 bg-navy px-2 py-1.5 text-sm text-white focus:border-cyan focus:outline-none [color-scheme:dark]";
+  "min-w-0 max-w-full rounded-md border border-white/15 bg-navy px-2 py-1.5 text-sm text-white focus:border-cyan focus:outline-none";
 
 /** From/To on the list's date column (the API's since/until), for the
  * toolbar. `label` names the column, e.g. "Uploaded". */

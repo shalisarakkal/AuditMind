@@ -2,6 +2,17 @@
 
 ## Phase 4 backend follow-up — 2026-10-23
 
+Final pre-push check (26 October): **54 focused PostgreSQL tests** passed in
+33.21s with warnings as errors; this overlaps the earlier 1,218-test full run,
+not a fresh full run. Test database round-trip/drift checks passed at 0024.
+
+26 October inclusive deadline correction: **1,218 full PostgreSQL tests passed**
+in 637.17s with `--require-postgres -W error`. This includes **54 focused workflow/
+deadline tests** (44.30s), not 1,272 separate tests. Newly entered dates cannot
+precede creation; Accepted risk allows today until its saved local-day UTC expiry.
+Bulk rejection remains atomic. **35 installed-Chrome workflow checks** also passed;
+see [validation details](PHASE4_VALIDATION.md). No schema change or inference.
+
 26 October dependency blocker **resolved**: approved transitive-only updates to
 `undici@8.12.3` / `zod@4.6.7`; only the lockfile changed, not package.json or
 application source. Full/production npm audits both **zero**. Fresh **367 frontend

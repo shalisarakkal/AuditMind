@@ -4,6 +4,14 @@
 scoring integration is not approved.** Phase 3
 local-testing closure remains unchanged. See [validation](PHASE4_VALIDATION.md).
 
+26 October deadline clarification: newly set due/review dates must include or
+follow the finding's creation instant when interpreted as an inclusive day in
+the entering browser's timezone. Today is valid. Accepted-risk review deadlines
+must also be unexpired, compared as UTC instants against the exclusive next-local-
+midnight boundary. Validate every bulk target before writing any changes. Existing
+kept deadlines retain their saved timezone/expiry; no migration or backfill is
+required for this validation change.
+
 ## Scope and delivery order
 
 1. Finding remediation state, assignee, due date, rationale and history.
@@ -47,8 +55,10 @@ These are targeted code-review observations, not a full Phase 4 audit.
 All states may be reopened. Other transitions are explicit edits subject to the
 same authorization and evidence rules; no silent status changes. Moving out of
 Accepted risk requires admin approval too. A passed review date marks acceptance
-overdue, not automatically Open or approved again. Review date must be future
-when accepting/reaffirming risk. Due dates may be past to represent existing overdue work.
+overdue, not automatically Open or approved again. The review deadline must be
+unexpired when accepting/reaffirming risk; today's date is allowed through its
+local end of day. Due dates may be past to represent existing overdue work,
+but newly set due/review dates cannot precede the finding's creation day.
 
 Verification notes are user assertions, not automatic technical verification or
 qualified evidence for AI scoring. No attachments in the first increment.
