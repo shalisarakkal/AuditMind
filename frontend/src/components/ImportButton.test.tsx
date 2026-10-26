@@ -23,6 +23,28 @@ function calls(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchMock"
 }
 
 describe("ImportButton", () => {
+  it("gives every selected file independent source confirmation and cancellation", async () => {
+    await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [
+      new File(["type,hostname\nserver,one"], "one.csv"), new File(["type,hostname\nserver,two"], "two.csv"),
+    ] } });
+    await screen.findByLabelText("Source for one.csv");
+    await screen.findByLabelText("Source for two.csv");
+    expect(screen.getAllByRole("group", { name: "Upload options" })).toHaveLength(2);
+    const first = screen.getByLabelText("Source for one.csv").closest<HTMLElement>('[role="group"]')!;
+    fireEvent.click(within(first).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Source for one.csv")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Source for two.csv")).toBeInTheDocument();
+  });
+
+  it("accepts dropped files and rejects batches over the limit", async () => {
+    await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
+    const area = screen.getByLabelText("File upload area");
+    fireEvent.drop(area, { dataTransfer: { files: Array.from({ length: 21 }, (_, i) => new File(["x"], `${i}.csv`)) } });
+    expect(screen.getByRole("alert")).toHaveTextContent("at most 20");
+    fireEvent.drop(area, { dataTransfer: { files: [new File(["type,hostname\nserver,a"], "drop.csv")] } });
+    await screen.findByLabelText("Source for drop.csv");
+  });
   it("uploads the file and hands its import to the tracker", async () => {
     const { fetchMock } = await renderButton({
       "POST /orgs/org-1/findings/import": () => json({ scan_id: "s1", status: "pending", report: null }, 202),

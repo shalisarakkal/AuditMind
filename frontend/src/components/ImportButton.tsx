@@ -40,7 +40,34 @@ type Repeat = { file: File; profileKey: string; previous: RepeatUpload };
  * (pre-selected when the file's columns match a profile). The import is then
  * followed app-wide (ImportsContext): its progress and report show on the
  * page (ImportStatus), whichever page the user is on when it finishes. */
-export default function ImportButton({ orgId, kind, accept, label, profiles }: ImportButtonProps) {
+export default function ImportButton(props: ImportButtonProps) {
+  return <ImportQueue key={props.orgId} {...props} />;
+}
+
+function ImportQueue(props: ImportButtonProps) {
+  const [batch, setBatch] = useState<{ id: number; file: File }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const sequence = useRef(0);
+  function receive(files: File[]) {
+    if (files.length > 20 || batch.length + files.length > 20) { setError("Choose at most 20 files at a time."); return; }
+    setError(null);
+    const additions = files.map(file => ({ id: ++sequence.current, file }));
+    setBatch(previous => [...previous, ...additions]);
+  }
+  return <div aria-label="File upload area" onDragOver={event => { event.preventDefault(); }} onDrop={event => {
+    event.preventDefault(); receive(Array.from(event.dataTransfer.files));
+  }} className="space-y-3">
+    <SingleImportButton {...props} onFiles={receive} />
+    <p className="text-right text-xs text-white/60">Choose or drop files here. Each file has its own source and report (up to 20 at once).</p>
+    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+    {batch.map(item => <SingleImportButton {...props} key={`${props.orgId}-${item.id}`} initialFile={item.file}
+      onSettled={() => setBatch(previous => previous.filter(row => row.id !== item.id))} />)}
+  </div>;
+}
+
+function SingleImportButton({ orgId, kind, accept, label, profiles, initialFile, onFiles, onSettled }: ImportButtonProps & {
+  initialFile?: File; onFiles?(files: File[]): void; onSettled?(): void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const imports = useImports();
   const [uploading, setUploading] = useState(false);
@@ -89,6 +116,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
     }
     // Accepted: the import is followed from here on, wherever the user goes.
     await imports.track(response.scan_id, kind);
+    onSettled?.();
   }
 
   async function handleFile(file: File) {
@@ -110,6 +138,13 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
     setPending({ file, detected: detected?.key ?? null, columns });
   }
 
+  const started = useRef(false);
+  useEffect(() => {
+    if (!initialFile || started.current || profiles === null) return;
+    started.current = true;
+    void handleFile(initialFile);
+  }, [initialFile, profiles]);
+
   const busy = uploading;
   const nessus = pending !== null && fileExtension(pending.file.name) === ".nessus";
   const choices = nessus ? (profiles ?? []).filter((p) => p.key === GENERIC_FINDINGS) : sortedChoices(profiles ?? [], pageDefault);
@@ -121,16 +156,18 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="flex items-center gap-3">
+      {!initialFile && <div className="flex items-center gap-3">
         <input
           ref={inputRef}
           type="file"
+          multiple
           accept={accept}
           className="hidden"
           data-testid={`${kind}-file-input`}
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleFile(file);
+            const files = Array.from(e.target.files ?? []);
+            if (files.length > 1 && onFiles) { onFiles(files); e.target.value = ""; }
+            else if (files[0]) void handleFile(files[0]);
           }}
         />
         {uploading && <span className="text-sm text-white/60">Uploading…</span>}
@@ -142,7 +179,9 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
         >
           {label}
         </button>
-      </div>
+      </div>}
+      {initialFile && uploading && <p role="status" className="text-sm text-white/60">Uploading {initialFile.name}…</p>}
+      {initialFile && error && <button type="button" onClick={onSettled} className="text-xs text-cyan">Dismiss {initialFile.name}</button>}
 
       {error && (
         <p role="alert" className="max-w-md text-right text-sm text-red-300">
@@ -162,7 +201,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
           }
           confirmLabel="Upload anyway"
           onConfirm={() => void upload(repeat.file, repeat.profileKey, true)}
-          onCancel={() => setRepeat(null)}
+          onCancel={() => { setRepeat(null); onSettled?.(); }}
           busy={busy}
         />
       )}
@@ -176,11 +215,10 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
           <span className="max-w-56 truncate font-medium text-white" title={pending.file.name}>
             {pending.file.name}
           </span>
-          <label htmlFor={`${kind}-import-source`} className="text-white/60">
+          <label className="text-white/60">
             Source
-          </label>
           <select
-            id={`${kind}-import-source`}
+            aria-label={initialFile ? `Source for ${initialFile.name}` : "Source"}
             value={source}
             onChange={(e) => setSource(e.target.value)}
             className="max-w-64 rounded-md border border-white/15 bg-navy px-2 py-1 text-sm text-white focus:border-cyan focus:outline-none"
@@ -191,6 +229,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
               </option>
             ))}
           </select>
+          </label>
           {pending.detected && source === pending.detected && (
             <span className="text-xs text-emerald-300">Detected from the file&apos;s columns</span>
           )}
@@ -222,6 +261,7 @@ export default function ImportButton({ orgId, kind, accept, label, profiles }: I
             onClick={() => {
               setPending(null);
               setError(null);
+              onSettled?.();
             }}
             className="px-1 text-xs text-white/60 hover:text-white">
             Cancel

@@ -95,7 +95,10 @@ export function useListState(pageSize: number, orgId: string) {
         .join("&"),
       clearCount,
       setText: (key: string, value: string) =>
-        update((next) => (value.trim() ? next.set(key, value.trim()) : next.delete(key))),
+        update((next) => {
+          if (key === "since" || key === "until") { next.delete("window_start"); next.delete("window_end"); }
+          if (value.trim()) next.set(key, value.trim()); else next.delete(key);
+        }),
       setValues: (key: string, values: string[]) =>
         update((next) => {
           next.delete(key);

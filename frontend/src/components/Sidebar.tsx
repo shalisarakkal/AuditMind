@@ -1,4 +1,5 @@
 "use client";
+import ProductBrand from "./ProductBrand";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,7 +45,7 @@ export default function Sidebar() {
   return (
     <nav className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-navy/60 p-4">
       <div className="mb-6 text-lg font-semibold tracking-wide text-white">
-        Audit<span className="text-cyan">Mind</span>
+        <ProductBrand />
       </div>
       <div className="mb-6">
         <OrgPicker />

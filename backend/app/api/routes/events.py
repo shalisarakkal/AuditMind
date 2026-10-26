@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
@@ -192,11 +192,19 @@ def list_events(
     page: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     membership: OrgMembership = Depends(require_org_member),
+    window_start: datetime | None = Query(None, description="Exact inclusive start instant; paired with window_end"),
+    window_end: datetime | None = Query(None, description="Exact exclusive end instant; paired with window_start"),
 ) -> Page[EventRead]:
     """What happened in the org, newest first by default. Every member can
     read it; nothing can change it."""
+    scope = _in_org(membership.organization)
+    if window_start is not None or window_end is not None:
+        if (window_start is None or window_end is None or window_start.tzinfo is None
+                or window_end.tzinfo is None or window_start >= window_end):
+            raise HTTPException(422, "Provide paired timezone-aware window_start/window_end with start before end")
+        scope = and_(scope, Event.started_at >= window_start, Event.started_at < window_end)
     return _event_page(
-        db, _in_org(membership.organization), q=q, type=type, item=item, who=who, result=result, criticality=criticality,
+        db, scope, q=q, type=type, item=item, who=who, result=result, criticality=criticality,
         dates=dates, sort=sort, order=order, page=page,
     )
 

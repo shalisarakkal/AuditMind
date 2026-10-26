@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.enums import Domain, RiskTier, Severity
@@ -10,6 +11,12 @@ class DomainScore(BaseModel):
     score: float
     tier: RiskTier
     justification: str
+
+
+class SecuritySummary(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    counts: dict[str, int]
 
 
 class DashboardSummary(BaseModel):

@@ -7,6 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AuditMind AI",
   description: "AI-powered cyber resilience auditing platform",
+  icons: { icon: "/brand.svg" },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

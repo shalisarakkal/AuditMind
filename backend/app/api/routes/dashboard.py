@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -9,9 +10,10 @@ from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.enums import Severity
 from app.models.finding import Finding
+from app.models.event import Event
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
-from app.schemas.dashboard import DashboardSummary, DomainScore
+from app.schemas.dashboard import DashboardSummary, DomainScore, SecuritySummary
 from app.schemas.finding import FindingRead
 from app.schemas.scan import brief_scan
 from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
@@ -20,6 +22,20 @@ router = APIRouter(prefix="/orgs/{org_id}/dashboard", tags=["dashboard"])
 
 TOP_FINDINGS = 5
 RECENT_SCANS = 5
+
+
+@router.get("/security-summary", response_model=SecuritySummary)
+def security_summary(org_id: uuid.UUID, db: Session = Depends(get_db),
+                     _: OrgMembership = Depends(require_org_member)):
+    """Completed organization actions started within the exact rolling seven days."""
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=7)
+    types = ("member_added", "role_changed", "purge")
+    counts = dict(db.query(Event.type, func.count(Event.id)).filter(
+        Event.org_id == org_id, Event.type.in_(types), Event.outcome == "completed",
+        Event.started_at >= start, Event.started_at < end).group_by(Event.type).all())
+    return dict(window_start=start, window_end=end,
+                counts={kind: counts.get(kind, 0) for kind in types})
 
 
 @router.get("", response_model=DashboardSummary)

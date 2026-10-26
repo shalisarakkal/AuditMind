@@ -68,6 +68,10 @@ export default function EventLog({
       <ListToolbar list={list} label="activity">
         <DateRangeFilter list={list} label="When" />
       </ListToolbar>
+      {list.text("window_start") && list.text("window_end") && <p className="text-xs text-white/60">
+        Exact summary period: {formatDateTime(list.text("window_start"))} to {formatDateTime(list.text("window_end"))} (end excluded).
+        Changing the date filters replaces this period; Clear filters removes it.
+      </p>}
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (

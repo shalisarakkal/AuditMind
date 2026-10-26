@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import ScoreCard from "@/components/ScoreCard";
+import SecuritySummary from "@/components/SecuritySummary";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
 import {
@@ -14,9 +15,7 @@ import {
   SEVERITY_ORDER,
   formatDateTime,
 } from "@/lib/domain";
-import { CriticalityBadge } from "@/components/ListPage";
-import { eventLabel, eventSummary } from "@/lib/activity";
-import type { ActivityEvent, DashboardSummary, Page } from "@/lib/types";
+import type { DashboardSummary } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 export default function DashboardPage() {
@@ -69,7 +68,7 @@ function Dashboard({ data }: { data: DashboardSummary }) {
 
       <section>
         <h2 className="mb-3 text-lg font-medium text-white">Per-domain scores</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {domains.map((d) => (
             <ScoreCard key={d.domain} label={DOMAIN_LABELS[d.domain]} score={d.score} tier={d.tier} title={d.justification} />
           ))}
@@ -123,45 +122,12 @@ function Dashboard({ data }: { data: DashboardSummary }) {
         </section>
       </div>
 
-      <RecentActivity />
+      <DashboardSecuritySummary />
     </>
   );
 }
 
-const RECENT_EVENTS = 8;
-
-/** The latest events, linked to Activity. */
-function RecentActivity() {
+function DashboardSecuritySummary() {
   const { selectedOrg } = useApp();
-  const { data } = useApi<Page<ActivityEvent>>(`/orgs/${selectedOrg!.id}/events?limit=${RECENT_EVENTS}`);
-  return (
-    <section>
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-medium text-white">Recent activity</h2>
-        <Link href="/activity" className="text-sm text-cyan hover:underline">
-          All activity
-        </Link>
-      </div>
-      {data && data.items.length === 0 && <p className="text-sm text-white/60">Nothing has happened yet.</p>}
-      {data && data.items.length > 0 && (
-        <ul className="divide-y divide-white/10 rounded-xl border border-white/10 bg-white/5">
-          {data.items.map((event) => (
-            <li key={event.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-              <div className="min-w-0">
-                <p className="truncate text-white">
-                  {eventLabel(event)}
-                  {event.item && <span className="text-white/70">: {event.item}</span>}
-                </p>
-                <p className="truncate text-xs text-white/50">
-                  {event.actor_label} · {formatDateTime(event.started_at)}
-                  {eventSummary(event) && ` · ${eventSummary(event)}`}
-                </p>
-              </div>
-              <CriticalityBadge criticality={event.criticality} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
+  return <SecuritySummary key={selectedOrg!.id} orgId={selectedOrg!.id} />;
 }

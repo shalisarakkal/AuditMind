@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ProductBrand from "./ProductBrand";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -48,6 +49,7 @@ export default function AuthForm({ title, fields, submitLabel, onSubmit, footer,
 
   return (
     <form method="post" onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-6">
+      <ProductBrand />
       <h1 className="text-lg font-semibold text-white">{title}</h1>
       {notice && !error && <p className="text-sm text-amber-200">{notice}</p>}
       {fields.map((field) => (

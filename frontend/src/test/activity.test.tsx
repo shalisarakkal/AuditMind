@@ -117,18 +117,18 @@ describe("Activity page", () => {
 });
 
 describe("Dashboard", () => {
-  it("shows recent activity with a link to all of it", async () => {
+  it("replaces the noisy recent feed with an organization security summary", async () => {
     const summary: DashboardSummary = {
       overall_score: 90, overall_tier: "low", domains: [], top_findings: [], recent_scans: [scan()], asset_count: 1,
       findings_by_severity: { critical: 0, high: 0, medium: 0, low: 0 },
     };
     await renderSignedIn(<DashboardPage />, "viewer", {
       "GET /orgs/org-1/dashboard": () => summary,
-      "GET /orgs/org-1/events?limit=8": () => page([event({ type: "restore", details: { undo: true }, counts: { findings: 40 } })]),
+      "GET /orgs/org-1/dashboard/security-summary": () => ({ window_start: "2026-10-19T00:00:00Z", window_end: "2026-10-26T00:00:00Z", counts: { member_added: 1, role_changed: 2, purge: 0 } }),
     });
-    const recent = (await screen.findByText("Recent activity")).closest("section")!;
-    expect(await within(recent).findByText("Undo archive")).toBeInTheDocument();
-    expect(within(recent).getByText(/Ann · .* · 40 findings/)).toBeInTheDocument();
+    const recent = await screen.findByRole("region", { name: "Security summary" });
+    expect(await within(recent).findByRole("link", { name: "Role changes 2" })).toBeInTheDocument();
+    expect(screen.queryByText("Recent activity")).not.toBeInTheDocument();
     expect(within(recent).getByRole("link", { name: "All activity" })).toHaveAttribute("href", "/activity");
   });
 });

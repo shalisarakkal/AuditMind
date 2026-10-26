@@ -1,4 +1,5 @@
 import AuthGuard from "@/components/AuthGuard";
+import ApplicationHeader from "@/components/ApplicationHeader";
 import OrgGate from "@/components/OrgGate";
 import Sidebar from "@/components/Sidebar";
 import { ImportsProvider } from "@/context/ImportsContext";
@@ -12,6 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="min-w-0 flex-1 p-3 sm:p-8">
+            <ApplicationHeader />
             <p className="mb-3 text-xs text-white/60">All times are displayed in your browser time zone.</p>
             <OrgGate>{children}</OrgGate>
           </main>

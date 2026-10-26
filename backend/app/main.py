@@ -1,6 +1,8 @@
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.responses import JSONResponse
+from app.services.readiness import readiness_checks
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
@@ -94,3 +96,11 @@ def get_current_metrics() -> dict[str, Any]:
 def health() -> dict[str, str]:
     """Cheap liveness probe; dependency readiness is a separate concern."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def ready(checks: dict = Depends(readiness_checks)):
+    healthy = all(checks.values())
+    return JSONResponse(status_code=200 if healthy else 503,
+                        content={"status": "ready" if healthy else "not_ready", "checks": checks},
+                        headers={"Cache-Control": "no-store"})
