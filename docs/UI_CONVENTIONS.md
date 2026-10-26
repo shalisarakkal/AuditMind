@@ -1,5 +1,10 @@
 # UI conventions: list pages
 
+Dashboard security cards link to the same exact seven-day organization event
+window used for counting; Activity labels that window and replaces it when date
+filters change. Import cards keep source/cancel/error/report independent per file.
+Use shared ProductBrand/header components rather than screen-specific marks.
+
 Review synchronization (2026-10-22): These conventions remain normative. Passing component tests does not replace full Chrome accessibility/lifecycle acceptance; release findings and remaining gates are tracked separately.
 See [current code review and release gates](RELEASE_READINESS.md).
 

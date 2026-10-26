@@ -1588,6 +1588,22 @@ See [Phase3.md — Phase 3b](Phase3.md#phase-3b--openai-hosted-report-generation
 
 ## Phase 4 — Polish & resilience focus (Week 4 of the roadmap)
 
+Current code reconciliation (26 October): [status matrix](docs/PHASE4_STATUS.md).
+Subsequent approved [dependency remediation](docs/BACKEND_DEPENDENCY_REMEDIATION.md)
+now has clean core/dev, optional and installed audits with no conflicts; the
+initial audit blocker described in earlier entries is historical.
+The local operations increment adds Dashboard security summary, `/ready`,
+multi-file/drop import, product/header branding and configured browser/security CI.
+See [contract and remaining blockers](docs/PHASE4_LOCAL_OPERATIONS.md): the initial
+34 backend advisory entries were addressed in the subsequent increment above. Organization
+logos and broader hardening/performance remain pending; Phase 4 is not complete.
+Latest dependency checkpoint supersedes the earlier 1,229-test run: 1,238 full
+PostgreSQL tests (628.60s, warnings as errors), 376 frontend tests (29.03s),
+lint/build/TypeScript and 39 Chrome workflow checks passed. Six Documents grouped
+checks passed separately; focused results overlap the full suite. All three
+backend audit scopes are clean. See the dependency remediation evidence above.
+Linux hosted CI is configured but unverified; no dependency risk waiver exists.
+
 Kickoff design prepared 23 October 2026:
 [remediation workflow contract and acceptance gates](docs/PHASE4_REMEDIATION_DESIGN.md).
 The remediation backend, Findings workflow controls and list filters are implemented;
@@ -1625,36 +1641,41 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
       panel, version toggle, local loading/retry, keyboard scrolling and focus restoration.
 - [x] Unified Findings selection with both bulk actions, 100-workflow/500-archive
       limits, all-manual archive eligibility, frozen confirmations and sticky row Actions.
-- [x] Local remediation verification: earlier 1,182 full PostgreSQL backend tests, 365
-      frontend tests, lint/TypeScript/isolated production build, migration round
-      trips/drift and 35 Chrome workflow/action checks; latest action follow-up has
-      67 focused PostgreSQL archive/workflow tests. The separate 6 grouped document
-      Chrome checks remain historical; no new full backend run. Assignee search now matches
-      name/email only; People search is unchanged. No production/global Phase 4 sign-off.
+- [x] Local remediation verification: 1,218 full PostgreSQL tests (deadline
+      increment); subsequent shared-selection tree passed 372 frontend tests,
+      lint/TypeScript/production builds and 37 Chrome checks. Final pre-push
+      rerun: 54 overlapping focused PostgreSQL tests and 372 frontend tests.
+      Migration round-trips/drift passed at 0024. Separate Documents Chrome
+      evidence remains historical. No production/global Phase 4 sign-off.
+- [x] Shared date-input contrast, today's inclusive deadline validation and
+      creation-date boundaries; Archived/Assets/Uploads row-versus-bulk actions,
+      immutable confirmation targets and modal interaction safeguards.
 - [ ] UI polish (requested 2026-09-28; can be done any time, needs no other
       phase):
-  - File upload: drag and drop, and several files at once (each gets its own
-    source choice and report)
-  - Logos: an AuditMind product logo (sidebar, login/register, browser tab),
-    plus each organization's own logo, uploaded by its admins (needs a small
-    backend addition to store it)
-  - Product name and the current organization's name shown in the UI header
-  - Dashboard "Recent activity" (raised 2026-10-02: no value as it is). It
+  - [x] File upload: drag/drop and multiple files with individual source choices,
+    cancellation, errors and reports (up to 20 queued cards).
+  - [x] Product logo (sidebar, login/register and browser tab).
+  - [ ] Organization logos uploaded by admins: storage/validation/permissions pending.
+  - [x] Product and current organization's name in the common UI header.
+  - [x] Dashboard "Recent activity" replacement (raised 2026-10-02). Historical rationale: it
     lists every Info event (sign-ins, worker started/stopped), so routine
     noise fills it. Decided (2026-10-02): replace it with a security
     summary: a few counts for the last 7 days (failed sign-ins, new users,
     role changes, data purged), each linking to Activity filtered to those
-    events. Worker and sign-in events stay in the full Activity log only
+    events. Implemented member additions, role changes and completed purge-operation
+    counts, with exact rolling-seven-day Activity links. Failed-sign-in attribution
+    is unavailable, not guessed; worker/sign-in events stay in full Activity.
 - [ ] Keyless Claude auth for deployed environments (no long-lived API key):
       identity federation with the host platform's workload identity, or
       Amazon Bedrock / Google Vertex AI with cloud IAM if hosted on AWS/GCP.
       Decide once hosting is chosen; confirm what the Claude API supports at
       that point. Likely shape: a `CLAUDE_AUTH_MODE` setting read by
       `claude_service.py`, with local dev staying on the API key.
-- [ ] Readiness check (CoPilot review, finding 5): `/health` stays a cheap
+- [x] Local readiness check (CoPilot review, finding 5): `/health` stays a cheap
       "the process is up"; a new `/ready` checks the database, the uploads
       folder and the worker's last check-in (quickly, without revealing
-      connection details), for the host's load balancer
+      connection details). Local implementation complete; hosted load-balancer
+      exposure and dependency/OS timeout acceptance remain separate.
 - [ ] Big orgs' list pages (found measuring Phase 2d Part 3, 2026-09-30):
       with 500K assets and findings, Dashboard 1.2 s, Assets 0.75 s,
       Findings 0.7 s, mostly exact counts. Estimated counts ("about
@@ -1701,12 +1722,13 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
     grow
   - A dedicated queue service (Azure Service Bus, SQS) only if the
     database queue can't keep up
-- [ ] Remediation workflow (CoPilotSuggestions, 2026-09-30; needed by
-      Phase 3's remediation and reports): a finding's status (open,
-      accepted risk, mitigated, resolved, false positive), assignee, due
-      date, notes and history; changing several at once; a re-import never
-      undoes someone's decision on a finding; scores and reports take status
-      into account. Ticketing integrations (Jira, ServiceNow) later
+- [x] Core remediation workflow (original CoPilotSuggestions item): statuses,
+      assignee, due/review dates, notes/history and role/version-safe bulk edits.
+      Existing duplicate import/restore paths preserve edited workflows within
+      current matching rules; this is not cross-scan reconciliation.
+- [ ] Separate remediation policy work: stable imported identity/suppression and
+      absence review; approved status-aware scoring/report semantics. Existing
+      scores and saved reports remain unchanged. Ticketing integrations later.
 - [ ] Production operations (CoPilotSuggestions, 2026-09-30), with the
       hosting choice: infrastructure as code; separate dev, staging and
       production; automated backups with point-in-time recovery and a
@@ -1717,21 +1739,27 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
       the cloud's secret manager, with a rotation procedure; rate limits on
       sign-in, uploads and Claude calls; upload checks (content type, a
       malware-scanning policy); CORS reviewed for the production domain
-- [x] Observability (CoPilotSuggestions): structured logs with request,
+- [x] Local observability implementation (CoPilotSuggestions): structured logs with request,
       job, org and user IDs to follow one action through web and worker;
       error tracking and alerts (worker not checking in, jobs failing
       repeatedly, database or storage nearly full, Claude outages);
       credentials, tokens and personal data never written to logs
-- [ ] Automated checks (CoPilotSuggestions): a Playwright browser suite in
+- [ ] Hosted observability acceptance: persistent/exported telemetry, external
+      alert delivery and production load/operational verification. Existing
+      in-memory metrics and local tests are not production acceptance.
+- [ ] Remaining automated checks (partial foundations already exist): a Playwright browser suite in
       CI for what's checked by hand today (sign-in, org switching, roles,
       uploads, worker recovery, archive/restore/purge, Activity, isolation
       between orgs); CI scans for vulnerable dependencies (pip-audit,
       npm audit), committed secrets and common code flaws (SAST); a
       separate, opt-in performance suite with million-row files
+      Browser/dependency/secret/high-severity Bandit gates are now configured;
+      Linux CI execution, backend dependency remediation, lower-severity static
+      triage and opt-in performance CI remain pending. See local operations.
 
 Work started on 2026-10-15:
 - Observability: implementing structured JSON logs with request/job/org/user correlation IDs, metrics for latency/queue depth/worker heartbeat/import throughput/failures, error aggregation and alerts (stale workers, repeated failures, storage pressure, provider outages), traceability from reports/findings back to source scans/prompts, and redaction rules for credentials/tokens/PII — per CoPilotSuggestions.md Section 9
-- Automated checks: pending; to be started after observability is complete per CoPilotSuggestions.md suggested delivery order (item 6: Harden deployment, secrets, backups, observability; then item 11: browser/accessibility/security validation)
+- Automated checks: baseline backend/frontend CI and local Chrome acceptance are implemented; portable browser CI, security scans and opt-in performance CI remain pending. See the current Phase 4 status matrix; the original suggested delivery order is not evidence that no automation exists.
 
 ## Phase 5 — Live connectors (not yet scheduled)
 

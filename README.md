@@ -1,5 +1,11 @@
 # AuditMind AI
 
+Local operations features: [Phase 4 local operations](docs/PHASE4_LOCAL_OPERATIONS.md).
+Current [dependency remediation](docs/BACKEND_DEPENDENCY_REMEDIATION.md) supersedes
+the initial backend audit blocker. Phase 4 remains partial.
+
+Phase 4 progress and remaining work: [code-backed status and next milestone](docs/PHASE4_STATUS.md).
+
 Latest local-testing UI: consistent date-picker contrast, inclusive browser-local
 workflow deadlines and safe row/bulk actions across Findings, Archived, Assets
 and Uploads. See [Chrome verification steps](docs/PHASE4_USER_VERIFICATION.md)

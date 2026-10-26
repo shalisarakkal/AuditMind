@@ -1,5 +1,21 @@
 # Testing strategy and measured coverage
 
+Latest dependency checkpoint (26 October): **1,238 full PostgreSQL tests**
+(628.60s, warnings as errors), **376 frontend tests** (29.03s), lint, production
+build and TypeScript passed. **39 installed-Chrome workflow checks** and **6
+separate Documents grouped checks** passed; scopes are not interchangeable.
+The 73 focused compatibility/14 JWT tests overlap the full suite. Backend audits
+for core/dev, optional embeddings and installed packages are clean, with no
+dependency conflicts. Hosted CI remains unverified. Earlier failing-audit text
+below is historical. [Final evidence](BACKEND_DEPENDENCY_REMEDIATION.md).
+
+Latest local operations increment: **1,229 full PostgreSQL tests** (651.52s),
+final **20 focused tests** (7.08s), **376 frontend tests** (21.87s), lint/builds
+and **39 installed-Chrome checks**. Focused coverage includes final edits/new
+guard cases collected after the full run; counts are not additive. New CI jobs
+are configured but hosted execution is unverified, and the backend dependency
+audit fails. [Evidence and limitations](PHASE4_LOCAL_OPERATIONS.md).
+
 Final pre-push rerun (26 October): **372 frontend tests** (22.19s), lint,
 TypeScript and **54 focused PostgreSQL tests** (33.21s) passed. Prior full backend,
 production-build and Chrome evidence below is preserved separately. See

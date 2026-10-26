@@ -1,5 +1,10 @@
 # AuditMind user manual
 
+New local Phase 4 features: [Dashboard security summary, readiness, multiple-file
+import and branding](PHASE4_LOCAL_OPERATIONS.md). Organization logos and broader
+hardening are still pending. Initial backend audit findings are addressed in the
+separate [dependency compatibility increment](BACKEND_DEPENDENCY_REMEDIATION.md).
+
 New Phase 4 functionality: [what changed and how to verify it in Chrome](PHASE4_USER_VERIFICATION.md).
 
 Search performance (25 October): specific Findings text/IP searches now use

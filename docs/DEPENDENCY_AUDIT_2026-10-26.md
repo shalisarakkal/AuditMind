@@ -1,5 +1,24 @@
 # Dependency audit — 26 October 2026
 
+Latest user-approved remediation: core/dev requirements, optional embeddings
+requirements and installed-environment audits now report **no known
+vulnerabilities**, and `pip check` reports no conflicts. PyJWT replaces
+python-jose/ecdsa; the framework/async/multipart/tooling and optional model runtime
+pins were compatibility-upgraded. No advisory ignore or risk waiver added.
+See [precise versions and test evidence](BACKEND_DEPENDENCY_REMEDIATION.md).
+The failing backend audit described below is historical, not the current scan.
+Final compatibility acceptance: 1,238 full PostgreSQL tests (warnings as errors),
+376 frontend tests, lint/build/TypeScript and 39 Chrome workflow checks passed;
+six Documents grouped checks are separate. Hosted CI remains unverified.
+
+Historical intermediate backend audit (subsequently resolved above): a
+`pip-audit -r requirements-dev.txt`
+reported **34 advisory entries across six packages**, including duplicates and
+two packages with no listed fixed version. See
+[local operations / exact audit scope](PHASE4_LOCAL_OPERATIONS.md). No new risk
+exception or dependency upgrade was made. The resolved frontend finding below
+must not be read as an all-backend/all-dependency clearance. Fresh npm audit: zero.
+
 **Resolved after explicit user approval on 26 October.** Targeted updates changed
 only `frontend/package-lock.json`: `undici` **8.11.2 → 8.12.3**, `zod` **4.6.5 →
 4.6.7**, and their resolved URLs/integrity values (6 added/6 removed lines).

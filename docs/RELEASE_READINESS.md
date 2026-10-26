@@ -1,5 +1,32 @@
 # Release readiness and code review
 
+Subsequent approved dependency remediation: **core/dev, optional embeddings and
+installed-environment audits report no known vulnerabilities**; `pip check`
+reports no conflicts. The initial backend blocker below is historical. Full
+acceptance results: [dependency compatibility record](BACKEND_DEPENDENCY_REMEDIATION.md).
+Production/live AI, hosted CI and remaining Phase 4 requirements are not thereby approved.
+
+Latest local validation after dependency remediation: **1,238 full PostgreSQL
+tests** (628.60s, warnings as errors), **376 frontend tests** (29.03s), lint/build/
+TypeScript and **39 Chrome workflow checks** passed. **6 Documents grouped checks**
+passed separately. Focused results overlap the full suite. Demo is running with
+all readiness checks true. No dependency audit waiver was needed.
+
+26 October local operations follow-up: Dashboard summary, readiness, multi-file
+imports, product/header branding and portable browser/security CI configuration
+implemented. **Not Phase 4 completion:** backend audit initially reported 34 advisory
+entries across six packages, remediated in the subsequent increment above without
+ignores or risk waivers. Hosted CI has not been proved. Organization
+logos and broader hardening/performance remain pending. See
+[implementation and limitations](PHASE4_LOCAL_OPERATIONS.md).
+
+26 October roadmap reconciliation: Phase 4 is **partially delivered**, not
+complete. See [code-backed status and next milestone](PHASE4_STATUS.md).
+At that earlier checkpoint Dashboard security summary, readiness checks and
+expanded CI were pending; they are now implemented/configured locally above.
+Production/live-AI approval
+and user-approved Future work are distinct. No tests rerun for this docs audit.
+
 26 October Archived/shared selection follow-up: **372 frontend tests**,
 lint/production builds and **37 Chrome workflow checks** passed. Archived now
 matches Findings' row-versus-bulk interaction, fixed-target modal confirmations

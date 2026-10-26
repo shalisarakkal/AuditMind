@@ -66,18 +66,17 @@ mocked; synchronization uses events rather than sleeps.
 
 ## Dependency warning compatibility
 
-`python-jose` 3.5.0 replaces the deprecated UTC call made during JWT validation.
+PyJWT 2.15.1 replaces python-jose/ecdsa after the 26 October dependency audit.
 Security regressions cover token expiry, signed round trips, session identifiers,
 wrong signing keys and unsigned-token rejection, alongside the auth/session API
 tests. No token format or password hashing changes are intended.
 
-AnyIO is temporarily pinned to 4.14.1 because FastAPI 0.115.6 requires Starlette
-below 0.42, whose test client imports the `anyio.abc.BlockingPortal` alias
-deprecated in AnyIO 4.15. This is a compatibility constraint, not an upstream
-source fix. Remove/reassess it when upgrading FastAPI and Starlette together;
-do not replace it with a warning ignore or a site-packages patch. See
-[Starlette issue 3497](https://github.com/Kludex/starlette/issues/3497) and the
-[python-jose changelog](https://github.com/mpdavis/python-jose/blob/master/CHANGELOG.md).
+The coordinated stack is pinned to FastAPI 0.162.0, Starlette 1.10.0 and AnyIO
+4.14.2; multipart parser 0.0.32 and pytest 9.0.3 address the other audited pins.
+No warning suppression or site-packages patch is used. Legacy independently
+signed HS256 tokens remain a compatibility fixture; malformed session-claim
+types must return unauthorized rather than raise server errors. See
+[dependency remediation](../../docs/BACKEND_DEPENDENCY_REMEDIATION.md).
 
 `integration/test_demo_setup.py` verifies local-only target/schema selection,
 disabled external credentials, closed sign-up and idempotent synthetic seeding

@@ -1,6 +1,39 @@
 # Check-in preparation — 26 October 2026
 
-## Current follow-up and push authorization
+## Local operations and dependency follow-up
+
+User authorized scoped commits for this follow-up; no push is authorized in this
+step. Reviewed scope is the pending local-operations/dependency tree, not a
+production or completed Phase 4 release. Groups, explicitly staged by path:
+
+1. Backend dependency pins, PyJWT migration, modern status aliases and JWT tests.
+2. Organization security summary/exact Activity windows, readiness, multi-file
+   uploads and shared product branding, with backend/frontend regressions.
+3. Portable browser acceptance, PostgreSQL/browser/security CI gates, tracked-file
+   secret guard and non-security hash annotation preserving existing vectors.
+4. Shared roadmap/manual/validation and compatibility documentation.
+
+Combined validation: **1,238 full PostgreSQL tests** (628.60s, warnings as errors),
+**376 frontend tests** (29.03s), lint/production build/TypeScript and **39 Chrome
+workflow checks** passed. **6 Documents grouped checks** are separate fixture-based
+evidence. Focused tests overlap the full suite; these are not independent test
+totals per commit. All three backend audit scopes are clean, `pip check` has no
+conflicts, migration round-trip/drift checks passed at 0024 and demo readiness is
+healthy. Final tracked-file secret guard, high-severity Bandit and whitespace
+checks passed. No blocking finding identified in the scoped review. Hosted CI,
+real model/vector quality and remaining Phase 4 requirements remain unverified
+or pending as recorded in [Phase 4 status](PHASE4_STATUS.md).
+
+Excluded: unrelated `cline.json`, `.env`/sign-in credentials, temporary evidence,
+logs, generated builds and installed packages. No `git add .` or blanket staging.
+The secret guard is pattern-based, not a guarantee or full Git-history scan.
+
+Commits: dependency compatibility **75ad31b**; local application features
+**7a8a966**; CI/security **4c8d878**. The documentation commit contains this record.
+No application code changed during this check-in review; the combined validation
+above is retained evidence, not a newly rerun full suite.
+
+## Historical deadline/selection follow-up and push authorization
 
 The user subsequently authorized committing and pushing the deadline and shared
 selection fixes, including the three earlier local commits. The "no push"

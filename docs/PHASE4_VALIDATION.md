@@ -1,5 +1,29 @@
 # Phase 4 remediation workflow validation
 
+26 October final dependency compatibility checkpoint: **1,238 full PostgreSQL
+tests passed** in 628.60s with warnings as errors. Earlier **73 focused** and
+**14 JWT** results overlap this full run. Fresh **376 frontend tests** (29.03s),
+lint, production build and TypeScript passed. **39 installed-Chrome workflow
+checks** passed (`phase3_browser_df711584fa08`); **6 Documents grouped checks**
+passed separately using intercepted fixtures, not 45 equivalent checks. Core/dev,
+optional embeddings and installed-environment audits are clean; `pip check`,
+tracked-file secret guard and high-severity Bandit passed. Test database restored
+to 0024 with migration round-trip/drift checks clean; demo readiness is healthy.
+Hosted CI and live model/vector quality are not certified. This supersedes the
+initial dependency blocker in the historical checkpoint below.
+[Versions, compatibility and evidence](BACKEND_DEPENDENCY_REMEDIATION.md).
+
+26 October local operations increment: **1,229 full PostgreSQL tests** (651.52s,
+warnings as errors), final **20 focused tests** (7.08s), **376 frontend tests**
+(21.87s), lint/production builds and **39 Chrome checks** passed. Full collection
+preceded the four new secret-guard tests and final schema/hash refinements;
+the final focused run covers those changes and overlaps the full run. New code
+adds summary/exact-window links, redacted readiness, multi-file/drop import,
+product/header branding and portable browser/security CI configuration.
+**Backend dependency audit is not green:** 34 advisory entries across six packages.
+No ignores/waiver added. CI execution, organization logos and broader hardening
+remain pending. See [exact scope, limitations and evidence](PHASE4_LOCAL_OPERATIONS.md).
+
 26 October final check-in review: pending code, regressions, browser script and
 documentation reviewed; no blocking finding identified. Fresh pre-push reruns:
 **372 frontend tests** (22.19s), lint, normal TypeScript check and **54 focused

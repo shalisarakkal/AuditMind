@@ -1,5 +1,17 @@
 # Phase 4 changes and Chrome verification
 
+## New local operations features
+
+Refresh Dashboard: check **Security summary · Last 7 days** and open a count.
+Activity must show the exact summary period and matching completed event type;
+Clear filters removes it. Failed sign-ins are explicitly unavailable, not zero.
+From Assets/Findings, select multiple CSV files or drop them in the upload area:
+each gets its own source and Upload/Cancel controls and independent report.
+Check the shared product mark/header and browser icon. `/health` remains liveness;
+`http://localhost:8000/ready` reports dependency booleans with 200 or 503.
+Organization logos and some security gates remain unfinished. See
+[scope, exact date semantics and security blocker](PHASE4_LOCAL_OPERATIONS.md).
+
 ## Archived, Assets and Uploads selection consistency (26 October)
 
 On **Archived**, select two available rows: use **Restore selected** or (admin

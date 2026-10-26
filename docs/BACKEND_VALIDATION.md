@@ -1,5 +1,19 @@
 # Backend validation — 2026-10-20
 
+Latest 26 October dependency checkpoint: **1,238 full PostgreSQL tests passed**
+in 628.60s with warnings as errors, including all new guard/JWT cases. Earlier
+73 focused compatibility and 14 JWT tests overlap this run. All three dependency
+audit scopes are clean; `pip check` has no conflicts. Disposable test database
+restored to 0024 with round-trip/drift checks clean and no browser schemas.
+The unresolved-audit statement below is historical, not current.
+[Final dependency record](BACKEND_DEPENDENCY_REMEDIATION.md).
+
+26 October local operations: **1,229 full PostgreSQL tests** passed in 651.52s
+with warnings as errors. Final **20 focused tests** passed in 7.08s, including
+final response-schema/hash edits and four secret-guard cases added after full
+collection. Not additive. New dependency audit findings remain unresolved;
+[scope and security blocker](PHASE4_LOCAL_OPERATIONS.md).
+
 ## Phase 4 backend follow-up — 2026-10-23
 
 Final pre-push check (26 October): **54 focused PostgreSQL tests** passed in
