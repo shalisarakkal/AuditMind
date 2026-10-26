@@ -23,6 +23,11 @@ export type BulkRequest = {
  * Rows that couldn't start are listed with why. */
 export default function BulkConfirm({ request, selection, onClose }: { request: BulkRequest; selection: Selection; onClose(): void }) {
   const { startBulk } = useImports();
+  // Confirmation owns an immutable target snapshot, not the live checkboxes.
+  const [targets] = useState(() => {
+    const ids = [...selection.ids];
+    return { ids, names: selection.names(ids) };
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<{ name: string; detail: string }[] | null>(null);
@@ -33,8 +38,8 @@ export default function BulkConfirm({ request, selection, onClose }: { request: 
     inFlight.current = true;
     setBusy(true);
     setError(null);
-    const ids = selection.ids;
-    const picked = selection.names(ids);
+    const ids = targets.ids;
+    const picked = targets.names;
     const names = new Map(ids.map((id, i) => [id, picked[i]]));
     try {
       const result = await startBulk(request.action, ids, request.itemType);

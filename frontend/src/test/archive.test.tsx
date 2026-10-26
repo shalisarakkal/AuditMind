@@ -548,6 +548,70 @@ describe("helpers", () => {
 });
 
 describe("Several at once", () => {
+  it("disables Archived row mutations while selected, confirms fixed bulk targets, and restores row actions on clear", async () => {
+    const { fetchMock } = await renderSignedIn(<ArchivedPage />, "admin", {
+      "GET /orgs/org-1/archive": () => archivedPage([archived(), archived({ id: "b2", label: "second.csv" })]),
+      "POST /orgs/org-1/archive-jobs/bulk": () => json({ jobs: [], refused: [] }, 202),
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select findings.csv" }));
+    expect(screen.getByRole("button", { name: "Restore findings.csv" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Purge second.csv" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select second.csv" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore selected" }));
+    const modal = screen.getByRole("dialog", { name: "Restore selected" });
+    expect(within(modal).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(modal).toHaveTextContent("Restore 2 archived items?");
+    expect(modal).toHaveTextContent("findings.csv — b1");
+    expect(modal).toHaveTextContent("second.csv — b2");
+    fireEvent.click(within(modal).getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/archive-jobs/bulk"))!;
+    expect(JSON.parse(String(request[1]!.body))).toEqual({ action: "restore", item_type: null, ids: ["b1", "b2"] });
+    expect(screen.getByRole("button", { name: "Restore findings.csv" })).toBeEnabled();
+  });
+
+  it("blocks incompatible bulk restore/purge without silently skipping targets", async () => {
+    await renderSignedIn(<ArchivedPage />, "admin", {
+      "GET /orgs/org-1/archive": () => archivedPage([archived({ state: "restoring" }), archived({ id: "b2", label: "purging.csv", state: "purging" })]),
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select findings.csv" }));
+    expect(screen.getByRole("button", { name: "Restore selected" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Purge selected" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select purging.csv" }));
+    expect(screen.getByRole("button", { name: "Restore selected" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Purge selected" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.getByRole("button", { name: "Retry restore findings.csv" })).toBeEnabled();
+  });
+
+  it("admin bulk purge confirms permanent deletion and submits exactly the selected batches", async () => {
+    const { fetchMock } = await renderSignedIn(<ArchivedPage />, "admin", {
+      "GET /orgs/org-1/archive": () => archivedPage([archived(), archived({ id: "b2", label: "second.csv" })]),
+      "POST /orgs/org-1/archive-jobs/bulk": () => json({ jobs: [], refused: [] }, 202),
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select all on this page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Purge selected" }));
+    const modal = screen.getByRole("dialog", { name: "Purge selected" });
+    expect(modal).toHaveTextContent("Permanently delete 2 archived items");
+    expect(modal).toHaveTextContent("This can't be undone.");
+    fireEvent.click(within(modal).getByRole("button", { name: "Purge for good" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/archive-jobs/bulk"))!;
+    expect(JSON.parse(String(request[1]!.body))).toEqual({ action: "purge", item_type: null, ids: ["b1", "b2"] });
+  });
+
+  it("auditors may bulk restore but cannot bulk purge; cancellation submits nothing", async () => {
+    const { fetchMock } = await renderSignedIn(<ArchivedPage />, "auditor", {
+      "GET /orgs/org-1/archive": () => archivedPage([archived()]),
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select findings.csv" }));
+    expect(screen.queryByRole("button", { name: "Purge selected" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restore selected" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("checkbox", { name: "Select findings.csv" })).toBeChecked();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST" && String(init.body).includes('"restore"'))).toBe(false);
+  });
+
   const uploads = (from: number, count: number) =>
     Array.from({ length: count }, (_, i) => upload({ id: `s${from + i}`, filename: `f${from + i}.csv` }));
 

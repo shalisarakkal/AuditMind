@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useState } from "react";
 
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
+import FindingActionDialog from "@/components/FindingActionDialog";
 import ImportReportPanel from "@/components/ImportReportPanel";
 import { ArchiveButtons } from "@/components/JobButton";
 import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
@@ -55,9 +56,10 @@ function outcome(upload: Upload): string {
 
 // The list reads its sort and filters from the page address.
 export default function UploadsPage() {
+  const { selectedOrg } = useApp();
   return (
     <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
-      <Uploads />
+      <Uploads key={selectedOrg?.id} />
     </Suspense>
   );
 }
@@ -76,7 +78,7 @@ function Uploads() {
   const { retry } = useImports();
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
-  useReloadOnImport(reload);
+  useReloadOnImport(() => { selection.clear(); reload(); });
   useReloadOnImport(facets.reload);
 
   const archive = (upload: Upload) =>
@@ -126,7 +128,7 @@ function Uploads() {
     <div className="space-y-6">
       <PageHeader title="Uploads" total={page?.total} noun="uploads" orgName={org.name} filtered={list.hasFilters} />
       <JobStatus />
-      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
+      {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
       <ListToolbar list={list} label="uploads">
         <DateRangeFilter list={list} label="Uploaded" />
       </ListToolbar>
@@ -135,7 +137,7 @@ function Uploads() {
           <SelectionAction onClick={archiveSelected}>Archive selected</SelectionAction>
         </SelectionBar>
       )}
-      {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
+      {bulk && <FindingActionDialog title={bulk.label} orgName={org.name} onClose={() => setBulk(null)}><BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} /></FindingActionDialog>}
 
       {retryError && (
         <p role="alert" className="text-sm text-red-300">
@@ -218,7 +220,7 @@ function Uploads() {
                       <button
                         type="button"
                         aria-label={`Retry ${u.filename ?? "upload"}`}
-                        disabled={retrying === u.id}
+                        disabled={retrying === u.id || selection.count > 0 || loading}
                         onClick={() => retryUpload(u)}
                         className={ROW_ACTION}
                       >
@@ -233,8 +235,8 @@ function Uploads() {
                         batchId={u.archiving_batch_id}
                         onArchive={() => archive(u)}
                         onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, u.filename ?? "upload"))}
-                        disabled={isRunning(u)}
-                        disabledTitle="Archive it once it has finished processing"
+                        disabled={isRunning(u) || selection.count > 0 || loading}
+                        disabledTitle={selection.count ? "Clear selection to use individual row actions." : "Archive it once it has finished processing"}
                       />
                     )}
                   </td>

@@ -28,7 +28,7 @@ export default function ConfirmPanel({
         danger ? "border-red-400/30 bg-red-400/5" : "border-cyan/30 bg-cyan/5"
       }`}
     >
-      <span className="text-white">{message}</span>
+      <div className="text-white">{message}</div>
       <button
         type="button"
         disabled={busy}

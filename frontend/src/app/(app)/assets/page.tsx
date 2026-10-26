@@ -5,6 +5,7 @@ import { Fragment, Suspense, useState } from "react";
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
+import FindingActionDialog from "@/components/FindingActionDialog";
 import { ArchiveButtons } from "@/components/JobButton";
 import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
 import JobStatus from "@/components/JobStatus";
@@ -38,9 +39,10 @@ const PAGE_SIZE = 100;
 
 // The list reads its sort and filters from the page address.
 export default function AssetsPage() {
+  const { selectedOrg } = useApp();
   return (
     <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
-      <Assets />
+      <Assets key={selectedOrg?.id} />
     </Suspense>
   );
 }
@@ -57,7 +59,7 @@ function Assets() {
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
   const selection = useSelection(list, org.id);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
-  useReloadOnImport(reload);
+  useReloadOnImport(() => { selection.clear(); reload(); });
   useReloadOnImport(facets.reload);
 
   const assets = page?.items;
@@ -116,7 +118,7 @@ function Assets() {
       />
       <ImportStatus page="assets" />
       <JobStatus />
-      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
+      {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
 
       <ListToolbar list={list} label="assets" />
       {writer && (
@@ -124,7 +126,7 @@ function Assets() {
           <SelectionAction onClick={archiveSelected}>Archive selected</SelectionAction>
         </SelectionBar>
       )}
-      {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
+      {bulk && <FindingActionDialog title={bulk.label} orgName={org.name} onClose={() => setBulk(null)}><BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} /></FindingActionDialog>}
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
@@ -230,6 +232,8 @@ function Assets() {
                             archiving={a.archiving}
                             batchId={a.archiving_batch_id}
                             onArchive={() => archive(a)}
+                            disabled={selection.count > 0 || loading}
+                            disabledTitle="Clear selection to use individual row actions."
                             onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, a.hostname ?? a.ip ?? a.cloud_id ?? "asset"))}
                           />
                         )}

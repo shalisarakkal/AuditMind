@@ -4,6 +4,7 @@ import { Fragment, Suspense, useState } from "react";
 
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
 import JobButton from "@/components/JobButton";
+import FindingActionDialog from "@/components/FindingActionDialog";
 import JobConfirm, { type JobRequest } from "@/components/JobConfirm";
 import ImportReportPanel from "@/components/ImportReportPanel";
 import JobStatus from "@/components/JobStatus";
@@ -53,9 +54,10 @@ const TYPE_OPTIONS: { value: ArchiveItemType; label: string }[] = [
 // The list reads its sort and filters (the type chips too) from the page
 // address.
 export default function ArchivedPage() {
+  const { selectedOrg } = useApp();
   return (
     <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
-      <Archived />
+      <Archived key={selectedOrg?.id} />
     </Suspense>
   );
 }
@@ -73,6 +75,13 @@ function Archived() {
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const busy = (item: ArchivedItem) => item.running !== null || jobs.some((j) => isRunning(j) && j.batch_id === item.id);
+  const eligibility = (item: ArchivedItem) => ({ restore: !busy(item) && item.state !== "purging", purge: !busy(item) && item.state !== "restoring" });
+  const canSelectAction = (action: "restore" | "purge") => selection.ids.every(id => {
+    const current = page?.items.find(item => item.id === id);
+    return current ? eligibility(current)[action] : selection.metadata(id)?.[action] === true && !jobs.some(j => isRunning(j) && j.batch_id === id);
+  });
+  const targetNames = selection.names(selection.ids);
+  const targetSummary = <details className="my-2"><summary>Selected archived items ({selection.count})</summary><ul className="max-h-48 overflow-y-auto break-all text-xs">{selection.ids.map((id, i) => <li key={id}>{targetNames[i]} — {id}</li>)}</ul></details>;
   const restoreSelected = () =>
     setBulk({
       action: "restore",
@@ -81,6 +90,7 @@ function Archived() {
         <>
           Restore <strong>{selectedText(selection.count, "archived item")}</strong>? Findings recorded again since they were
           archived are kept, and their archived copies purged.
+          {targetSummary}
         </>
       ),
       confirmLabel: "Restore",
@@ -93,12 +103,13 @@ function Archived() {
         <>
           Permanently delete <strong>{selectedText(selection.count, "archived item")}</strong> and everything archived with
           them? This can&apos;t be undone.
+          {targetSummary}
         </>
       ),
       confirmLabel: "Purge for good",
       danger: true,
     });
-  useReloadOnImport(reload);
+  useReloadOnImport(() => { selection.clear(); reload(); });
 
   const restore = (item: ArchivedItem) =>
     setConfirming({
@@ -136,7 +147,7 @@ function Archived() {
         note="Archived items are hidden from every list and score, and purged automatically after the retention period set in Settings."
       />
       <JobStatus />
-      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
+      {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
 
       <div className="space-y-3">
         <ListToolbar list={list} label="archived items">
@@ -146,15 +157,17 @@ function Archived() {
       </div>
       {writer && (
         <SelectionBar selection={selection}>
-          <SelectionAction onClick={restoreSelected}>Restore selected</SelectionAction>
+          <span>Actions for selected archived items</span>
+          <SelectionAction disabled={loading || !canSelectAction("restore")} onClick={restoreSelected}>Restore selected</SelectionAction>
           {admin && (
-            <SelectionAction onClick={purgeSelected} danger>
+            <SelectionAction disabled={loading || !canSelectAction("purge")} onClick={purgeSelected} danger>
               Purge selected
             </SelectionAction>
           )}
+          <span className="text-xs text-white/60">Clear selection to use individual row actions. Restore is unavailable for purging items; Purge is unavailable for restoring items. No items are silently skipped.</span>
         </SelectionBar>
       )}
-      {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
+      {bulk && <FindingActionDialog title={bulk.label} orgName={org.name} onClose={() => setBulk(null)}><BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} /></FindingActionDialog>}
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
@@ -165,7 +178,7 @@ function Archived() {
                 <th className={SELECT_CELL}>
                   <SelectPageBox
                     selection={selection}
-                    rows={page.items.filter((item) => !busy(item)).map((item) => ({ id: item.id, name: item.label }))}
+                    rows={page.items.filter((item) => !busy(item)).map((item) => ({ id: item.id, name: item.label, metadata: eligibility(item) }))}
                   />
                 </th>
               )}
@@ -175,8 +188,8 @@ function Archived() {
               <SortHeader label="Archived by" column="archived_by" list={list} />
               <SortHeader label="Archived" column="archived" list={list} defaultSort="archived" defaultOrder="desc" />
               <SortHeader label="Purge" column="purge" list={list} />
-              <th className={TH}>
-                <span className="sr-only">Actions</span>
+              <th className={`${TH} sticky right-0 z-10 bg-navy`}>
+                Actions
               </th>
             </tr>
             <tr>
@@ -203,7 +216,7 @@ function Archived() {
                 <tr className={ROW}>
                   {writer && (
                     <td className={SELECT_CELL}>
-                      <SelectBox selection={selection} id={item.id} name={item.label} disabled={busy(item)} />
+                      <SelectBox selection={selection} id={item.id} name={item.label} metadata={eligibility(item)} disabled={busy(item)} />
                     </td>
                   )}
                   <td className={`${TD} text-white`}>{item.label}</td>
@@ -215,7 +228,7 @@ function Archived() {
                     <div>{purgeCountdown(item.purge_at)}</div>
                     <div className="text-white/40">{formatDateTime(item.purge_at)}</div>
                   </td>
-                  <td className={ACTIONS_CELL}>
+                  <td className={`${ACTIONS_CELL} sticky right-0 bg-navy`}>
                     {item.item_type === "upload" && (
                       <button
                         type="button"
@@ -230,7 +243,7 @@ function Archived() {
                     {writer && (
                       <RowActions
                         item={item}
-                        busy={busy(item)}
+                        busy={busy(item) || loading || selection.count > 0}
                         canPurge={admin}
                         onRestore={() => restore(item)}
                         onPurge={() => purge(item)}
