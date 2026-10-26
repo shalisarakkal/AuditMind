@@ -1,5 +1,23 @@
 # Testing strategy and measured coverage
 
+Final pre-push rerun (26 October): **372 frontend tests** (22.19s), lint,
+TypeScript and **54 focused PostgreSQL tests** (33.21s) passed. Prior full backend,
+production-build and Chrome evidence below is preserved separately. See
+[check-in review](PHASE4_VALIDATION.md) for scope, secret checks and exclusions.
+
+26 October lifecycle selection UI follow-up: **372 frontend tests** (25.74s),
+lint, TypeScript/production builds and **37 installed-Chrome workflow checks**
+passed, including Archived multi-selection and shared Assets/Uploads safeguards.
+The prior 1,218-test backend result remains earlier evidence, not a new run for
+this frontend-only change. See [current validation](PHASE4_VALIDATION.md).
+
+26 October deadline validation follow-up: **1,218 full PostgreSQL tests passed**
+(637.17s, warnings as errors), including the **54 focused deadline/workflow tests**
+(44.30s; not additive). **367 frontend tests** (23.64s), lint, production builds,
+and **35 installed-Chrome workflow checks** passed. New regressions cover today's
+deadlines, creation-day boundaries, local midnight and atomic bulk rejection.
+See [current validation evidence](PHASE4_VALIDATION.md). No inference/paid calls.
+
 26 October dependency blocker **resolved**: approved transitive-only updates to
 `undici@8.12.3` / `zod@4.6.7`; only the lockfile changed, not package.json or
 application source. Full/production npm audits both **zero**. Fresh **367 frontend

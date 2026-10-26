@@ -1,5 +1,20 @@
 # Release readiness and code review
 
+26 October Archived/shared selection follow-up: **372 frontend tests**,
+lint/production builds and **37 Chrome workflow checks** passed. Archived now
+matches Findings' row-versus-bulk interaction, fixed-target modal confirmations
+and selection safeguards; Assets/Uploads share those controls. Purge stays
+admin-only and irreversible; backend per-item authorization/refusals are unchanged.
+No new backend run for this frontend-only increment. See [evidence](PHASE4_VALIDATION.md).
+
+26 October deadline follow-up validated: **1,218 full PostgreSQL tests**
+(637.17s, warnings as errors), **367 frontend tests**, lint/production builds and
+**35 installed-Chrome workflow checks** passed. Today's due/review dates are
+allowed through local end of day; newly set dates cannot precede finding creation,
+and invalid bulk edits reject atomically. Test database restored to 0024 with no
+Alembic drift. See [current evidence](PHASE4_VALIDATION.md). This does not change
+the local-testing-only release scope or approve production/live AI.
+
 26 October dependency blocker **resolved**: approved transitive-only updates to
 `undici@8.12.3` / `zod@4.6.7`; only the lockfile changed, not package.json or
 application source. Full/production npm audits both **zero**. Fresh **367 frontend

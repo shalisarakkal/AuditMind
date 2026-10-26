@@ -1,5 +1,57 @@
 # Phase 4 remediation workflow validation
 
+26 October final check-in review: pending code, regressions, browser script and
+documentation reviewed; no blocking finding identified. Fresh pre-push reruns:
+**372 frontend tests** (22.19s), lint, normal TypeScript check and **54 focused
+PostgreSQL tests** (33.21s, warnings as errors) passed. These focused tests overlap
+the earlier **1,218 full-suite** result; no second full backend run is claimed.
+Production builds and the **37-check Chrome run** below remain applicable because
+only documentation changed after that validated application tree. Disposable test
+database restored to 0024 with round-trip/drift checks clean and no leftover
+browser schemas. Pending and previously committed outgoing additions passed the
+value-redacted secret-pattern scan; staged groups are checked separately before
+commit. User authorized push, including the three earlier local commits. Scope
+and exclusions: [check-in record](CHECKIN_PREPARATION.md).
+
+26 October Archived/shared lifecycle selection follow-up: **372 frontend tests**
+(25.74s), lint, TypeScript/isolated and live production builds passed.
+**37 installed-Chrome workflow checks** passed (`phase3_browser_26291a6cb024`),
+including two-row Archived selection, disabled row Restore/Purge, fixed-target
+modal confirmation, Cancel focus/Escape, scoped Axe, and Assets/Uploads modal and
+row-selection behavior. Additional component regressions cover admin bulk purge,
+auditor permissions, incompatible states, cancellation and immutable bulk IDs.
+Native dialogs prevent background selection changes; no backend contract changed.
+The earlier **1,218 PostgreSQL tests** below were not rerun for this frontend-only
+increment. Demo restarted with data/passwords retained. No live AI or paid calls.
+
+26 October inclusive deadline validation fix: newly set due/review dates cannot
+precede the finding's creation day in the entering browser timezone. Accepted
+risk compares the saved UTC expiry against now, allowing today until exclusive
+next-local-midnight (rather than rejecting today's calendar date). Kept legacy
+deadlines are not backfilled/reinterpreted; bulk validation remains atomic.
+Fresh focused PostgreSQL validation: **54 passed** (44.30s), including 15 new
+creation/midnight/timezone/bulk regressions. Fresh **367 frontend tests** (23.64s),
+lint, TypeScript/production builds and **35 installed-Chrome workflow checks**
+passed (`phase3_browser_848f08d422c8`). Chrome now explicitly tests pre-creation
+rejection and today's due/review acceptance, without inference or paid calls.
+Separate full PostgreSQL regression: **1,218 passed** (637.17s), with
+`--require-postgres -W error`; the 54 focused cases are included, not additional.
+Demo restarted with data/passwords retained; no migration change, paid calls or
+real inference. Live Chrome also rechecked date-input contrast/entry after restart.
+Disposable `auditmind_test` restored to revision 0024 after the suite;
+upgrade/downgrade/upgrade and Alembic drift check passed, 30 public tables and
+zero leftover isolated browser schemas. Demo data was not part of this reset.
+
+26 October date-picker contrast fix: native date inputs now share the dark
+color-scheme rule in `globals.css`; the duplicate list-only utility was removed.
+Fresh **367 frontend tests** (21.67s), lint and both isolated/live production
+builds passed. Targeted installed-Chrome verification confirmed dark native
+controls on both Findings date filters and workflow Due/Risk review inputs,
+with date entry preserved and no workflow submitted. Screenshot visually reviewed:
+`temp/auditmind-demo/date-picker-dark.png`. This targeted check is separate from
+the earlier 35-check workflow run; backend tests were not rerun for this CSS-only
+change. Demo restarted with data/passwords retained. Shared convention documented.
+
 26 October dependency blocker **resolved**: approved transitive-only updates to
 `undici@8.12.3` / `zod@4.6.7`; only the lockfile changed, not package.json or
 application source. Full/production npm audits both **zero**. Fresh **367 frontend

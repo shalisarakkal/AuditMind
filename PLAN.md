@@ -4,6 +4,17 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 ## How this works
 
+26 October follow-up: shared calendar contrast fixed; today's deadlines allowed
+until browser-local end of day, newly set dates bounded by finding creation, and
+invalid bulk workflow updates reject atomically. Archived/Assets/Uploads now use
+Findings-style row-versus-bulk selection and fixed-target native confirmations.
+Latest combined validation: 1,218 full PostgreSQL tests (deadline increment),
+372 frontend tests and 37 Chrome checks (subsequent selection increment), lint
+and builds passed. Relevant manuals/contracts synchronized. Commit/push now
+authorized; [scope and exclusions](docs/CHECKIN_PREPARATION.md). The older
+checkpoint results and "No push" statements below are historical. Broader Phase 4
+and production/live-AI acceptance remain out of scope.
+
 Step 3 (25 October): selective Findings search indexed in migration 0024; local
 SA01 warm HTTP search `ssss` fell from 12.472s to 0.031s, with the first post-restart
 request 2.299s; live Chrome including debounce/render 1.127s. Literal semantics,

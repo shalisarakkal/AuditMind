@@ -1,5 +1,41 @@
 # Check-in preparation — 26 October 2026
 
+## Current follow-up and push authorization
+
+The user subsequently authorized committing and pushing the deadline and shared
+selection fixes, including the three earlier local commits. The "no push"
+statements below describe the earlier checkpoint, not the current authorization.
+Reviewable follow-up groups, explicitly staged by path (never `git add .`):
+
+1. Deadline validation/calendar contrast: backend workflow service and PostgreSQL
+   regressions, shared date-input CSS/ListPage and workflow explanatory text.
+2. Shared lifecycle selection: Archived/Assets/Uploads, fixed-target BulkConfirm,
+   semantic ConfirmPanel markup and component/page regressions.
+3. Shared Chrome acceptance and synchronized roadmap/manual/validation documents.
+   These files cover both fixes; keeping them together avoids fragile partial-file
+   staging. Browser acceptance describes the combined result, not each intermediate commit.
+
+Deadline group committed as **bc7b9fb** (7 files, including its backend contract
+and validation notes). Lifecycle selection committed as **ba7de7d** (7 code/test
+files). The final acceptance/docs commit contains this synchronization record;
+remote push confirmation is reported separately after Git verifies it.
+
+Review scope: every pending tracked diff, new BulkConfirm regression, existing
+outgoing commit scope, authorization/date-boundary/atomicity behavior, immutable
+targets, dialog focus/busy/cancel behavior and explicit per-item bulk refusals.
+No blocking finding identified. This is a local-testing milestone only.
+Excluded: unrelated untracked `cline.json`, `.env` files, sign-in credentials,
+temporary browser artifacts, generated acceptance build paths and local logs.
+
+Current combined evidence: **1,218 full PostgreSQL tests** (637.17s, warnings as
+errors) from the deadline increment; **372 frontend tests** (25.74s), lint,
+production builds and **37 Chrome checks** from the subsequent selection increment.
+The full backend run was not repeated for the frontend-only selection changes.
+The 54 focused backend tests overlap the full suite. Current pre-push reruns and
+staged review are recorded in [validation](PHASE4_VALIDATION.md).
+
+## Earlier checkpoint (historical)
+
 Prepared for a **local-testing increment**, not a production/live-AI release.
 The user authorized these grouped commits on 26 October. **The dependency blocker
 is resolved by targeted updates and fresh validation.** Push is not authorized. Do not use

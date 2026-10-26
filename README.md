@@ -1,5 +1,11 @@
 # AuditMind AI
 
+Latest local-testing UI: consistent date-picker contrast, inclusive browser-local
+workflow deadlines and safe row/bulk actions across Findings, Archived, Assets
+and Uploads. See [Chrome verification steps](docs/PHASE4_USER_VERIFICATION.md)
+and [current validation evidence](docs/PHASE4_VALIDATION.md). This does not enable
+production deployment or live inference.
+
 Evidence-aware AI assessment is available **opt-in/off by default**: explicit
 unscored evidence states, reviewed coverage qualification and server aggregation.
 See [profiles/operator workflow](docs/EVIDENCE_COVERAGE_PROFILES.md) and

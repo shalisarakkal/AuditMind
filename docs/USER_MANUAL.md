@@ -579,3 +579,30 @@ legacy reports are included under All. Null scores sort last, not as zero.
 Four persistent mocked report examples are available in the separate
 **Evidence examples - SYNTHETIC ONLY** organization. See
 [the demonstration guide](SYNTHETIC_EVIDENCE_EXAMPLES.md) for access and limitations.
+
+## Finding deadline validation
+
+Due dates and risk review dates include the entire selected day in the entering
+browser's timezone. Newly set dates cannot precede the finding's creation day in
+that timezone. Today is allowed. Accepted risk additionally requires a review
+deadline that has not expired: it expires at the start of the next local day.
+Bulk edits validate every finding and reject the entire update if any target
+fails. Keeping an existing deadline does not reinterpret it in another timezone.
+
+## Archived selection and actions
+
+With no selection, use a row's **Restore** or (admins only) **Purge** action.
+Select checkboxes for one or several archived items to use **Restore selected**
+or **Purge selected** in the selection bar. Row mutation actions are disabled
+until you **Clear selection**; reports remain readable. Selection is retained
+across pages, up to 500 items, and reset by filter/organization changes or
+completed jobs. Purging items cannot be restored; restoring items cannot be
+purged. Incompatible selections disable the corresponding bulk action rather
+than silently skipping items.
+
+Review the confirmation's item count and expandable names/IDs. The confirmation
+blocks background selection changes until you confirm or cancel; Escape cancels
+before submission. Purge is permanent and cannot be undone. Bulk operations may
+queue some jobs and refuse others if availability/permissions changed; review
+the refusal details. This is not a database-wide atomic bulk transaction.
+Assets and Uploads use the same selection/confirmation safeguards.

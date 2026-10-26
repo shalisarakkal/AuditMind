@@ -9,6 +9,21 @@ shared pieces in `frontend/src/components/ListPage.tsx` and
 `frontend/src/components/ListControls.tsx` rather than styling them afresh.
 Agreed 2026-09-30.
 
+Native date inputs use the shared `input[type="date"] { color-scheme: dark; }`
+rule in `globals.css`, including workflow deadlines and list filters. Keep the
+calendar indicator legible against navy; retain the native picker and keyboard
+entry rather than applying per-screen icon inversion or custom replacements.
+
+Archived, Assets and Uploads follow the Findings selection contract: selected
+rows enable bulk actions and disable individual mutation/retry actions (read-only
+reports/details remain available). Clear selection restores row actions. Native
+application-styled confirmation modals block background interaction, focus Cancel,
+preserve original bulk IDs, and block cancellation while submitting. Organization
+changes remount the list; filter changes and completed jobs clear selection.
+Archived shows Restore for writers and Purge only for admins. A purging target
+blocks bulk Restore; a restoring target blocks bulk Purge, including across pages.
+Never silently omit incompatible targets; backend validation remains authoritative.
+
 ## Layout, top to bottom
 
 1. **Header** (`PageHeader`): the title; under it the count, "2,184,928

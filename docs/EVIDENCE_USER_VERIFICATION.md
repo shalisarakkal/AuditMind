@@ -3,6 +3,9 @@
 For the newly committed Phase 4 changes, start with the detailed
 [Chrome walkthrough and phase summary](PHASE4_USER_VERIFICATION.md). It covers
 workflow, selection/archive, dates, search, shared UI and two-user conflicts.
+The 26 October follow-up includes today's inclusive deadlines and matching
+Archived/Assets/Uploads row/bulk confirmations. Follow that current walkthrough;
+older test counts below remain historical evidence, not current suite totals.
 
 23 October 2026. Synthetic/mocked testing only. **Do not enable real inference,
 enter credentials, grant ordinary-organization external processing consent, or

@@ -1,5 +1,23 @@
 # Phase 4 changes and Chrome verification
 
+## Archived, Assets and Uploads selection consistency (26 October)
+
+On **Archived**, select two available rows: use **Restore selected** or (admin
+only) **Purge selected** in the selected-items bar. Individual Restore/Purge
+buttons must be disabled until **Clear selection**. Open either bulk action:
+check the count and expand **Selected archived items** for names/batch IDs.
+Cancel or press Escape: selection remains and no action starts. Clear selection,
+then open a single row's Restore: only that named row is the target. Confirm only
+if you intend to restore it. Purge is irreversible; do not use real data to test it.
+
+Stopped restoring items allow only Restore; stopped purging items allow only
+Purge. A mixed selection disables incompatible bulk actions; nothing is silently
+skipped. Running jobs are not selectable. Reports remain available read-only.
+On **Assets** and **Uploads**, selecting rows disables individual archive/undo
+(and upload retry) actions. Bulk confirmation blocks background interaction.
+Cancellation preserves selection; completed jobs/filter/organization changes
+clear it. Backend permissions and per-item refusals remain authoritative.
+
 26 October 2026. This increment is for **local synthetic testing**, not production
 or live-AI release acceptance. No provider calls or paid inference are needed.
 
@@ -57,7 +75,10 @@ In **Workflow history**, check human-readable assignee labels and only changed
 fields. An unchanged assignee/date must not produce a before → identical-after
 entry. Notes/history remain paged; **Saved notes and history** opens the history area.
 
-As admin, you can separately test **Accepted risk** with a future review date.
+As admin, you can separately test **Accepted risk** with today's review date
+(valid until the next local midnight) or a future review date. Newly entered
+due/review dates cannot precede the finding's creation day in your browser's
+timezone; invalid bulk updates reject every target without partial changes.
 For a selection with mixed resulting statuses, setting a shared review date must
 be blocked unless every resulting status is Accepted risk. Cancel that draft if
 you do not intend to update all selected findings. Auditor access to accepted-risk
