@@ -1,5 +1,11 @@
 # Backend validation — 2026-10-20
 
+Latest hosted Linux backend: **1,244 passed in 331.37s** (`4ffee34`), required
+PostgreSQL and warnings as errors. Includes three original-Passlib hash fixtures.
+Clean dev-only Windows installation before the password fork passed 1,241 tests
+(601.72s), with no optional OpenAI SDK. These supersede the local-only checkpoint
+below; focused counts overlap. [Clean-install corrections and final CI link](BACKEND_DEPENDENCY_REMEDIATION.md).
+
 Latest 26 October dependency checkpoint: **1,238 full PostgreSQL tests passed**
 in 628.60s with warnings as errors, including all new guard/JWT cases. Earlier
 73 focused compatibility and 14 JWT tests overlap this run. All three dependency

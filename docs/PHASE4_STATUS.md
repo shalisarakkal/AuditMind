@@ -28,7 +28,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Large-organization list performance | Partial | Indexed selective Findings search delivered; short/broad searches remain slow. Dashboard/list exact counts remain; estimated counts and cached facets not completed. |
 | Security hardening | Partial | Sign-in process-local limiter and durable AI accounting exist. Shared/distributed request limits, dedicated upload request throttling, malware policy, service-account ACL validation and production secrets/CORS need further work. File-size limits are not request-rate limits. |
 | Observability | Local implementation present; hosted acceptance pending | Structured logs/correlation, worker metrics/alerts and unit tests exist. Metrics are in-memory; external alert delivery/load/production monitoring is not certified. |
-| CI automation | Configured, hosted execution pending | Required PostgreSQL/warnings-as-errors, npm ci, isolated Linux Chromium job, dependency/secret/high-severity SAST gates. Local Chrome tested; Linux execution not yet proved. Dependency audits now clean; medium/low SAST triage and opt-in performance jobs remain pending. |
+| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates exercised. Clean-install failures corrected; Linux backend 1,244 passed, hosted browser/frontend/security passed. See dependency record for final run. Medium/low SAST triage and opt-in performance jobs remain pending. |
 | Multi-worker SaaS fairness/storage/scaling | Partial foundations; pending rollout | `FOR UPDATE SKIP LOCKED`, resumable jobs and heartbeat exist. Tenant-fair scheduling, autoscaling, separate worker groups, shared object storage and plan limits are not delivered as a SaaS operating model. |
 | Hosting/keyless provider auth/managed DB/backups/production operations | Hosting-dependent, not implemented/accepted | Hosting choice and separate deployment authorization required. Existing local test success is not backup/restore, workload-identity or production acceptance. |
 
@@ -68,11 +68,17 @@ organization security summary. Preserve scores, source evidence and reports.
 
 `/ready` and portable browser/security CI are also implemented/configured locally.
 The dependency increment resolves the initial audit findings without ignores;
-local regression acceptance is recorded below; hosted acceptance remains pending.
+local regression acceptance is recorded below; subsequent hosted evidence is in
+[dependency follow-up](BACKEND_DEPENDENCY_REMEDIATION.md).
 Organization logos, ACL/throttling/malware policy, static-analysis triage and large-
 org performance remain pending. Scoring, reconciliation and hosting stay separate.
 
 ## Current validation baseline
+
+Subsequent clean-install follow-up: Linux backend **1,244 passed**, frontend
+**377 passed**, **39 local Chrome checks**, hosted browser/frontend/security
+passed; [exact SHA scope and final CI link](BACKEND_DEPENDENCY_REMEDIATION.md).
+The preceding checkpoint below is retained as history.
 
 After dependency remediation, full PostgreSQL: **1,238 passed** (628.60s), warnings
 as errors. Focused compatibility **73 passed** and JWT **14 passed** overlap this

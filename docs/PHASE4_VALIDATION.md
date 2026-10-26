@@ -1,5 +1,16 @@
 # Phase 4 remediation workflow validation
 
+Latest clean-install/Linux correction: old `httpx` fallback, missing browser
+`vector` extension, deprecated Unix `crypt` import and upload-result mobile
+overflow corrected without warning ignores or relaxed assertions. Linux backend
+**1,244 passed** (331.37s at `4ffee34`); final frontend **377 passed** (58.16s),
+lint/TypeScript/production builds and **39 local Chrome checks**
+(`phase3_browser_d3a197287cee`). Hosted browser/frontend/security jobs passed at
+`f8959ad`; final backend status is tracked in
+[run 40376551395](https://github.com/shalisarakkal/AuditMind/actions/runs/40376551395).
+Historical 1,241/1,238 and focused results below overlap, not additive totals.
+[Compatibility details](BACKEND_DEPENDENCY_REMEDIATION.md).
+
 Hosted CI follow-up: first run at `9720777` passed frontend and security/audit
 jobs, but exposed missing dev-only `httpx2` and missing browser database `vector`
 extension. Explicit dependency/extension setup and both-client offline guards

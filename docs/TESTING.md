@@ -1,5 +1,11 @@
 # Testing strategy and measured coverage
 
+Latest follow-up: **1,244 Linux PostgreSQL tests** (331.37s), **377 frontend tests**
+(58.16s), lint/TypeScript/production builds, **39 local Chrome checks** and hosted
+Chromium acceptance passed. See [per-SHA evidence and CI results](BACKEND_DEPENDENCY_REMEDIATION.md).
+This supersedes earlier local-only/dependency checkpoints; counts are not additive.
+Clean dev-only installation no longer depends on optional OpenAI SDK packages.
+
 Latest dependency checkpoint (26 October): **1,238 full PostgreSQL tests**
 (628.60s, warnings as errors), **376 frontend tests** (29.03s), lint, production
 build and TypeScript passed. **39 installed-Chrome workflow checks** and **6

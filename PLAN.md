@@ -1602,7 +1602,10 @@ PostgreSQL tests (628.60s, warnings as errors), 376 frontend tests (29.03s),
 lint/build/TypeScript and 39 Chrome workflow checks passed. Six Documents grouped
 checks passed separately; focused results overlap the full suite. All three
 backend audit scopes are clean. See the dependency remediation evidence above.
-Linux hosted CI is configured but unverified; no dependency risk waiver exists.
+Subsequent clean-install corrections exercised Linux hosted CI: backend 1,244
+passed, frontend 377 passed, 39 local Chrome checks and hosted Chromium acceptance
+passed. [Exact SHA evidence/final CI status](docs/BACKEND_DEPENDENCY_REMEDIATION.md).
+No dependency risk waiver exists; production/live-AI approval remains separate.
 
 Kickoff design prepared 23 October 2026:
 [remediation workflow contract and acceptance gates](docs/PHASE4_REMEDIATION_DESIGN.md).

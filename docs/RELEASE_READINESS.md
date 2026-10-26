@@ -1,10 +1,17 @@
 # Release readiness and code review
 
+Clean-install follow-up: explicit httpx2, browser PostgreSQL extensions, compatible
+libpass password dependency and responsive upload-result headings address hosted
+failures. Linux backend 1,244 passed; frontend 377 passed, local Chrome 39 passed,
+and hosted browser/frontend/security jobs passed at the final layout tree.
+[Per-SHA evidence / final CI run](BACKEND_DEPENDENCY_REMEDIATION.md).
+These checks do not complete Phase 4 or authorize production/live AI.
+
 Subsequent approved dependency remediation: **core/dev, optional embeddings and
 installed-environment audits report no known vulnerabilities**; `pip check`
 reports no conflicts. The initial backend blocker below is historical. Full
 acceptance results: [dependency compatibility record](BACKEND_DEPENDENCY_REMEDIATION.md).
-Production/live AI, hosted CI and remaining Phase 4 requirements are not thereby approved.
+Production/live AI and remaining Phase 4 requirements are not thereby approved.
 
 Latest local validation after dependency remediation: **1,238 full PostgreSQL
 tests** (628.60s, warnings as errors), **376 frontend tests** (29.03s), lint/build/
