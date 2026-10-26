@@ -331,7 +331,7 @@ def create_finding(
             ref = db.get(model, ref_id, populate_existing=True)
             if ref is None or ref.org_id != org_id or ref.archived_at is not None:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=f"{name} {ref_id} is not in this organization",
                 )
     finding = Finding(org_id=org_id, **payload.model_dump())

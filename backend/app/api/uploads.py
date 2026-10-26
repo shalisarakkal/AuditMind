@@ -174,7 +174,7 @@ async def _receive(file: UploadFile, max_bytes: int, keep_in_memory: int) -> _Re
         while chunk := await file.read(_CHUNK_BYTES):
             size += len(chunk)
             if size > max_bytes:
-                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=upload_limit_message())
+                raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=upload_limit_message())
             digest.update(chunk)
             if out is None and size > keep_in_memory:
                 settings.upload_dir.mkdir(parents=True, exist_ok=True)

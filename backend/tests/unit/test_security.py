@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError as JWTError
 
 from app.core.config import settings
 from app.core.security import (
@@ -71,7 +72,7 @@ def test_access_token_rejects_unsigned_token():
 
 
 def test_access_token_accepts_existing_hs256_format(monkeypatch):
-    """Build a legacy-format JWT without jose, so encode/decode cannot hide drift."""
+    """Build a legacy-format JWT independently, so encode/decode cannot hide drift."""
     key = "legacy-format-regression-signing-key"
     monkeypatch.setattr(settings, "SECRET_KEY", key)
     monkeypatch.setattr(settings, "ALGORITHM", "HS256")
@@ -98,3 +99,12 @@ def test_access_token_rejects_algorithm_outside_allowlist(monkeypatch):
     )
     with pytest.raises(JWTError):
         decode_access_token(token)
+
+
+@pytest.mark.parametrize("sid", [None, 123, [], {}, "not-a-uuid"])
+def test_invalid_session_claim_is_rejected_without_server_error(sid):
+    from app.api.deps import parse_access_token
+    token = jwt.encode({"sub": str(uuid.uuid4()), "sid": sid,
+                        "exp": datetime.now(timezone.utc) + timedelta(minutes=1)},
+                       settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    assert parse_access_token(token) is None

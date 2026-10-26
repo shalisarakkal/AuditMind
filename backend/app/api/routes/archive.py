@@ -221,7 +221,7 @@ def start_bulk(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     refuse_if_archived(membership)
     if body.action == ArchiveAction.archive and body.item_type is None:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Say which item_type the ids are")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Say which item_type the ids are")
     jobs, refused = [], []
     actor_id = membership.user_id
     for item_id in dict.fromkeys(body.ids):  # each once, in order

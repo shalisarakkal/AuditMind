@@ -153,7 +153,7 @@ def create_asset(
     try:
         asset_type, alias_subtype = resolve_asset_type(payload.type, aliases)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     asset = Asset(
         org_id=org_id,
         **payload.model_dump(exclude={"type", "subtype"}),

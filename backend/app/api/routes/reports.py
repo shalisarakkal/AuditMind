@@ -144,7 +144,7 @@ def bulk_download_reports(
 ) -> StreamingResponse:
     """Downloads selected completed reports as PDFs in one ZIP archive."""
     if len(set(payload.ids)) != len(payload.ids):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Report IDs must be unique.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Report IDs must be unique.")
     reports = db.scalars(
         select(Report).where(Report.org_id == org_id, Report.id.in_(payload.ids))
     ).all()
@@ -196,7 +196,7 @@ def bulk_delete_reports(
 ) -> ReportBulkDeleteResponse:
     """Delete selected, finished reports atomically and record each deletion."""
     if len(set(payload.ids)) != len(payload.ids):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Report IDs must be unique.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Report IDs must be unique.")
     reports = db.scalars(
         select(Report).where(Report.org_id == org_id, Report.id.in_(payload.ids))
     ).all()
@@ -272,7 +272,7 @@ def generate_rule_based_test_report(
     if not settings.RULE_BASED_TEST_REPORTS_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report workflow not found")
     if not payload.title.strip():
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Report title cannot be blank.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Report title cannot be blank.")
     return report_service.create_rule_based_test_report(
         db=db,
         org_id=org_id,

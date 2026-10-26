@@ -131,7 +131,7 @@ def _start_session(
 
 def _password_rejected(problems) -> HTTPException:
     return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail={
             "code": "password_policy",
             "message": "; ".join(p.message for p in problems),

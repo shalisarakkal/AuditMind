@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError
+from jwt import InvalidTokenError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -56,6 +56,8 @@ def parse_access_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None:
     """The user and session an access token names, if it's valid and unexpired."""
     try:
         payload = decode_access_token(token)
+        if not isinstance(payload.get("sub"), str) or not isinstance(payload.get("sid"), str):
+            return None
         return uuid.UUID(payload["sub"]), uuid.UUID(payload["sid"])
     except (JWTError, KeyError, TypeError, ValueError):
         return None

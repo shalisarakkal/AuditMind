@@ -102,7 +102,7 @@ def _validated(family, column_map: dict, params: dict) -> tuple[dict, dict]:
     try:
         cleaned, parsed = validate_profile_parts(family, column_map, params)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     return cleaned, params_json(parsed)
 
 
