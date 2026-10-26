@@ -42,8 +42,8 @@ export default function ImportReportPanel({
       aria-label="Upload result"
       className={`rounded-xl border p-4 ${failed ? "border-red-400/40 bg-red-400/5" : "border-emerald-400/30 bg-emerald-400/5"}`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-white">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <p className="min-w-0 max-w-full break-words text-sm text-white">
           <span className="font-medium">{filename}</span>{" "}
           {failed ? <span className="text-red-300">— processing failed</span> : <span className="text-emerald-300">— processed</span>}
         </p>

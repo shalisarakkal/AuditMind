@@ -18,6 +18,15 @@ const report = {
 };
 
 describe("ImportReportPanel", () => {
+  it("allows narrow report headings to wrap without dropping dismissal", () => {
+    const filename = "long-upload-name-".repeat(12) + ".csv";
+    render(<ImportReportPanel result={{ status: "completed", report: null, filename }} onDismiss={vi.fn()} />);
+    const heading = screen.getByText(filename).parentElement!;
+    expect(heading).toHaveClass("min-w-0", "max-w-full", "break-words");
+    expect(heading.parentElement).toHaveClass("flex-wrap");
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeEnabled();
+  });
+
   it("counts each asset once and its other rows as repeats", () => {
     const repeats = { ...report, created: 10800, updated: 0, repeated: 489200, errors: [], failed: 0, duplicates: 0 };
     render(<ImportReportPanel result={{ status: "completed", report: repeats, filename: "ad.csv", scanType: "directory_import" }} />);
