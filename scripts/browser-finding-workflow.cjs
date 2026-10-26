@@ -237,7 +237,12 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.screenshot({path:path.join(output,'workflow-desktop.png'),fullPage:true});
     let axe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze(); assert.deepEqual(axe.violations.map(v=>v.id),[]);
     await p.setViewportSize({width:390,height:844}); const box=await dialog().boundingBox(); assert.ok(box.x>=0&&box.x+box.width<=390);
-    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+    const mobileLayout=await p.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,
+      overflowing:[...document.querySelectorAll('main,main input,main select,main button,main p,main header')].map(el=>({
+        tag:el.tagName,classes:el.className,right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width
+      })).filter(el=>el.right>innerWidth).slice(0,15)}));
+    evidence.mobileLayout=mobileLayout;
+    assert.ok(mobileLayout.width<=mobileLayout.viewport,JSON.stringify(mobileLayout));
     await dialog().evaluate(el=>{el.scrollTop=0;}); await expect(dialog().getByRole('button',{name:'Close finding workflow'})).toBeInViewport();
     await p.screenshot({path:path.join(output,'workflow-mobile.png'),fullPage:true});
     axe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze(); assert.deepEqual(axe.violations.map(v=>v.id),[]); check('Desktop/mobile modal fits viewport; scoped Axe WCAG A/AA checks pass');

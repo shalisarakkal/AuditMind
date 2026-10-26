@@ -11,7 +11,8 @@ pydantic-settings==2.7.1
 email-validator==2.2.0
 PyJWT[crypto]==2.15.1
 anyio==4.14.2
-passlib[bcrypt]==1.7.4
+# Maintained compatible passlib namespace without deprecated Unix crypt import.
+libpass[bcrypt]==1.9.4
 bcrypt==4.0.1
 python-multipart==0.0.32
 defusedxml==0.7.1

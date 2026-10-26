@@ -7,6 +7,18 @@ from app.services.password_policy import check_password
 from app.services.security_policy import PasswordRules
 
 SIMPLE = PasswordRules()
+
+
+@pytest.mark.parametrize("stored", [
+    "$2b$04$abcdefghijklmnopqrstuuuFnUeCZCRUnAaFirPaYgONdtc8pGfLe",
+    "$bcrypt-sha256$2b,4$abcdefghijklmnopqrstuu$cNxf8GSrX5wbOi4XRxavMsiPassiRKa",
+    "$bcrypt-sha256$v=2,t=2b,r=4$abcdefghijklmnopqrstuu$OTjqMVv187D8bCMJkIUiEV6iVjDYIyK",
+])
+def test_pre_upgrade_password_hashes_remain_compatible(stored):
+    """Synthetic fixtures generated with original Passlib 1.7.4, not the new fork."""
+    assert verify_password("Synthetic-compatibility-2026!", stored)
+    assert not verify_password("Synthetic-compatibility-2026?", stored)
+
 COMPLEX = PasswordRules(
     rule="complex",
     min_length=14,
