@@ -47,6 +47,13 @@ function lastEventsQuery(fetchMock: FetchMock) {
 }
 
 describe("Activity page", () => {
+  it("labels and links known finding references without treating other item IDs as findings", async () => {
+    await renderSignedIn(<ActivityPage />, "viewer", {
+      "GET /orgs/org-1/events": () => ({ items: [event({ type: "finding_workflow_changed", item: "f1", details: { finding_id: "f1" } }), event({ id: "e2", type: "import", item: "upload-id" })], total: 2 }),
+    });
+    expect(await screen.findByRole("link", { name: "Find finding f1" })).toHaveAttribute("href", "/findings/lookup?org=org-1&finding_id=f1");
+    expect(screen.queryByRole("link", { name: "Find finding upload-id" })).not.toBeInTheDocument();
+  });
   it("lists what happened, with who, how long it waited and took, and its criticality", async () => {
     await renderSignedIn(<ActivityPage />, "viewer", {
       "GET /orgs/org-1/events": () =>

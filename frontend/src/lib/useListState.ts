@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { browserTimezone } from "./findingWorkflow";
 
 export type SortOrder = "asc" | "desc";
 
@@ -68,6 +69,9 @@ export function useListState(pageSize: number, orgId: string) {
     own.delete(ORG_KEY);
     const offset = Math.max(0, Number(own.get("offset")) || 0);
     const apiQuery = new URLSearchParams(own);
+    // Date-only controls cover whole browser-local days; no time controls needed.
+    apiQuery.delete("filter_timezone");
+    if (own.get("since") || own.get("until")) apiQuery.set("filter_timezone", browserTimezone() || "");
     // A sort without an order (an old link) is shown ascending: ask for it
     // (some lists' own default is newest first).
     if (own.get("sort") && !own.get("order")) apiQuery.set("order", "asc");

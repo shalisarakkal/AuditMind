@@ -4,6 +4,11 @@ import { Fragment, Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
+import FindingWorkflowDialog from "@/components/FindingWorkflowDialog";
+import FindingReference from "@/components/FindingReference";
+import FindingActionDialog from "@/components/FindingActionDialog";
+import AddFindingDialog from "@/components/AddFindingDialog";
+import { formatDeadline, WORKFLOW_LABELS, WORKFLOW_OPTIONS } from "@/lib/findingWorkflow";
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
 import { ArchiveButtons } from "@/components/JobButton";
 import JobConfirm, { type JobRequest, undoRequest } from "@/components/JobConfirm";
@@ -22,6 +27,7 @@ import {
   SelectionAction,
   SelectionBar,
   SelectPageBox,
+  StatusBadge,
   THEAD,
 } from "@/components/ListPage";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
@@ -66,15 +72,24 @@ function Findings() {
   useReloadOnImport(reload);
   useReloadOnImport(facets.reload);
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
-  const selection = useSelection(list, org.id);
-  const [bulk, setBulk] = useState<BulkRequest | null>(null);
+  const workflowScope = `${org.id}?${list.filterKey}`;
+  const selection = useSelection(list, org.id, 500);
+  useReloadOnImport(selection.clear);
+  const [workflow, setWorkflow] = useState<{ scope: string; ids: string[]; names: string[] } | null>(null);
+  const [bulk, setBulk] = useState<{ request: BulkRequest; ids: string[]; names: string[]; scope: string } | null>(null);
+  const [addingOrg, setAddingOrg] = useState<string | null>(null);
+  const hasManual = facets.data?.has_manual_findings ?? page?.items.some(f => f.scan_id === null) ?? false;
   // The event log finding whose details are open.
   const [opened, setOpened] = useState<string | null>(null);
   const nameOf = (f: FindingListItem) => f.description ?? f.category ?? "finding";
-  // Only findings added by hand, not being archived, can be picked.
-  const pickable = (f: FindingListItem) => f.scan_id === null && f.archiving !== "running";
-  const archiveSelected = () =>
-    setBulk({
+  const pickable = (f: FindingListItem) => !loading && !f.archiving;
+  const allManual = selection.count > 0 && selection.ids.every(id => {
+    const current = page?.items.find(f => f.id === id);
+    return current ? current.scan_id === null && !current.archiving : selection.metadata(id)?.manual === true;
+  });
+  const archiveSelected = () => {
+    if (loading || !allManual) return;
+    setBulk({ ids: selection.ids, names: selection.names(selection.ids), scope: workflowScope, request: {
       action: "archive",
       itemType: "finding",
       label: "Archive selected findings",
@@ -82,10 +97,13 @@ function Findings() {
         <>
           Archive <strong>{selectedText(selection.count, "finding")}</strong>? They leave every list and score. Each can be
           restored from Archived until it&apos;s purged.
+          <span role="list" className="mt-2 block">{selection.names(selection.ids).slice(0, 10).map((name, index) => <span role="listitem" className="block" key={selection.ids[index]}>{name}</span>)}</span>
+          {selection.count > 10 && <span className="block">and {selection.count - 10} more selected findings.</span>}
         </>
       ),
-      confirmLabel: "Archive",
-    });
+      confirmLabel: `Archive ${selection.count} ${selection.count === 1 ? "finding" : "findings"}`,
+    }});
+  };
   // Only findings added by hand are archived one by one; imported ones go
   // with their upload or asset (a re-import would bring them back).
   const archive = (f: FindingListItem) => {
@@ -95,16 +113,19 @@ function Findings() {
       label: `Archive ${name}`,
       message: (
         <>
-          Archive <strong>{name}</strong>? It leaves every list and score. You can restore it from Archived until it&apos;s
+          Archive only this finding: <strong>{name}</strong>?
+          <span className="my-2 block break-all">Finding ID: {f.id}</span>
+          <span className="mb-2 block">This archives 1 finding only. Other checked findings are not included.</span>
+          It leaves every list and score. You can restore it from Archived until it&apos;s
           purged.
         </>
       ),
-      confirmLabel: "Archive",
+      confirmLabel: "Archive 1 finding",
     });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageHeader
         title="Findings"
         total={page?.total}
@@ -117,24 +138,39 @@ function Findings() {
         }
         action={
           writer && (
-            <ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} />
+            <div className="flex flex-wrap gap-3"><button type="button" className="rounded-md border border-cyan px-4 py-2 text-sm text-cyan" onClick={() => setAddingOrg(org.id)}>Add finding</button><ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} /></div>
           )
         }
       />
       <ImportStatus page="findings" />
       <JobStatus />
-      {confirming && <JobConfirm request={confirming} onClose={() => setConfirming(null)} />}
+      {writer && addingOrg === org.id && <AddFindingDialog key={org.id} orgId={org.id} orgName={org.name} onClose={() => setAddingOrg(null)} onSaved={() => { reload(); facets.reload(); selection.clear(); }} />}
+      {workflow?.scope === workflowScope && <FindingWorkflowDialog key={workflowScope} orgId={org.id} orgName={org.name} role={org.role}
+        ids={workflow.ids} names={workflow.names} onClose={() => setWorkflow(null)} onSaved={() => { reload(); facets.reload(); selection.clear(); }} />}
+      {writer && confirming && <FindingActionDialog title={confirming.path.endsWith('/archive') ? "Archive this finding" : "Confirm finding action"} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
 
       <div className="space-y-3">
         <ListToolbar list={list} label="findings">
           <DateRangeFilter list={list} label="Added" />
+          <label className="min-w-0 max-w-full text-xs text-white/70">Overdue<select aria-label="Overdue" value={list.text("overdue")} onChange={e => list.setText("overdue", e.target.value)} className="max-w-full rounded border border-white/20 bg-navy p-1 text-white sm:ml-2">
+            <option value="">All deadlines</option><option value="due">Remediation overdue</option><option value="risk_review">Risk review overdue</option>
+          </select></label>
         </ListToolbar>
+        {writer && !hasManual && <p className="text-xs text-white/70">No active manual findings are available to archive. Use Add finding for manual entry. Uploaded findings are archived with their upload or asset, not individually.</p>}
+        <p className="text-xs text-white/70">Search an exact Finding ID to locate it in this organization. Archived or purged findings do not appear in this active list.</p>
+        {list.text("finding_id") && <p className="text-sm">Finding ID: <span className="break-all">{list.text("finding_id")}</span></p>}
+        {facets.error && <p role="alert" className="text-sm text-red-300">Could not load filter options: {facets.error} <button type="button" className="text-cyan underline" onClick={facets.reload}>Retry filter options</button></p>}
         {writer && (
           <SelectionBar selection={selection}>
-            <SelectionAction onClick={archiveSelected}>Archive selected</SelectionAction>
+            <span className="text-white/80">Actions for selected findings</span>
+            <span className="text-xs text-white/60">Clear selection to use individual row actions.</span>
+            <SelectionAction disabled={loading || selection.count > 100} onClick={() => { if (selection.count <= 100) { setBulk(null); setWorkflow({ scope: workflowScope, ids: selection.ids, names: selection.names(selection.ids) }); } }}>Update selected workflow</SelectionAction>
+            <SelectionAction disabled={loading || !allManual} onClick={archiveSelected}>Archive selected</SelectionAction>
+            {selection.count > 100 && <p className="text-xs text-white/70">Workflow updates support up to 100 findings. Reduce the selection to update workflow; archiving supports up to 500 eligible manual findings.</p>}
+            {!allManual && <p className="text-xs text-white/70">Archive selected requires every selected finding to be manually added and available. Imported findings are archived with their upload or asset. No findings will be silently skipped.</p>}
           </SelectionBar>
         )}
-        {bulk && <BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} />}
+        {writer && bulk?.scope === workflowScope && <FindingActionDialog title="Archive selected findings" orgName={org.name} onClose={() => setBulk(null)}><BulkConfirm request={bulk.request} selection={{ ...selection, ids: bulk.ids, count: bulk.ids.length, names: ids => ids.map(id => bulk.names[bulk.ids.indexOf(id)] ?? id) }} onClose={() => setBulk(null)} /></FindingActionDialog>}
         {page && (
           <FilterChips list={list} name="domain" label="Domain" options={DOMAIN_OPTIONS} counts={page.domain_counts} />
         )}
@@ -142,12 +178,12 @@ function Findings() {
 
       <StatusMessage loading={loading && !page} error={error} />
       {page && (
-        <ListTable fixed>
+        <ListTable fixed className="min-w-[1900px]">
             <thead className={THEAD}>
               <tr>
                 {writer && (
                   <th className={SELECT_CELL}>
-                    <SelectPageBox selection={selection} rows={page.items.filter(pickable).map((f) => ({ id: f.id, name: nameOf(f) }))} />
+                    <SelectPageBox selection={selection} rows={page.items.filter(pickable).map((f) => ({ id: f.id, name: nameOf(f), metadata: { manual: f.scan_id === null } }))} />
                   </th>
                 )}
                 <SortHeader label="Severity" column="severity" list={list} defaultSort="severity" className="w-32" />
@@ -155,12 +191,12 @@ function Findings() {
                 <SortHeader label="Domain" column="domain" list={list} className="w-44" />
                 <SortHeader label="Asset" column="asset" list={list} className="w-44" />
                 <SortHeader label="Source" column="source" list={list} className="w-36" />
+                <SortHeader label="Status" column="workflow_status" list={list} className="w-40" />
+                <SortHeader label="Assignee" column="assignee" list={list} className="w-44" />
+                <SortHeader label="Due" column="due_date" list={list} className="w-32" />
+                <SortHeader label="Risk review" column="risk_review_date" list={list} className="w-44" />
                 <SortHeader label="Added" column="created" list={list} className="w-40" />
-                {writer && (
-                  <th className="w-24 px-4 py-2">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                )}
+                <th className="sticky right-0 z-20 w-28 bg-navy px-4 py-2 text-right sm:w-44">Actions</th>
               </tr>
               <tr>
                 {writer && <th />}
@@ -179,20 +215,23 @@ function Findings() {
                 <th className="px-4 pb-2">
                   <PickFilter name="source" label="source" list={list} options={facetOptions(facets.data?.source)} />
                 </th>
+                <th className="px-4 pb-2"><PickFilter name="workflow_status" label="status" list={list} options={WORKFLOW_OPTIONS.filter(option => !facets.data?.workflow_status || facets.data.workflow_status.includes(option.value as keyof typeof WORKFLOW_LABELS))} /></th>
+                <th className="px-4 pb-2"><PickFilter name="assignee" label="assignee" list={list} options={facets.data?.assignee ?? []} /></th>
+                <th /><th />
                 <th />
-                {writer && <th />}
+                <th className="sticky right-0 z-20 bg-navy" />
               </tr>
             </thead>
             <tbody>
               {page.items.length === 0 && (
-                <EmptyRow colSpan={writer ? 8 : 6} noun="findings" filtered={list.hasFilters} />
+                <EmptyRow colSpan={writer ? 12 : 11} noun="findings" filtered={list.hasFilters} />
               )}
               {page.items.map((f) => (
                 <Fragment key={f.id}>
                 <tr className="border-t border-white/10 text-white/80">
                   {writer && (
                     <td className={SELECT_CELL}>
-                      {f.scan_id === null && <SelectBox selection={selection} id={f.id} name={nameOf(f)} disabled={!pickable(f)} />}
+                      <SelectBox selection={selection} id={f.id} name={nameOf(f)} metadata={{ manual: f.scan_id === null }} disabled={!pickable(f)} />
                     </td>
                   )}
                   <td className="px-4 py-2">
@@ -203,6 +242,7 @@ function Findings() {
                   <td className="px-4 py-2">
                     <p className="text-white">{f.description ?? f.category ?? "—"}</p>
                     {f.description && f.category && <p className="text-xs text-white/50">{f.category}</p>}
+                    <details className="mt-1 text-xs"><summary>Finding ID</summary><FindingReference orgId={org.id} id={f.id} copy /></details>
                     {f.event_count != null && (
                       <p className="mt-1 text-xs text-white/60">
                         {f.event_count.toLocaleString("en-US")} {f.event_count === 1 ? "event" : "events"}
@@ -228,12 +268,19 @@ function Findings() {
                     {f.asset_hostname ?? f.asset_ip ?? f.asset_cloud_id ?? "—"}
                   </td>
                   <td className="truncate px-4 py-2">{f.source ?? "—"}</td>
+                  <td className="px-4 py-2"><StatusBadge status={f.workflow_status ?? "open"} label={WORKFLOW_LABELS[f.workflow_status ?? "open"]} /></td>
+                  <td className="break-words px-4 py-2 text-xs">{f.assignee_id ? f.assignee_label || "Assignee unavailable" : "Unassigned"}</td>
+                  <td className="px-4 py-2 text-xs">{formatDeadline(f.due_date, f.due_expires_at)}</td>
+                  <td className="px-4 py-2 text-xs">{formatDeadline(f.risk_review_date, f.risk_review_expires_at)}</td>
                   <td className="px-4 py-2 text-xs text-white/60">{formatDateTime(f.created_at)}</td>
-                  {writer && (
-                    <td className={ACTIONS_CELL}>
-                      {f.scan_id === null && (
+                    <td className={`${ACTIONS_CELL} sticky right-0 z-10 bg-navy`}>
+                      <div className="flex flex-wrap justify-end gap-3">
+                      <button type="button" disabled={loading || !!f.archiving || selection.count > 0} title={selection.count ? "Clear selection to use individual row actions." : undefined} className={`${ROW_ACTION_VIEW} disabled:opacity-50`} onClick={() => { setBulk(null); setWorkflow({ scope: workflowScope, ids: [f.id], names: [nameOf(f)] }); }}>Workflow</button>
+                      {writer && f.scan_id === null && (
                         <ArchiveButtons
                           itemId={f.id}
+                          disabled={loading || selection.count > 0}
+                          disabledTitle="Clear selection to use individual row actions."
                           name={f.description ?? f.category ?? "finding"}
                           archiving={f.archiving}
                           batchId={f.archiving_batch_id}
@@ -241,12 +288,12 @@ function Findings() {
                           onUndo={(batchId) => setConfirming(undoRequest(org.id, batchId, f.description ?? f.category ?? "finding"))}
                         />
                       )}
+                      </div>
                     </td>
-                  )}
                 </tr>
                 {opened === f.id && f.details && (
                   <tr className="text-white/80">
-                    <td colSpan={writer ? 8 : 6} className="px-4 pb-4">
+                    <td colSpan={writer ? 12 : 11} className="px-4 pb-4">
                       <EventDetailsPanel details={f.details} />
                     </td>
                   </tr>

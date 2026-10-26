@@ -214,6 +214,16 @@ export type EventDetails = {
 
 /** A finding in the org's paged list, with its asset's name. */
 export type FindingListItem = Finding & {
+  due_timezone?: string | null;
+  due_expires_at?: string | null;
+  risk_review_timezone?: string | null;
+  risk_review_expires_at?: string | null;
+  workflow_status?: import("./findingWorkflow").WorkflowStatus;
+  workflow_version?: number;
+  assignee_id?: string | null;
+  assignee_label?: string | null;
+  due_date?: string | null;
+  risk_review_date?: string | null;
   asset_hostname: string | null;
   asset_ip: string | null;
   /** A cloud resource may be known only by this. */
@@ -228,7 +238,7 @@ export type Page<T> = { items: T[]; total: number };
 
 /** The values each pick-list filter can offer; "" stands for "no value". */
 export type AssetFacets = { type: string[]; subtype: string[]; environment: string[]; criticality: string[] };
-export type FindingFacets = { source: string[] };
+export type FindingFacets = { source: string[]; has_manual_findings?: boolean; workflow_status?: import("./findingWorkflow").WorkflowStatus[]; assignee?: { value: string; label: string }[] };
 
 export type FindingPage = Page<FindingListItem> & {
   /** Findings per domain for the same search, whatever the domain filter. */

@@ -134,6 +134,8 @@ export function ArchiveButtons({
           name={name}
           progress={null}
           labels={UNDO}
+          disabled={disabled}
+          disabledTitle={disabledTitle}
           idleTitle="Bring back what was archived before it stopped."
           onClick={() => onUndo(batchId)}
           className={className}

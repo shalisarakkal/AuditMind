@@ -39,10 +39,10 @@ export function SortHeader({
       <button
         type="button"
         onClick={next}
-        className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-cyan ${active ? "text-cyan" : ""}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap pr-1 uppercase tracking-wide hover:text-cyan ${active ? "text-cyan" : ""}`}
       >
         {label}
-        <span aria-hidden className="text-[10px]">
+        <span aria-hidden className="shrink-0 text-[10px]">
           {active ? (order === "asc" ? "▲" : "▼") : "↕"}
         </span>
       </button>

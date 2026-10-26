@@ -21,6 +21,7 @@ function Activity() {
     <EventLog
       base={`/orgs/${org.id}/events`}
       scope={org.id}
+      orgId={org.id}
       scopeName={org.name}
       note="Uploads, archives, restores and purges, sign-ins, and changes to settings and people. Nothing here can be changed or deleted; old events are removed after the retention period set in Settings."
     />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import ConfirmPanel from "@/components/ConfirmPanel";
 import { useImports } from "@/context/ImportsContext";
@@ -26,8 +26,11 @@ export default function BulkConfirm({ request, selection, onClose }: { request: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<{ name: string; detail: string }[] | null>(null);
+  const inFlight = useRef(false);
 
   async function confirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     const ids = selection.ids;
@@ -40,7 +43,7 @@ export default function BulkConfirm({ request, selection, onClose }: { request: 
       setRefused(result.refused.map((r) => ({ name: names.get(r.id) ?? r.id, detail: r.detail })));
     } catch (err) {
       setError((err as Error).message);
-    }
+    } finally { inFlight.current = false; }
     setBusy(false);
   }
 

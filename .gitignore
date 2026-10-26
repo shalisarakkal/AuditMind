@@ -12,6 +12,7 @@ backend/htmlcov/
 # Node / Next.js
 node_modules/
 .next/
+.next-acceptance/
 out/
 npm-debug.log*
 .turbo/

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DocumentsLibrary from "@/components/DocumentsLibrary";
@@ -17,7 +17,7 @@ beforeEach(() => {
 
 const VERSION = { id: "version-ui", number: 1, edition: "Demo", source: "Synthetic policy",
   content_kind: "organization_policy", rights: "Synthetic example", content_hash: "b".repeat(64),
-  current: false, retired_at: null as string | null, purged_at: null,
+  current: false, retired_at: null as string | null, purged_at: null as string | null,
   indexes: [{ id: "index-ui", status: "pending", publish_version: true, error_message: null }] };
 const DOCUMENT = { id: "doc-ui", org_id: "org-1" as string | null, title: "UI policy", framework: null,
   created_at: "2026-10-21T12:00:00Z", versions: [VERSION] };
@@ -30,6 +30,61 @@ function routes(documents = [DOCUMENT]) {
 }
 
 describe("Documents UI permissions and states", () => {
+  it.each([false, true])("opens and hides a version preview beneath its own row (writable=%s)", async writable => {
+    const { fetchMock } = await renderSignedIn(<DocumentsLibrary orgId="org-1" writable={writable} />, writable ? "admin" : "viewer", {
+      ...routes([{ ...DOCUMENT, versions: [{ ...VERSION, indexes: [] }] }]),
+      "GET /orgs/org-1/documents/versions/version-ui": () => ({ content: "Saved policy text" }),
+    });
+    const row = (await screen.findByText("UI policy")).closest("tr")!;
+    const trigger = within(row).getByRole("button", { name: "Preview v1" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false"); fireEvent.click(trigger);
+    const panel = await screen.findByRole("region", { name: "Preview of UI policy · v1" });
+    expect(await within(panel).findByText("Saved policy text")).toBeVisible();
+    expect(panel.closest("tr")?.previousElementSibling).toBe(row);
+    expect(panel.closest("td")).toHaveAttribute("colspan", writable ? "6" : "5");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute("aria-controls", panel.id);
+    fireEvent.click(within(panel).getByRole("button", { name: "Close preview" }));
+    expect(trigger).toHaveFocus(); expect(screen.queryByText("Saved policy text")).not.toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /orgs/org-1/documents?limit=100&offset=0")).toHaveLength(1);
+    fireEvent.click(trigger); await screen.findByText("Saved policy text"); fireEvent.click(trigger);
+    expect(screen.queryByRole("region", { name: /Preview of/ })).not.toBeInTheDocument();
+  });
+  it("switches versions/documents without showing a late response from the old preview", async () => {
+    let finish!: (value: {content: string}) => void;
+    const first = new Promise<{content: string}>(resolve => { finish = resolve; });
+    await renderSignedIn(<DocumentsLibrary orgId="org-1" writable={false} />, "viewer", {
+      ...routes([{ ...DOCUMENT, versions: [{ ...VERSION, indexes: [] }] }, { ...DOCUMENT, id: "doc-2", title: "Other policy", versions: [{ ...VERSION, id: "version-2", indexes: [] }] }]),
+      "GET /orgs/org-1/documents/versions/version-ui": () => first,
+      "GET /orgs/org-1/documents/versions/version-2": () => ({ content: "Second policy text" }),
+    });
+    fireEvent.click(within((await screen.findByText("UI policy")).closest("tr")!).getByRole("button", { name: "Preview v1" }));
+    expect(await screen.findByText("Loading preview…")).toBeVisible();
+    fireEvent.click(within(screen.getByText("Other policy").closest("tr")!).getByRole("button", { name: "Preview v1" }));
+    expect(await screen.findByText("Second policy text")).toBeVisible();
+    await act(async () => { finish({ content: "Late first response" }); });
+    expect(screen.queryByText("Late first response")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("region", { name: /Preview of/ })).toHaveLength(1);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search documents" }), { target: { value: "Other" } });
+    await waitFor(() => expect(screen.queryByRole("region", { name: /Preview of/ })).not.toBeInTheDocument());
+  });
+  it("keeps preview errors and retry inside the row and treats source text as plain text", async () => {
+    let fail = true;
+    await renderSignedIn(<DocumentsLibrary orgId="org-1" writable={false} />, "viewer", {
+      ...routes([{ ...DOCUMENT, versions: [{ ...VERSION, indexes: [] }] }]),
+      "GET /orgs/org-1/documents/versions/version-ui": () => fail ? json({ detail: "Preview denied" }, 403) : { content: "<script>not executable</script>" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Preview v1" }));
+    const panel = await screen.findByRole("region", { name: "Preview of UI policy · v1" });
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("Preview denied");
+    fail = false; fireEvent.click(within(panel).getByRole("button", { name: "Retry preview" }));
+    expect(await within(panel).findByText("<script>not executable</script>")).toBeVisible();
+    expect(panel.querySelector("script")).toBeNull();
+  });
+  it("does not offer preview text for removed versions", async () => {
+    await renderSignedIn(<DocumentsLibrary orgId="org-1" writable={false} />, "viewer", routes([{ ...DOCUMENT, versions: [{ ...VERSION, purged_at: "2026-10-25T12:00:00Z", indexes: [] }] }]));
+    expect(await screen.findByRole("button", { name: "Preview v1" })).toBeDisabled();
+  });
   it.each(["viewer", "auditor"] as const)("keeps %s read-only, including bulk controls", async role => {
     await renderSignedIn(<DocumentsLibrary orgId="org-1" orgName="SA01" writable={false} />, role, routes());
     await screen.findByText("UI policy");
@@ -229,6 +284,7 @@ describe("DocumentsLibrary list", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Preview v1" }));
     const preview = await screen.findByText("x".repeat(5000));
     expect(preview.tagName).toBe("PRE");
+    expect(preview).toHaveAttribute("tabindex", "0");
     expect(preview).toHaveClass("min-w-0", "max-w-full", "overflow-auto", "break-words");
     expect(preview.parentElement).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
   });

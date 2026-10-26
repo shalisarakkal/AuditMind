@@ -87,7 +87,7 @@ describe("an event log's finding", () => {
     });
     const row = (await screen.findByText(EVENT_FINDING.description!)).closest("tr")!;
     expect(row).toHaveTextContent("3 events");
-    expect(within(row).getByText("—")).toBeInTheDocument(); // no asset
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("—"); // no asset
 
     fireEvent.click(within(row).getByRole("button", { name: "Details" }));
     const details = screen.getByRole("region", { name: "Event details" });

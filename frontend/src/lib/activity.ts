@@ -9,6 +9,7 @@ export const EVENT_LABELS: Record<string, string> = {
   purge: "Purge",
   asset_added: "Asset added",
   finding_added: "Finding added",
+  finding_workflow_changed: "Finding remediation changed",
   settings_changed: "Settings changed",
   profile_created: "File format created",
   profile_updated: "File format changed",

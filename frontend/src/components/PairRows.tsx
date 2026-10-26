@@ -51,7 +51,7 @@ export default function PairRows({
     const value = rows[i][side];
     if (choices) {
       return (
-        <select aria-label={label} value={value} disabled={disabled} onChange={(e) => set(i, side, e.target.value)} className={selectClass}>
+        <select aria-label={label} value={value} disabled={disabled} onChange={(e) => set(i, side, e.target.value)} className={`${selectClass} max-w-full`}>
           {choices.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}

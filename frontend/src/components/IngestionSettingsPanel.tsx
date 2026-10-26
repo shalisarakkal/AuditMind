@@ -97,7 +97,7 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
                 </label>
                 <p className="text-xs text-white/50">{field.help}</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
                 <span
                   className={`rounded px-2 py-0.5 text-xs ${overridden ? "bg-cyan/15 text-cyan" : "bg-white/10 text-white/60"}`}
                 >
@@ -112,7 +112,7 @@ export default function IngestionSettingsPanel({ orgId, isAdmin }: Props) {
                       [field.key]: field.key === "import_partial_success" ? e.target.value === "true" : e.target.value,
                     })
                   }
-                  className={selectClass}
+                  className={`${selectClass} max-w-full`}
                 >
                   {field.choices.map((c) => (
                     <option key={c.value} value={c.value}>
@@ -238,7 +238,7 @@ function RetentionField({
         </label>
         <p className="text-xs text-white/50">{help}</p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
         <span className={`rounded px-2 py-0.5 text-xs ${overridden ? "bg-cyan/15 text-cyan" : "bg-white/10 text-white/60"}`}>
           {overridden ? "Override" : "Default"}
         </span>
@@ -250,7 +250,7 @@ function RetentionField({
           value={value}
           disabled={!isAdmin || saving}
           onChange={(e) => setValue(e.target.value)}
-          className={`w-24 ${selectClass}`}
+          className={`w-24 max-w-full ${selectClass}`}
         />
         <span className="text-sm text-white/60">days</span>
         {isAdmin && value !== String(days) && (

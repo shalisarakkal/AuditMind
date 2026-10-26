@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
+import { FormEvent, Fragment, Suspense, useEffect, useRef, useState } from "react";
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import ConfirmPanel from "@/components/ConfirmPanel";
 import {
@@ -61,7 +61,9 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
   const facets = useApi<{ framework: string[] }>(`${base}/facets`);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ documentId: string; versionId: string; scope: string } | null>(null);
+  const previewScope = `${list.filterKey}:${list.offset}:${list.sort}:${list.order}`;
+  useEffect(() => { setPreview(null); }, [previewScope]);
   const [confirm, setConfirm] = useState<{ version: Version; documentTitle: string } | null>(null);
   const [bulkAction, setBulkAction] = useState<"retire" | "remove" | null>(null);
   const [replacement, setReplacement] = useState<Document | null>(null);
@@ -207,7 +209,7 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
     </thead>
       <tbody>{loading && !data ? <tr><td colSpan={columns} className="px-4 py-8 text-center text-white/50">Loading documents…</td></tr> :
         error ? null : !data?.items.length ? <EmptyRow colSpan={columns} noun="documents" filtered={list.hasFilters} /> :
-          data.items.map(d => <tr key={d.id} className={ROW}>
+          data.items.map(d => <Fragment key={d.id}><tr className={ROW}>
             {writable && <td className={SELECT_CELL}><div className="space-y-3">{d.versions.map(v => <div key={v.id}>
               {!v.retired_at && !v.purged_at && canManage(d) && <SelectBox selection={retireSelection} id={v.id} name={`${d.title} · v${v.number} (retire)`} />}
               {v.retired_at && !v.current && !v.purged_at && !isReactivationPending(v) && canManage(d) && <SelectBox selection={removeSelection} id={v.id} name={`${d.title} · v${v.number} (remove)`} />}
@@ -226,15 +228,35 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
             </div>)}</td>
             <td className={TD}>{formatDateTime(d.created_at)}</td>
             <td className={ACTIONS_CELL}>{d.versions.map(v => <div key={v.id} className="mb-3 flex flex-wrap justify-end gap-3">
-              <button className={ROW_ACTION_VIEW} onClick={() => execute(async () => { const p = await api.get<{ content: string }>(`${base}/versions/${v.id}`); setPreview(p.content); })}>Preview v{v.number}</button>
+              <button type="button" className={ROW_ACTION_VIEW} disabled={!!v.purged_at}
+                id={`document-preview-toggle-${v.id}`}
+                aria-expanded={preview?.scope === previewScope && preview.versionId === v.id}
+                aria-controls={`document-preview-${v.id}`}
+                onClick={() => setPreview(preview?.scope === previewScope && preview.versionId === v.id ? null : { documentId: d.id, versionId: v.id, scope: previewScope })}>
+                {preview?.scope === previewScope && preview.versionId === v.id ? "Hide preview" : "Preview"} v{v.number}
+              </button>
               {canManage(d) && !v.purged_at && <>{!v.retired_at && <><button disabled={busy} className={ROW_ACTION} onClick={() => execute(() => api.post(`${base}/versions/${v.id}/reindex`))}>Index / retry</button><button disabled={busy} className={ROW_ACTION} onClick={() => execute(() => api.post(`${base}/versions/${v.id}/retire`))}>Retire</button></>}{v.retired_at && !v.current && <><button disabled={busy || isReactivationPending(v)} className={ROW_ACTION} onClick={() => reactivate(v, d.title)}>{isReactivationPending(v) ? "Reactivating…" : `Reactivate v${v.number}`}</button>{!isReactivationPending(v) && <button disabled={busy} className={ROW_ACTION_DANGER} onClick={() => setConfirm({ version: v, documentTitle: d.title })}>Remove</button>}</>}</>}
             </div>)}{canManage(d) && <button disabled={busy} className={ROW_ACTION} onClick={() => { setReplacement(d); setUploadOpen(true); }}>New version</button>}</td>
-          </tr>)}
+          </tr>{preview?.scope === previewScope && preview.documentId === d.id && d.versions.filter(v => v.id === preview.versionId && !v.purged_at).map(v => <tr key={v.id}>
+            <td colSpan={columns} className="px-4 pb-3"><DocumentPreview key={`${base}:${v.id}`} base={base} version={v} title={d.title} onClose={() => { setPreview(null); document.getElementById(`document-preview-toggle-${v.id}`)?.focus(); }} /></td>
+          </tr>)}</Fragment>)}
       </tbody></ListTable>
     <Pager offset={list.offset} limit={PAGE_SIZE} total={data?.total ?? 0} onChange={list.setOffset} />
-    {preview !== null && <section className="w-full min-w-0 max-w-full overflow-hidden"><button className="underline" onClick={() => setPreview(null)}>Close preview</button><pre className="max-h-96 w-full min-w-0 max-w-full overflow-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded bg-black/20 p-4">{preview}</pre></section>}
     {!platform && <EvidenceSearch base={base} />}
   </div>;
+}
+
+function DocumentPreview({ base, version, title, onClose }: { base: string; version: Version; title: string; onClose(): void }) {
+  const { data, loading, error, reload } = useApi<{ content: string | null }>(`${base}/versions/${version.id}`);
+  return <section id={`document-preview-${version.id}`} aria-label={`Preview of ${title} · v${version.number}`} className="min-w-0 max-w-full overflow-hidden rounded-lg border border-white/10 bg-white/5 p-4">
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <h2 className="break-words text-sm font-medium text-white">{title} · v{version.number} · {version.edition}</h2>
+      <button type="button" className={ROW_ACTION_VIEW} onClick={onClose}>Close preview</button>
+    </div>
+    {loading && <p role="status" className="text-sm text-white/60">Loading preview…</p>}
+    {error && <div role="alert" className="text-sm text-red-300"><p>{error}</p><button type="button" className={ROW_ACTION_VIEW} onClick={reload}>Retry preview</button></div>}
+    {!loading && !error && data && (data.content ? <pre role="region" aria-label={`Document text for ${title} · v${version.number}`} tabIndex={0} className="max-h-96 min-w-0 max-w-full overflow-auto whitespace-pre-wrap break-words text-sm text-white/80 [overflow-wrap:anywhere]">{data.content}</pre> : <p className="text-sm text-white/60">No preview text is available for this version.</p>)}
+  </section>;
 }
 
 function ConsentSettings({ orgId, writable }: { orgId: string; writable: boolean }) {

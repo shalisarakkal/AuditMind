@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { isInterrupted, isRunning, jobProgressText, jobResultText, jobTitle, useImports } from "@/context/ImportsContext";
 import type { ArchiveJob } from "@/lib/types";
+import { useVisibleAutoDismiss } from "@/lib/useVisibleAutoDismiss";
 
 // Past this many, jobs are summed up rather than shown one by one (e.g.
 // several selected rows archived at once).
@@ -12,7 +13,7 @@ const ONE_BY_ONE = 3;
 const DONE = { archive: "Archived", restore: "Restored", purge: "Purged" } as const;
 
 /** Archive, restore and purge jobs: progress while they run, then the
- * outcome (for whoever started it) until it's dismissed. Many at once are
+ * outcome (for whoever started it); routine success auto-dismisses. Many at once are
  * summed up: the one running, how many wait their turn, and one result. */
 export default function JobStatus() {
   const { jobs, dismissJob, workerDown } = useImports();
@@ -23,9 +24,9 @@ export default function JobStatus() {
   const shown = running.length > ONE_BY_ONE ? running.filter((job) => job.status === "running") : running;
   const queued = running.length - shown.length;
   const finished = jobs.filter((job) => !isRunning(job));
-  const dismiss = (ids: string[]) => {
+  const dismiss = (ids: string[], background = false) => {
     setError(null);
-    Promise.all(ids.map((id) => dismissJob(id))).catch((err: Error) => setError(err.message));
+    Promise.all(ids.map((id) => dismissJob(id, background))).catch((err: Error) => setError(err.message));
   };
 
   return (
@@ -57,7 +58,7 @@ export default function JobStatus() {
         </p>
       )}
       {finished.length > ONE_BY_ONE ? (
-        <Result failed={finished.some((job) => job.status === "failed")} onDismiss={() => dismiss(finished.map((j) => j.id))} label="Job results" dismissLabel="Dismiss all">
+        <Result identity={finished.map(job => job.id).sort().join(":")} autoDismiss={finished.every(routineSuccess)} failed={finished.some((job) => job.status === "failed")} onDismiss={background => dismiss(finished.map((j) => j.id), background)} label="Job results" dismissLabel="Dismiss all">
           <p>{summary(finished)}</p>
           {finished
             .filter((job) => job.status === "failed")
@@ -70,13 +71,17 @@ export default function JobStatus() {
         </Result>
       ) : (
         finished.map((job) => (
-          <Result key={job.id} failed={job.status === "failed"} onDismiss={() => dismiss([job.id])} label={`${jobTitle(job)} result`}>
+          <Result key={job.id} identity={job.id} autoDismiss={routineSuccess(job)} failed={job.status === "failed"} onDismiss={background => dismiss([job.id], background)} label={`${jobTitle(job)} result`}>
             <p>{jobResultText(job)}</p>
           </Result>
         ))
       )}
     </div>
   );
+}
+
+function routineSuccess(job: ArchiveJob) {
+  return job.status === "completed" && !job.summary?.error && !job.summary?.findings_kept_with_asset && !job.summary?.duplicates_purged;
 }
 
 /** "Archived 38 items, restored 2; 1 stopped." */
@@ -93,27 +98,33 @@ function summary(jobs: ArchiveJob[]): string {
 }
 
 function Result({
+  identity,
+  autoDismiss,
   failed,
   onDismiss,
   label,
   dismissLabel = "Dismiss",
   children,
 }: {
+  identity: string;
+  autoDismiss: boolean;
   failed: boolean;
-  onDismiss(): void;
+  onDismiss(background?: boolean): void;
   label: string;
   dismissLabel?: string;
   children: React.ReactNode;
 }) {
+  const notice = useVisibleAutoDismiss(autoDismiss, identity, () => onDismiss(true));
   return (
     <section
+      ref={notice}
       aria-label={label}
       className={`flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4 text-sm ${
         failed ? "border-red-400/30 bg-red-400/5 text-red-200" : "border-white/10 bg-white/5 text-white"
       }`}
     >
       <div>{children}</div>
-      <button type="button" onClick={onDismiss} className="text-xs text-white/60 hover:text-white">
+      <button type="button" onClick={() => onDismiss(false)} className="text-xs text-white/60 hover:text-white">
         {dismissLabel}
       </button>
     </section>

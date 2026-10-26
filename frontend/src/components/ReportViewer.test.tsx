@@ -22,6 +22,14 @@ function report(count?: number, baseline?: number): AuditReport {
 }
 
 describe("assessment interpretation", () => {
+  it("links domain evidence and remediation findings using the report organization", () => {
+    const value = report();
+    value.data!.domains[0].evidence_finding_ids = ["domain-finding"];
+    value.data!.remediations[0].affected_finding_ids = ["action-finding"];
+    render(<ReportViewer report={value} />);
+    expect(screen.getByRole("link", { name: "Find finding domain-finding" })).toHaveAttribute("href", "/findings/lookup?org=o&finding_id=domain-finding");
+    expect(screen.getByRole("link", { name: "Find finding action-finding" })).toHaveAttribute("href", "/findings/lookup?org=o&finding_id=action-finding");
+  });
   it("clearly labels synthetic fixtures without implying real AI assessment", () => {
     const value = report();
     value.assessment_type = "synthetic_mock";

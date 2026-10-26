@@ -6,17 +6,15 @@ import Link from "next/link";
 import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
 import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import { useApp } from "@/context/AppContext";
+import { PageHeader } from "@/components/ListPage";
 
 export default function SettingsPage() {
   const { selectedOrg } = useApp();
   const org = selectedOrg!;
 
   return (
-    <div className="max-w-3xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <p className="mt-2 text-sm text-white/60">{org.name}</p>
-      </div>
+    <div className="min-w-0 w-full space-y-8">
+      <PageHeader title="Settings" orgName={org.name} total={undefined} noun="settings" />
 
       <section className="space-y-3">
         <div>

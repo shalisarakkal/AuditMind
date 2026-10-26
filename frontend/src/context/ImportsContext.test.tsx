@@ -64,7 +64,8 @@ describe("Import tracking", () => {
     expect(report).toHaveTextContent("big.csv");
     expect(report).toHaveTextContent("Assets created 3");
     expect(screen.queryByRole("region", { name: "Processing big.csv" })).not.toBeInTheDocument();
-    expect(reload).toHaveBeenCalledTimes(1);
+    // Report rendering may precede the passive effect that refreshes the list.
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   });
 
   it("polls only the light list while nothing starts or finishes", async () => {

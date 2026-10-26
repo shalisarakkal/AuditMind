@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import ConfirmPanel from "@/components/ConfirmPanel";
 import { useImports } from "@/context/ImportsContext";
@@ -21,8 +21,11 @@ export default function JobConfirm({ request, onClose }: { request: JobRequest; 
   const { startJob } = useImports();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   async function confirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -31,7 +34,7 @@ export default function JobConfirm({ request, onClose }: { request: JobRequest; 
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
-    }
+    } finally { inFlight.current = false; }
   }
 
   return (

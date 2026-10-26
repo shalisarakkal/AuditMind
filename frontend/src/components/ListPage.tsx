@@ -70,10 +70,10 @@ export function ListToolbar({ list, label, children }: { list: ListState; label:
 }
 
 /** The table's frame and header styles. */
-export function ListTable({ children, fixed = false }: { children: React.ReactNode; fixed?: boolean }) {
+export function ListTable({ children, fixed = false, className = "" }: { children: React.ReactNode; fixed?: boolean; className?: string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className={`w-full text-left text-sm ${fixed ? "table-fixed" : ""}`}>{children}</table>
+    <div className="relative overflow-x-auto rounded-xl border border-white/10">
+      <table className={`w-full text-left text-sm ${fixed ? "table-fixed" : ""} ${className}`}>{children}</table>
     </div>
   );
 }
@@ -104,6 +104,9 @@ const STATUS_BADGES: Record<string, string> = {
   stopped: "bg-red-400/15 text-red-300",
   running: "bg-cyan/15 text-cyan",
   pending: "bg-white/10 text-white/70",
+  resolved: "bg-emerald-400/15 text-emerald-300",
+  mitigated: "bg-cyan/15 text-cyan",
+  accepted_risk: "bg-yellow-400/15 text-yellow-200",
 };
 
 export function StatusBadge({ status, label = status }: { status: string; label?: string }) {
@@ -135,13 +138,13 @@ export const ROW_ACTION_DANGER = "text-xs text-red-300 hover:underline";
 export const ACTIONS_CELL = "whitespace-nowrap px-4 py-2 text-right space-x-3";
 
 const DATE_INPUT =
-  "rounded-md border border-white/15 bg-navy px-2 py-1.5 text-sm text-white focus:border-cyan focus:outline-none [color-scheme:dark]";
+  "min-w-0 max-w-full rounded-md border border-white/15 bg-navy px-2 py-1.5 text-sm text-white focus:border-cyan focus:outline-none [color-scheme:dark]";
 
 /** From/To on the list's date column (the API's since/until), for the
  * toolbar. `label` names the column, e.g. "Uploaded". */
 export function DateRangeFilter({ list, label }: { list: ListState; label: string }) {
   return (
-    <div role="group" aria-label={`${label} between`} className="flex items-center gap-2 text-sm text-white/60">
+    <div role="group" aria-label={`${label} between`} className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-sm text-white/60">
       <span>{label}</span>
       <input
         type="date"
@@ -218,7 +221,7 @@ export const SELECT_CELL = "w-10 px-4 py-2";
 
 /** The header checkbox: pick, or drop, every row on this page that can be
  * picked (`rows`); shown half-ticked when some are. */
-export function SelectPageBox({ selection, rows }: { selection: Selection; rows: { id: string; name: string }[] }) {
+export function SelectPageBox({ selection, rows }: { selection: Selection; rows: { id: string; name: string; metadata?: Record<string, unknown> }[] }) {
   const picked = rows.filter((row) => selection.has(row.id)).length;
   const box = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -239,14 +242,14 @@ export function SelectPageBox({ selection, rows }: { selection: Selection; rows:
 
 /** A row's checkbox; `disabled` when the row can't take the action now
  * (e.g. a job is already running on it). */
-export function SelectBox({ selection, id, name, disabled = false }: { selection: Selection; id: string; name: string; disabled?: boolean }) {
+export function SelectBox({ selection, id, name, metadata, disabled = false }: { selection: Selection; id: string; name: string; metadata?: Record<string, unknown>; disabled?: boolean }) {
   return (
     <input
       type="checkbox"
       aria-label={`Select ${name}`}
       checked={selection.has(id)}
       disabled={disabled || (selection.full && !selection.has(id))}
-      onChange={(e) => selection.set([{ id, name }], e.target.checked)}
+      onChange={(e) => selection.set([{ id, name, metadata }], e.target.checked)}
       className={CHECKBOX}
     />
   );

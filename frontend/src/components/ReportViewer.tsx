@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { reportErrorMessage } from "@/lib/report";
 import { AuditReport, AuditReportSnapshot } from "@/lib/types";
+import FindingReference from "./FindingReference";
 
 type Props = {
   report: AuditReport;
@@ -195,7 +196,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                   <p className="mt-2.5 text-xs text-white/70">{d.justification}</p>
                   {!ruleBasedTest && <p className="mt-2 text-xs">{d.evidence_status ? evidenceLabels[d.evidence_status] : "Evidence status not recorded (legacy assessment)"}</p>}
                   {d.evidence_reason && <p className="mt-2 text-xs">{d.evidence_reason}</p>}
-                  {!!d.evidence_finding_ids?.length && <p className="mt-2 break-all text-xs">Evidence findings: {d.evidence_finding_ids.join(", ")}</p>}
+                  {!!d.evidence_finding_ids?.length && <p className="mt-2 break-all text-xs">Evidence findings: {d.evidence_finding_ids.map((id, index) => <span key={`${id}-${index}`}>{index > 0 && ", "}<FindingReference orgId={report.org_id} id={id} /></span>)}</p>}
                   {citationLinks(d.citation_ids)}
                 </div>
 
@@ -272,7 +273,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                   {citationLinks(r.citation_ids)}
                   <div className="mt-2 space-y-1 break-all text-xs text-white/60">
                     <p>{r.confidence == null ? "Confidence: not recorded" : `Model-estimated confidence: ${Math.round(r.confidence * 100)}% (not calibrated)`}</p>
-                    <p>Affected findings: {r.affected_finding_ids?.join(", ") || "No specific finding references recorded"}</p>
+                    <p>Affected findings: {r.affected_finding_ids?.length ? r.affected_finding_ids.map((id, index) => <span key={`${id}-${index}`}>{index > 0 && ", "}<FindingReference orgId={report.org_id} id={id} /></span>) : "No specific finding references recorded"}</p>
                     <p>Affected assets: {r.affected_asset_ids?.join(", ") || "No specific asset references recorded"}</p>
                   </div>
 

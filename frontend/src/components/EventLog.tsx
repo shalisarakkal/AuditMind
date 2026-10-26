@@ -16,6 +16,7 @@ import {
 } from "@/components/ListPage";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
+import FindingReference from "@/components/FindingReference";
 import { CRITICALITY_ORDER, EVENT_LABELS, timing, eventLabel, eventSummary } from "@/lib/activity";
 import { formatDateTime } from "@/lib/domain";
 import type { ActivityEvent, EventFacets, Page } from "@/lib/types";
@@ -36,12 +37,14 @@ export default function EventLog({
   scopeName,
   title = "Activity",
   note,
+  orgId,
 }: {
   base: string;
   scope: string;
   scopeName: string;
   title?: string;
   note: string;
+  orgId?: string;
 }) {
   const list = useListState(PAGE_SIZE, scope);
   const { data: page, error, loading, reload } = useApi<Page<ActivityEvent>>(`${base}?${list.apiQuery}`);
@@ -100,7 +103,7 @@ export default function EventLog({
           <tbody>
             {page.items.length === 0 && <EmptyRow colSpan={COLUMNS} noun="events" filtered={list.hasFilters} />}
             {page.items.map((event) => (
-              <EventRow key={event.id} event={event} />
+              <EventRow key={event.id} event={event} orgId={orgId} />
             ))}
           </tbody>
         </ListTable>
@@ -110,7 +113,7 @@ export default function EventLog({
   );
 }
 
-function EventRow({ event }: { event: ActivityEvent }) {
+function EventRow({ event, orgId }: { event: ActivityEvent; orgId?: string }) {
   const took = timing(event);
   const summary = eventSummary(event);
   return (
@@ -123,7 +126,9 @@ function EventRow({ event }: { event: ActivityEvent }) {
         {eventLabel(event)}
         {summary && <p className="text-xs text-white/50">{summary}</p>}
       </td>
-      <td className={TD}>{event.item ?? "—"}</td>
+      <td className={TD}>{orgId && event.type === "finding_workflow_changed" && typeof event.details?.finding_id === "string"
+        ? <><p className="text-xs text-white/60">Finding ID</p><FindingReference orgId={orgId} id={event.details.finding_id} /></>
+        : event.item ?? "—"}</td>
       <td className={TD}>{event.actor_label}</td>
       <td className={TD}>
         <StatusBadge status={event.outcome} />

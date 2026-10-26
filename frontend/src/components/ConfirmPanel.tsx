@@ -22,6 +22,7 @@ export default function ConfirmPanel({
   return (
     <div
       role="group"
+      aria-busy={busy}
       aria-label={label}
       className={`flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm ${
         danger ? "border-red-400/30 bg-red-400/5" : "border-cyan/30 bg-cyan/5"
@@ -36,7 +37,7 @@ export default function ConfirmPanel({
       >
         {confirmLabel}
       </button>
-      <button type="button" onClick={onCancel} className="text-xs text-white/60 hover:text-white">
+      <button type="button" data-confirm-cancel disabled={busy} onClick={onCancel} className="text-xs text-white/60 hover:text-white disabled:opacity-50">
         Cancel
       </button>
     </div>

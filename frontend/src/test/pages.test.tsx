@@ -319,10 +319,10 @@ describe("Findings page", () => {
 
     const rows = (await screen.findAllByRole("row")).slice(2); // titles, then filters
     // Cells: the checkbox (writers), severity, finding...
-    expect(rows.map((r) => within(r).getAllByRole("cell")[2].textContent)).toEqual([
-      "Remote code executionCRIT-ONE",
-      "MFA offMFA",
-      "Minor issueLOW-ONE",
+    expect(rows.map((r) => within(r).getAllByRole("cell")[2].querySelector("p.text-white")?.textContent)).toEqual([
+      "Remote code execution",
+      "MFA off",
+      "Minor issue",
     ]);
     expect(rows[0]).toHaveTextContent("web-01.acme.io");
     expect(rows[0]).toHaveTextContent("Vulnerability Mgmt");
@@ -338,7 +338,7 @@ describe("Findings page", () => {
       }),
     });
 
-    const row = (await screen.findByText("S3-PUBLIC")).closest("tr")!;
+    const row = (await screen.findByText("S3-PUBLIC", { selector: "p" })).closest("tr")!;
     expect(row).toHaveTextContent("arn:aws:s3:::acme-backups");
   });
 

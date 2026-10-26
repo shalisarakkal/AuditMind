@@ -450,7 +450,7 @@ describe("ReportsPage", () => {
     expect(screen.getByText("Enforce Hardware-backed MFA for Cloud Admins")).toBeInTheDocument();
     expect(screen.getAllByText("CIS-5.2").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Model-estimated confidence: 80% (not calibrated)")).toBeInTheDocument();
-    expect(screen.getByText(/Affected findings: 11111111/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Find finding 11111111/ })).toHaveAttribute("href", expect.stringContaining("finding_id=11111111"));
     expect(screen.getByText(/Affected assets: 22222222/)).toBeInTheDocument();
   });
 

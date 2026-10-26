@@ -42,7 +42,7 @@ type ImportsContextValue = {
   /** POST `path` (an archive, restore or purge endpoint) and follow the job it
    * starts. Throws if the server refuses. */
   startJob(path: string): Promise<ArchiveJob>;
-  dismissJob(jobId: string): Promise<void>;
+  dismissJob(jobId: string, background?: boolean): Promise<void>;
   /** Archive (`itemType` items), restore or purge (archived entries) several
    * at once: a job each, queued for the background worker, followed like
    * the others. Throws if the server refuses the whole request. */
@@ -300,9 +300,9 @@ function useArchiveJobs(orgId: string | null, pollIntervalMs: number, onFinished
   );
 
   const dismissJob = useCallback(
-    async (jobId: string) => {
+    async (jobId: string, background = false) => {
       if (!orgId) return;
-      await api.post<ArchiveJob>(`/orgs/${orgId}/archive-jobs/${jobId}/dismiss`);
+      await api.post<ArchiveJob>(`/orgs/${orgId}/archive-jobs/${jobId}/dismiss`, undefined, { background });
       const request = ++current.current.requested;
       apply(orgId, request, current.current.jobs.filter((j) => j.id !== jobId));
     },

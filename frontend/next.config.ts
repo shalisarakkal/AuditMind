@@ -10,6 +10,8 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  // Dedicated acceptance builds must not replace a running demo's chunks.
+  distDir: process.env.AUDITMIND_ISOLATED_BUILD === "1" ? ".next-acceptance" : ".next",
   reactStrictMode: true,
   // Next's dev badge sits bottom-left by default, over the sidebar's account
   // menu.
