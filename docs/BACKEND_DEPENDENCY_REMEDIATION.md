@@ -44,6 +44,17 @@ not ignored. No third-party package source was patched.
 
 ## Verification record
 
+Hosted follow-up: the first run at `9720777` passed frontend and dependency/security
+jobs, but backend collection failed because the clean dev installation lacked
+`httpx2`. Locally it had been supplied indirectly by the optional OpenAI SDK.
+The browser fixture separately failed because its fresh database did not enable
+`vector`. These failures invalidate any claim of hosted acceptance, not the
+historical local results below. The correction explicitly pins `httpx2==2.13.1`
+in dev requirements, adds dependency/import smoke checks, enables browser database
+extensions and targets the correct database in PostgreSQL health checks. Test
+network guards now cover both HTTP client stacks. Final rerun evidence is recorded
+separately after completion; no warning suppression or live inference is used.
+
 Initial compatibility rerun after status-alias fixes: **73 passed** (77.65s).
 JWT unit regressions including malformed session claims: **14 passed** (0.99s).
 Final full PostgreSQL regression: **1,238 passed in 628.60s**, using

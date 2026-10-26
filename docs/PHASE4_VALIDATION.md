@@ -1,5 +1,14 @@
 # Phase 4 remediation workflow validation
 
+Hosted CI follow-up: first run at `9720777` passed frontend and security/audit
+jobs, but exposed missing dev-only `httpx2` and missing browser database `vector`
+extension. Explicit dependency/extension setup and both-client offline guards
+correct these clean-install gaps; warnings remain errors. Fresh isolated dev-only
+installation passes `pip check` and TestClient import with no optional OpenAI SDK;
+39 installed-Chrome checks passed using that environment
+(`phase3_browser_0a574e56247f`). Final full-suite/hosted results follow separately;
+these initial failures are not treated as hosted acceptance.
+
 26 October final dependency compatibility checkpoint: **1,238 full PostgreSQL
 tests passed** in 628.60s with warnings as errors. Earlier **73 focused** and
 **14 JWT** results overlap this full run. Fresh **376 frontend tests** (29.03s),

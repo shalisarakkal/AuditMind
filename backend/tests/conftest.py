@@ -88,6 +88,7 @@ def _no_real_http(monkeypatch):
     native driver, not HTTP. This also prevents accidental paid inference.
     """
     import httpx
+    import httpx2
 
     def forbidden(*args, **kwargs):
         raise AssertionError("Real HTTP forbidden in tests; use a mocked transport")
@@ -95,8 +96,9 @@ def _no_real_http(monkeypatch):
     async def forbidden_async(*args, **kwargs):
         raise AssertionError("Real HTTP forbidden in tests; use a mocked transport")
 
-    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", forbidden)
-    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", forbidden_async)
+    for transport_module in (httpx, httpx2):
+        monkeypatch.setattr(transport_module.HTTPTransport, "handle_request", forbidden)
+        monkeypatch.setattr(transport_module.AsyncHTTPTransport, "handle_async_request", forbidden_async)
 
 
 @pytest.fixture(autouse=True)

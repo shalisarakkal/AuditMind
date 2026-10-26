@@ -3,5 +3,7 @@ pytest==9.0.3
 pytest-cov==7.1.0
 coverage==7.17.0
 httpx==0.28.1
+# Starlette TestClient uses httpx2; do not rely on optional OpenAI dependencies.
+httpx2==2.13.1
 pip==26.2.2
 setuptools==84.1.0

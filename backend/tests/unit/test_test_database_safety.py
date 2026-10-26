@@ -43,8 +43,24 @@ def test_required_postgres_does_not_silently_accept_skips(required, skipped, fai
     assert (session.exitstatus == pytest.ExitCode.TESTS_FAILED) is failed
 
 
-def test_real_http_requires_an_explicit_mock_transport():
-    import httpx
-    with httpx.Client(trust_env=False) as client:
+@pytest.mark.parametrize('module_name', ['httpx', 'httpx2'])
+def test_real_http_requires_an_explicit_mock_transport(module_name):
+    from importlib import import_module
+    transport_module = import_module(module_name)
+    with transport_module.Client(trust_env=False) as client:
         with pytest.raises(AssertionError, match='Real HTTP forbidden'):
             client.get('https://inference.invalid')
+
+
+@pytest.mark.parametrize('module_name', ['httpx', 'httpx2'])
+def test_real_async_http_requires_an_explicit_mock_transport(module_name):
+    import asyncio
+    from importlib import import_module
+    transport_module = import_module(module_name)
+
+    async def request():
+        async with transport_module.AsyncClient(trust_env=False) as client:
+            with pytest.raises(AssertionError, match='Real HTTP forbidden'):
+                await client.get('https://inference.invalid')
+
+    asyncio.run(request())

@@ -47,9 +47,12 @@ def main():
     from app.services import accounts, knowledge_embeddings, claude_service
     # No model downloads or external HTTP are possible through these boundaries.
     import httpx
+    import httpx2
     def forbidden(*a, **kw):
         raise RuntimeError('External HTTP forbidden in isolated browser fixture')
-    httpx.HTTPTransport.handle_request = forbidden
+    for transport_module in (httpx, httpx2):
+        transport_module.HTTPTransport.handle_request = forbidden
+        transport_module.AsyncHTTPTransport.handle_async_request = forbidden
     knowledge_embeddings.embed = lambda profile, texts, **kw: [[1.0] + [0.0] * (profile.dimensions - 1) for _ in texts]
     attempts = {}
     def complete(**kwargs):

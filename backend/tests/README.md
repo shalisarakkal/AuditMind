@@ -1,5 +1,12 @@
 # Backend verification
 
+Clean CI installation: `requirements-dev.txt` explicitly includes both `httpx`
+(existing adapters/tests) and `httpx2` (modern Starlette TestClient). Installing
+the optional OpenAI SDK must not be required to collect tests without warnings.
+Real synchronous/asynchronous transports for both clients are blocked by default.
+Hosted browser CI enables `vector` and `pg_trgm` in its fresh PostgreSQL database
+before fixture setup; the server image alone does not enable extensions.
+
 Remediation verification (2026-10-22): full suite **987 passed** with warnings as
 errors. Final expanded/strengthened cancellation/provider regressions **24 passed**,
 including two direct-Anthropic cases added after the full run was collected.
