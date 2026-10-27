@@ -138,7 +138,7 @@ function Findings() {
         }
         action={
           writer && (
-            <div className="flex flex-wrap gap-3"><button type="button" className="rounded-md border border-cyan px-4 py-2 text-sm text-cyan" onClick={() => setAddingOrg(org.id)}>Add finding</button><ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} /></div>
+            <div className="flex flex-wrap items-start gap-3"><button type="button" className="h-10 shrink-0 rounded-md border border-cyan px-4 text-sm text-cyan" onClick={() => setAddingOrg(org.id)}>Add finding</button><ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} /></div>
           )
         }
       />

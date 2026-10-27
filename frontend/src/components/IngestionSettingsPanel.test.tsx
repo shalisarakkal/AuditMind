@@ -9,6 +9,7 @@ function settings(overrides: Partial<IngestionSettings> = {}): IngestionSettings
   return {
     import_partial_success: true,
     asset_existing_strategy: "update",
+    exact_duplicate_file_policy: "ask",
     nessus_info_severity: "skip",
     nessus_domain_map: { Firewalls: "network_config", "Web Servers": "incident_response" },
     nessus_default_domain: "vulnerability_management",
@@ -47,13 +48,25 @@ function setup(initial: IngestionSettings, isAdmin = true) {
 }
 
 describe("IngestionSettingsPanel", () => {
+  it("saves all exact duplicate file policies and resets to Ask", async () => {
+    const patches = setup(settings());
+    const policy = await screen.findByLabelText("Exact duplicate files");
+    for (const value of ["skip", "reimport", "ask"]) {
+      await waitFor(() => expect(policy).toBeEnabled());
+      fireEvent.change(policy, { target: { value } });
+      await waitFor(() => expect(patches.at(-1)).toEqual({ exact_duplicate_file_policy: value }));
+    }
+    await waitFor(() => expect(policy).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    await waitFor(() => expect(patches.at(-1)).toEqual({ exact_duplicate_file_policy: null }));
+  });
   it("shows effective values and whether each is an override", async () => {
     setup(settings({ asset_existing_strategy: "skip", overridden: ["asset_existing_strategy"] }));
 
     expect(await screen.findByLabelText("Asset already in inventory")).toHaveValue("skip");
     expect(screen.getByLabelText("Files with bad rows")).toHaveValue("true");
     expect(screen.getAllByText("Override")).toHaveLength(1);
-    expect(screen.getAllByText("Default")).toHaveLength(5);
+    expect(screen.getAllByText("Default")).toHaveLength(6);
     expect(screen.getByLabelText("Keep Activity events for")).toHaveValue(365);
     expect(screen.getByLabelText("Keep archived items for")).toHaveValue(180);
     expect(screen.getByText("Firewalls → Network & Config")).toBeInTheDocument();

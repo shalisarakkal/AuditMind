@@ -41,6 +41,17 @@ export const TIER_COLORS: Record<RiskTier, string> = {
   critical: "text-red-400",
 };
 
+/** Presentation only: tiers come from the assessment, never from UI thresholds. */
+export function riskTierStyle(tier?: string | null) {
+  switch (tier?.toLowerCase()) {
+    case "critical": return { bg: "bg-red-500/10", text: "text-red-300", border: "border-red-400/40", label: "Critical risk" };
+    case "high": return { bg: "bg-orange-500/10", text: "text-orange-300", border: "border-orange-400/40", label: "High risk" };
+    case "medium": return { bg: "bg-amber-500/10", text: "text-amber-200", border: "border-amber-400/40", label: "Medium risk" };
+    case "low": return { bg: "bg-emerald-500/10", text: "text-emerald-300", border: "border-emerald-400/40", label: "Low risk" };
+    default: return { bg: "bg-white/5", text: "text-white/70", border: "border-white/20", label: "Risk tier unavailable" };
+  }
+}
+
 // Badge styles; a critical finding is shown like a critical-risk tier.
 export const SEVERITY_BADGES: Record<Severity, string> = {
   critical: "bg-red-400/15 text-red-300",

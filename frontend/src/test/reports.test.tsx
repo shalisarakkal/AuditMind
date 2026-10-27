@@ -444,7 +444,7 @@ describe("ReportsPage", () => {
 
     expect(screen.getByText("Q3 Executive Cyber Resilience Audit")).toBeInTheDocument();
     expect(screen.getByText("82")).toBeInTheDocument();
-    expect(screen.getByText("LOW Risk Tier")).toBeInTheDocument();
+    expect(screen.getAllByText("LOW Risk Tier").length).toBeGreaterThan(0);
     expect(screen.getByText(/Overall organizational cyber resilience score is 82\/100/)).toBeInTheDocument();
     expect(screen.getByText("IDENTITY ACCESS")).toBeInTheDocument();
     expect(screen.getByText("Enforce Hardware-backed MFA for Cloud Admins")).toBeInTheDocument();
@@ -465,7 +465,7 @@ describe("ReportsPage", () => {
     });
     render(<ReportViewer report={{ ...SAMPLE_REPORT, data: { ...data,
       overall_score: 35, overall_tier: "high", remediations } }} />);
-    expect(screen.getByText("HIGH Risk Tier")).toBeInTheDocument();
+    expect(screen.getAllByText("HIGH Risk Tier").length).toBeGreaterThan(0);
     expect(screen.getByText("Confidence: not recorded")).toBeInTheDocument();
     expect(screen.getByText(/No specific finding references recorded/)).toBeInTheDocument();
   });

@@ -2,6 +2,7 @@ import AuthGuard from "@/components/AuthGuard";
 import ApplicationHeader from "@/components/ApplicationHeader";
 import OrgGate from "@/components/OrgGate";
 import Sidebar from "@/components/Sidebar";
+import FileDropGuard from "@/components/FileDropGuard";
 import { ImportsProvider } from "@/context/ImportsContext";
 
 /** Signed-in area: sidebar with org picker, pages scoped to the selected org.
@@ -9,6 +10,7 @@ import { ImportsProvider } from "@/context/ImportsContext";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
+      <FileDropGuard />
       <ImportsProvider>
         <div className="flex min-h-screen">
           <Sidebar />

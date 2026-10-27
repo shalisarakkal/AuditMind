@@ -36,6 +36,21 @@ function requests(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchMo
 beforeEach(() => window.sessionStorage.clear());
 
 describe("Import tracking", () => {
+  it("groups running imports in a compact collapsed progress disclosure", async () => {
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [scan({ id: "one", status: "running" }), scan({ id: "two", status: "pending" })]));
+    const summary = await screen.findByText("2 imports processing");
+    const details = summary.closest("details")!;
+    expect(details.open).toBe(false);
+    fireEvent.click(summary.closest("summary")!);
+    expect(details.open).toBe(true);
+  });
+
+  it("opens the progress disclosure automatically when an import fails", async () => {
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [scan({ id: "one", status: "failed" })]));
+    const summary = await screen.findByText("Attention required");
+    expect(summary.closest("details")!.open).toBe(true);
+  });
+
   it("picks up a running import after a refresh, follows it, then shows its report", async () => {
     const states = [
       scan({ id: "big", filename: "big.csv", status: "running", progress: { phase: "reading" } }),

@@ -4,6 +4,7 @@ import type { ActivityEvent, Criticality } from "@/lib/types";
 export const EVENT_LABELS: Record<string, string> = {
   import: "Upload",
   repeat_upload: "Same file uploaded again",
+  upload_skipped: "Exact duplicate file skipped",
   archive: "Archive",
   restore: "Restore",
   purge: "Purge",
@@ -139,6 +140,7 @@ export function eventSummary(event: ActivityEvent): string {
     }
   }
   if (event.type === "repeat_upload" && details.previously_by) parts.push(`first uploaded by ${details.previously_by}`);
+  if (event.type === "upload_skipped" && typeof details.reason === "string") parts.push(details.reason);
   if (event.type === "profile_updated" && Array.isArray(details.changed)) parts.push(`changed: ${details.changed.join(", ")}`);
   if (event.type === "document_uploaded" && typeof details.version === "number") {
     parts.push(`version ${details.version}${typeof details.content_kind === "string" ? ` · ${details.content_kind.replace(/_/g, " ")}` : ""}`);

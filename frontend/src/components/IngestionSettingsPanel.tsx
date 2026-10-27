@@ -14,11 +14,21 @@ const DOMAIN_CHOICES: Choice[] = DOMAIN_ORDER.map((d) => ({ value: d, label: DOM
 const TYPE_CHOICES: Choice[] = ASSET_TYPES.map((t) => ({ value: t, label: ASSET_TYPE_LABELS[t] }));
 
 const FIELDS: {
-  key: "import_partial_success" | "asset_existing_strategy" | "nessus_info_severity" | "nessus_default_domain";
+  key: "import_partial_success" | "asset_existing_strategy" | "exact_duplicate_file_policy" | "nessus_info_severity" | "nessus_default_domain";
   label: string;
   help: string;
   choices: Choice[];
 }[] = [
+  {
+    key: "exact_duplicate_file_policy",
+    label: "Exact duplicate files",
+    help: "Same SHA-256 within this organization. Queued/running matches are always skipped. Reimport does not guarantee a record update.",
+    choices: [
+      { value: "ask", label: "Ask before importing again" },
+      { value: "skip", label: "Skip identical files" },
+      { value: "reimport", label: "Reimport identical files" },
+    ],
+  },
   {
     key: "import_partial_success",
     label: "Files with bad rows",

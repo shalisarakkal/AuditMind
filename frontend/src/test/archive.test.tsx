@@ -506,17 +506,18 @@ describe("Uploading a file already uploaded", () => {
     );
     fireEvent.change(screen.getByTestId("findings-file-input"), { target: { files: [new File(["x"], "f.csv")] } });
 
-    const ask = await screen.findByRole("group", { name: "Already uploaded" });
-    expect(ask).toHaveTextContent("f.csv: this exact file was already uploaded on");
-    expect(ask).toHaveTextContent("by Ann. Upload it again?");
+    const ask = await screen.findByRole("region", { name: "Already uploaded files" });
+    expect(ask).toHaveTextContent("f.csv");
+    expect(ask).toHaveTextContent("Previously uploaded by Ann on");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload findings" })).toBeDisabled();
 
-    fireEvent.click(within(ask).getByRole("button", { name: "Upload anyway" }));
+    fireEvent.click(within(ask).getByLabelText("f.csv"));
+    fireEvent.click(within(ask).getByRole("button", { name: "Upload selected anyway (1)" }));
     await waitFor(() => expect(attempts).toBe(2));
     const second = fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/findings/import"))[1][1]!;
     expect((second.body as FormData).get("confirm")).toBe("true");
-    await waitFor(() => expect(screen.queryByRole("group", { name: "Already uploaded" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Already uploaded files" })).not.toBeInTheDocument());
   });
 
   it("drops the file on Cancel", async () => {
@@ -525,10 +526,11 @@ describe("Uploading a file already uploaded", () => {
         json({ detail: { message: "Already uploaded.", imported_at: null, imported_by: "Ann" } }, 409),
     });
     fireEvent.change(screen.getByTestId("findings-file-input"), { target: { files: [new File(["x"], "f.csv")] } });
-    const ask = await screen.findByRole("group", { name: "Already uploaded" });
-    expect(ask).toHaveTextContent("f.csv: this exact file was already uploaded by Ann.");
-    fireEvent.click(within(ask).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("group", { name: "Already uploaded" })).not.toBeInTheDocument();
+    const ask = await screen.findByRole("region", { name: "Already uploaded files" });
+    expect(ask).toHaveTextContent("Previously uploaded by Ann");
+    fireEvent.click(within(ask).getByLabelText("f.csv"));
+    fireEvent.click(within(ask).getByRole("button", { name: "Skip selected (1)" }));
+    expect(screen.queryByRole("region", { name: "Already uploaded files" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload findings" })).toBeEnabled();
   });
 });

@@ -14,6 +14,7 @@ import {
   SEVERITY_BADGES,
   SEVERITY_ORDER,
   formatDateTime,
+  riskTierStyle,
 } from "@/lib/domain";
 import type { DashboardSummary } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
@@ -38,6 +39,7 @@ export default function DashboardPage() {
 }
 
 function Dashboard({ data }: { data: DashboardSummary }) {
+  const style = riskTierStyle(data.overall_score == null ? null : data.overall_tier);
   const domains = [...data.domains].sort((a, b) => DOMAIN_ORDER.indexOf(a.domain) - DOMAIN_ORDER.indexOf(b.domain));
   const totalFindings = SEVERITY_ORDER.reduce((sum, s) => sum + data.findings_by_severity[s], 0);
 
@@ -46,10 +48,10 @@ function Dashboard({ data }: { data: DashboardSummary }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl bg-navy-cyan-gradient p-6 lg:col-span-2">
           <p className="text-sm text-white/80">Overall Resilience Score</p>
-          <p className="mt-2 text-5xl font-bold text-white" data-testid="overall-score">
-            {Math.round(data.overall_score)}
+          <p className={`mt-2 ${data.overall_score == null ? "text-2xl font-medium" : "text-5xl font-bold"} ${style.text}`} data-testid="overall-score">
+            {data.overall_score == null ? "Not assessed" : Math.round(data.overall_score)}
           </p>
-          <p className="mt-1 text-sm uppercase tracking-wide text-white/80">{data.overall_tier} risk tier</p>
+          {data.overall_score != null && <p className={`mt-1 text-sm uppercase tracking-wide ${style.text}`}>{data.overall_tier} risk tier</p>}
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-6">
           <p className="text-sm text-white/60">

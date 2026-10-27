@@ -12,9 +12,18 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
   const [error, setError] = useState<string | null>(null);
   const mine = scans.filter((s) => importPages(s).includes(page));
   if (mine.length === 0) return null;
+  const running = mine.filter(isRunning);
+  const needsAttention = mine.some(scan => isInterrupted(scan, workerDown) || scan.status === "failed" || (scanResult(scan).report?.failed ?? 0) > 0);
 
   return (
-    <div className="space-y-3">
+    <details key={needsAttention ? "attention" : "normal"} open={needsAttention || undefined} className="group rounded-xl border border-white/15 bg-white/5 text-sm">
+      <summary className="cursor-pointer px-4 py-3 text-white">
+        <span className="font-medium">{running.length ? `${running.length} import${running.length === 1 ? "" : "s"} processing` : `${mine.length} import report${mine.length === 1 ? "" : "s"} available`}</span>
+        {needsAttention && <span className="ml-3 text-amber-200">Attention required</span>}
+        <span className="ml-3 text-cyan group-open:hidden">{running.length ? "Show progress and reports" : "Show reports"}</span>
+        <span className="ml-3 hidden text-cyan group-open:inline">{running.length ? "Hide progress and reports" : "Hide reports"}</span>
+      </summary>
+    <div className="space-y-3 border-t border-white/10 p-3">
       {mine.filter(isRunning).map((scan) => {
         const interrupted = isInterrupted(scan, workerDown);
         return (
@@ -60,5 +69,6 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
           />
         ))}
     </div>
+    </details>
   );
 }

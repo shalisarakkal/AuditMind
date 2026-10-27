@@ -4,6 +4,7 @@ import { useState } from "react";
 import { reportErrorMessage } from "@/lib/report";
 import { AuditReport, AuditReportSnapshot } from "@/lib/types";
 import FindingReference from "./FindingReference";
+import { riskTierStyle } from "@/lib/domain";
 
 type Props = {
   report: AuditReport;
@@ -53,14 +54,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
     })}</p> : null;
   }
 
-  const tierColors: Record<string, { bg: string; text: string; border: string }> = {
-    LOW: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30" },
-    MEDIUM: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30" },
-    HIGH: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30" },
-    CRITICAL: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/30" },
-  };
-
-  const currentTierStyle = (overallTier ? tierColors[overallTier] : null) || { bg: "bg-white/5", text: "text-white/70", border: "border-white/20" };
+  const currentTierStyle = riskTierStyle(overallScore == null ? null : overallTier);
 
   const filteredRemediations = data.remediations?.filter((r) => {
     if (activePriority === "ALL") return true;
@@ -136,7 +130,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       </section>
       {/* Resilience Scorecard */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className={`flex flex-col justify-between rounded-xl border ${currentTierStyle.border} ${currentTierStyle.bg} p-6`}>
+        <div className="flex flex-col justify-between rounded-xl border border-white/20 bg-white/5 p-6">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-white/60">
               {syntheticMock ? "Simulated score (not a real assessment)" : ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
@@ -148,7 +142,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           </div>
           <div className="mt-4 border-t border-white/10 pt-3">
             <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-bold ${currentTierStyle.text}`}>
-              {overallTier ? `${overallTier} Risk Tier` : "No overall risk tier assigned"}
+              {overallScore != null && overallTier ? `${overallTier} Risk Tier` : "No overall risk tier assigned"}
             </span>
             <p className="mt-1 text-xs text-white/50">
               {ruleBasedTest
@@ -184,12 +178,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.domains?.map((d) => {
             const domainName = d.domain.replace("_", " ").toUpperCase();
+            const style = riskTierStyle(d.score == null ? null : d.tier);
             return (
               <div key={d.domain} className="rounded-lg border border-white/5 bg-white/[0.02] p-4 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white/80">{domainName}</span>
-                    <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-cyan-400">
+                    <span className={`rounded bg-white/10 px-2 py-0.5 text-xs font-semibold ${style.text}`}>
                       {d.score == null ? "Not scored" : `${d.score}/100`}
                     </span>
                   </div>

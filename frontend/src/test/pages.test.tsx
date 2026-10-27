@@ -391,6 +391,19 @@ describe("Findings page", () => {
 });
 
 describe("Dashboard page", () => {
+  it("renders empty organizations as not assessed without zero, perfect scores or risk labels", async () => {
+    await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => ({
+      overall_score: null, overall_tier: null, assessment_status: "not_assessed",
+      domains: [{ domain: "network_config", score: null, tier: null, assessment_status: "not_assessed", justification: "No active assets or findings recorded. Not assessed." }],
+      top_findings: [], recent_scans: [], asset_count: 0,
+      findings_by_severity: { critical: 0, high: 0, medium: 0, low: 0 },
+    }) });
+    expect(await screen.findByTestId("overall-score")).toHaveTextContent("Not assessed");
+    expect(screen.getAllByText("Not assessed")).toHaveLength(2);
+    expect(screen.queryByText(/risk tier/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("100")).not.toBeInTheDocument();
+    expect(screen.getByTitle("No active assets or findings recorded. Not assessed.")).toHaveClass("bg-white/5");
+  });
   const summary: DashboardSummary = {
     overall_score: 87.35,
     overall_tier: "low",

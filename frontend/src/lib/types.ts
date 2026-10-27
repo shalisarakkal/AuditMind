@@ -278,6 +278,8 @@ export type ImportResponse = {
   scan_id: string;
   status: ScanStatus;
   report: ImportReport | null;
+  skipped?: boolean;
+  skip_reason?: string | null;
 };
 
 export type Scan = {
@@ -313,11 +315,12 @@ export type ImportProgress = {
   rows_total?: number;
 };
 
-export type DomainScore = { domain: Domain; score: number; tier: RiskTier; justification: string };
+export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier | null; assessment_status?: "not_assessed" | "findings_based"; justification: string };
 
 export type DashboardSummary = {
-  overall_score: number;
-  overall_tier: RiskTier;
+  overall_score: number | null;
+  overall_tier: RiskTier | null;
+  assessment_status?: "not_assessed" | "findings_based";
   domains: DomainScore[];
   top_findings: Finding[];
   recent_scans: Scan[];
@@ -331,6 +334,7 @@ export type NessusInfoSeverity = "skip" | "low";
 export type IngestionSettings = {
   import_partial_success: boolean;
   asset_existing_strategy: AssetExistingStrategy;
+  exact_duplicate_file_policy: "ask" | "skip" | "reimport";
   nessus_info_severity: NessusInfoSeverity;
   nessus_domain_map: Record<string, Domain>;
   nessus_default_domain: Domain;
