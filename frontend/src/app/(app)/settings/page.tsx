@@ -7,6 +7,7 @@ import IngestionSettingsPanel from "@/components/IngestionSettingsPanel";
 import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import { useApp } from "@/context/AppContext";
 import { PageHeader } from "@/components/ListPage";
+import OrganizationLogoSettings from "@/components/OrganizationLogo";
 
 export default function SettingsPage() {
   const { selectedOrg } = useApp();
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   return (
     <div className="min-w-0 w-full space-y-8">
       <PageHeader title="Settings" orgName={org.name} total={undefined} noun="settings" />
+      <OrganizationLogoSettings key={org.id} orgId={org.id} name={org.name} editable={org.role === "admin"} />
 
       <section className="space-y-3">
         <div>
