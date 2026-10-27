@@ -35,12 +35,13 @@ def _seed(db_session, org_id, severity, minutes_ago, domain=Domain.vulnerability
     return finding
 
 
-def test_empty_org_scores_perfect(client, admin):
+def test_empty_org_is_not_assessed(client, admin):
     body = _dashboard(client, admin).json()
 
-    assert (body["overall_score"], body["overall_tier"]) == (100.0, "low")
+    assert body["assessment_status"] == "not_assessed"
+    assert (body["overall_score"], body["overall_tier"]) == (None, None)
     assert len(body["domains"]) == 7
-    assert all(d["score"] == 100.0 and d["tier"] == "low" for d in body["domains"])
+    assert all(d["score"] is None and d["tier"] is None and d["assessment_status"] == "not_assessed" for d in body["domains"])
     assert body["top_findings"] == []
     assert body["recent_scans"] == []
     assert body["asset_count"] == 0
@@ -110,5 +111,32 @@ def test_dashboard_only_counts_the_orgs_own_data(client, admin, db_session):
 
     body = _dashboard(client, admin).json()
 
-    assert body["overall_score"] == 100.0
+    assert body["overall_score"] is None
+    assert body["assessment_status"] == "not_assessed"
     assert body["top_findings"] == []
+
+
+def test_findings_without_assets_keep_existing_baseline(client, admin, db_session):
+    _seed(db_session, admin[1], Severity.critical, 1)
+    body = _dashboard(client, admin).json()
+    assert body["asset_count"] == 0
+    assert body["assessment_status"] == "findings_based"
+    assert body["overall_score"] is not None
+
+
+def test_asset_only_org_keeps_baseline_pending_coverage_design(client, admin):
+    headers, org_id = admin
+    upload(client, f"/api/v1/orgs/{org_id}/assets/import", headers, "asset-only.csv", b"type,hostname\nserver,web\n")
+    body = _dashboard(client, admin).json()
+    assert body["asset_count"] == 1
+    assert body["assessment_status"] == "findings_based"
+    assert body["overall_score"] == 100
+
+
+def test_archived_findings_do_not_make_empty_org_assessed(client, admin, db_session):
+    finding = _seed(db_session, admin[1], Severity.critical, 1)
+    finding.archived_at = datetime.now(timezone.utc)
+    db_session.commit()
+    body = _dashboard(client, admin).json()
+    assert body["assessment_status"] == "not_assessed"
+    assert body["overall_score"] is None

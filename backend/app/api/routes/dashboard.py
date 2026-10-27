@@ -77,16 +77,23 @@ def get_dashboard(
         for severity, count in by_domain.items():
             by_severity[severity] += count
 
+    asset_count = db.query(func.count(Asset.id)).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar()
+    empty = asset_count == 0 and not any(by_severity.values())
+    status = "not_assessed" if empty else "findings_based"
+
     return DashboardSummary(
-        overall_score=overall,
-        overall_tier=overall_tier,
+        overall_score=None if empty else overall,
+        overall_tier=None if empty else overall_tier,
+        assessment_status=status,
         domains=[
-            DomainScore(domain=domain, score=score, tier=tier, justification=justification)
+            DomainScore(domain=domain, score=None if empty else score, tier=None if empty else tier,
+                        assessment_status=status,
+                        justification="No active assets or findings recorded. Not assessed." if empty else justification)
             for domain, (score, tier, justification) in domain_scores.items()
         ],
         top_findings=[FindingRead.model_validate(f) for f in top],
         recent_scans=[brief_scan(s) for s in recent_scans],
-        asset_count=db.query(func.count(Asset.id)).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar(),
+        asset_count=asset_count,
         findings_by_severity=by_severity,
     )
 
