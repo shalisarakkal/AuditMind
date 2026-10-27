@@ -24,7 +24,7 @@ export default function DashboardPage() {
   const { data, error, loading } = useApi<DashboardSummary>(`/orgs/${selectedOrg!.id}/dashboard`);
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8 [overflow-wrap:anywhere]">
       <div>
         <h1 className="text-2xl font-semibold text-white">Resilience Dashboard</h1>
         <p className="mt-1 text-sm text-white/60">
@@ -45,15 +45,15 @@ function Dashboard({ data }: { data: DashboardSummary }) {
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-xl bg-navy-cyan-gradient p-6 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="min-w-0 rounded-xl bg-navy-cyan-gradient p-4 sm:p-6 lg:col-span-2">
           <p className="text-sm text-white/80">Overall Resilience Score</p>
           <p className={`mt-2 ${data.overall_score == null ? "text-2xl font-medium" : "text-5xl font-bold"} ${style.text}`} data-testid="overall-score">
             {data.overall_score == null ? "Not assessed" : Math.round(data.overall_score)}
           </p>
           {data.overall_score != null && <p className={`mt-1 text-sm uppercase tracking-wide ${style.text}`}>{data.overall_tier} risk tier</p>}
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+        <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
           <p className="text-sm text-white/60">
             {data.asset_count} assets · {totalFindings} findings
           </p>
@@ -77,7 +77,7 @@ function Dashboard({ data }: { data: DashboardSummary }) {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section>
           <h2 className="mb-3 text-lg font-medium text-white">Top issues</h2>
           {data.top_findings.length === 0 ? (

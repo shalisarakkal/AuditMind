@@ -1930,6 +1930,11 @@ lint and isolated production build passed. No backend contract changed.
 
 ## Resilience presentation follow-up (27 October 2026)
 
+- [x] Fix dashboard mobile grid/text overflow locally; preserve desktop layout,
+  add 320/390px wrapping regression checks (434 frontend tests, 70 Chrome checks).
+- [ ] Commit/push mobile fix after review and confirm hosted Ubuntu acceptance;
+  `387f72c` browser failure means earlier local closure is not hosted sign-off.
+
 - [x] Retain former layout; apply shared risk-tier text colors only.
 - [x] Implement explicit empty-organization Not assessed API/UI handling.
 - [x] PostgreSQL/frontend/Chrome regression, production build and local activation.

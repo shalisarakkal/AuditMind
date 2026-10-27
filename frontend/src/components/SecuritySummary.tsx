@@ -18,7 +18,7 @@ export default function SecuritySummary({ orgId }: { orgId: string }) {
     <p className="text-xs text-white/60">Completed organization actions started in the rolling seven-day period. Purges count operations, not deleted records.</p>
     <StatusMessage loading={loading && !data} error={error} />
     {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry security summary</button>}
-    {data && <div className="grid gap-3 sm:grid-cols-3">{cards.map(card => {
+    {data && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{cards.map(card => {
       const query = new URLSearchParams({ org: orgId, type: card.type, result: "completed", window_start: data.window_start, window_end: data.window_end });
       return <Link key={card.type} aria-label={`${card.label} ${data.counts[card.type].toLocaleString()}`} href={`/activity?${query}`} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan">
         <span className="block text-sm text-white/70">{card.label}</span>

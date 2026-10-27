@@ -122,7 +122,24 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     assert.deepEqual(summaryAxe.violations.map(v=>v.id),[]);
     await p.screenshot({path:path.join(output,'dashboard-summary-desktop.png'),fullPage:true});
     await p.setViewportSize({width:390,height:844});
-    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Dashboard must not overflow on mobile');
+    const mobileOverflow=await p.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,
+      elements:Array.from(document.querySelectorAll('main *')).filter(node=>node.getBoundingClientRect().right>innerWidth+1)
+        .slice(0,12).map(node=>({tag:node.tagName,text:node.textContent?.slice(0,70),className:node.className,right:node.getBoundingClientRect().right}))}));
+    assert.ok(mobileOverflow.width<=mobileOverflow.viewport,`Dashboard must not overflow on mobile: ${JSON.stringify(mobileOverflow)}`);
+    await p.setViewportSize({width:320,height:844});
+    const narrowOverflow=await p.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,
+      elements:Array.from(document.querySelectorAll('main *')).filter(node=>node.getBoundingClientRect().right>innerWidth+1)
+        .slice(0,12).map(node=>({tag:node.tagName,text:node.textContent?.slice(0,70),className:node.className,right:node.getBoundingClientRect().right}))}));
+    assert.ok(narrowOverflow.width<=narrowOverflow.viewport,`Dashboard must fit narrow mobile widths: ${JSON.stringify(narrowOverflow)}`);
+    await p.setViewportSize({width:390,height:844});
+    for (const width of [320,390]) {
+      await p.setViewportSize({width,height:844});
+      const clipped=await p.locator('main').evaluate(main=>Array.from(main.querySelectorAll('div,p,h1,h2,a,span'))
+        .filter(node=>node.clientWidth>0 && node.scrollWidth>node.clientWidth+1 && getComputedStyle(node).overflowX==='visible')
+        .slice(0,8).map(node=>({text:node.textContent?.slice(0,60),width:node.clientWidth,scrollWidth:node.scrollWidth})));
+      assert.deepEqual(clipped,[],`Dashboard content must wrap, not just hide overflow at ${width}px`);
+    }
+    await p.setViewportSize({width:390,height:844});
     const overall=p.getByTestId('overall-score').locator('..');
     await expect(p.getByTestId('overall-score')).toHaveText('Not assessed');
     await expect(overall.getByText(/risk tier/i)).toHaveCount(0);
@@ -140,6 +157,8 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     assert.ok([200,503].includes(probe.status));
     assert.deepEqual(Object.keys(await probe.json()).sort(),['checks','status']);
     check('Dashboard security counts deep-link to the exact Activity window; clear removes it; readiness response is redacted');
+    // Focused cross-browser diagnostics still use the real isolated services.
+    if (process.env.AUDITMIND_BROWSER_DASHBOARD_ONLY === '1') return;
     await p.goto(base+'/settings');
     await expect(p.getByText('No organization logo set.',{exact:true})).toBeVisible();
     const logoBytes=await p.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=40;canvas.height=20;

@@ -1,5 +1,33 @@
 # Phase 4 remediation workflow validation
 
+## Hosted mobile-overflow follow-up — 27 October 2026
+
+Hosted run `40553450269` for `387f72c` failed the browser job's dashboard mobile
+width assertion on ubuntu-latest; frontend and backend dependency-audit jobs passed.
+This does not invalidate recorded Windows local passes, nor establish Linux success.
+
+Fix: explicit one-column shrinkable tracks for dashboard overview, lower panels
+and Security summary; min-width zero on score cards; dashboard text may wrap
+anywhere for narrow available content; smaller mobile padding retains desktop
+spacing. No overflow-x hiding, scoring change or sidebar redesign. The fixed-width
+sidebar makes available main-content width smaller than the viewport; implicit
+minimum-content grid sizing and font metrics must not dictate the page width.
+
+Browser regression now checks 320px and 390px, reports offending elements when
+document width fails and checks visible-overflow content rather than accepting
+clipping. Targeted runs may set AUDITMIND_BROWSER_DASHBOARD_ONLY=1 with bundled
+Chromium; they still prepare/clean isolated PostgreSQL/API/worker fixtures.
+
+Fresh local validation: 434 frontend tests passed (29 focused tests overlap),
+ESLint and isolated production build passed; full Chrome 70 checks passed.
+Artifacts: `temp/testing/finding-workflow/phase3_browser_6377fef7e550`.
+Bundled Chromium focused run: 7 checks passed including 320/390px document/content
+width checks; `temp/testing/finding-workflow/phase3_browser_0bb4a8d62c13`.
+Normal production build and idle demo restart passed; no data/password resets.
+An initial baseline diagnostic run later failed an unrelated password-toggle
+assertion; the rebuilt complete Chrome rerun passed. Hosted Linux verification
+of the fix remains pending a separately approved commit/push.
+
 ## Empty-organization dashboard safeguard — 27 October 2026
 
 Dashboard API returns `assessment_status=not_assessed`, null score/tier for overall

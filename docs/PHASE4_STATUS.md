@@ -1,5 +1,13 @@
 # Phase 4 status and next milestone
 
+## Hosted CI follow-up — mobile dashboard
+
+`387f72c` is pushed but hosted browser acceptance failed mobile dashboard width.
+Local fix uses shrinkable grid tracks, wrapping and mobile padding, not clipping.
+434 frontend tests, full Chrome 70 checks, bundled Chromium focused 7 checks,
+lint and builds pass; corrected demo is running. Fix remains uncommitted/unpushed;
+hosted Ubuntu acceptance must be rerun after approval. See latest validation.
+
 ## Current local closure review — 27 October 2026
 
 Reviewed code paths against the recorded validation and activation evidence.
