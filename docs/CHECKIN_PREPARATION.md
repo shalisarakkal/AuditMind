@@ -1,5 +1,35 @@
 # Check-in preparation — 26 October 2026
 
+## Current branding/auth/password handoff
+
+The user approved both scoped check-in and push, followed by hosted CI verification.
+Groups are explicitly staged by path, never `git add .`:
+
+1. Backend organization-logo normalization/transport, tenant-safe versioned APIs,
+   platform branding, header preferences and migrations 0025–0028 with regressions
+   (**d08b0fe**).
+2. Organization/header UI, settings and component regressions (**1cf9923**).
+3. Product-branding controls/approved active SVGs, single-brand auth presentation
+   and shared hidden-by-default password controls, safe handover clipboard errors
+   and auth/People/platform regressions (**4f153f9**).
+4. Combined Chrome acceptance and synchronized roadmap/manual/validation records.
+
+Excluded: credentials/.env/SIGN_IN.txt, temp evidence/logs/process state, generated
+builds, dependencies, unrelated cline.json, alternate/reference branding images and
+branding/tmp originals. The active product-logo.svg/favicon.svg and branding README
+are the only public branding assets in scope. User originals remain on disk.
+
+Review corrected configurable-prefix logo transport enforcement and temporary-
+password clipboard failure/stale-notice handling. Full PostgreSQL validation,
+frontend checks, migration/Chrome acceptance, dependency/static checks and exact
+staged-diff/secret checks gate the commits. Final local gate passed **1,268 full
+PostgreSQL tests**, **413 frontend tests**, **61 Chrome executions**, lint/build,
+clean dependency manifests and high-severity static checks. Test public schema
+restored at 0028 (31 tables), no drift. Current measured results and per-SHA hosted
+evidence belong in [PHASE4_VALIDATION.md](PHASE4_VALIDATION.md).
+
+## Historical check-in records
+
 ## Local operations and dependency follow-up
 
 User authorized scoped commits for this follow-up; no push is authorized in this

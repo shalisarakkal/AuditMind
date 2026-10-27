@@ -119,6 +119,10 @@ def main():
                     if args.workflow and role == 'admin':
                         db.add(OrgMembership(user_id=user.id, org_id=beta.id, role=UserRole.admin))
                 db.commit()
+                if args.workflow:
+                    platform_user = User(email='platform@phase3.example', name='Fixture platform', is_sysadmin=True)
+                    db.add(platform_user); db.flush(); accounts.set_password(db, platform_user, password)
+                    db.commit()
                 print(json.dumps({'password': password, 'org': str(alpha.id), 'other_org': str(beta.id)}))
         elif args.action == 'inspect':
             from app.models.report import Report

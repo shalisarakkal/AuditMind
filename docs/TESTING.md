@@ -1,5 +1,77 @@
 # Testing strategy and measured coverage
 
+## Final combined-tree check-in gate — 26 October 2026
+
+**1,268 full PostgreSQL tests passed** (668.14s, required PostgreSQL, warnings as
+errors), **413 frontend tests passed** (25.09s final rerun), lint/TypeScript/build
+and **61 Chrome executions** passed (`phase3_browser_526fedeba757`). Real migration
+upgrade/rollback/no-op/drift included through 0028. npm/core-dev/optional-embedding
+audits are clean; pip check, high-severity Bandit and tracked-file/whitespace
+guards passed. Low/medium static findings remain tracked, not waived. Preliminary
+interrupted backend run is not counted. Older focused/full results below are
+historical, not additive. [Authoritative local/hosted evidence](PHASE4_VALIDATION.md).
+
+## Historical implementation checkpoints
+
+Password visibility: **411 frontend tests** (24.16s), lint/build/TypeScript passed.
+New shared-control tests cover keyboard/no-submit behavior, per-field masking,
+remounts, metadata, disabled state and temporary handover copy/reset; existing
+auth/change-password/People/platform regressions pass. Backend unchanged; earlier
+focused/full backend counts are not reruns. **61 Chrome executions passed** through
+real test API/PostgreSQL, including synthetic reset/change-password and Axe. Final
+13 focused People tests overlap the full frontend suite; do not add the counts.
+[Browser evidence](PHASE4_VALIDATION.md).
+
+Platform product-logo sizing: **406 frontend tests** (24.69s), lint/build/TypeScript,
+**29 focused PostgreSQL checks** (25.59s, including two migration tests) and **25
+separate platform API regressions** (46.95s) passed, warnings as errors. The 54
+backend checks cover disjoint files; no new full-suite run. No migration beyond
+0028. **55 Chrome check executions passed**, including platform permissions,
+cross-user sizing, conflicts and Axe. [Current browser evidence](PHASE4_VALIDATION.md).
+
+Company-name typography follow-up: **399 frontend tests** (37.68s), lint/build/
+TypeScript and **28 PostgreSQL tests** (34.73s, warnings as errors) passed: 26
+focused branding/logo/settings tests plus two migration checks at 0028. Earlier
+full backend counts are not reruns. **52 Chrome check executions passed**, including
+computed font sizes, persistence and stale edits. [Current evidence](PHASE4_VALIDATION.md).
+
+Configurable organization-logo size: **395 frontend tests** (23.96s), lint/build/
+TypeScript and **27 PostgreSQL tests** (34.38s, warnings as errors) passed. Backend
+scope is 25 focused branding/logo/settings checks plus two migration tests at
+0027, not a new full-suite run. **50 Chrome check executions passed**, including
+size persistence/permissions, mobile layout and two-tab conflicts.
+[Current browser evidence](PHASE4_VALIDATION.md).
+
+Header preference/sizing: **391 frontend tests** (24.65s), lint/build/TypeScript,
+**24 focused PostgreSQL backend tests** (19.78s), **two migration tests** (2.65s)
+and **48 Chrome check executions** passed. Migration round-trip/no-op/drift at
+0026 passed. Focused backend checks are not a new full-suite run; prior 1,260
+results remain historical. [Evidence](PHASE4_VALIDATION.md).
+
+Signed-in branding follow-up: **387 frontend tests** (28.95s), lint/build/TypeScript
+and **47 Chrome check executions** passed. Product branding appears once in the
+sidebar, while the header retains organization identity/company branding. Auth
+presentation is unchanged. Backend unchanged; earlier full PostgreSQL evidence
+is not a rerun. [Scope/artifact](PHASE4_VALIDATION.md).
+
+Authentication presentation follow-up: **385 frontend tests** (21.99s), lint/
+build/TypeScript and **47 Chrome check executions** passed, with full-page Axe,
+keyboard and desktop/mobile auth screenshots. Authentication groups repeat for
+admin contexts; open signup uses a presentation-only fixture. Backend unchanged;
+prior full PostgreSQL evidence is not a rerun. [Scope/artifact](PHASE4_VALIDATION.md).
+
+Product-asset follow-up: **383 frontend tests** (32.88s), lint/build/TypeScript
+and **43 installed-Chrome checks** passed. New checks verify the fixed product
+SVG across sign-in/sidebar/header and the independent favicon. Backend unchanged;
+the 1,260-test result below is earlier evidence, not rerun for this UI-only change.
+[Scope and artifact](PHASE4_VALIDATION.md).
+
+Latest local logo increment: **1,260 full PostgreSQL tests** (629.34s, warnings
+as errors), **382 frontend tests** (26.05s), lint/TypeScript/build and **42 Chrome
+checks** passed. Migration round-trip/drift passed at 0025. Focused counts overlap;
+interrupted runs are not counted. Hosted c008efc below is the preceding baseline,
+not execution of this uncommitted feature. [Evidence](PHASE4_VALIDATION.md).
+
 Latest follow-up: **1,244 Linux PostgreSQL tests** (331.37s), **377 frontend tests**
 (58.16s), lint/TypeScript/production builds, **39 local Chrome checks** and hosted
 Chromium acceptance passed. See [per-SHA evidence and CI results](BACKEND_DEPENDENCY_REMEDIATION.md).

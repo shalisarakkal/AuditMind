@@ -1,5 +1,68 @@
 # Phase 4 status and next milestone
 
+## Current handoff — 26 October 2026
+
+Organization logo management and header name/size preferences, platform-admin
+product-logo sizing, active approved SVG assets, single-brand authentication
+presentation and shared Show/Hide password controls are implemented locally.
+Migrations 0025–0028 cover organization branding; platform presentation uses the
+existing platform_settings table. Final combined-tree review passed: **1,268 full
+PostgreSQL tests**, **413 frontend tests**, **61 Chrome executions**, lint/build,
+migration checks and dependency/static gates. Scoped commits, push and hosted CI
+verification are approved and in progress. [Authoritative acceptance record](PHASE4_VALIDATION.md).
+
+Phase 4 remains partial. Large-org broad-search/count/facet performance, ACLs/
+throttling/malware policy, lower-severity static triage, tenant-fair scheduling and
+production hosting/monitoring acceptance remain open. Imported identity and
+status-aware scoring need separate design approval. Docker/cache deployment and
+report-date UI remain Future. None is silently waived by local test success.
+
+## Historical local checkpoints
+
+Latest password UI: shared hidden-by-default Show/Hide control for all password
+entry fields and temporary-password handovers, independent/keyboard accessible;
+no storage/API changes. 411 frontend tests, 61 Chrome checks and lint/build passed. Backend evidence
+below is historical, not rerun for this UI-only change. [Acceptance](PHASE4_VALIDATION.md).
+Local changes remain uncommitted/unpushed; hosted CI has not run this tree.
+
+Latest platform branding: platform-admin-only sidebar product size under Platform
+→ Product branding, Small/Medium/Large; authenticated readers use it platform-wide.
+Sign-in/company branding unchanged. 406 frontend and 54 focused backend/migration/
+platform checks and 55 Chrome executions passed, plus lint/build. Uses existing platform_settings; no new
+migration (head 0028). [Current evidence](PHASE4_VALIDATION.md). Uncommitted/unpushed.
+
+Latest company-name size setting: Small 16px, Medium 20px (larger default), Large
+24px, saved per organization/admin-only; selector and product branding unchanged.
+Migration 0028 retains logos/preferences. 399 frontend and 28 focused/migration
+PostgreSQL and 52 Chrome checks passed, plus lint/build. [Current evidence](PHASE4_VALIDATION.md).
+Local changes remain uncommitted/unpushed; hosted CI has not run this tree.
+
+Current logo-size follow-up: admin-configurable Small/Medium/Large header logo,
+default Medium 160×64px; matching Settings preview, no product-logo changes.
+Migration 0027 retains existing images/name preferences. 395 frontend, 27
+focused/migration PostgreSQL and 50 Chrome checks passed; lint/build passed. These local changes
+are uncommitted/unpushed. [Current evidence](PHASE4_VALIDATION.md).
+
+Latest header branding: larger 180×48 sidebar product-logo box, 16px organization
+name and admin-only saved header-name visibility preference (migration 0026).
+Missing/broken logos retain the name. 391 frontend tests, 24 focused backend tests,
+two migration tests and 48 Chrome executions passed; lint/build passed. Earlier
+full backend counts below are not reruns. [Validation](PHASE4_VALIDATION.md).
+
+Latest auth presentation: one larger user-supplied product logo above the shared
+login/register card; 385 frontend tests and 47 grouped Chrome executions passed.
+Backend/authentication policy unchanged. [Validation scope](PHASE4_VALIDATION.md).
+
+Product-asset follow-up: fixed replaceable SVG wordmark/favicon paths, 383 frontend
+tests and 43 Chrome checks passed. [Replacement instructions](PRODUCT_BRANDING.md).
+Defaults remain provisional; this local follow-up is uncommitted/unpushed.
+
+Latest local increment: [organization logos](ORGANIZATION_LOGOS.md), migration
+0025, 1,260 full PostgreSQL / 382 frontend / 42 Chrome checks passed. This feature
+is uncommitted/unpushed; hosted CI at c008efc remains the preceding green baseline.
+Roadmap entries incorrectly listing baseline CI/dependency remediation pending
+have been reconciled. Hardening/performance and production acceptance remain open.
+
 Code/document reconciliation: 26 October 2026, after pushed checkpoint
 `79c4a66`, followed by the user-approved local operations increment. See
 [implementation, validation scope and security blocker](PHASE4_LOCAL_OPERATIONS.md).
@@ -23,7 +86,8 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Further per-domain refinement and export polish | Baseline exists; additional scope not defined | `scoring_service.py` implements deterministic domain scores; reports route exports HTML/JSON/PDF. Phase 4 refinements beyond those delivered features require concrete acceptance criteria, not duplicate implementation or a blanket completion checkbox. |
 | Dashboard security summary | Implemented locally | Three completed organization-event counts; exact Activity links; global failed sign-ins explicitly unavailable. Scores unchanged. |
 | Drag/drop and multiple-file import | Implemented locally | Independent per-file source/duplicate/cancel/error/report flow; 20 queued-card limit. |
-| Product/organization logos and common header branding | Partial | Product mark, browser icon and common organization header implemented. Organization-uploaded logos remain pending. |
+| Product/organization logos and common header branding | Implemented locally | Product mark in sidebar/authentication and browser icon; organization name/company logo only in header. Org-admin logo/visibility/name and image sizing, migrations 0025–0028; platform-admin product sizing with version checks. See ORGANIZATION_LOGOS.md / PRODUCT_BRANDING.md. |
+| Password visibility | Implemented locally | Shared masked-by-default keyboard-accessible Show/Hide on auth/change-password fields and temporary handovers; copy without reveal. Values/autocomplete/submission retained. |
 | Dependency readiness endpoint | Implemented locally | `/health` remains cheap; `/ready` checks PostgreSQL, upload access and worker freshness with redacted responses. Hosted acceptance pending. |
 | Large-organization list performance | Partial | Indexed selective Findings search delivered; short/broad searches remain slow. Dashboard/list exact counts remain; estimated counts and cached facets not completed. |
 | Security hardening | Partial | Sign-in process-local limiter and durable AI accounting exist. Shared/distributed request limits, dedicated upload request throttling, malware policy, service-account ACL validation and production secrets/CORS need further work. File-size limits are not request-rate limits. |
@@ -70,7 +134,7 @@ organization security summary. Preserve scores, source evidence and reports.
 The dependency increment resolves the initial audit findings without ignores;
 local regression acceptance is recorded below; subsequent hosted evidence is in
 [dependency follow-up](BACKEND_DEPENDENCY_REMEDIATION.md).
-Organization logos, ACL/throttling/malware policy, static-analysis triage and large-
+Organization logos are delivered in the subsequent local increment. ACL/throttling/malware policy, static-analysis triage and large-
 org performance remain pending. Scoring, reconciliation and hosting stay separate.
 
 ## Current validation baseline

@@ -1,5 +1,13 @@
 # AuditMind AI
 
+Product logo trials: [replaceable asset locations and instructions](docs/PRODUCT_BRANDING.md).
+
+Organization admins can manage [organization logos](docs/ORGANIZATION_LOGOS.md)
+in Settings; authenticated header branding uses bounded normalized PNG images.
+Organization branding uses migrations 0025–0028; platform admins control product
+logo size under Platform → Product branding. Password fields share accessible
+Show/Hide controls. These local features are not production/live-AI approval.
+
 Local operations features: [Phase 4 local operations](docs/PHASE4_LOCAL_OPERATIONS.md).
 Current [dependency remediation](docs/BACKEND_DEPENDENCY_REMEDIATION.md) supersedes
 the initial backend audit blocker. Phase 4 remains partial.

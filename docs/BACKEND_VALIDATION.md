@@ -1,5 +1,51 @@
 # Backend validation — 2026-10-20
 
+## Current combined-tree gate — 26 October 2026
+
+**1,268 full PostgreSQL tests passed in 668.14s**, `--require-postgres -W error`,
+including branding roles/versions/normalization, custom API-prefix transport bounds,
+existing platform/auth/workflow regressions and migration upgrade/rollback/no-op/
+drift through 0028. Preliminary run stopped before the transport fix is not counted.
+Core/dev and optional-embedding manifests audit clean; pip check and high-severity
+Bandit passed. Lower-severity static triage remains separate. Earlier focused and
+full counts below are historical, not additional tests.
+[Local and per-SHA hosted evidence](PHASE4_VALIDATION.md).
+
+## Historical validation checkpoints
+
+26 October product-branding follow-up: **29 focused PostgreSQL tests** (25.59s,
+including two migration tests) and **25 disjoint platform API regressions** (46.95s)
+passed with warnings as errors. Read/write permissions, defaults, enum validation,
+stale writes, no-op/audit behavior and organization independence covered. New key
+uses existing platform_settings; migration head remains 0028. These 54 checks are
+not a rerun of the earlier full backend suite.
+
+26 October company-name size: **28 PostgreSQL tests passed** (34.73s, warnings as
+errors), 26 focused branding/logo/settings checks plus two migration tests through
+0028. Enum/pair validation, viewer denial, stale-update atomicity, persistence,
+existing-data defaults and real upgrade/rollback/no-op/drift verified. The earlier
+full backend suite was not rerun for this increment.
+
+26 October logo-size follow-up: **27 PostgreSQL tests passed** (34.38s, warnings
+as errors), comprising 25 focused branding/logo/settings checks and two migration
+tests through **0027**. Size enum/pair validation, persistence, stale edits,
+permissions and existing-data defaults checked; upgrade/rollback/no-op/drift passed.
+Earlier full backend totals are historical, not rerun for this follow-up.
+
+26 October header-preference follow-up: **24 focused PostgreSQL tests** passed
+(19.78s, warnings as errors), plus **two migration tests** (2.65s) exercising
+upgrade/rollback/no-op/drift to **0026** and defaults for existing organizations.
+Member/admin/tenant/archived boundaries, strict booleans and stale writes checked.
+This is not a new full backend run; 1,260 below is earlier evidence.
+
+Organization-logo follow-up: **1,260 full PostgreSQL tests passed in 629.34s**
+with warnings as errors, including bounded raster normalization, authorization,
+stale-write/lifecycle/cleanup, transport limits and post-commit deletion race.
+Migration head/round-trip/drift passed at **0025**; 31 public tables and zero
+browser schemas after restoration. Earlier focused/hosted counts below overlap;
+this local increment has not been pushed to hosted CI.
+[Current acceptance record](PHASE4_VALIDATION.md).
+
 Latest hosted Linux backend: **1,244 passed in 331.37s** (`4ffee34`), required
 PostgreSQL and warnings as errors. Includes three original-Passlib hash fixtures.
 Clean dev-only Windows installation before the password fork passed 1,241 tests

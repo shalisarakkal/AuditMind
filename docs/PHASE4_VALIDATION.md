@@ -1,5 +1,242 @@
 # Phase 4 remediation workflow validation
 
+## Final combined-tree check-in review — 26 October 2026
+
+Scope: migrations 0025–0028, organization and platform branding, approved active
+SVG assets, auth presentation and shared password visibility. Review corrected
+two issues before handoff: logo transport bounds now honor configured API prefixes
+(regressions cover default/custom prefixes), and temporary-password clipboard
+failures have a safe fallback while copy status resets for a new handover.
+
+Fresh **413 frontend tests passed** (25.09s final rerun), lint/TypeScript/isolated production
+build passed; **61 Chrome check executions passed** (`phase3_browser_526fedeba757`)
+against real isolated PostgreSQL/API/worker, including synthetic password reset/
+change, platform/organization role separation, stale writes, layout and Axe.
+Grouped/repeated executions are not independent scenarios. npm audit found zero
+vulnerabilities; core/dev and optional-embedding pip-audit manifests found none;
+pip check passed. Bandit's high-severity gate passed; 12 low/16 medium findings
+remain triage work, not a blanket security clearance. No live AI calls.
+
+The preliminary backend run was intentionally stopped after the configurable-
+prefix finding. The restarted **full PostgreSQL suite passed 1,268 tests in
+668.14s**, with `--require-postgres -W error`. It includes real migration upgrade/
+rollback/no-op/drift checks through 0028. Earlier focused/full counts below are
+historical and must not be added to this run.
+
+After pytest, the disposable auditmind_test public schema was restored to **0028**
+(31 tables), repeated upgrade was a no-op and autogenerate check found no drift.
+The temporary restore helper's first check used an explicitly qualified version
+table while comparing the default schema; removing that helper-only schema hint
+resolved the false alembic_version remove-table diff. No application schema fix
+or stamping was needed; real round-trip tests had already passed.
+
+Reviewed code commits: backend **d08b0fe**, organization UI **1cf9923**, product/
+auth/password UI **4f153f9**. The acceptance/docs commit contains this record.
+Remote main was unchanged at c008efc before commit preparation; push and hosted
+CI verification for the new tip are the next gate, not inherited from that baseline.
+
+Commit scope excludes unrelated cline.json, credentials, temp evidence/process
+state, alternate/reference branding originals, installed packages and builds.
+Only active product-logo.svg/favicon.svg and their README are staged as public
+assets. Hosted results must be tied to the actual pushed SHA, not c008efc history.
+
+## Historical implementation checkpoints
+
+## Shared password visibility — 26 October 2026
+
+Shared PasswordInput now covers login/register, every current/new/confirmation
+field and admin temporary-password handovers (People/platform Accounts/organization
+creation). Hidden by default; independent Show/Hide actions use type=button,
+field-specific accessible labels, aria-controls, visible keyboard focus and 44px
+controls. Values/name/autocomplete/required state and paste are retained. A new
+handover resets visibility; explicit Copy works while masked. Visibility is local
+state, not stored or sent. Change-password native form now uses POST, preventing
+password query strings before hydration; footer links are permanently underlined.
+
+**411 frontend tests passed** (24.16s), lint, TypeScript and production build
+passed. Tests cover keyboard activation/no form submission, hidden remounts,
+independent fields, preserved metadata/value, disabled controls, masked handover
+copy/reset, and existing auth/change-password/People/platform submissions. An
+initial test matched both the handover group and field label; the field now has
+the distinct accessible name “Temporary password value.” Backend unchanged; the
+earlier 54 focused and 1,260 full backend results are not reruns for this UI-only
+follow-up. **61 Chrome check executions passed** (`phase3_browser_438b4af892ce`),
+covering keyboard login reveal/hide/no-submit/remount, registration presentation,
+real synthetic-user reset handover, independent change-password toggles and a
+successful real test-API password change, plus existing regressions/Axe checks.
+Auth groups repeat across two contexts; counts are executions, not independent
+scenarios. Mobile sign-in screenshot visually reviewed. A final stronger Done-
+removal assertion passed all **13 focused People tests** (3.09s), overlapping the
+411 total, not additive. No actual demo-account password changes or AI calls.
+Changes remain local, uncommitted/unpushed; hosted CI has not run this tree.
+
+## Platform-admin product-logo size — 26 October 2026
+
+New **Platform → Product branding** page controls only the shared sidebar product
+logo: Small 144×40, Medium 180×48 (default), Large 192×64px, bounded by sidebar
+width and preserving proportions. Auth stays 240×72; company branding is unchanged.
+Signed-in users can read display size/version; only active platform admins can
+write. Stored in existing platform_settings (no new migration). Version checks,
+transaction advisory locking for concurrent first saves, fresh actor-role checks
+and Platform activity auditing protect writes. No-op saves leave version/audit
+unchanged; stale UI requires explicit reload.
+
+**406 frontend tests passed** (24.69s), lint, TypeScript and production build
+passed. **29 focused PostgreSQL tests passed** (25.59s, warnings as errors),
+including branding/logo/settings and two migration checks; **25 separate platform
+API regression tests passed** (46.95s). These are 54 checks across disjoint files,
+not a new full backend run. Head remains 0028. **55 Chrome check executions passed**
+(`phase3_browser_b2627365248d`), including all size choices, platform-admin editing,
+organization-admin UI/API denial, cross-user persistence, two-tab conflict/reload,
+Axe and existing regressions. Initial conflict assertion also matched Next.js's
+route-announcer alert; scoping it to the settings panel corrected the test without
+weakening the expected error. Product-branding screenshot visually reviewed.
+These are grouped executions, not 55 independent scenarios. No external inference
+or provider credentials used; local changes are uncommitted/unpushed and hosted
+CI has not run this tree.
+
+## Company-name typography — 26 October 2026
+
+New admin-only **Header company name size** setting: Small 16px, Medium 20px
+(larger default), Large 24px. Organization-wide persistence, same-window header
+refresh and other-session refresh behavior match logo sizing. Selector, product
+logo and other typography are unchanged; visibility/fallback rules are retained.
+Migration **0028** adds a constrained size defaulting to medium, retaining existing
+logos and branding preferences. Optional expected/value size pairs maintain old
+client compatibility; all requested fields validate before any mutation. Actual
+changes are audited under the existing organization lock/lifecycle fences.
+
+**399 frontend tests passed** (37.68s), lint, TypeScript and production build
+passed. **28 PostgreSQL tests passed** (34.73s, warnings as errors): 26 focused
+branding/logo/settings checks and two real upgrade/rollback/no-op/drift tests,
+including existing-organization defaults at 0028. These are not a rerun of the
+earlier 1,260-test full backend suite. **52 Chrome check executions passed**
+(`phase3_browser_da2795906ee4`), including actual 16/20/24px computed font sizes,
+cross-member persistence, viewer read-only access, stale-name-size reload and the
+existing workflow/auth/accessibility regressions. These are grouped executions,
+not independent scenarios. No live inference calls. Local changes remain
+uncommitted/unpushed; hosted CI has not run this tree.
+
+## Configurable organization-logo size — 26 October 2026
+
+Admin-only Small/Medium/Large preference changes header and Settings preview,
+preserving aspect ratio. Medium 160×64px is the default; Small is 96×48px and
+Large 224×80px. No square backdrop, automatic cropping or product-logo changes.
+Header identity wraps within mobile widths. Transparent source padding remains.
+Migration **0027** retains images/name preferences and adds a constrained size
+with default medium. Writes validate values, lock the organization, audit actual
+changes and reject stale expected size/name values; viewers remain read-only.
+
+Final **395 frontend tests passed** (23.96s), lint, production build and TypeScript
+passed. **27 PostgreSQL tests passed** (34.38s, warnings as errors): 25 focused
+branding/logo/settings checks and two real migration upgrade/rollback/no-op/drift
+checks, including the default for an existing organization. This is not a rerun
+of the earlier 1,260-test full backend suite. Chrome initially found an ambiguous
+wrapping-select label; explicit label/control association corrected it without
+weakening the browser assertions. Final **50 Chrome check executions passed**
+(`phase3_browser_428780bc0bd5`), including all three sizes, cross-member persistence,
+mobile overflow checks/screenshots, two-admin stale-size conflict/reload and all
+existing workflow/auth/accessibility regressions. These are grouped executions,
+not 50 independent scenarios. No external inference calls or browser page errors.
+Changes remain local, uncommitted/unpushed; hosted CI has not run this tree.
+
+## Branding sizing and header-name preference — 26 October 2026
+
+Sidebar product logo uses a 180×48px box with existing artwork; authentication
+remains 240×72px. Organization header names use 16px medium-weight text. New
+admin-only organization-wide visibility preference defaults on; absent/broken
+logos always fall back to the name. The organization selector is unchanged.
+Preference edits are locked, audited and reject stale expected values (409).
+
+**391 frontend tests passed** (24.65s), lint and production build/TypeScript
+passed. **24 focused PostgreSQL backend tests passed** (19.78s, warnings as
+errors), covering branding, logos and organization settings. **Two migration
+tests passed** (2.65s): real upgrade/rollback/no-op/drift at **0026**, including
+the true default for existing organizations. These focused results are not a
+rerun of the earlier 1,260-test full backend suite.
+
+**48 Chrome check executions passed** (`phase3_browser_1d7f845e51c6`), including
+persisted admin/viewer preference, read-only access, accessibility and existing
+workflow regressions. Initial checkbox automation assumed synchronous saving;
+it was corrected to click and await persisted state, with assertions retained.
+No inference calls. Local changes remain uncommitted/unpushed; no new hosted CI.
+
+## Signed-in branding separation — 26 October 2026
+
+Product branding now appears once in the sidebar; the application header retains
+only the selected organization name/company logo (or Platform). Authentication
+branding remains unchanged. Header regression tests cover organization identity
+with and without a saved company logo.
+
+Fresh **387 frontend tests passed** (28.95s), lint, production build and TypeScript
+passed. **47 Chrome check executions** passed (`phase3_browser_547a228290fa`),
+including the single sidebar product logo, organization-logo lifecycle, auth
+accessibility and existing workflow regressions. Repeated authentication groups
+are executions, not distinct scenarios. No AI calls were made. Backend unchanged;
+the earlier 1,260 full PostgreSQL tests were not rerun for this UI-only follow-up.
+These local changes remain uncommitted/unpushed; hosted CI has not run this tree.
+
+## Authentication presentation — 26 October 2026
+
+One 240×72 product-logo box above a 400px-max card; duplicate text/inner logo
+removed. Shared login/register/signup-closed shell, subtitles, 44px controls,
+visible focus and underlined footer links. User-supplied SVG artwork unchanged;
+compact sidebar/header sizing unchanged. Password/session/signup logic unchanged.
+
+Fresh **385 frontend tests passed** (21.99s), lint, isolated production build and
+TypeScript passed. **47 Chrome check executions** passed
+(`phase3_browser_fb68af7170c4`), including full-page Axe WCAG A/AA, keyboard entry,
+desktop/mobile screenshots and existing app regressions. The two authentication
+groups repeat for two admin contexts; these are grouped executions, not 47 unique
+independent scenarios. Open-registration presentation uses an intercepted signup-
+options fixture only; real signup remains disabled and its closed state is checked.
+No account is created by the presentation fixture. Initial Axe failure on a
+color-only footer link was corrected with a permanent underline; final run passed
+without weakening assertions. Desktop/mobile screenshots were visually reviewed.
+
+No backend changes in this follow-up; prior 1,260 full PostgreSQL tests remain
+earlier evidence, not rerun. Demo rebuilt/restarted, retaining data/passwords.
+Changes remain uncommitted/unpushed and have not run in hosted CI.
+
+## Replaceable product assets — 26 October 2026
+
+Shared product placements now read `public/branding/product-logo.svg`; root
+metadata uses `public/branding/favicon.svg`. The complete wordmark is replaceable
+without source edits; aspect ratio/available width and accessible name are retained.
+Defaults remain provisional until an approved SVG is supplied. Company logos are
+unchanged. Fresh **383 frontend tests** (32.88s), lint and isolated production
+build/TypeScript passed. **43 installed-Chrome checks** passed
+(`phase3_browser_fb3a96bca5ad`), checking sign-in/sidebar/header image loading,
+favicon metadata/serving and the existing organization/workflow/accessibility suite.
+SVG structure and tracked-file secret/whitespace/script checks passed.
+No backend code changed in this follow-up; the prior 1,260-test backend result
+below is retained evidence, not a newly rerun backend suite. Local demo rebuilt;
+this uncommitted/unpushed work has not run on hosted CI.
+[Asset replacement instructions](PRODUCT_BRANDING.md).
+
+## Organization logos / roadmap cleanup — 26 October 2026
+
+Final local tree: **1,260 full PostgreSQL tests passed in 629.34s**, required
+PostgreSQL and warnings as errors. **382 frontend tests passed** (26.05s), lint,
+TypeScript and isolated production build passed. **42 installed-Chrome checks**
+passed (`phase3_browser_e4adfd001408`), adding real logo persistence/header/viewer,
+two-tab stale-write and confirmed-removal flows to the existing suite. The 26
+focused checks were an earlier overlapping checkpoint, not an additive total.
+Interrupted intermediate runs are not acceptance evidence; final full collection
+includes all transport guards and the post-commit response-race regression.
+
+Migration 0025 adds one DB-bounded logo per organization. Test DB round-trip
+(head → 0020 → head), metadata drift and no-op checks passed; restored to **0025**,
+31 public tables and zero browser schemas. Demo migration/rebuild uses the guarded
+`auditmind_demo` preparation workflow, retaining data/passwords. High-severity
+Bandit, tracked-file secret guard, explicit new-file pattern review, script syntax
+and whitespace checks passed; no further blocking review finding. No dependency
+pins, live inference, scoring or saved reports changed in this increment.
+
+This increment is **uncommitted/unpushed**; the previously green hosted baseline
+at `c008efc` is not a hosted test of these new changes. Broader Phase 4 hardening
+and performance remain pending. [Branding contract / Chrome steps](ORGANIZATION_LOGOS.md).
+
 Latest clean-install/Linux correction: old `httpx` fallback, missing browser
 `vector` extension, deprecated Unix `crypt` import and upload-result mobile
 overflow corrected without warning ignores or relaxed assertions. Linux backend

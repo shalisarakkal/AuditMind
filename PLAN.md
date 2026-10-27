@@ -4,6 +4,17 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 ## How this works
 
+Current check-in scope (26 October): organization logos/header preferences
+(migrations 0025–0028), approved fixed SVG assets, platform product-logo sizing,
+single-brand auth presentation and shared password visibility are implemented.
+Final combined-tree review/testing and scoped commits/push are approved. See
+[current acceptance and per-SHA CI evidence](docs/PHASE4_VALIDATION.md); the
+chronological checkpoints below retain their original validation counts and are
+not the current release gate. Phase 4 remains partial; production/live AI,
+reconciliation/scoring policy and user-approved Future work remain separate.
+
+### Historical delivery checkpoints
+
 26 October follow-up: shared calendar contrast fixed; today's deadlines allowed
 until browser-local end of day, newly set dates bounded by finding creation, and
 invalid bulk workflow updates reject atomically. Archived/Assets/Uploads now use
@@ -1470,15 +1481,18 @@ and offline embedding API/worker packaging are implemented. Migration head is
 `0021`; do not apply it to important databases without the release checks in
 [docs/PHASE3_OPERATIONS.md](docs/PHASE3_OPERATIONS.md). Container build/startup/cache
 validation is deferred to the Future phase by the user's 2026-10-22 decision. See
-[validation evidence](docs/BACKEND_VALIDATION.md). Phase 3 acceptance and explicit
-sign-off are still pending; older unchecked entries are not proof of missing code.
+[validation evidence](docs/BACKEND_VALIDATION.md). The Phase 3 local-testing
+milestone was accepted; production/live-provider acceptance remains separate.
+Older unchecked entries are not proof of missing code.
 
 **Scope:** load
-CIS/NIST/ISO docs (pgvector is already set up), Claude-driven risk scoring with RAG citations, full report
-generation endpoint.
+CIS/NIST/ISO docs (pgvector is already set up), AI report assessments with RAG
+citations and report generation. `/risk/score` remains deterministic; AI report
+assessments do not replace that scoring boundary.
 
 - [x] Working-tree implementation has passing automated suites (987 backend/274 frontend on 2026-10-22), plus 24 final focused regressions after adding two direct-provider cases. Production build passes.
-- [ ] Reviewable commits, development-tool audit disposition and final release acceptance/sign-off.
+- [x] Reviewable commits and development-tool audit disposition for the accepted local-testing milestone; subsequent dependency remediation is recorded separately.
+- [ ] Production/live-provider release acceptance and sign-off (not implied by local milestone closure).
 - Review fixes (2026-10-06): reproduced before implementation, with regression
   tests for CloudTrail account separation, assetless finding restore, idle-timeout
   renewal, concurrent last-admin deactivation, report recovery/cancellation,
@@ -1536,7 +1550,8 @@ generation endpoint.
   - [x] Resolve production dependency audit; frontend build passes on Next 16.4.2.
   - [x] Complete scoped native/mock browser acceptance; see recorded limits and evidence.
   - [x] Add explicit full-request byte budget, bounded source excerpts and omission provenance; reject references to excluded evidence. Prompt v3 requires fresh approval.
-  - [ ] Resolve development-tool audit disposition and genuine provider/model/pricing/quality acceptance. Container staging is Future scope.
+  - [x] Development-tool audit disposition recorded; subsequent dependency remediation removed the earlier advisory blocker without new ignores.
+  - [ ] Genuine provider/model/pricing/quality acceptance. Container staging is Future scope.
 
 ## Phase 3a — Local and Claude report providers
 
@@ -1596,7 +1611,9 @@ The local operations increment adds Dashboard security summary, `/ready`,
 multi-file/drop import, product/header branding and configured browser/security CI.
 See [contract and remaining blockers](docs/PHASE4_LOCAL_OPERATIONS.md): the initial
 34 backend advisory entries were addressed in the subsequent increment above. Organization
-logos and broader hardening/performance remain pending; Phase 4 is not complete.
+logos were pending at that checkpoint and are now implemented locally in migration
+0025; [branding contract](docs/ORGANIZATION_LOGOS.md). Broader hardening/performance
+remain pending; Phase 4 is not complete.
 Latest dependency checkpoint supersedes the earlier 1,229-test run: 1,238 full
 PostgreSQL tests (628.60s, warnings as errors), 376 frontend tests (29.03s),
 lint/build/TypeScript and 39 Chrome workflow checks passed. Six Documents grouped
@@ -1653,13 +1670,28 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
 - [x] Shared date-input contrast, today's inclusive deadline validation and
       creation-date boundaries; Archived/Assets/Uploads row-versus-bulk actions,
       immutable confirmation targets and modal interaction safeguards.
-- [ ] UI polish (requested 2026-09-28; can be done any time, needs no other
+- [x] UI polish listed below (local application scope; requested 2026-09-28, needs no other
       phase):
   - [x] File upload: drag/drop and multiple files with individual source choices,
     cancellation, errors and reports (up to 20 queued cards).
   - [x] Product logo (sidebar, login/register and browser tab).
-  - [ ] Organization logos uploaded by admins: storage/validation/permissions pending.
-  - [x] Product and current organization's name in the common UI header.
+    Platform → Product branding offers platform-admin-only sidebar size choices
+    Small 144×40 / Medium 180×48 (default) / Large 192×64; versioned/audited storage
+    uses existing platform_settings. Authentication/company branding is unchanged.
+  - [x] Shared Show/Hide password control across login/register, change-password
+    fields and temporary-password handovers; hidden by default, keyboard accessible,
+    independent per field, no submission/value/autocomplete changes.
+  - [x] Organization logos: admin upload/replace/remove, authenticated header display,
+    bounded normalized PNG storage, stale-write protection and migration 0025.
+    See [contract and user steps](docs/ORGANIZATION_LOGOS.md).
+  - [x] Organization name/company logo in the common UI header; product branding
+    appears in the sidebar and once above authentication cards, without duplication.
+    Admin-controlled header-name visibility defaults on (migration 0026); missing
+    or broken logos retain the name. Compact product logo box is 180×48px.
+    Header organization-logo size is configurable (Small/Medium/Large), default
+    Medium 160×64px, preserving proportions; migration 0027.
+    Header company name size: Small 16px / Medium 20px (default) / Large 24px,
+    admin-configurable with stale-edit protection; migration 0028.
   - [x] Dashboard "Recent activity" replacement (raised 2026-10-02). Historical rationale: it
     lists every Info event (sign-ins, worker started/stopped), so routine
     noise fills it. Decided (2026-10-02): replace it with a security
@@ -1757,12 +1789,13 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
       npm audit), committed secrets and common code flaws (SAST); a
       separate, opt-in performance suite with million-row files
       Browser/dependency/secret/high-severity Bandit gates are now configured;
-      Linux CI execution, backend dependency remediation, lower-severity static
-      triage and opt-in performance CI remain pending. See local operations.
+      Linux execution and dependency remediation passed in hosted run
+      40377211631 at c008efc. Lower-severity static triage and opt-in performance
+      CI remain pending. See the dependency compatibility record.
 
 Work started on 2026-10-15:
 - Observability: implementing structured JSON logs with request/job/org/user correlation IDs, metrics for latency/queue depth/worker heartbeat/import throughput/failures, error aggregation and alerts (stale workers, repeated failures, storage pressure, provider outages), traceability from reports/findings back to source scans/prompts, and redaction rules for credentials/tokens/PII — per CoPilotSuggestions.md Section 9
-- Automated checks: baseline backend/frontend CI and local Chrome acceptance are implemented; portable browser CI, security scans and opt-in performance CI remain pending. See the current Phase 4 status matrix; the original suggested delivery order is not evidence that no automation exists.
+- Automated checks: backend/frontend, portable Linux browser acceptance and security scans passed hosted CI at c008efc. Opt-in performance CI and lower-severity static triage remain pending. See the current Phase 4 status matrix; historical delivery order is not current status.
 
 ## Phase 5 — Live connectors (not yet scheduled)
 

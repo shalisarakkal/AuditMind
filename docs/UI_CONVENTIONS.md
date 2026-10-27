@@ -1,5 +1,52 @@
 # UI conventions: list pages
 
+All password controls use shared PasswordInput: hidden by default, per-field
+Show/Hide text button (type=button), explicit accessible action name/aria-controls,
+keyboard focus and 44px controls. Preserve autocomplete/name/value/required state,
+paste and password-manager behavior. New temporary handovers reset visibility;
+copy remains explicit and possible while masked. Visibility is local React state,
+never persisted or sent in API requests. Native auth/password forms use POST to
+avoid passwords entering query strings before hydration. No passwords in logs or
+analytics. Revealing remains vulnerable to shoulder surfing/screen sharing; this
+is a usability feature, not extra cryptographic protection.
+
+Platform → Product branding controls sidebar product-logo size only: Small
+144×40, Medium 180×48 (default), Large 192×64 CSS pixels, bounded by the sidebar.
+Platform-admin writes only; authenticated users read the saved size. Sign-in
+240×72 and organization branding remain independent. Preserve aspect ratio.
+
+Header organization-name typography is configurable per organization: Small 16px,
+Medium 20px (default), Large 24px, medium font weight. Existing visibility/fallback
+rules remain; the selector/other text and logo sizing are independent. Admin-only
+Settings choice saves automatically and header content wraps within narrow widths.
+
+Organization header logo sizes use proportional bounding boxes: Small 96×48,
+Medium 160×64 (default), Large 224×80 CSS pixels. Admin-controlled preference is
+organization-wide and shared with Settings preview. No forced square backdrop or
+image distortion; identity content wraps within narrow viewports. Product logo
+sizing is independent.
+
+Authentication uses one larger product logo (240×72 display box) above a card
+up to 400px wide, not duplicated inside it. Sign-in, registration and signup-
+closed share the shell. Forms use 44px controls, visible keyboard focus, an
+optional explanatory subtitle, and permanently underlined footer links. Vertical
+overflow scrolls naturally on short screens; artwork is not cropped or rewritten.
+
+Organization branding uses the existing full-width Settings layout, labelled
+file control and application-styled removal confirmation. Saved logos appear in
+the shared header beside the organization name by default. Admins may hide the
+header name with a saved organization preference when a logo is available.
+Header names use configurable medium-weight text (20px default); compact product logos fit 180×48px.
+Missing/failed
+images leave the name visible. Header/settings state is keyed by organization;
+stale edits require explicit reload. Shared product placements use the complete
+`public/branding/product-logo.svg` asset, not inline artwork or appended text;
+the browser icon uses `public/branding/favicon.svg`. Preserve aspect ratio and
+keep the image within available width. The product logo belongs in the sidebar,
+not duplicated in the adjacent application header; that header contains only the
+organization name/company logo (or Platform label). Authentication retains its
+single larger product logo. See PRODUCT_BRANDING.md for replacement.
+
 Dashboard security cards link to the same exact seven-day organization event
 window used for counting; Activity labels that window and replaces it when date
 filters change. Import cards keep source/cancel/error/report independent per file.

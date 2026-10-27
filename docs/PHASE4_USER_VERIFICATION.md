@@ -1,5 +1,69 @@
 # Phase 4 changes and Chrome verification
 
+## Password visibility
+
+On sign-in and registration, passwords start hidden. Click Show or focus the
+toggle and press Enter/Space; it reveals only that field without submitting.
+Hide reverses it; reload starts hidden. In Change password, current/new/confirmation
+toggle independently and submission must still work. Temporary-password panels
+after add/reset start hidden, allow Show/Hide and Copy, and a new handover starts
+hidden again. Do not use real credentials in screenshots or screen recordings.
+
+## Platform product-logo sizing
+
+As a platform admin open **Platform → Product branding**. Try each sidebar size,
+refresh, then sign in as an organization member and confirm the saved size.
+Organization admins must see no platform controls and API writes must return 403.
+In two platform tabs, change one first: the stale tab must reject its save and
+require **Reload product branding**. Sign-in stays 240×72px. Company branding is
+unchanged. [Contract](PRODUCT_BRANDING.md).
+
+## Refreshed authentication screens
+
+Open `/login` in a signed-out/private window. Expect one readable product logo
+above the card, a workspace subtitle and taller controls. Tab through Email,
+Password and Sign in: focus must be visible. At mobile width, no horizontal
+scroll should appear. Wrong credentials must show an error without redirecting.
+If public signup is enabled, `/register` uses the same shell and underlined footer
+link; otherwise it still shows **Sign-up is closed**, with no signup form.
+
+## Replaceable product assets
+
+The product mark now comes from a fixed SVG file, separate from company branding.
+See [file locations and exact replacement/restart steps](PRODUCT_BRANDING.md).
+Verify sign-in, sidebar/header and browser tab after swapping your approved SVG.
+User-supplied SVG artwork is now installed at the active fixed paths.
+
+## Organization logos
+
+Choose **Header company name size**: Small/Medium/Large should render the common
+header name at 16/20/24px. Medium is the larger default (previously 16px). Refresh
+as another member to verify persistence; viewers cannot edit it. Two admin tabs
+with stale name sizes must require reload. The selector/product logo must remain
+unchanged. Enable **Show organization name beside logo** if the name is hidden.
+
+With a saved logo, select Small/Medium/Large under **Header logo size**. Check
+preview/header resizing, refresh persistence and viewer read-only access. Large
+must fit a mobile viewport without horizontal overflow; product logo stays the
+same size. Medium (160×64px) is the default. Two admin tabs with stale sizes must
+require reload rather than silently overwrite. See migration 0027 in the contract.
+
+The sidebar product logo is larger (180×48px display box). Organization header
+names use configurable medium-weight text (20px default). In Settings, toggle **Show organization name
+beside logo** off with a saved logo: the header text disappears but the logo
+retains its accessible name. Refresh as a viewer to verify persistence; viewers
+cannot change the preference. Turn it back on to restore the text. Removing the
+logo always restores the name, even with the preference off. Selector names stay
+visible. This preference is added in migration 0026.
+
+As an organization admin, open **Settings → Organization logo**, choose a static
+PNG/JPEG/WebP (at most 2 MiB, 2048 pixels per side), then **Save logo**. Check the
+Settings preview and common header, then refresh. **Remove logo** must confirm;
+Cancel preserves it. A viewer/auditor sees no upload controls. With two admin
+tabs loaded before one saves, the other's stale change must require **Reload
+organization logo**, not overwrite the newer image.
+[Detailed contract and migration 0025](ORGANIZATION_LOGOS.md).
+
 ## New local operations features
 
 Refresh Dashboard: check **Security summary · Last 7 days** and open a count.
@@ -9,7 +73,7 @@ From Assets/Findings, select multiple CSV files or drop them in the upload area:
 each gets its own source and Upload/Cancel controls and independent report.
 Check the shared product mark/header and browser icon. `/health` remains liveness;
 `http://localhost:8000/ready` reports dependency booleans with 200 or 503.
-Organization logos and some security gates remain unfinished. See
+Organization logos are implemented locally; broader production acceptance remains separate. See
 [scope, exact date semantics and security blocker](PHASE4_LOCAL_OPERATIONS.md).
 
 ## Archived, Assets and Uploads selection consistency (26 October)

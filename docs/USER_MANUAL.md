@@ -1,8 +1,58 @@
 # AuditMind user manual
 
+Password fields are hidden by default. Use **Show** beside a field to reveal it,
+then **Hide** to mask it again. This applies to sign-in, registration, current/new/
+confirmation passwords, and admin temporary-password handovers. Each field works
+independently; reopening the screen or receiving a new handover starts hidden.
+Temporary passwords can still be copied while hidden. Visibility does not change
+the password or submit the form. Avoid revealing passwords during screen sharing
+or when someone can see your screen; the clipboard is also sensitive. Password-
+manager autocomplete and paste remain supported.
+
+Platform admins: open **Platform → Product branding → Sidebar product logo size**
+to choose Small **144 × 40**, Medium **180 × 48** (default) or Large **192 × 64**.
+The choice saves automatically across all organizations; refresh other sessions.
+Organization admins cannot edit it. Sign-in branding, company logos and company
+name sizes are unchanged. No new logo file or rebuild is needed for size changes.
+
+To enlarge the company name, open **Settings → Organization logo → Header company
+name size**: Small **16px**, Medium **20px** (default), Large **24px**. It saves
+automatically for all organization members; other sessions update on refresh.
+Only admins can change it. It affects the common header only, not the organization
+selector or product logo. If the name is hidden beside a logo, enable **Show
+organization name beside logo** to see the new font size.
+
+To enlarge your company logo, open **Settings → Organization logo → Header logo
+size**. Choose **Small (96 × 48)**, **Medium (160 × 64)** or **Large (224 × 80)**.
+Medium is the default. It saves automatically for the organization; other sessions
+update on refresh. The preview and header preserve the logo's proportions. This
+does not change the AuditMind product logo. If artwork still looks small, check
+for transparent padding inside the uploaded image; sizing cannot add image detail.
+
+In **Settings → Organization logo**, admins can turn off **Show organization
+name beside logo** when the artwork already includes the name. It saves
+automatically for all members; refresh other sessions to see it. The header
+always shows the name if no usable logo is available. The organization selector
+is unchanged. Header names use configurable medium-weight text (20px default); the sidebar product logo
+uses a 180×48px box with the existing SVG. Sign-in sizing is unchanged.
+
+Brand placement: the product logo appears in the sidebar, while the application
+header shows only the selected organization's name/company logo. Authentication
+keeps its single larger product logo above the card.
+
+Sign-in and registration now share a single larger logo above the card, clearer
+workspace descriptions and consistent keyboard-accessible controls. This is a
+presentation change only; passwords, sessions and sign-up policy are unchanged.
+
+Approved product-logo trials: replace the fixed product SVG and browser icon;
+[locations and exact refresh/restart steps](PRODUCT_BRANDING.md). These are
+separate from company logos managed through Settings.
+
 New local Phase 4 features: [Dashboard security summary, readiness, multiple-file
-import and branding](PHASE4_LOCAL_OPERATIONS.md). Organization logos and broader
-hardening are still pending. Initial backend audit findings are addressed in the
+import and branding](PHASE4_LOCAL_OPERATIONS.md). Admins can now use
+**Settings → Organization logo** to upload/replace/remove logos; members see
+them in the common header. See [limits and Chrome steps](ORGANIZATION_LOGOS.md).
+Broader hardening remains pending. Initial backend audit findings are addressed in the
 separate [dependency compatibility increment](BACKEND_DEPENDENCY_REMEDIATION.md).
 
 New Phase 4 functionality: [what changed and how to verify it in Chrome](PHASE4_USER_VERIFICATION.md).

@@ -1,5 +1,9 @@
 # Phase 4 local operations increment
 
+Subsequent branding increment implements [organization logos](ORGANIZATION_LOGOS.md)
+with migration 0025. Statements below that logos are pending describe this earlier
+checkpoint. Hosted CI was subsequently verified at c008efc; it is not still pending.
+
 Subsequent approved dependency remediation: core/dev, optional embeddings and
 installed audits are now clean, with no conflicts/ignores. The initial blocker
 and old versions below are historical evidence. See
@@ -57,11 +61,12 @@ worker behavior; this is not an atomic multi-file transaction. Accepted files
 remain tracked even if another file fails. Cancel dismisses only that file's
 pending card. Organization changes discard unsubmitted cards.
 
-The code-native product mark is shared by Sidebar and sign-in/register; the
-browser icon uses the same shield/check motif. The signed-in header shows product
-and current organization. **Organization-uploaded logos are not implemented**;
-file validation/storage/permissions must be completed separately, including the
-compatibility testing documented in the subsequent dependency remediation record.
+The initial code-native product mark has been replaced by approved fixed SVG
+assets shared by Sidebar and sign-in/register, with a separate browser icon.
+The header now shows organization identity only. Organization logo upload and
+header preferences are implemented through migrations 0025–0028; platform admins
+can independently resize the product logo. See ORGANIZATION_LOGOS.md and
+PRODUCT_BRANDING.md for current validation/storage/permissions and setup.
 
 ## CI and security gates
 
@@ -99,7 +104,7 @@ See the current remediation record above; no ignores, forced overrides or new
 risk exception were added. npm audit also reports zero vulnerabilities. Hosted
 CI still requires actual execution before being considered passed.
 
-Remaining local Phase 4 work includes organization logos, upload-directory ACL
+Organization logos are delivered. Remaining local Phase 4 work includes upload-directory ACL
 policy, broader request throttling/malware policy, full static-findings triage,
 large-org count/facet improvements and opt-in performance CI. Hosting, scoring,
 reconciliation and other user-approved deferrals remain separate.

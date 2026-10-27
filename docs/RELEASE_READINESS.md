@@ -1,5 +1,54 @@
 # Release readiness and code review
 
+## Current scoped handoff — 26 October 2026
+
+Branding/auth/password UI and associated organization migrations passed final
+combined-tree validation: **1,268 full PostgreSQL**, **413 frontend** and **61
+Chrome** checks, lint/build, migration and dependency/static gates. Scoped commits
+and push are approved; hosted CI for the new SHA must be verified. The authoritative
+[acceptance record](PHASE4_VALIDATION.md) distinguishes full backend, focused,
+frontend, browser and hosted CI runs. This is a local-testing milestone, not a
+production/live-AI release. Remaining Phase 4 requirements remain open.
+
+## Historical validation checkpoints
+
+Password-visibility follow-up: shared masked-by-default accessible Show/Hide for
+auth/change-password fields and temporary-password handovers, with no backend
+change. 411 frontend tests, 61 Chrome checks and lint/build/TypeScript passed. Earlier full/focused
+backend results are not reruns. [Current Chrome acceptance](PHASE4_VALIDATION.md).
+Revealed passwords remain vulnerable to shoulder surfing/screen sharing; no new
+password logging, storage or transmission is introduced.
+
+Platform product-branding increment: admin-only shared sidebar size with versioned
+audited storage and first-save concurrency fencing. 406 frontend and 54 focused
+PostgreSQL/migration/platform checks and 55 Chrome executions passed, plus lint/build; no new migration.
+No full backend rerun, hosted CI or production/live-AI approval is implied.
+[Current Chrome acceptance](PHASE4_VALIDATION.md).
+
+Company-name typography increment: migration 0028; admin-only 16/20/24px header
+name setting, 20px default, selector/product branding unchanged. 399 frontend and
+28 focused/migration PostgreSQL and 52 Chrome checks passed; lint/build passed. Earlier full
+backend and hosted CI evidence is historical. [Acceptance](PHASE4_VALIDATION.md).
+
+Current logo-size follow-up: migration 0027 and admin-only proportional header/
+preview size setting (Small/Medium/Large, default Medium). 395 frontend and 27
+focused/migration PostgreSQL and 50 Chrome checks passed, plus lint/build. No new full backend
+run or hosted CI; [current Chrome evidence](PHASE4_VALIDATION.md). No live AI calls.
+
+Latest local branding follow-up: migration 0026, larger sidebar logo and admin-
+controlled header-name visibility with safe fallback. 391 frontend / 24 focused
+PostgreSQL backend / two migration tests / 48 Chrome executions passed, plus lint
+and build. This is not a rerun of the earlier full backend suite, production
+acceptance or hosted CI. [Current evidence](PHASE4_VALIDATION.md).
+
+Subsequent local [organization-logo increment](ORGANIZATION_LOGOS.md): authenticated
+admin branding, version/lifecycle safeguards and migration 0025. Broader Phase 4
+hardening/performance remain pending. Earlier references to missing logos or
+unverified Linux execution are historical, not current status.
+Verified locally: 1,260 full PostgreSQL tests (warnings as errors), 382 frontend
+tests, lint/TypeScript/build and 42 Chrome checks. Test migration round-trip/drift
+clean at 0025. New feature not committed/pushed; prior hosted acceptance is separate.
+
 Clean-install follow-up: explicit httpx2, browser PostgreSQL extensions, compatible
 libpass password dependency and responsive upload-result headings address hosted
 failures. Linux backend 1,244 passed; frontend 377 passed, local Chrome 39 passed,
