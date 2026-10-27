@@ -5,7 +5,8 @@
 Branding/auth/password UI and associated organization migrations passed final
 combined-tree validation: **1,268 full PostgreSQL**, **413 frontend** and **61
 Chrome** checks, lint/build, migration and dependency/static gates. Scoped commits
-and push are approved; hosted CI for the new SHA must be verified. The authoritative
+were pushed through **b91ade6**; hosted CI conclusions belong to the linked per-SHA
+run and the latest-tip workflow, not earlier checkpoints. The authoritative
 [acceptance record](PHASE4_VALIDATION.md) distinguishes full backend, focused,
 frontend, browser and hosted CI runs. This is a local-testing milestone, not a
 production/live-AI release. Remaining Phase 4 requirements remain open.

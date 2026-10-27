@@ -7,7 +7,9 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 Current check-in scope (26 October): organization logos/header preferences
 (migrations 0025–0028), approved fixed SVG assets, platform product-logo sizing,
 single-brand auth presentation and shared password visibility are implemented.
-Final combined-tree review/testing and scoped commits/push are approved. See
+Final combined-tree review/testing passed; four scoped commits were pushed
+through **b91ade6**. The handoff follow-up is docs-only. Hosted CI conclusions
+must be checked for the actual tip. See
 [current acceptance and per-SHA CI evidence](docs/PHASE4_VALIDATION.md); the
 chronological checkpoints below retain their original validation counts and are
 not the current release gate. Phase 4 remains partial; production/live AI,

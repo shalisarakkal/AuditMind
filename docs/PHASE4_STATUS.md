@@ -9,7 +9,9 @@ Migrations 0025–0028 cover organization branding; platform presentation uses t
 existing platform_settings table. Final combined-tree review passed: **1,268 full
 PostgreSQL tests**, **413 frontend tests**, **61 Chrome executions**, lint/build,
 migration checks and dependency/static gates. Scoped commits, push and hosted CI
-verification are approved and in progress. [Authoritative acceptance record](PHASE4_VALIDATION.md).
+verification are approved. Four scoped commits were pushed through **b91ade6**;
+hosted acceptance is tracked by [per-SHA run and latest-tip links](PHASE4_VALIDATION.md),
+not by historical local-only notes below. The subsequent handoff update is docs-only.
 
 Phase 4 remains partial. Large-org broad-search/count/facet performance, ACLs/
 throttling/malware policy, lower-severity static triage, tenant-fair scheduling and

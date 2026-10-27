@@ -32,8 +32,13 @@ or stamping was needed; real round-trip tests had already passed.
 
 Reviewed code commits: backend **d08b0fe**, organization UI **1cf9923**, product/
 auth/password UI **4f153f9**. The acceptance/docs commit contains this record.
-Remote main was unchanged at c008efc before commit preparation; push and hosted
-CI verification for the new tip are the next gate, not inherited from that baseline.
+Acceptance/docs commit **b91ade6** was pushed with those three code commits to
+origin/main. Remote main had been unchanged at c008efc before preparation.
+GitHub's [per-SHA validation run for b91ade6](https://github.com/shalisarakkal/AuditMind/actions/runs/40431697376)
+is the authoritative hosted result for the accepted code, not the old baseline.
+The documentation-only handoff follow-up leaves application/test code unchanged;
+its own [latest main workflow result](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain)
+must also be checked. Local results above do not imply a hosted conclusion.
 
 Commit scope excludes unrelated cline.json, credentials, temp evidence/process
 state, alternate/reference branding originals, installed packages and builds.

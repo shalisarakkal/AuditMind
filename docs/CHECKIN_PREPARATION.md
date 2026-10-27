@@ -13,6 +13,8 @@ Groups are explicitly staged by path, never `git add .`:
    and shared hidden-by-default password controls, safe handover clipboard errors
    and auth/People/platform regressions (**4f153f9**).
 4. Combined Chrome acceptance and synchronized roadmap/manual/validation records.
+   Committed as **b91ade6**; all four groups pushed to origin/main. The subsequent
+   handoff follow-up is documentation-only; CI must be checked for that tip too.
 
 Excluded: credentials/.env/SIGN_IN.txt, temp evidence/logs/process state, generated
 builds, dependencies, unrelated cline.json, alternate/reference branding images and
