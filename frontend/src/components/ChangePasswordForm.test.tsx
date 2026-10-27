@@ -89,6 +89,10 @@ describe("ChangePasswordForm", () => {
     fill("Current password", "Sup3rSecret!");
     fill("New password", "A-new-passphrase-2026");
     fill("New password again", "A-new-passphrase-2026");
+    fireEvent.click(screen.getByRole("button", { name: "Show current password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
+    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("New password again")).toHaveAttribute("type", "password");
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());

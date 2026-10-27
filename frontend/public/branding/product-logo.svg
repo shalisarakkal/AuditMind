@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="AuditMind AI logo">
+<defs><linearGradient id="shield" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#1554d9"/><stop offset="1" stop-color="#09e4ed"/></linearGradient><linearGradient id="ai" x1="0" x2="1"><stop stop-color="#05b9f3"/><stop offset="1" stop-color="#00dce9"/></linearGradient></defs>
+<path d="M165 22 L302 70 V171 Q298 259 165 333 Q32 259 28 171 V70 Z" fill="none" stroke="url(#shield)" stroke-width="11" stroke-linejoin="round"/>
+<path d="M165 27 L296 75 V170 Q291 252 165 324 Z" fill="url(#shield)"/>
+<path d="M165 25 V328" stroke="#061b38" stroke-width="7"/>
+<g stroke="#08c9ef" stroke-width="3.4" fill="none" stroke-linecap="round"><path d="M65 125 L100 98 L137 80 L161 132 L105 155 L65 125 L65 181 L105 155 L137 205 L92 243 L65 181 L137 205 L160 266 L92 243 L131 294"/><path d="M100 98 L161 132 M105 155 L161 132 M137 205 L161 132 M137 205 L65 181"/></g>
+<g fill="#0cc9ed"><circle cx="65" cy="125" r="10"/><circle cx="100" cy="98" r="9"/><circle cx="137" cy="80" r="9"/><circle cx="161" cy="132" r="11"/><circle cx="105" cy="155" r="9"/><circle cx="65" cy="181" r="9"/><circle cx="137" cy="205" r="11"/><circle cx="92" cy="243" r="10"/><circle cx="160" cy="266" r="8"/><circle cx="131" cy="294" r="8"/></g>
+<g stroke="#052b4d" stroke-width="6" fill="none" stroke-linejoin="round"><path d="M165 132 L195 106 V56 M165 205 L195 227 V286 M165 266 L225 224 V174 L195 146 L239 113 V79 M165 303 L239 257 V228 L273 193 V151"/></g>
+<g fill="#05d9ee" stroke="#052b4d" stroke-width="5"><circle cx="239" cy="79" r="10"/><circle cx="273" cy="151" r="10"/><circle cx="273" cy="193" r="10"/><circle cx="239" cy="257" r="10"/><circle cx="195" cy="227" r="9"/></g>
+<text x="330" y="222" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="112" font-weight="800" letter-spacing="-5">AuditMind</text><text x="980" y="222" fill="url(#ai)" font-family="Arial, Helvetica, sans-serif" font-size="112" font-weight="800">AI</text>
+</svg>

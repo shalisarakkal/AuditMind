@@ -152,7 +152,8 @@ describe("Organizations", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Create" }));
 
     const panel = await screen.findByRole("group", { name: "Temporary password" });
-    expect(within(panel).getByText("Tmp-Zed-12345678")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveValue("Tmp-Zed-12345678");
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveAttribute("type", "password");
     expect(bodyOf(fetchMock, "POST /platform/orgs")).toEqual({ name: "Globex", admin_email: "zed@globex.io" });
   });
 

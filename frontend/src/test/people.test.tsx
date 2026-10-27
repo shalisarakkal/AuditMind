@@ -109,13 +109,14 @@ describe("People page", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Add" }));
 
     const panel = await screen.findByRole("group", { name: "Temporary password" });
-    expect(within(panel).getByText("Tmp-Pass-1234567")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveValue("Tmp-Pass-1234567");
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveAttribute("type", "password");
     expect(panel).toHaveTextContent("Bob is added.");
     const [[, init]] = callsTo(fetchMock, "POST /orgs/org-1/members");
     expect(JSON.parse(String(init.body))).toEqual({ email: "bob@acme.io", name: "Bob", role: "auditor" });
 
     fireEvent.click(within(panel).getByRole("button", { name: "Done" }));
-    expect(screen.queryByText("Tmp-Pass-1234567")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Temporary password value")).not.toBeInTheDocument();
   });
 
   it("says when the person already had an account", async () => {
@@ -177,7 +178,8 @@ describe("People page", () => {
     fireEvent.click(within(screen.getByRole("group", { name: "Confirm" })).getByRole("button", { name: "Reset password" }));
     const panel = await screen.findByRole("group", { name: "Temporary password" });
     expect(panel).toHaveTextContent("Bob's password is reset.");
-    expect(within(panel).getByText("New-Temp-7654321")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveValue("New-Temp-7654321");
+    expect(within(panel).getByLabelText("Temporary password value")).toHaveAttribute("type", "password");
   });
 
   it("renames someone", async () => {

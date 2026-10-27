@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
+import AuthLayout from "@/app/(auth)/layout";
 import { AppProvider } from "@/context/AppContext";
 import { getToken } from "@/lib/apiClient";
 import { callsTo, json, mockApi, org } from "@/test/helpers";
@@ -21,6 +22,20 @@ function fill(label: string, value: string) {
 describe("login and register pages", () => {
   beforeEach(() => replace.mockReset());
 
+  it.each([{ Page: LoginPage, title: "Sign in" }, { Page: RegisterPage, title: "Create your account" }])(
+    "shows one readable brand above the $title card", async ({ Page, title }) => {
+      mockApi({ "GET /auth/options": () => ({ public_signup: true }) });
+      const { container } = render(<AppProvider><AuthLayout><Page /></AuthLayout></AppProvider>);
+      expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
+      const logo = screen.getByRole("img", { name: "AuditMind" });
+      expect(screen.getAllByRole("img", { name: "AuditMind" })).toHaveLength(1);
+      expect(logo).toHaveAttribute("width", "240");
+      expect(container.querySelector("form img")).toBeNull();
+      expect(screen.getByLabelText("Email")).toHaveClass("h-11");
+      expect(screen.getByLabelText("Password")).toHaveClass("h-11");
+    },
+  );
+
   it("signs in and goes to the dashboard", async () => {
     const fetchMock = mockApi({
       "POST /auth/login": () => ({ access_token: "tok", token_type: "bearer", expires_in: 900, must_change_password: false }),
@@ -30,6 +45,8 @@ describe("login and register pages", () => {
 
     fill("Email", "owner@acme.io");
     fill("Password", "Sup3rSecret!");
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "text");
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));

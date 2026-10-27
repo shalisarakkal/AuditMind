@@ -12,6 +12,7 @@ export default function LoginPage() {
     <AuthForm
       notice={signedOutReason}
       title="Sign in"
+      subtitle="Access your organization’s audit workspace."
       fields={[
         { name: "email", label: "Email", type: "email", autoComplete: "email" },
         { name: "password", label: "Password", type: "password", autoComplete: "current-password" },

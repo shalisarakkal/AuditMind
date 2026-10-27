@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { api, ApiError } from "@/lib/apiClient";
 import type { PasswordRules } from "@/lib/types";
+import PasswordInput from "./PasswordInput";
 
 /** What the rule asks for, as lines to show above the form. */
 export function describeRules(rules: PasswordRules): string[] {
@@ -74,21 +75,22 @@ export default function ChangePasswordForm({ onDone }: { onDone(): void }) {
       <label htmlFor={name} className="block text-sm text-white/70">
         {label}
       </label>
-      <input
+      <PasswordInput
+        label={label}
+        containerClassName="mt-1"
         id={name}
         name={name}
-        type="password"
         autoComplete={autoComplete}
         required
         value={values[name]}
         onChange={(e) => setValues({ ...values, [name]: e.target.value })}
-        className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none"
+        className="h-11 w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none"
       />
     </div>
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-6">
+    <form method="post" onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-6">
       <h1 className="text-lg font-semibold text-white">Change password</h1>
       {mustChangePassword && (
         <p className="text-sm text-amber-200">
@@ -121,11 +123,11 @@ export default function ChangePasswordForm({ onDone }: { onDone(): void }) {
       </button>
       <p className="text-center text-sm text-white/60">
         {mustChangePassword ? (
-          <button type="button" onClick={() => void logout()} className="text-cyan hover:underline">
+          <button type="button" onClick={() => void logout()} className="text-cyan underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan">
             Sign out
           </button>
         ) : (
-          <Link href="/" className="text-cyan hover:underline">
+          <Link href="/" className="text-cyan underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan">
             Cancel
           </Link>
         )}

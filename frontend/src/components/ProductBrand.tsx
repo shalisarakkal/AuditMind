@@ -1,10 +1,22 @@
-/** Shared code-native product mark; decorative SVG keeps the name accessible. */
-export default function ProductBrand() {
-  return <span className="inline-flex items-center gap-2 text-lg font-semibold tracking-wide text-white">
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 32 32" className="h-7 w-7 shrink-0" fill="none">
-      <path d="M16 3 27 7v9c0 6-6 11-11 13C11 27 5 22 5 16V7Z" stroke="#00c8ff" strokeWidth="2" />
-      <path d="m10 17 4 4 8-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-    <span>Audit<span className="text-cyan">Mind</span></span>
+"use client";
+
+import Image from "next/image";
+import { PRODUCT_SIZES, useProductBranding } from "@/lib/productBranding";
+
+/** Replace public/branding/product-logo.svg to try an approved product logo. */
+export default function ProductBrand({ variant = "compact" }: { variant?: "compact" | "auth" }) {
+  return variant === "auth" ? <BrandImage width={240} height={72} className="h-[4.5rem] w-60" /> : <SidebarBrand />;
+}
+
+function SidebarBrand() {
+  const branding = useProductBranding();
+  const size = PRODUCT_SIZES[branding.data?.sidebar_logo_size ?? "medium"];
+  return <BrandImage {...size} />;
+}
+
+function BrandImage({ width, height, className }: { width: number; height: number; className: string }) {
+  return <span className={`inline-flex min-w-0 max-w-full ${className}`}>
+    <Image src="/branding/product-logo.svg" width={width} height={height} unoptimized
+      alt="AuditMind" className="h-full w-full object-contain object-left" />
   </span>;
 }
