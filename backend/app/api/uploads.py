@@ -6,17 +6,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Form, HTTPException, Response, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.middleware import upload_limit_message
 from app.models.enums import ScanStatus
 from app.models.scan import Scan
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.ingestion import ImportResponse
 from app.services.events import record_event
 from app.services.import_profiles import ProfileConfig
+from app.services.org_settings import resolve_ingestion_settings
 from app.services.ingestion_service import (
     ImportKind,
     IngestionError,
@@ -29,9 +31,10 @@ _CHUNK_BYTES = 1024 * 1024
 
 # OpenAPI docs for the two import endpoints' variable status code.
 IMPORT_RESPONSES = {
+    200: {"model": ImportResponse, "description": "Exact duplicate skipped; scan_id references the matching import, not a new job"},
     202: {"model": ImportResponse, "description": "Large file accepted; poll the scan for the report"},
     400: {"description": "Unsupported file type"},
-    409: {"description": "The same file was already imported: send it again with confirm=true to import it anyway"},
+    409: {"description": "Ask policy: completed identical file needs confirm=true before reimport"},
     413: {"description": "File exceeds the upload size limit"},
 }
 
@@ -39,8 +42,7 @@ IMPORT_RESPONSES = {
 def confirm_form() -> bool:
     return Form(
         False,
-        description="Import even if this exact file was already imported into the org "
-        "(otherwise that answers 409 with when and by whom)",
+        description="Confirm reimport under Ask policy. Skip policy and queued/running duplicate protection cannot be overridden.",
     )
 
 
@@ -65,8 +67,10 @@ async def start_import(
     background worker (202, report later on the scan). kind "profile" reads
     each row with `profile`. `started_by` (the uploader) is the one who sees
     the scan's report until they dismiss it. A byte-identical file already
-    imported into the org (not failed or archived) is refused with 409
-    unless `confirm`: a warning, not a block (and an Activity event)."""
+    imported into the org (not failed or archived) follows its Ask/Skip/Reimport
+    policy. Ask returns 409 until confirmed. Skip returns 200 without a new job;
+    queued/running matches are always skipped. Reimport starts another import,
+    not a guaranteed update of existing records. Skip/reimport are audited."""
     try:
         fmt = detect_format(file.filename, kind)
     except IngestionError as exc:
@@ -78,9 +82,24 @@ async def start_import(
             require_active_org(db, org_id, lock=True)
         except KnowledgeError as exc:
             raise HTTPException(409, str(exc)) from exc
+        # Serialize admission of this org/hash only. The org's shared lock above
+        # also prevents concurrent settings/lifecycle changes during admission.
+        lock_key = int.from_bytes(hashlib.sha256(f"{org_id}:{received.sha256}".encode()).digest()[:8], "big", signed=True)
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+        org = db.get(Organization, org_id, populate_existing=True)
+        policy = resolve_ingestion_settings(org).exact_duplicate_file_policy
         previous = _previous_import(db, org_id, received.sha256)
-        if previous is not None and not confirm:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=previous)
+        if previous is not None:
+            in_progress = previous["status"] in {ScanStatus.pending, ScanStatus.running}
+            if policy == "skip" or in_progress:
+                reason = "An identical import is already queued or running" if in_progress else "Exact duplicate skipped by organization policy"
+                record_event(db, "upload_skipped", org_id=org_id, actor=db.get(User, started_by),
+                             item=(file.filename or "")[:255], details={"matched_scan_id": str(previous["scan_id"]), "content_hash": received.sha256, "reason": reason, "policy": policy})
+                db.commit()
+                response.status_code = status.HTTP_200_OK
+                return ImportResponse(scan_id=previous["scan_id"], status=previous["status"], skipped=True, skip_reason=reason)
+            if policy == "ask" and not confirm:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=previous)
 
         inline = received.content is not None
         filename = (file.filename or "")[:255] or None
@@ -129,7 +148,7 @@ def _previous_import(db: Session, org_id: uuid.UUID, content_hash: str) -> dict 
     """The same file already imported into the org (not failed or
     archived): when and by whom, as the 409 answers it."""
     previous = db.execute(
-        select(Scan.started_at, User.name, User.email)
+        select(Scan.id.label("scan_id"), Scan.status, Scan.started_at, User.name, User.email)
         .outerjoin(User, User.id == Scan.started_by)
         .where(
             Scan.org_id == org_id,
@@ -149,6 +168,8 @@ def _previous_import(db: Session, org_id: uuid.UUID, content_hash: str) -> dict 
         "message": f"This exact file was already uploaded{when} by {who}.",
         "imported_at": started.isoformat() if started else None,
         "imported_by": who,
+        "scan_id": str(previous.scan_id),
+        "status": previous.status,
     }
 
 

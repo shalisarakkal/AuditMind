@@ -71,8 +71,12 @@ class ImportResponse(BaseModel):
     """Files processed during the request come back completed/failed with the
     report. Larger files come back pending with no report: poll
     GET /orgs/{org_id}/scans/{scan_id} until status is completed or failed;
-    the report is then in the scan's summary."""
+    the report is then in the scan's summary. A 200 skipped response references
+    an existing scan, never creates a job, and deliberately omits its report."""
 
     scan_id: uuid.UUID
     status: ScanStatus
     report: ImportReport | None = None
+    # A matching existing scan, not a newly created job. Never return its report.
+    skipped: bool = False
+    skip_reason: str | None = None

@@ -7,7 +7,7 @@ changed .env default still applies to every org that hasn't overridden it.
 
 from dataclasses import dataclass
 
-from app.core.config import AssetExistingStrategy, NessusInfoSeverity, settings
+from app.core.config import AssetExistingStrategy, ExactDuplicateFilePolicy, NessusInfoSeverity, settings
 from app.models.enums import Domain
 from app.models.organization import Organization
 from app.services.asset_types import BUILTIN_TYPE_ALIASES
@@ -16,6 +16,7 @@ from app.services.nessus_parser import DEFAULT_NESSUS_DOMAIN_MAP
 OVERRIDABLE_KEYS = (
     "import_partial_success",
     "asset_existing_strategy",
+    "exact_duplicate_file_policy",
     "nessus_info_severity",
     "nessus_domain_map",
     "nessus_default_domain",
@@ -29,6 +30,7 @@ OVERRIDABLE_KEYS = (
 class IngestionSettings:
     import_partial_success: bool
     asset_existing_strategy: AssetExistingStrategy
+    exact_duplicate_file_policy: ExactDuplicateFilePolicy
     nessus_info_severity: NessusInfoSeverity
     # Plugin family -> domain. Built-in map, then .env additions, then the
     # org's own additions (later entries win).
@@ -54,6 +56,7 @@ def resolve_ingestion_settings(org: Organization) -> IngestionSettings:
     return IngestionSettings(
         import_partial_success=overrides.get("import_partial_success", settings.IMPORT_PARTIAL_SUCCESS),
         asset_existing_strategy=overrides.get("asset_existing_strategy", settings.ASSET_EXISTING_STRATEGY),
+        exact_duplicate_file_policy=overrides.get("exact_duplicate_file_policy", settings.EXACT_DUPLICATE_FILE_POLICY),
         nessus_info_severity=overrides.get("nessus_info_severity", settings.NESSUS_INFO_SEVERITY),
         nessus_domain_map=domain_map,
         nessus_default_domain=Domain(overrides.get("nessus_default_domain", settings.NESSUS_DEFAULT_DOMAIN)),

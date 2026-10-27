@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.config import AssetExistingStrategy, NessusInfoSeverity
+from app.core.config import AssetExistingStrategy, ExactDuplicateFilePolicy, NessusInfoSeverity
 from app.models.enums import Domain
 from app.services.asset_types import check_alias_targets
 
@@ -11,6 +11,7 @@ class IngestionSettingsRead(BaseModel):
 
     import_partial_success: bool
     asset_existing_strategy: AssetExistingStrategy
+    exact_duplicate_file_policy: ExactDuplicateFilePolicy
     nessus_info_severity: NessusInfoSeverity
     nessus_domain_map: dict[str, Domain]
     nessus_default_domain: Domain
@@ -34,6 +35,7 @@ class IngestionSettingsUpdate(BaseModel):
 
     import_partial_success: bool | None = None
     asset_existing_strategy: AssetExistingStrategy | None = None
+    exact_duplicate_file_policy: ExactDuplicateFilePolicy | None = None
     nessus_info_severity: NessusInfoSeverity | None = None
     nessus_domain_map: dict[str, Domain] | None = None
     nessus_default_domain: Domain | None = None

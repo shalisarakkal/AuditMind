@@ -8,6 +8,7 @@ from app.models.enums import Domain
 from app.services.asset_types import check_alias_targets
 
 AssetExistingStrategy = Literal["update", "skip", "duplicate"]
+ExactDuplicateFilePolicy = Literal["ask", "skip", "reimport"]
 NessusInfoSeverity = Literal["skip", "low"]
 
 
@@ -139,6 +140,7 @@ class Settings(BaseSettings):
     # What to do when an imported asset matches an existing one (by hostname,
     # else IP): update its non-empty fields, skip it, or insert a duplicate.
     ASSET_EXISTING_STRATEGY: AssetExistingStrategy = "update"
+    EXACT_DUPLICATE_FILE_POLICY: ExactDuplicateFilePolicy = "ask"
     # Nessus severity 0 ("Info") items: skip them, or record them as low.
     NESSUS_INFO_SEVERITY: NessusInfoSeverity = "skip"
     # Extra Nessus plugin-family -> domain mappings, merged over the built-in

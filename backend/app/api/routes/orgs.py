@@ -127,6 +127,7 @@ def _ingestion_settings(org: Organization) -> IngestionSettingsRead:
     return IngestionSettingsRead(
         import_partial_success=effective.import_partial_success,
         asset_existing_strategy=effective.asset_existing_strategy,
+        exact_duplicate_file_policy=effective.exact_duplicate_file_policy,
         nessus_info_severity=effective.nessus_info_severity,
         nessus_domain_map=effective.nessus_domain_map,
         nessus_default_domain=effective.nessus_default_domain,

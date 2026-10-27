@@ -33,6 +33,7 @@ UNKNOWN = "Unknown"
 TYPES: dict[str, Criticality] = {
     "import": Criticality.info,
     "repeat_upload": Criticality.warning,
+    "upload_skipped": Criticality.info,
     "archive": Criticality.info,
     "restore": Criticality.info,
     "purge": Criticality.critical,

@@ -77,6 +77,7 @@ def _in_org(org: Organization):
 _TYPE_LABELS = {
     "import": "Import",
     "repeat_upload": "Same file imported again",
+    "upload_skipped": "Exact duplicate file skipped",
     "archive": "Archive",
     "restore": "Restore",
     "purge": "Purge",
