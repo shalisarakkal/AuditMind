@@ -8,11 +8,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from pydantic import ValidationError
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_sysadmin
+from app.api.deps import get_current_user, require_sysadmin
 from app.api.paging import PageParams, SortOrder, any_of, contains, labelled, one_of, ordered, page_params
 from app.db.session import get_db
 from app.models.enums import UserRole
@@ -34,12 +34,50 @@ from app.schemas.platform import (
     UserOrg,
 )
 from app.schemas.security import SecuritySettingsRead, SecuritySettingsUpdate
+from app.schemas.product_branding import ProductBrandingRead, ProductBrandingUpdate
 from app.services import people, platform
 from app.services.events import record_event
 from app.services.people import PeopleError
 from app.services.security_policy import PLATFORM_KEY, SecuritySettings, change_layer, resolve_platform_security
 
 router = APIRouter(prefix="/platform", tags=["platform"])
+
+PRODUCT_BRANDING_KEY = "product_branding"
+
+
+@router.get("/branding", response_model=ProductBrandingRead)
+def read_product_branding(response: Response, db: Session = Depends(get_db),
+                          _: User = Depends(get_current_user)):
+    """Display-only preferences readable by signed-in users; not security defaults."""
+    _no_store(response)
+    row = db.get(PlatformSetting, PRODUCT_BRANDING_KEY)
+    return ProductBrandingRead.model_validate(row.value if row else {})
+
+
+@router.patch("/branding", response_model=ProductBrandingRead)
+def update_product_branding(payload: ProductBrandingUpdate, response: Response,
+                            db: Session = Depends(get_db), sysadmin: User = Depends(require_sysadmin)):
+    # A row lock alone cannot fence two first saves when no row exists yet.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('auditmind:product-branding'))"))
+    actor = db.scalar(select(User).where(User.id == sysadmin.id).with_for_update(read=True).execution_options(populate_existing=True))
+    if actor is None or not actor.is_active or not actor.is_sysadmin:
+        raise HTTPException(403, "Platform permissions changed; reload before retrying")
+    row = db.get(PlatformSetting, PRODUCT_BRANDING_KEY, populate_existing=True)
+    before = ProductBrandingRead.model_validate(row.value if row else {})
+    if payload.expected_version != before.version:
+        raise HTTPException(409, "Product branding changed; reload before retrying")
+    after = before
+    if payload.sidebar_logo_size != before.sidebar_logo_size:
+        after = ProductBrandingRead(sidebar_logo_size=payload.sidebar_logo_size, version=str(uuid.uuid4()))
+        if row is None:
+            db.add(PlatformSetting(key=PRODUCT_BRANDING_KEY, value=after.model_dump()))
+        else:
+            row.value = after.model_dump()
+        record_event(db, "settings_changed", org_id=None, actor=sysadmin, item="Product branding",
+                     details={"sidebar_logo_size": {"from": before.sidebar_logo_size, "to": after.sidebar_logo_size}})
+    db.commit()
+    _no_store(response)
+    return after
 
 
 def _now() -> datetime:

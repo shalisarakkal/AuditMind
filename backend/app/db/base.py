@@ -1,5 +1,6 @@
 from app.db.base_class import Base
 from app.models.organization import Organization
+from app.models.organization_logo import OrganizationLogo
 from app.models.user import User
 from app.models.membership import OrgMembership
 from app.models.asset import Asset

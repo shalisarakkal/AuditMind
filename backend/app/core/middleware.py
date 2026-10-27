@@ -20,8 +20,8 @@ _MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 class _TooLarge(HTTPException):
     # An HTTPException, so FastAPI passes it through body parsing (anything
     # else there becomes a generic 400) and renders it as a 413.
-    def __init__(self) -> None:
-        super().__init__(status_code=413, detail=upload_limit_message())
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(status_code=413, detail=detail or upload_limit_message())
 
 
 class UploadSizeLimitMiddleware:
@@ -37,16 +37,18 @@ class UploadSizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        logo = scope.get("path", "").startswith(f"{settings.API_V1_STR}/orgs/") and scope.get("path", "").endswith("/logo")
         if not (
-            scope["type"] == "http" and scope["method"] == "POST" and scope["path"].endswith(IMPORT_PATH_SUFFIXES)
+            scope["type"] == "http" and scope["method"] == "POST" and (logo or scope["path"].endswith(IMPORT_PATH_SUFFIXES))
         ):
             await self.app(scope, receive, send)
             return
 
-        limit = settings.IMPORT_MAX_BYTES + _MULTIPART_OVERHEAD_BYTES
+        limit = (2 * 1024 * 1024 if logo else settings.IMPORT_MAX_BYTES) + _MULTIPART_OVERHEAD_BYTES
+        detail = "Logo request exceeds the 3 MiB transport limit (file limit: 2 MiB)" if logo else upload_limit_message()
         declared = dict(scope["headers"]).get(b"content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
-            await _reject(send)
+            await _reject(send, detail)
             return
 
         received = 0
@@ -58,7 +60,7 @@ class UploadSizeLimitMiddleware:
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > limit:
-                    raise _TooLarge
+                    raise _TooLarge(detail)
             return message
 
         async def tracking_send(message: Message) -> None:
@@ -70,7 +72,7 @@ class UploadSizeLimitMiddleware:
             await self.app(scope, counting_receive, tracking_send)
         except _TooLarge:
             if not started:
-                await _reject(send)
+                await _reject(send, detail)
 
 
 def upload_limit_message() -> str:
@@ -80,8 +82,8 @@ def upload_limit_message() -> str:
     return f"File exceeds the {limit // (1024 * 1024)} MB upload limit"
 
 
-async def _reject(send: Send) -> None:
-    body = json.dumps({"detail": upload_limit_message()}).encode()
+async def _reject(send: Send, detail: str | None = None) -> None:
+    body = json.dumps({"detail": detail or upload_limit_message()}).encode()
     await send(
         {
             "type": "http.response.start",

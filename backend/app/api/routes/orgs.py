@@ -1,6 +1,7 @@
 import uuid
+import base64
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,15 +12,108 @@ from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.membership import OrgMembership
 from app.models.organization import Organization
+from app.models.organization_logo import OrganizationLogo
 from app.models.user import User
 from app.schemas.org_settings import IngestionSettingsRead, IngestionSettingsUpdate
-from app.schemas.organization import MyOrganizationRead, OrganizationRead
+from app.schemas.organization import MyOrganizationRead, OrganizationRead, OrganizationLogoRead
+from app.schemas.organization import OrganizationBrandingRead, OrganizationBrandingUpdate
 from app.schemas.security import SecuritySettingsRead, SecuritySettingsUpdate
 from app.services.events import record_event
 from app.services.org_settings import apply_overrides, resolve_ingestion_settings
 from app.services.security_policy import change_layer, resolve_org_security, resolve_platform_security
+from app.services.organization_logos import MAX_UPLOAD, normalize_logo
 
 router = APIRouter(prefix="/orgs", tags=["orgs"])
+
+
+def _branding_response(org: Organization) -> dict:
+    return {"show_name_in_header": org.show_name_in_header, "header_logo_size": org.header_logo_size,
+            "header_name_size": org.header_name_size}
+
+
+@router.get("/{org_id}/branding", response_model=OrganizationBrandingRead)
+def read_branding(org_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                  _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    org = db.get(Organization, org_id)
+    return _branding_response(org)
+
+
+@router.patch("/{org_id}/branding", response_model=OrganizationBrandingRead)
+def update_branding(org_id: uuid.UUID, payload: OrganizationBrandingUpdate, response: Response,
+                    db: Session = Depends(get_db), admin: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    org = db.get(Organization, org_id, with_for_update=True, populate_existing=True)
+    if org.show_name_in_header != payload.expected_show_name_in_header:
+        raise HTTPException(409, "Branding changed; reload before retrying")
+    for field in ("header_logo_size", "header_name_size"):
+        value, expected = getattr(payload, field), getattr(payload, "expected_" + field)
+        if (value is None) != (expected is None):
+            raise HTTPException(422, "Size and expected size must be supplied together")
+        if value is not None and getattr(org, field) != expected:
+            raise HTTPException(409, "Branding changed; reload before retrying")
+    if org.show_name_in_header != payload.show_name_in_header:
+        record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
+                     item="Organization header name", details={"from": org.show_name_in_header, "to": payload.show_name_in_header})
+        org.show_name_in_header = payload.show_name_in_header
+    for field, label in (("header_logo_size", "Organization header logo size"), ("header_name_size", "Organization header name size")):
+        value = getattr(payload, field)
+        if value is not None and getattr(org, field) != value:
+            record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
+                         item=label, details={"from": getattr(org, field), "to": value})
+            setattr(org, field, value)
+    result = _branding_response(org)
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+def _logo_response(logo: OrganizationLogo | None) -> dict:
+    return {"version": logo.version if logo else None,
+            "image_data_url": "data:image/png;base64," + base64.b64encode(logo.image).decode("ascii") if logo else None}
+
+
+@router.get("/{org_id}/logo", response_model=OrganizationLogoRead)
+def read_logo(org_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+              _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    return _logo_response(db.get(OrganizationLogo, org_id))
+
+
+@router.post("/{org_id}/logo", response_model=OrganizationLogoRead)
+def upload_logo(org_id: uuid.UUID, response: Response, file: UploadFile = File(...),
+                expected_version: str = Form(...), db: Session = Depends(get_db),
+                admin: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    current = db.get(OrganizationLogo, org_id, populate_existing=True)
+    if expected_version != (current.version if current else "none"):
+        raise HTTPException(409, "Logo changed; reload before retrying")
+    image = normalize_logo(file.file.read(MAX_UPLOAD + 1), file.content_type or "")
+    version = str(uuid.uuid4())
+    if current is None:
+        current = OrganizationLogo(org_id=org_id, version=version, image=image)
+        db.add(current)
+    else:
+        current.version, current.image = version, image
+    record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
+                 item="Organization logo", details={"action": "logo_saved", "version": version})
+    # Snapshot before commit expires ORM state: a later admin may immediately
+    # replace/remove the row, but must not turn this committed save into a 500.
+    result = _logo_response(current)
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.delete("/{org_id}/logo", status_code=204)
+def remove_logo(org_id: uuid.UUID, expected_version: str, db: Session = Depends(get_db),
+                admin: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    current = db.get(OrganizationLogo, org_id, populate_existing=True)
+    if expected_version != (current.version if current else "none"):
+        raise HTTPException(409, "Logo changed; reload before retrying")
+    if current is not None:
+        db.delete(current)
+        record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
+                     item="Organization logo", details={"action": "logo_removed"})
+    db.commit()
 
 
 def _my_org(org: Organization, role: UserRole, access: str = "member") -> MyOrganizationRead:

@@ -71,6 +71,9 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
             ).one()
             assert migrated[:3] == ("Legacy report", "generated", 0)
             assert migrated.created_at is not None
+            assert connection.scalar(text("SELECT show_name_in_header FROM organizations WHERE id=:id"), {"id": org}) is True
+            assert connection.scalar(text("SELECT header_logo_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
+            assert connection.scalar(text("SELECT header_name_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
             assert {index["name"] for index in inspect(connection).get_indexes("reports", schema=schema)} >= {
                 "ix_reports_org_created", "ix_reports_org_status",
             }
