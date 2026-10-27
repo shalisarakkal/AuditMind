@@ -4,7 +4,36 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 ## How this works
 
-Current check-in scope (26 October): organization logos/header preferences
+27 October drag/drop regression: restored page-wide Assets/Findings file intake
+and guarded signed-in pages against Chrome local-file navigation. Native file
+inputs/text drags remain intact; busy/unrelated-modal drops do not enqueue files.
+Fresh frontend/browser evidence and local activation: docs/PHASE4_VALIDATION.md.
+
+27 October exact-file policy: organization Ingestion setting Ask/Skip/Reimport
+implemented for shared Assets/Findings uploads, default Ask. Skip is audited
+without a new job; in-flight identical hashes always skip. Hash admission is
+serialized in PostgreSQL. Uses existing settings JSON; no migration. Activated
+locally on 27 October after approved idle-queue restart; readiness passed and data/
+accounts/settings were preserved. Test evidence: docs/PHASE4_VALIDATION.md.
+
+27 October: grouped duplicate decisions implemented for all Assets/Findings
+import formats/sources. Submit later ready files, collect duplicates for explicit
+selected skip/reimport, separate failures/source issues and avoid resubmitting
+accepted jobs. Documents/logo single-item lifecycle semantics remain unchanged.
+Latest evidence is in docs/PHASE4_VALIDATION.md; activation remains separate.
+
+Upload presentation follow-up: queues moved into a native dialog, fixed-height
+header actions, compact Detected badges and grouped expandable progress/reports.
+Source changes prepared/tested separately while large demo imports run; no demo
+restart/activation is included. See latest validation before activating the build.
+
+Follow-up: shared Assets/Findings multi-file upload now offers one-click sequential
+submission, fixed sources during the batch, stop/retry and explicit duplicate
+confirmation. Separate file reports and existing server import behavior remain.
+See the latest batch-upload validation in docs/PHASE4_VALIDATION.md; the combined
+backend/branding counts below are the previous baseline, not a fresh backend run.
+
+Previously accepted check-in scope (26 October): organization logos/header preferences
 (migrations 0025–0028), approved fixed SVG assets, platform product-logo sizing,
 single-brand auth presentation and shared password visibility are implemented.
 Final combined-tree review/testing passed; four scoped commits were pushed
@@ -1862,7 +1891,14 @@ implemented now.
 
 ## Future phase — Deferred delivery
 
-User-approved deferrals (2026-10-22); not core Phase 3 release gates:
+User-approved deferrals (2026-10-22; scheduled-import addition 2026-10-27);
+not core Phase 3 release gates:
+
+- [ ] **Scheduled location-based imports:** user-defined schedule/time zone,
+  server-accessible source or local agent, least-privilege credentials/location
+  access, complete-file detection, retries/checkpoints and audit history. Reuse
+  exact-file policy; unattended jobs must not wait for a browser prompt. A browser
+  folder selection alone does not provide persistent server filesystem access.
 
 - [ ] **Docker/container deployment:** review/update deployment packaging; build
   API and worker images; verify non-root permissions, secrets, network/health
@@ -1879,3 +1915,49 @@ User-approved deferrals (2026-10-22); not core Phase 3 release gates:
 Existing Docker/cache instructions remain reference material for this phase,
 not evidence of execution or approval to deploy. Current Phase 3 browser checks
 use native local services, isolated synthetic data and mocked inference only.
+
+## Upload wording follow-up (27 October 2026)
+
+- [x] Implement shared source guidance, Remove/confirmed Close and Show/Hide labels.
+- [x] Validate and activate locally without interrupting active imports.
+
+Shared Assets/Findings uploads now distinguish compatible-source guidance from
+unsupported files, visibly disable invalid Upload actions, use Remove per file,
+and confirm Close before discarding queued files. Submitted imports continue.
+Submission summaries are location-neutral; report disclosures use Show/Hide
+labels matching their expanded state. Frontend regression: 428 tests passed;
+lint and isolated production build passed. No backend contract changed.
+
+## Resilience presentation follow-up (27 October 2026)
+
+- [x] Retain former layout; apply shared risk-tier text colors only.
+- [x] Implement explicit empty-organization Not assessed API/UI handling.
+- [x] PostgreSQL/frontend/Chrome regression, production build and local activation.
+- [x] Draft evidence-qualified dashboard contract using existing report profiles.
+- [ ] Approve qualification contract, reviewer authority and organization-wide scope.
+- [ ] Implement/review/test qualified domain and partial-overall scoring after approval.
+- [x] Review exact scope/secrets and check in completed work in scoped commits.
+- [ ] Push the reviewed commits and verify hosted CI for this tree (separate approval).
+
+Next design increment: [Dashboard evidence-qualified scoring contract](docs/DASHBOARD_EVIDENCE_SCORING_DESIGN.md)
+is drafted for approval, reusing existing seven report coverage profiles. No
+partial-evidence dashboard scoring behavior has changed. Reviewer authority,
+organization-wide scope and persisted qualification workflow require approval
+before implementation.
+
+Empty-organization safeguard: dashboard API explicitly returns `not_assessed`
+with null overall/domain scores and tiers when active assets AND findings are
+both zero; UI displays neutral Not assessed labels in existing cards. No database
+migration. Asset-only/partial evidence, risk snapshots and saved reports retain
+their existing contracts pending separate domain-coverage design. Frontend 434
+tests passed; 61 focused PostgreSQL scoring/dashboard/archive tests and 70 Chrome
+checks passed; lint/build/activation pass. The 61 include the initial 9 dashboard
+tests, not a fresh full backend run. Earlier 1,281 full-backend results are historical.
+
+Per user feedback, preserve the former compact layout and dashboard gradient;
+change score/tier text colors only: Critical/red, High/orange, Medium/amber,
+Low/green. No new badges, tinted domain surfaces or explanatory blocks.
+Evidence and confidence remain separate; missing report scores stay neutral.
+No scoring thresholds, stored
+assessments, or exported report templates changed. Frontend: 433 tests passed;
+ESLint and isolated production build passed.

@@ -1,5 +1,238 @@
 # Phase 4 remediation workflow validation
 
+## Empty-organization dashboard safeguard — 27 October 2026
+
+Dashboard API returns `assessment_status=not_assessed`, null score/tier for overall
+and seven domains when active asset and finding counts are both zero. Otherwise
+status is `findings_based`, without claiming qualified evidence coverage. Existing
+scoring calculation is unchanged for nonempty organizations. Archived records and
+other tenants cannot make an empty organization assessed. UI preserves the layout
+and displays neutral Not assessed, without risk labels or coercing null to zero.
+No migration; risk snapshots and saved report contracts are unchanged.
+
+Validation: 434 frontend tests, ESLint and isolated production build passed.
+Focused PostgreSQL scoring/dashboard/archive regression: 61 passed (includes the
+initial 9 dashboard tests; do not add the counts). These focused results are not
+a new full-backend-suite run. Partial-domain evidence rules remain pending.
+Normal production build and idle demo restart passed; data/accounts retained.
+Chrome: 70 checks passed against isolated PostgreSQL/API/worker, including null
+API contracts and eight Not assessed cards with no risk tier.
+Artifacts: `temp/testing/finding-workflow/phase3_browser_61c079037c36`.
+Earlier attempts exposed an obsolete tier assertion and a missing authentication
+header in the new test; both corrected before the successful complete rerun.
+
+## Resilience risk-tier presentation — 27 October 2026
+
+**Current design correction:** user requested the former appearance with text
+colors only. The new bordered badges, tinted domain cards, added dashboard /100
+and guidance blocks have been removed; original dashboard gradient and compact
+domain layout restored. Critical/red, High/orange, Medium/amber and Low/green
+score/tier text remains shared. Report evidence and scoring contracts unchanged.
+433 frontend tests, ESLint and both builds pass after this correction.
+Chrome: 69 checks passed, including original gradient/layout preservation;
+artifacts `temp/testing/finding-workflow/phase3_browser_0173fd6c38cf`.
+The first attempt used the stale acceptance build; rebuilt it and reran fully.
+Demo was
+idle before restart; the corrected version is active, with readiness all true
+and frontend login HTTP 200. The description below records the earlier design,
+not the current presentation.
+
+Dashboard and browser Reports share red Critical, orange High, amber Medium and
+green Low risk badges, subtle tier-tinted surfaces and / 100 score labels.
+The existing assessment tier is authoritative; no thresholds or scoring changed.
+Missing report scores remain neutral, and evidence/confidence remain separate.
+Downloaded HTML/PDF templates were not modified in this increment.
+
+Validation: 433 frontend tests passed, including all four tier mappings and
+neutral fallback; ESLint, isolated build and normal production build passed.
+Chrome: 69 checks passed against isolated PostgreSQL/API/worker, including the
+dashboard text badge, denominator, tier surface, layout and accessibility suite.
+Artifacts: `temp/testing/finding-workflow/phase3_browser_ae7fd600ed16`.
+After confirming zero active demo jobs, restarted without resetting data or
+credentials. API database/uploads/worker readiness all passed; frontend login 200.
+This also activates the earlier shared upload wording and Show/Hide changes.
+
+## Upload wording and disclosure follow-up — 27 October 2026
+
+Shared upload controls now distinguish incompatible selected sources from files
+with no supported profile, use visibly disabled Upload buttons and per-file Remove,
+and confirm Close/Escape before discarding queued files. Keep reviewing preserves
+the queue; submitted imports are never cancelled by closing. Summaries no longer
+refer to groups "below". Disclosure action labels switch Show/Hide through native
+open-state styling, with shorter reports-only labels after processing.
+
+Validation: 428 frontend tests passed; ESLint and isolated production build passed.
+Chrome acceptance: 68 checks passed against isolated PostgreSQL/API/worker;
+artifacts: `temp/testing/finding-workflow/phase3_browser_a72f892930a7`.
+An initial browser startup timeout ran zero checks; the subsequent full run passed.
+The earlier full PostgreSQL backend run is unchanged evidence, not rerun for this
+frontend-only increment. Activation is deferred while demo imports are active.
+
+## Drag/drop navigation regression — 27 October 2026
+
+Cause: the upload-dialog refactor left drag/drop handlers on the small header
+control only. A file dropped on the surrounding page could reach Chrome's default
+local-file navigation. Fix: shared Assets/Findings document-level intake, with a
+signed-in layout capture guard preventing file-open default on other pages.
+Local drop targets stop propagation; listeners clean up on unmount and maintain
+current queue/org state via a ref. Busy queues and unrelated modals do not receive
+files. Native file inputs and text drags retain their defaults. No auto-submit.
+
+Fresh **428 frontend tests passed** (70.39s), including body multi-file drops,
+single delivery, guard cleanup, text and native file-input cases. Lint and isolated
+production build/TypeScript passed. No backend code/schema changed in this fix;
+the **1,281 backend tests below are the previous full policy run**, not rerun here.
+Chrome acceptance uses real Input.dispatchDragEvent OS-file payloads, asserts two
+actual filenames and unchanged app URLs, then exercises the existing real API/
+PostgreSQL workflow. The first attempt dispatched before the uploader was ready;
+waiting for visible authenticated controls corrected the test timing. Final
+**68 Chrome check executions passed** (`phase3_browser_3052352df4b8`) against real
+isolated API/PostgreSQL/worker, including the native two-file drop and existing
+policy/workflow regressions. Grouped/repeated checks are not independent scenarios.
+No browser page errors or AI usage. Secret/whitespace guards passed.
+Local activation: read-only live checks found zero pending/running scans, archive
+jobs and reports. Rebuilt the normal production frontend and restarted the local
+demo successfully; existing data/accounts/settings retained. Database/uploads/
+worker readiness and login HTTP 200 passed. No active jobs were interrupted.
+
+## Exact duplicate file policy — 27 October 2026
+
+Local activation: on the user's later restart approval, read-only admission check
+found zero pending/running demo imports. start-demo.ps1 stopped only its recorded
+processes, retained demo data/accounts/settings, passed the normal production
+build and restarted API/worker/frontend. /ready confirmed database/uploads/worker,
+/login returned HTTP 200 and live OpenAPI exposed ask/skip/reimport. No credentials
+were reset, no organization policy was changed and no inference call was made.
+
+Organization admins can select Settings → Ingestion → Exact duplicate files:
+Ask (default), Skip or Reimport. The backend enforces the effective organization
+override/server EXACT_DUPLICATE_FILE_POLICY on generic assets, generic findings
+and profile imports. All use the same org/SHA-256 comparison; filenames/profile
+changes alone do not change identity. Ask preserves grouped decisions. Skip
+returns HTTP 200 with skipped=true and the matched scan ID, no new job/report;
+it records upload_skipped with actor, filename, matched scan/hash, reason/policy.
+Reimport admits another job without asking, while existing row-handling settings
+remain independent. confirm=true cannot override Skip. Queued/running matches
+always skip, including Reimport and confirmed Ask. Failed/archived matches are
+excluded; explicit worker retry remains a different operation.
+
+Review: PostgreSQL transaction advisory locks serialize org/hash admission; the
+existing shared organization lifecycle lock keeps settings/archive changes out
+of admission. Skip responses do not return the matching uploader's report and
+the frontend never adds their scan to its tracker. Skip counts and single-file
+reasons are shown; Activity has a labelled/searchable event. Settings retain
+admin-only writes, enum validation and reset-to-server-default. No schema change:
+the policy uses existing ingestion_overrides JSON. No new dependency or paid AI.
+
+Focused PostgreSQL passes: 33 new-policy/settings unit/integration tests and
+101 broader import/archive/worker/activity regressions. Full frontend rerun:
+**425 tests passed** (73.87s, two workers), lint and isolated build/TypeScript
+passed. These focused counts are not substitutes for, or additive to, a full
+backend result. Fresh **full PostgreSQL suite passed 1,281 tests** in 691.72s,
+with --require-postgres -W error. It includes real migration round-trip checks;
+this replaces (does not add to) the older 1,268-test baseline below. After pytest,
+auditmind_test public was restored to **0028 / 31 tables**, repeated upgrade was
+a no-op and autogenerate detected no drift. The restore helper's first launch
+from repo root had no TEST_DATABASE_URL loaded and stopped before connecting;
+running it from backend loaded the intended configuration and passed.
+Final **67 Chrome check executions passed** against real isolated PostgreSQL/API/
+worker (`temp/testing/finding-workflow/phase3_browser_2b4dd2510d0c`): Ask grouped
+approval, Settings-persisted Skip/Reimport with real files and no prompts, Activity
+skip rows and reset to Ask, plus existing roles/concurrency/layout/accessibility
+regressions. Initial acceptance stopped at a selector matching a hidden Activity
+filter label; scoping it to table rows fixed the test and the full rerun passed.
+Grouped/repeated executions are not independent scenarios. No browser errors or
+AI usage. Static high-severity, secret and whitespace guards passed.
+During implementation/testing no running application/worker restart or live
+configuration change was made; the subsequently approved activation is recorded above.
+The high-severity Bandit gate passed; this is not a blanket clearance of the
+previously documented lower-severity static-analysis backlog.
+
+## Grouped upload decisions — 27 October 2026
+
+All shared Assets/Findings import formats/sources now submit every ready file
+sequentially, continuing after duplicates as well as errors. Duplicates collect
+in Already uploaded with prior uploader/date, initially unselected, for Skip
+selected or explicit Upload selected anyway. Known accepted files leave the
+queue; failed submissions and source problems have separate groups. Retry failed
+targets failures only. Reimport is not a guarantee to update records: existing
+import settings still govern asset handling. Single-document versions and logo
+replacements retain their different single-item lifecycle contracts.
+
+Review preserved fixed targets, explicit confirmations, stop/double-start guards
+and the no-restart boundary. Queue cancellation and grouped skipping also check
+the active ref to guard the pre-render interval. Drops are blocked during an
+active submission; stale selections are cleared when their files are removed.
+Zero-ready primary buttons are hidden outside submission, and progress is labelled
+Last pass so its historical counts are distinct from current group counts.
+
+Tests cover mixed duplicates/failures/unreadable sources, later ready-file
+submission, explicit group selection/reimport, skipping without POST, independent
+sources, double clicks, stop and failure-only retry. Existing single-duplicate
+regressions now use the same group flow. Full/backend historical results below
+are not additive and no new full backend run is claimed: backend/schema unchanged.
+Final frontend suite: **422 tests passed** (80.90s, two workers). Lint and isolated
+production build/TypeScript passed. A focused post-review pass also passed 62
+tests; focused/full counts overlap and are not additive. **64 final-build Chrome
+check executions passed** against real isolated PostgreSQL/API/worker
+(`temp/testing/finding-workflow/phase3_browser_63afc981a1bf`), including two actual
+duplicates followed by a new file, selected skip and explicit selected reimport,
+dialog focus/mobile layout and scoped Axe. Screenshot visually reviewed. Grouped/
+repeated executions are not independent scenarios. No browser page errors or AI
+usage. Secret/whitespace guards passed; unrelated local/branding files preserved.
+No demo/worker restart, production migration, paid/inference call, commit or push.
+
+## Upload presentation follow-up — 26 October 2026
+
+Upload selection now opens a named native dialog shared by Assets/Findings, with
+secondary row actions and one primary batch action. Header actions stay 40px high;
+Detected badges replace repeated explanations. Empty accepted queues close;
+submission confirmation expires after 3 seconds. Background progress/reports use
+one expandable disclosure, automatically opened for failures/interruption/failed
+rows. Errors and reports are not timed away. Idle dialog cancellation discards
+only unsent files; active submission continues to block dismissal.
+
+Fresh **420 frontend tests passed** (82.77s, limited to two workers to reduce load),
+lint and isolated production build/TypeScript passed. Three additional regressions
+cover named dialog cancellation/no POST, collapsed grouped progress and failure
+auto-expansion. Existing tests were updated for short badges and explicit dialog
+cancellation before replacing a failed queue. Initial fixture selector/type
+failures were corrected before the successful run. Backend source/schema is
+unchanged; no new full backend run is claimed. **63 Chrome check executions
+passed** (`temp/testing/finding-workflow/phase3_browser_eb4fecbe009f`), including
+real PostgreSQL/API/worker submission, dialog focus, desktop/mobile overflow,
+scoped Axe and grouped progress/report disclosure. Desktop/mobile screenshots
+were visually reviewed. Grouped/repeated checks are not independent scenarios.
+No browser page errors or AI usage. Tracked-secret/whitespace guards passed.
+
+No normal frontend build, demo restart, worker stop or migration was performed.
+The running demo remains on its previous build so user imports are undisturbed;
+activation is a separate controlled restart after processing. The isolated
+acceptance server uses different ports/schema and no inference calls.
+
+## Shared batch-upload increment — 26 October 2026
+
+Assets and Findings share one-click sequential Upload all ready files, per-file
+source/report preservation, locked queue edits, double-start prevention, stop
+after the current submission, failed-file retry and explicit duplicate pauses.
+Review also preserves duplicate confirmation after a failed explicit retry and
+prevents tracking errors from making accepted jobs uploadable again.
+
+Fresh frontend suite: **417 tests passed** (25.00s); lint, TypeScript and isolated
+plus local-demo production builds passed. Four added component regressions cover
+sequential/stop/double-start behavior, failure continuation/retry, duplicate pause
+and independent source routing. A preliminary retry assertion ran before React's
+queue-state effect committed; the test now awaits the enabled Retry control.
+The final complete rerun passed. No backend source/schema changes: **1,268 backend
+tests below remain the earlier full run**, not a new result for this increment.
+The final **61 Chrome check executions passed** against real API/worker/PostgreSQL
+(`temp/testing/finding-workflow/phase3_browser_2cf4a9d36ca5`). The shared-control
+check submits both files with one click. Grouped/repeated checks are not 61
+independent scenarios. No browser page errors or AI usage were recorded.
+Demo rebuilt/restarted successfully; database/uploads/worker readiness passed.
+Tracked-secret and whitespace guards passed; unrelated branding originals and
+local configuration remain excluded. No inference, paid calls, commit or push.
+
 ## Final combined-tree check-in review — 26 October 2026
 
 Scope: migrations 0025–0028, organization and platform branding, approved active

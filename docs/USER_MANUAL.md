@@ -432,11 +432,69 @@ menu. Use Clear only to remove the selected values.
 
 For an import:
 
+An organization admin can choose **Settings → Ingestion → Exact duplicate files**:
+
+- **Ask before importing again** (default): completed byte-identical files appear
+  in the grouped decision list. Upload selected anyway explicitly confirms them.
+- **Skip identical files**: no new import/job/report; the queue counts them as
+  skipped and **Activity → Exact duplicate file skipped** records the matching
+  upload and reason. Even an explicit confirmation cannot override Skip.
+- **Reimport identical files**: start another import without prompting. Existing
+  asset/finding rules still apply; this is not a guaranteed record update.
+
+The comparison is SHA-256 within the current organization, across shared import
+sources/profiles. Filenames are not identity; different content with the same
+name is a new file. A matching queued/running import is always skipped under all
+three policies, preventing concurrent duplicate jobs. Failed or archived matching
+imports are excluded from duplicate matching. Reprocessing after profile changes
+requires Reimport or Ask with explicit confirmation. Reset to default follows
+the server's EXACT_DUPLICATE_FILE_POLICY (Ask unless configured otherwise).
+This setting is independent of **Asset already in inventory**, and applies to
+Assets/Findings uploads, not document-version or logo-replacement workflows.
+
+You can also drag one or more files onto the Assets/Findings page content (not
+just the small upload button); the same review queue opens once. File drops on
+other signed-in pages do not open the file in the browser or start an import.
+Native Documents/logo file inputs remain usable. Drop onto page content, not
+Chrome's address bar or tab strip, which the application cannot control.
+
+Selecting files opens **Upload files**, keeping the page header compact. Review
+the source on each file; **Detected** means its columns matched the source.
+Close (or Escape while idle) asks before removing remaining queued files.
+Keep reviewing retains them. Remove affects only that queued file; closing never
+cancels submitted imports. Upload is disabled until its source is compatible.
+If no source matches, configure an import profile in Settings, convert the file,
+or remove it.
+The dialog cannot close during submission. Once every selected file is accepted,
+it closes automatically; the submission notice disappears after 3 seconds.
+Background work continues independently. Use **Show progress and reports** while
+processing, or **Show reports** after completion. The expanded summary says **Hide**.
+Expand the summary
+on Assets/Findings to inspect each file. Failures/interruption open the summary
+for attention; reports and errors remain available until explicitly dismissed.
+
 1. Open Assets or Findings and use its import/upload control.
 2. Choose a supported CSV, JSON, Nessus or configured tool-export file. Select or
    confirm the correct source/import profile when prompted. Not every arbitrary
    vendor export is supported; the profile must recognize its structure.
 3. Review the result: imported, updated/skipped and invalid rows are distinct.
+   When selecting or dropping multiple files (up to 20), review each source and
+   choose **Upload all ready files (N)** to submit them sequentially. Individual
+   Upload/Cancel controls remain available before the batch starts. Sources and
+   queue changes are locked during submission. **Stop remaining uploads** stops
+   after the current request; it does not cancel accepted jobs. Failed files stay
+   in a **Submission failed** group for **Retry failed**. Duplicates do not stop
+   later ready files: under Ask they collect under **Already uploaded (N)**. Review previous
+   uploader/date, select individual files (or Select all), then **Skip selected**
+   or **Upload selected anyway**. No duplicates are selected/approved automatically.
+   Files with unreadable sources stay under **Source needs attention**; correct
+   their source or cancel them, then submit the remaining ready files.
+   Upload anyway permits another import, not a guaranteed update: Settings still
+   determine existing-asset handling. Accepted files are never included in later
+   retries or duplicate decisions. This covers all supported Assets/Findings
+   formats/sources. Documents and logos remain single-item version/replacement
+   flows, not multi-file imports.
+   Each file keeps its own report; submission completion is not import completion.
 4. Use **Uploads** to inspect history and row-level import feedback. Correct bad
    source rows and re-upload when needed; do not assume a partial import imported
    every row. Partial-success and matching behavior are configurable in Settings.
@@ -661,3 +719,18 @@ before submission. Purge is permanent and cannot be undone. Bulk operations may
 queue some jobs and refuse others if availability/permissions changed; review
 the refusal details. This is not a database-wide atomic bulk transaction.
 Assets and Uploads use the same selection/confirmation safeguards.
+# Reading resilience scores
+
+An organization with **zero active assets and zero active findings** displays
+**Not assessed** for the overall score and all seven domains, without numeric
+scores or risk tiers. Archived records do not count as active data. This is a
+narrow empty-data safeguard: asset-only or partially covered organizations still
+use the existing findings-based baseline, which is not proof of evidence coverage.
+Domain coverage/partial scoring is a separate pending design task.
+
+Dashboard and browser Reports retain their original compact layout. Only score
+and risk-tier text colors indicate risk: Critical red, High orange, Medium amber,
+Low green. No new colored card backgrounds, bordered badges or explanatory
+blocks are added. Existing textual tier labels remain; color is not the sole cue.
+Scores and thresholds are unchanged. Evidence coverage/confidence remain separate;
+unscored report domains stay neutral. Downloaded templates are unchanged.

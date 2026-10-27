@@ -1,5 +1,72 @@
 # Testing strategy and measured coverage
 
+## Latest drag/drop regression — 27 October 2026
+
+**428 frontend tests passed** (70.39s), lint and isolated build/TypeScript passed.
+File-only capture guard and page-wide queue regressions cover native-input/text
+preservation, listener cleanup and no double delivery. Chrome uses native OS-file
+drag payloads outside the upload button and checks URL/queue behavior. See latest
+validation for final evidence. No backend change/full rerun: 1,281 remains the
+earlier full policy run, not a new count for this frontend fix.
+Final **68 Chrome check executions passed** (`phase3_browser_3052352df4b8`), including
+real native OS-file drag data (two filenames), app URL preservation and single queue
+delivery. First attempt raced page hydration; explicit visible-control waits fixed
+the acceptance timing. No browser page errors or AI usage.
+
+## Latest exact-file policy increment — 27 October 2026
+
+Fresh **425 frontend tests passed** (73.87s), lint and isolated build/TypeScript
+passed. PostgreSQL-focused passes: 33 policy/settings tests and 101 broader
+import/archive/worker/activity regressions. Policy tests cover all shared import
+endpoints, concurrent identical admission, permissions, organization isolation,
+reset/validation, in-flight protection and failed/archived attempts. Frontend
+regressions verify single/batch skip feedback and no matched-scan tracking.
+See [latest validation](PHASE4_VALIDATION.md) for the full backend and browser
+final results; counts below are earlier checkpoints and must not be added.
+Fresh **1,281 full PostgreSQL tests passed** (691.72s, required PostgreSQL,
+warnings as errors), including migration checks. Test DB restored to 0028,
+31 tables, repeated upgrade/no drift passed. This is the new full backend run,
+not a sum of the focused results or the older 1,268-test baseline.
+Final **67 Chrome executions passed** (`phase3_browser_2b4dd2510d0c`) against real
+isolated PostgreSQL/API/worker. Initial hidden-label selector failure was fixed by
+targeting Activity table rows; final full rerun passed, with no browser errors or
+AI usage. Ask/Skip/Reimport/reset and skip audit visibility are exercised.
+
+## Latest grouped upload-decision increment — 27 October 2026
+
+New mixed-queue regressions verify duplicates never block later ready files,
+explicit selected skip/reimport, no automatic confirmation, no accepted-file
+resubmission and failure-only retry. Existing duplicate tests now exercise the
+grouped single-file path as well. Chrome adds real duplicate/new-file submission,
+selected skip/reimport and scoped accessibility through real API/PostgreSQL.
+See [latest validation](PHASE4_VALIDATION.md) for completed-run counts/artifacts.
+No backend/schema changes or fresh full backend run; no demo/worker restart.
+The final full frontend suite passed **422 tests** (80.90s, two workers); the
+62-test focused post-review pass overlaps this total. Lint and isolated build/
+TypeScript passed. **64 Chrome check executions passed** on the final build
+(`phase3_browser_63afc981a1bf`), including the real grouped-duplicate scenario.
+Earlier 420/417 counts below are historical checkpoints.
+
+## Latest upload-dialog presentation follow-up
+
+**420 frontend tests passed** (82.77s, two workers), **63 Chrome executions passed**
+(`phase3_browser_eb4fecbe009f`), lint and isolated production
+build/TypeScript passed. New regressions cover idle dialog cancellation without
+submission, compact grouped progress and automatic failure expansion. See
+[validation evidence](PHASE4_VALIDATION.md) for Chrome layout/accessibility checks.
+No backend code/schema change or fresh full backend run. Demo/worker were not
+restarted while large imports ran; the new presentation is not yet activated.
+
+## Latest shared batch-upload increment — 26 October 2026
+
+**417 frontend tests passed** (25.00s), including four new queue regressions;
+lint/TypeScript and isolated/demo builds passed. **61 Chrome check executions
+passed**, including one-click multi-file submission against real PostgreSQL/API/
+worker (`phase3_browser_2cf4a9d36ca5`). See the latest
+[validation record](PHASE4_VALIDATION.md) for browser artifacts and scope.
+No backend code/schema changed; the **1,268 backend tests** below are the previous
+full run, not rerun or added to these results. No inference calls.
+
 ## Final combined-tree check-in gate — 26 October 2026
 
 **1,268 full PostgreSQL tests passed** (668.14s, required PostgreSQL, warnings as
@@ -441,3 +508,11 @@ Later note-discovery/mixed-selection follow-up: **326 frontend tests**, lint,
 TypeScript/build, **21 installed Chrome checks** and **29 focused PostgreSQL
 workflow tests** passed. The earlier **1,153 full backend** result remains the
 last full-suite checkpoint, not a fresh full run for these presentation changes.
+# Empty-dashboard regression follow-up (27 October 2026)
+
+Latest increment: 434 frontend tests passed, ESLint and production builds passed.
+61 focused PostgreSQL scoring/dashboard/archive tests passed; this includes the
+initial 9 dashboard tests and is not a replacement for the historical full suite.
+Chrome: 70 checks passed (`phase3_browser_61c079037c36`).
+The API/UI now distinguish completely empty active organizations from numeric
+scores. Asset-only/partial-evidence baseline scoring is deliberately unchanged.

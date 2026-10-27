@@ -1,5 +1,41 @@
 # UI conventions: list pages
 
+File drag/drop must not navigate to a local file. Signed-in layout installs a
+capture-phase file-only navigation guard (preserve native file inputs and text
+drags). Assets/Findings accept page-content drops, not only the compact header
+button. Local targets stop propagation to avoid duplicate queue entries; page
+listeners clean up on unmount/org switch. Ignore drops during submission or over
+an unrelated modal. Other signed-in pages suppress file navigation without
+starting imports. Browser address bars/tab strips are outside application control.
+
+Upload queues live in a named native dialog, not inside page-header layout.
+Header actions have matching 40px heights; individual Upload actions are secondary
+to the dialog's batch action. Use a short Detected badge, preserve per-file source
+and cancellation, and block dismissal while requests are active. Successful batch
+submission closes the empty dialog and its success toast expires after 3 seconds.
+Group import progress/reports into one expandable summary; automatically open
+for failed/interrupted imports or failed rows. Do not auto-dismiss errors/reports.
+
+Shared Assets/Findings multi-file imports provide Upload all ready files (N),
+per-file source confirmation and separate reports. Submit sequentially, lock
+queue/source edits during a batch, prevent repeat starts and allow stopping
+after the current submission. Continue past failures; Retry failed targets only
+failed ready rows. Under Ask, collect duplicates without stopping later ready files. After
+the pass, show one Already uploaded group with per-file uploader/date, explicit
+selection, Skip selected and Upload selected anyway. No duplicate is selected
+or confirmed automatically. Failed submissions and Source needs attention remain
+separate groups. Upload all ready files excludes failures pending explicit Retry.
+Accepted jobs must not be re-uploaded because progress tracking fails. This
+applies to all supported shared-import formats/sources on Assets/Findings;
+single-document version uploads and logo replacements retain their own rules.
+
+Settings → Ingestion exposes organization-level Exact duplicate files
+(Ask/Skip/Reimport). The API, not the browser cache, enforces the effective policy.
+Ask is the default; Skip returns a skipped result, not an import success/new job,
+and must not add the matched scan to the uploader's tracker. Reimport is not a
+promise to update records. Queued/running matches are always skipped. Show skip
+counts/reasons; retain Activity audit evidence. No prompt for Skip/Reimport.
+
 All password controls use shared PasswordInput: hidden by default, per-field
 Show/Hide text button (type=button), explicit accessible action name/aria-controls,
 keyboard focus and 44px controls. Preserve autocomplete/name/value/required state,
@@ -301,4 +337,13 @@ Script: [`frontend/scripts/a11y.js`](../frontend/scripts/a11y.js).
 Pages audited: `/login`, `/reports`, `/`.
 
 **Last audit:** 2026-10-12 — **0 violations** on all three pages (`/login`, `/reports`, `/`).
+
+# Resilience risk tiers
+
+Dashboard and browser Reports retain their original compact layout. Only score
+and risk-tier text colors indicate risk: Critical red, High orange, Medium amber,
+Low green. No new colored card backgrounds, bordered badges or explanatory
+blocks are added. Existing textual tier labels remain; color is not the sole cue.
+Scores and thresholds are unchanged. Evidence coverage/confidence remain separate;
+unscored report domains stay neutral. Downloaded templates are unchanged.
 

@@ -123,6 +123,12 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.screenshot({path:path.join(output,'dashboard-summary-desktop.png'),fullPage:true});
     await p.setViewportSize({width:390,height:844});
     assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Dashboard must not overflow on mobile');
+    const overall=p.getByTestId('overall-score').locator('..');
+    await expect(p.getByTestId('overall-score')).toHaveText('Not assessed');
+    await expect(overall.getByText(/risk tier/i)).toHaveCount(0);
+    assert.ok((await overall.getAttribute('class')).includes('bg-navy-cyan-gradient'));
+    await expect(overall).not.toContainText('/ 100');
+    check('Empty dashboard preserves the original gradient and layout with neutral Not assessed text and no fabricated risk tier');
     await p.screenshot({path:path.join(output,'dashboard-summary-mobile.png'),fullPage:true});
     await p.setViewportSize({width:1440,height:1000});
     const summaryQuery=new URL(await card.getAttribute('href'),base).searchParams;
@@ -236,6 +242,33 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(p.getByText('No organization logo set.',{exact:true})).toBeVisible();
     await expect(p.getByAltText('Phase3 Alpha logo',{exact:true})).toHaveCount(0);
     check('Logo removal requires confirmation, Cancel preserves it and successful removal clears header and settings');
+    const dragSession=await p.context().newCDPSession(p);
+    async function dropNativeFiles() {
+      await p.evaluate(()=>{
+        window.__nativeDrop=null;
+        document.addEventListener('drop',event=>{window.__nativeDrop={types:Array.from(event.dataTransfer?.types??[]),files:Array.from(event.dataTransfer?.files??[]).map(file=>file.name)};},{capture:true,once:true});
+      });
+      const data={items:[],files:[path.join(root,'docs/examples/demo-assets.csv'),path.join(root,'docs/examples/demo-findings.csv')],dragOperationsMask:1};
+      for(const type of ['dragEnter','dragOver','drop']) await dragSession.send('Input.dispatchDragEvent',{type,x:650,y:250,data});
+      assert.deepEqual((await p.evaluate(()=>window.__nativeDrop))?.files,['demo-assets.csv','demo-findings.csv']);
+    }
+    await p.goto(base+'/activity');
+    await expect(p.getByRole('heading',{name:'Activity',exact:true})).toBeVisible();
+    await dropNativeFiles();
+    await expect(p).toHaveURL(base+'/activity');
+    await expect(p.getByRole('dialog',{name:'Upload files',exact:true})).toHaveCount(0);
+    await p.goto(base+'/assets');
+    await expect(p.getByRole('heading',{name:'Assets',exact:true})).toBeVisible();
+    await expect(p.getByRole('button',{name:'Upload file',exact:true})).toBeVisible();
+    await dropNativeFiles();
+    await expect(p).toHaveURL(base+'/assets');
+    await expect(p.getByRole('dialog',{name:'Upload files',exact:true})).toBeVisible();
+    await expect(p.getByLabel('Source for demo-assets.csv',{exact:true})).toBeVisible();
+    await expect(p.getByLabel('Source for demo-findings.csv',{exact:true})).toBeVisible();
+    await p.getByRole('button',{name:'Close',exact:true}).click();
+    await p.getByRole('button',{name:'Close and remove queued files',exact:true}).click();
+    await dragSession.detach();
+    check('Chrome native multi-file drag outside the upload button opens one queue; non-upload pages stay in the app without file navigation');
     await p.goto(base+'/assets');
     await p.locator('input[type="file"]').setInputFiles([
       {name:'browser-batch-a.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-a\n')},
@@ -244,12 +277,76 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     for(const name of ['browser-batch-a.csv','browser-batch-b.csv']) {
       const source=p.getByLabel('Source for '+name,{exact:true});
       await expect(source).toBeVisible();
-      await source.locator('xpath=ancestor::*[@role="group"]').getByRole('button',{name:'Upload',exact:true}).click();
-      await expect(source).toHaveCount(0);
     }
+    const uploadDialog=p.getByRole('dialog',{name:'Upload files',exact:true});
+    await expect(uploadDialog).toBeVisible();
+    await expect(uploadDialog.getByRole('button',{name:'Close',exact:true})).toBeFocused();
+    const uploadAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(uploadAxe.violations.map(v=>v.id),[]);
+    await p.screenshot({path:path.join(output,'upload-dialog-desktop.png'),fullPage:true});
+    await p.setViewportSize({width:390,height:844});
+    assert.ok(await uploadDialog.evaluate(node=>node.scrollWidth<=node.clientWidth));
+    await p.screenshot({path:path.join(output,'upload-dialog-mobile.png'),fullPage:true});
+    await p.setViewportSize({width:1440,height:1000});
+    check('Upload dialog has initial Close focus, compact desktop/mobile layout and no scoped Axe violations');
+    await p.getByRole('button',{name:'Upload all ready files (2)',exact:true}).click();
+    await expect(p.getByText(/2 submitted; 0 failed/)).toBeVisible();
+    await expect(p.getByLabel('Source for browser-batch-a.csv',{exact:true})).toHaveCount(0);
+    await expect(p.getByLabel('Source for browser-batch-b.csv',{exact:true})).toHaveCount(0);
+    await expect(uploadDialog).toHaveCount(0);
+    const importSummary=p.locator('summary').filter({hasText:'Show reports'});
+    await expect(importSummary).toBeVisible();
+    assert.equal(await importSummary.evaluate(node=>node.parentElement.open),false);
+    await importSummary.click();
+    assert.equal(await importSummary.evaluate(node=>node.parentElement.open),true);
+    await expect(importSummary.getByText('Hide reports',{exact:true})).toBeVisible();
+    await expect(importSummary.getByText('Show reports',{exact:true})).toBeHidden();
+    check('Accepted uploads close the dialog and retain reports/progress in one expandable summary');
     await expect(p.getByText('browser-batch-a',{exact:true})).toBeVisible();
     await expect(p.getByText('browser-batch-b',{exact:true})).toBeVisible();
-    check('Multi-file input preserves independent source confirmations and imports both files through real PostgreSQL/API');
+    check('One-click batch upload preserves independent sources and imports both files sequentially through real PostgreSQL/API');
+    await p.locator('input[type="file"]').setInputFiles([
+      {name:'browser-batch-a.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-a\n')},
+      {name:'browser-batch-b.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-b\n')},
+      {name:'browser-batch-c.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-c\n')},
+    ]);
+    await p.getByRole('button',{name:'Upload all ready files (3)',exact:true}).click();
+    await expect(p.getByText(/1 submitted; 0 failed; 2 already uploaded/)).toBeVisible();
+    const duplicates=p.getByRole('region',{name:'Already uploaded files',exact:true});
+    await expect(duplicates.getByRole('heading',{name:'Already uploaded (2)',exact:true})).toBeVisible();
+    await expect(duplicates.getByRole('button',{name:'Upload selected anyway (0)',exact:true})).toBeDisabled();
+    await duplicates.getByLabel('browser-batch-a.csv',{exact:true}).check();
+    await duplicates.getByRole('button',{name:'Skip selected (1)',exact:true}).click();
+    await expect(duplicates.getByLabel('browser-batch-a.csv',{exact:true})).toHaveCount(0);
+    await duplicates.getByLabel('Select all already uploaded files',{exact:true}).check();
+    const duplicateAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(duplicateAxe.violations.map(v=>v.id),[]);
+    await p.screenshot({path:path.join(output,'upload-duplicate-group.png'),fullPage:true});
+    await duplicates.getByRole('button',{name:'Upload selected anyway (1)',exact:true}).click();
+    await expect(p.getByRole('dialog',{name:'Upload files',exact:true})).toHaveCount(0);
+    await expect(p.getByText('browser-batch-c',{exact:true})).toBeVisible();
+    check('Two real duplicate files do not block a later ready file; grouped selection skips one and explicitly reimports the other; scoped Axe passes');
+    const ingestionSettingsPath=list.replace(/\/findings$/,'/settings');
+    for (const mode of ['skip','reimport']) {
+      await p.goto(base+'/settings');
+      await p.getByLabel('Exact duplicate files',{exact:true}).selectOption(mode);
+      await expect.poll(async()=>(await admin.request(ingestionSettingsPath)).body.exact_duplicate_file_policy).toBe(mode);
+      await p.goto(base+'/assets');
+      await p.locator('input[type="file"]').setInputFiles([
+        {name:'browser-batch-a.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-a\n')},
+        {name:'browser-batch-b.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-b\n')},
+      ]);
+      await p.getByRole('button',{name:'Upload all ready files (2)',exact:true}).click();
+      await expect(p.getByText(mode==='skip' ? /0 submitted; 0 failed; 0 already uploaded; 2 skipped/ : /2 submitted; 0 failed; 0 already uploaded; 0 skipped/)).toBeVisible();
+      await expect(p.getByRole('dialog',{name:'Upload files',exact:true})).toHaveCount(0);
+      check('Organization '+mode+' policy persists through Settings and handles real duplicate uploads without a prompt');
+    }
+    await p.goto(base+'/activity?type=upload_skipped');
+    await expect(p.getByRole('row').filter({hasText:'Exact duplicate file skipped'}).first()).toBeVisible();
+    assert.equal((await admin.request(ingestionSettingsPath,'PATCH',{exact_duplicate_file_policy:null})).status,200);
+    await p.goto(base+'/settings');
+    await expect(p.getByLabel('Exact duplicate files',{exact:true})).toHaveValue('ask');
+    check('Skipped duplicates are visible in Activity; resetting the organization override restores Ask');
     async function create(description) {const response=await admin.request(list,'POST',{domain:'network_config',severity:'high',description,source:'synthetic-workflow'}); assert.equal(response.status,201); return response.body.id;}
     const a=await create('Manual workflow A'), b=await create('Manual workflow B');
     // Seed one genuinely imported finding through the real upload endpoint.
@@ -440,6 +537,17 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.getByLabel('Overdue',{exact:true}).selectOption('due'); await expect(p.getByRole('group',{name:'Selected',exact:true})).toHaveCount(0); check('Filter scope changes clear prior workflow selection');
     await p.getByLabel('Organization',{exact:true}).selectOption({label:'Phase3 Beta'}); await expect(p.getByText('No findings yet.',{exact:true})).toBeVisible(); await expect(p.getByRole('group',{name:'Selected',exact:true})).toHaveCount(0); check('Organization switch clears selection and does not expose previous tenant findings');
     await expect(p.getByText(/No active manual findings/)).toBeVisible(); check('Archive availability explains organizations without eligible manual findings');
+    await p.goto(base+'/');
+    await expect(p.getByTestId('overall-score')).toHaveText('Not assessed');
+    await expect(p.getByText('Not assessed',{exact:true})).toHaveCount(8);
+    await expect(p.getByText(/risk tier/i)).toHaveCount(0);
+    const emptyDashboard=await p.request.get(base+`/api/v1/orgs/${seed.other_org}/dashboard`,{headers:{Authorization:authorization}});
+    assert.equal(emptyDashboard.status(),200);
+    const emptyBody=await emptyDashboard.json();
+    assert.equal(emptyBody.assessment_status,'not_assessed');
+    assert.equal(emptyBody.overall_score,null); assert.equal(emptyBody.overall_tier,null);
+    assert.ok(emptyBody.domains.every(domain=>domain.score===null && domain.tier===null && domain.assessment_status==='not_assessed'));
+    check('Empty organization returns explicit not_assessed/null scores and renders eight neutral Not assessed cards with no risk tier');
     const zonedId=await create('Timezone boundary example');
     const india=await session('admin','Asia/Kolkata');
     const detectedZone=await india.page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone);

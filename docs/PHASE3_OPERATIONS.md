@@ -1,5 +1,14 @@
 # Phase 3 operational controls
 
+Phase 4 shared-import policy: EXACT_DUPLICATE_FILE_POLICY=ask|skip|reimport
+(default ask), overridden per organization in Settings → Ingestion. Stored in
+existing ingestion_overrides JSON; no migration. Generic assets/findings/profile
+routes enforce policy using organization/SHA-256 transaction locks. In-flight
+identical imports always skip. Skip is an audited 200 response, not a new job or
+report; clients must respect skipped=true. This does not enable scheduled imports,
+document version replacement, inference or paid calls. Deploy backend/frontend
+together during an approved restart, not while interrupting active imports.
+
 Phase 4 search follow-up: migration 0024 requires `pg_trgm` and builds nine indexes
 concurrently. See [deployment/retry/rollback and timing limits](FINDING_SEARCH_PERFORMANCE.md).
 It does not change report consent, scoring, inference settings or provider costs.

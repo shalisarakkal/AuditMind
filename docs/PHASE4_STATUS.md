@@ -1,5 +1,105 @@
 # Phase 4 status and next milestone
 
+## Current local closure review — 27 October 2026
+
+Reviewed code paths against the recorded validation and activation evidence.
+The following increments are **complete locally**, not production release approval:
+
+- [x] Shared multi-file queue: ready-first sequential submission, grouped duplicate
+  decisions, source-attention/failure groups, retry/stop and accepted-file exclusion.
+- [x] Organization Ask/Skip/Reimport policy, in-flight duplicate protection,
+  organization/hash serialization and audited skips.
+- [x] Page-wide multi-file drag/drop without browser file navigation.
+- [x] Clear source guidance, visibly disabled invalid Upload, per-file Remove,
+  confirmed Close preserving submitted work, and contextual Show/Hide disclosure.
+- [x] Original resilience layout retained, risk-tier text colors shared across
+  Dashboard/browser Reports; no downloaded-template or scoring-threshold changes.
+- [x] Empty-organization dashboard: zero active assets AND findings returns
+  explicit not_assessed/null scores and neutral Not assessed cards.
+- [x] Local activation and health: idle restart, data/accounts preserved,
+  database/uploads/worker ready and frontend login HTTP 200.
+- [x] User manual, validation, verification and plan follow-ups synchronized.
+- [x] Evidence-qualified dashboard **draft prepared** using existing report profiles.
+
+Latest combined increment evidence: **434 frontend tests**, **61 focused PostgreSQL
+scoring/dashboard/archive tests**, **70 Chrome executions**, ESLint and production
+builds passed. The 61 include the initial 9 dashboard tests; do not add counts.
+The earlier **1,281 full backend tests** belong to the duplicate-policy checkpoint,
+not a fresh full run of the current tree. See [validation](PHASE4_VALIDATION.md).
+
+Still open:
+
+- [ ] Approve [evidence-qualified dashboard contract](DASHBOARD_EVIDENCE_SCORING_DESIGN.md),
+  reviewer authority and organization-wide scope, then implement qualifications
+  and partial-domain/overall scoring. Asset-only domains can still baseline at 100.
+- [x] Review exact commit scope/secrets and check in completed work in scoped groups.
+  Backend duplicate policy: `d26f525`; empty dashboard API: `e2288a6`; shared
+  frontend: `b223613`; acceptance/documentation accompany this closure record.
+- [ ] Push the reviewed commits after approval and verify hosted CI; no push
+  performed by this check-in. Local credentials/original branding files excluded.
+- [ ] Existing broader Phase 4 exclusions, live-provider approval, production
+  operations and Future items remain unchanged. No whole-phase closure implied.
+
+The sections below are **historical checkpoints**. Their counts and statements
+about pending activation describe those checkpoints, not the current running demo.
+
+## Historical increment — file-drop navigation fix, 27 October 2026
+
+Assets/Findings accept multi-file drops across page content, and signed-in pages
+guard against Chrome's file-open default. Native file inputs/text drags remain
+intact; unrelated modals/busy queues ignore file intake. Fresh **428 frontend
+tests**, **68 Chrome executions**, lint and isolated build passed. Backend is
+unchanged from the earlier full 1,281-test policy run. See latest validation for
+idle-job check, activation and health results; no paid/inference calls. The fix
+is now active locally after a successful idle-queue rebuild/restart; API, worker
+and frontend health checks passed, with data/accounts/settings preserved.
+
+## Latest increment — exact duplicate file policy, 27 October 2026
+
+Ask/Skip/Reimport now persists in organization Ingestion settings (server default
+Ask). Backend admission is serialized per organization/hash; queued/running
+identical imports always skip. Skip is audited without a job/report; Reimport
+does not promise record updates. All shared import formats/sources use it.
+Documents/logo single-item flows remain separate. No migration is required.
+Fresh 1,281 full PostgreSQL tests and 425 frontend tests, lint and isolated build
+passed; test database restored to 0028 with no drift. **67 Chrome executions**
+passed, including Settings changes, real Skip/Reimport, Activity and reset to Ask.
+Local activation completed on 27 October after the user approved a restart and
+the demo queue had no pending/running imports. API, worker and frontend restarted
+after a successful normal production build; readiness and login HTTP 200 passed.
+Live OpenAPI exposes Ask/Skip/Reimport. Existing data, passwords and organization
+settings were preserved; no paid/inference calls or commit/push.
+
+## Latest local increment — grouped upload decisions, 27 October 2026
+
+Implemented across every shared Assets/Findings import format/source: ready-first
+submission, grouped explicit duplicate skip/reimport, separate failure/source
+attention groups, failure-only retry and accepted-file exclusion. Documents/logo
+single-item version/replacement rules are unchanged. See latest validation for
+fresh test evidence; preceding checkpoints retain their original counts. The
+demo/worker have not been restarted and these changes remain uncommitted.
+Fresh validation: **422 frontend tests**, **64 Chrome executions**, lint and isolated production build/
+TypeScript passed; focused results overlap the full frontend suite. Browser
+artifacts/results are in the latest validation record, not the older counts below.
+
+## Latest presentation follow-up — not yet activated in demo
+
+Shared upload dialog, fixed-height header buttons, compact Detected badges and
+grouped expandable progress/reports are implemented. Fresh 420 frontend tests, 63 Chrome executions,
+lint and isolated production build passed. See latest validation for Chrome.
+The running demo and worker remain untouched to protect current imports; a later
+controlled restart is needed to expose the new UI. No commit/push or inference.
+
+## Latest local increment — shared batch upload
+
+Assets/Findings now share one-click sequential multi-file submission with
+per-file source/report preservation, locked source/queue edits, stop/retry and
+explicit duplicate confirmation. Individual uploads remain available outside
+batch submission. Fresh 417 frontend tests, 61 Chrome executions, lint and builds passed; demo rebuilt
+and healthy. See [latest validation](PHASE4_VALIDATION.md) for Chrome acceptance.
+Backend/full-suite counts in the earlier handoff below are historical. This
+increment is local-only and uncommitted; broader Phase 4 exclusions are unchanged.
+
 ## Current handoff — 26 October 2026
 
 Organization logo management and header name/size preferences, platform-admin

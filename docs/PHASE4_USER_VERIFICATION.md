@@ -1,5 +1,44 @@
 # Phase 4 changes and Chrome verification
 
+## One-click multi-file imports
+
+Drag/drop regression: after Assets/Findings controls finish loading, drag two
+files onto page content away from Upload file. One Upload files dialog must open
+with each filename once, and the URL must remain localhost (never file://).
+Cancel, then repeat on Activity: remain on Activity with no upload. Dropping on
+native Documents/logo file inputs must retain normal file-input behavior; text
+dragging is unaffected. Do not drop onto the browser address bar/tab strip.
+
+Organization admins: open Settings → Ingestion → Exact duplicate files. Choose
+Skip, upload a previously completed identical file and check skipped counts with
+no prompt/new report; Activity shows Exact duplicate file skipped. Choose Reimport
+and repeat: a new import proceeds without prompting (existing-asset rules still
+apply). Reset restores the configured server default (normally Ask). Under Ask,
+use the grouped explicit decisions below. A queued/running match always skips,
+even with Reimport or explicit confirmation. Viewer controls must be read-only.
+Setting changes save automatically. New location/schedule automation stays Future.
+
+Updated layout: file selection opens a named Upload files dialog, rather than
+expanding the page-header actions. Confirm Add finding/Upload file remain the
+same height. Cancel uploads/Escape close an idle queue without sending requests;
+active submission blocks dismissal. On success the empty dialog closes and a
+3-second toast confirms submission. Progress/reports share one expandable summary
+on Assets/Findings; failure/interruption opens it for attention. Check dialog
+wrapping at mobile widths and use Tab/Shift+Tab/Escape with keyboard only.
+
+In Assets or Findings, choose two supported files, review each Source, then click
+Upload all ready files (2). Both source rows disappear after submission; each
+file has its own processing status/report in Uploads. During a batch, source
+selectors and individual Upload/Cancel are disabled. Stop remaining uploads
+leaves unsent files ready and does not undo accepted jobs. Rejected files remain
+for Retry failed; unsupported sources are excluded from the ready count. A
+duplicate is collected without blocking later ready files. In Already uploaded,
+select files then Skip selected or Upload selected anyway. Deselecting a file
+leaves it untouched. Failed submissions and source problems remain separate;
+Retry failed must not resubmit accepted or duplicate files. Individual file
+upload remains available. The policy applies to all supported shared-import
+formats/sources, not the separate single-document/logo replacement workflows.
+
 ## Password visibility
 
 On sign-in and registration, passwords start hidden. Click Show or focus the
@@ -258,3 +297,11 @@ retroactively cancelled by later role changes.
 - Docker and report-date UI remain Future; imported-finding reconciliation remains
   design-only. See [concurrency limits](MULTIUSER_CONCURRENCY.md) and
   [check-in scope](CHECKIN_PREPARATION.md).
+# Empty-organization dashboard check (27 October 2026)
+
+Select an organization with no active assets/findings (for example the empty
+Apple organization), then open Dashboard. Overall and all seven domain cards
+must show Not assessed with no numeric score or risk tier. Counts remain zero.
+Existing layout is preserved. Reload and check a second organization to confirm
+tenant isolation. Populated organizations keep their previous baseline scores;
+asset-only/partial coverage is not qualified evidence and remains a separate task.
