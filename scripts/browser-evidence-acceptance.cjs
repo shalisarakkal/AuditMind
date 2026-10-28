@@ -96,6 +96,20 @@ async function free(port) {
       return region;
     }
     const initialDashboard = await a.request(org + '/dashboard');
+    const otherScoring = '/orgs/' + seed.other_org + '/scoring';
+    const otherMode = (await a.request(otherScoring + '/settings')).body;
+    assert.equal(initialDashboard.body.scoring_mode, 'findings_based');
+    assert.equal((await a.request(scoring + '/settings')).body.evidence_qualified_enabled, false);
+    assert.equal(otherMode.evidence_qualified_enabled, false);
+    assert.equal((await a.request(scoring + '/evaluations/current')).body, null);
+    await expect(a.panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true })).not.toBeChecked();
+    await a.page.goto(base + '/');
+    await expect(a.page.getByText('Findings-based baseline', { exact: true })).toBeVisible();
+    await expect(a.page.getByTestId('overall-score')).toHaveText(String(Math.round(initialDashboard.body.overall_score)));
+    await a.page.screenshot({ path: path.join(output, 'default-off-dashboard.png'), fullPage: true });
+    assert.equal((await a.request(scoring + '/evaluations/current')).body, null);
+    await a.page.goto(base + '/settings');
+    check('New organizations default off; baseline Dashboard matches its existing score and opening Settings/Dashboard queues no evaluation');
     await open(a);
     await a.panel.getByLabel('Scope description').fill('Entire synthetic organization inventory');
     await a.panel.getByLabel('Evidence rationale').fill('Synthetic operational observations; not a real audit');
@@ -142,16 +156,19 @@ async function free(port) {
     for (const role of ['viewer', 'auditor']) {
       const reader = await actor(role); await open(reader);
       await expect(reader.panel.getByLabel('Scope description')).toBeDisabled();
+      await expect(reader.panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true })).toBeDisabled();
       await expect(reader.panel.getByRole('button', { name: 'Revoke qualification', exact: true })).toHaveCount(0);
       const stored = (await a.request(scoring + '/qualifications')).body[0];
       const draft = { expected_version: stored.version, scope: stored.scope, rationale: stored.rationale, observations: stored.observations, inventory_sha256: stored.inventory_sha256 };
       assert.equal((await reader.request(qualification, 'PUT', draft)).status, 403);
       assert.equal((await reader.request(qualification + '/revoke', 'POST', { expected_version: 2, note: 'Not allowed' })).status, 403);
       assert.equal((await reader.request(qualification + '/review', 'POST', { expected_version: 2, inventory_sha256: stored.inventory_sha256, decision: 'approve', expires_at: new Date(Date.now() + 86400000).toISOString(), note: 'Not allowed', operational_review: true, covers_entire_inventory: true, conflicts_reviewed: true })).status, 403);
+      assert.equal((await reader.request(scoring + '/settings', 'PATCH', { expected_version: 0, evidence_qualified_enabled: true })).status, 403);
     }
     const outsider = await actor('other');
     assert.equal((await outsider.request(scoring + '/evaluation')).status, 403);
-    check('Viewer/auditor controls are read-only and server rejects all three write types; foreign organization is denied');
+    assert.equal((await outsider.request(scoring + '/settings', 'PATCH', { expected_version: 0, evidence_qualified_enabled: true })).status, 403);
+    check('Viewer/auditor controls and scoring toggle are read-only; server rejects review/edit/mode writes and foreign-organization access');
 
     // Confirm the setting in the real application; no default or automatic enable.
     const toggle = loser.panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true });
@@ -167,11 +184,34 @@ async function free(port) {
     await loser.page.goto(base + '/');
     await expect(loser.page.getByTestId('overall-score')).toHaveText('Not assessed');
     await expect(loser.page.getByText(/Evidence-qualified scoring · 1 of 7 domains qualified/)).toBeVisible();
-    assert.equal((await loser.request(org + '/dashboard')).body.overall_score, null);
+    const partialDashboard = (await loser.request(org + '/dashboard')).body;
+    assert.equal(partialDashboard.overall_score, null);
+    assert.equal(partialDashboard.qualified_domain_count, 1);
+    const partialCards = loser.page.locator('section').filter({ has: loser.page.getByRole('heading', { name: 'Per-domain scores', exact: true }) }).locator('div[title]');
+    await expect(partialCards).toHaveCount(7);
+    for (const domain of partialDashboard.domains) {
+      if (domain.domain === 'network_config') {
+        assert.equal(domain.score, initialDashboard.body.domains.find(item => item.domain === domain.domain).score);
+        await expect(partialCards.filter({ has: loser.page.getByText('Network & Config', { exact: true }) }).locator('p').nth(1)).toHaveText(String(Math.round(domain.score)));
+      } else {
+        assert.equal(domain.score, null);
+      }
+    }
+    await expect(partialCards.getByText('Not assessed', { exact: true })).toHaveCount(6);
     await loser.page.screenshot({ path: path.join(output, 'qualified-dashboard-partial.png'), fullPage: true });
-    await loser.page.goto(base + '/settings'); await open(loser);
+    const completedJob = (await loser.request(scoring + '/evaluations/current')).body;
+    await loser.page.goto(base + '/settings');
+    await loser.page.reload();
+    await expect(toggle).toBeChecked();
+    await open(loser);
     await expect(loser.panel.getByText(/Saved status: approved.*Version 2/)).toBeVisible();
     check('Scoring remains off until an admin confirms; Cancel preserves mode, opt-in Dashboard shows partial coverage without an overall score');
+    await winner.page.goto(base + '/');
+    await expect(winner.page.getByText(/Evidence-qualified scoring · 1 of 7 domains qualified/)).toBeVisible();
+    await expect(winner.page.getByTestId('overall-score')).toHaveText('Not assessed');
+    assert.deepEqual((await a.request(otherScoring + '/settings')).body, otherMode);
+    assert.equal((await winner.request(scoring + '/evaluations/current')).body.id, completedJob.id);
+    check('Opt-in persists across reload, reaches the second signed-in administrator, leaves the other organization unchanged and queues no automatic evaluation');
 
     // Use a real streamed HTTP snapshot, no interception or artificial delay.
     const started = performance.now();
@@ -203,6 +243,14 @@ async function free(port) {
     const staleDashboard = (await b.request(org + '/dashboard')).body;
     assert.equal(staleDashboard.evaluation_state, 'not_current');
     assert.ok(staleDashboard.domains.every(domain => domain.score === null));
+    assert.ok(staleDashboard.domains.every(domain => domain.evidence_status === 'limited' && domain.evidence_reason === 'evaluation_required'));
+    // Keep the other administrator's Dashboard open: its real 10-second state
+    // polling must withdraw the old qualified score without a reload.
+    await expect(winner.page.getByText('A current evidence evaluation is required.', { exact: false })).toBeVisible({ timeout: 20000 });
+    await expect(winner.page.getByText(/Evidence-qualified scoring · 0 of 7 domains qualified/)).toBeVisible();
+    const staleCards = winner.page.locator('section').filter({ has: winner.page.getByRole('heading', { name: 'Per-domain scores', exact: true }) }).locator('div[title]');
+    await expect(staleCards.getByText('Insufficient evidence', { exact: true })).toHaveCount(7);
+    await winner.page.screenshot({ path: path.join(output, 'invalidated-dashboard.png'), fullPage: true });
     evidence.concurrentWrite = { evaluationMs: +(finished - started).toFixed(1), writeCompletedMs: +(writeFinished - started).toFixed(1), snapshotFindings: 2, nextEvaluationFindings: 3 };
     check('Concurrent inventory write finishes during a real scan: in-flight evaluation uses its original snapshot, next evaluation rejects the stale binding');
 
@@ -220,11 +268,44 @@ async function free(port) {
     const conflict = await evaluate(loser);
     await expect(conflict.getByText('Network & Config: material conflict (not eligible)', { exact: true })).toBeVisible();
     await expect(conflict.getByText(/Coverage assessment:/)).toContainText('0 of 7 domains qualified');
+    const conflictJob = (await a.request(scoring + '/evaluations/current')).body;
     check('Browser revoke, authoritative inventory rebind, new draft and two-source material-conflict review all persist; revoked/conflicting evidence cannot qualify');
     await loser.page.screenshot({ path: path.join(output, 'conflicting.png'), fullPage: true });
     const mode = (await a.request(scoring + '/settings')).body;
     assert.equal(mode.evidence_qualified_enabled, true); assert.equal(mode.available, true);
-    assert.equal((await a.request(scoring + '/settings', 'PATCH', { expected_version: mode.version, evidence_qualified_enabled: false })).status, 200);
+    await loser.page.goto(base + '/');
+    await expect(loser.page.getByText(/Evidence-qualified scoring · 0 of 7 domains qualified/)).toBeVisible();
+    const conflictingCard = loser.page.locator('div[title]').filter({ has: loser.page.getByText('Network & Config', { exact: true }) });
+    await expect(conflictingCard.getByText('Review required', { exact: true })).toBeVisible();
+    await expect(loser.page.getByTestId('overall-score')).toHaveText('Not assessed');
+    check('Conflicting evidence is visibly Review required with no numeric domain or overall score');
+    await loser.page.goto(base + '/settings');
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    modeDialog = loser.page.getByRole('dialog', { name: 'Change Dashboard scoring mode?', exact: true });
+    await modeDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(toggle).toBeChecked();
+    assert.equal((await a.request(scoring + '/settings')).body.evidence_qualified_enabled, true);
+    await toggle.click();
+    await loser.page.getByRole('dialog', { name: 'Change Dashboard scoring mode?', exact: true }).getByRole('button', { name: 'Use findings-based baseline', exact: true }).click();
+    await expect(toggle).not.toBeChecked();
+    await loser.page.reload();
+    await expect(toggle).not.toBeChecked();
+    const restoredDashboard = (await a.request(org + '/dashboard')).body;
+    assert.equal(restoredDashboard.scoring_mode, 'findings_based');
+    // The synthetic concurrent finding changed baseline deductions. Compare the
+    // restored UI to the current baseline, not the pre-mutation score.
+    await loser.page.goto(base + '/');
+    await expect(loser.page.getByText('Findings-based baseline', { exact: true })).toBeVisible();
+    await expect(loser.page.getByTestId('overall-score')).toHaveText(String(Math.round(restoredDashboard.overall_score)));
+    await expect(winner.page.getByText('Findings-based baseline', { exact: true })).toBeVisible({ timeout: 20000 });
+    const retained = (await a.request(scoring + '/qualifications')).body.find(item => item.domain === 'network_config');
+    assert.equal(retained.status, 'conflicting'); assert.equal(retained.version, 5);
+    assert.equal((await a.request(scoring + '/evaluations/current')).body.id, conflictJob.id);
+    assert.equal((await a.request(scoring + '/dashboard-state')).body.evaluation_id, null);
+    assert.deepEqual((await a.request(otherScoring + '/settings')).body, otherMode);
+    await loser.page.screenshot({ path: path.join(output, 'restored-baseline-dashboard.png'), fullPage: true });
+    check('Disable Cancel preserves opt-in; confirmed UI rollback persists after reload, restores both sessions to current baseline and retains qualifications');
     const stats = JSON.parse(cli('inspect')); assert.equal(stats.usage_count, 0);
     assert.deepEqual(evidence.errors, []);
     check('No browser-native warnings, page errors or AI usage; scoring rolled back to the default-off baseline after the isolated opt-in test');

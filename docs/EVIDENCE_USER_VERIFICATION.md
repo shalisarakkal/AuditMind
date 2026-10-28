@@ -22,8 +22,11 @@ these are separate from the application's report-only print layout.
 
 ## Dashboard evidence review and opt-in scoring (updated 28 October 2026)
 
-Current local browser acceptance: seven dedicated real-worker/two-user scenarios
-and 71 full regression checks pass, plus 465 frontend and 1,366 full PostgreSQL tests. See
+Latest post-push local acceptance: **11 dedicated Chrome real-worker/two-user
+scenarios** pass, including mode persistence, cross-session invalidation, tenant
+isolation and confirmed UI rollback. The implementation checkpoint also passed
+71 full regression checks, 465 frontend and 1,366 full PostgreSQL tests; those
+broader suites were not rerun for the browser-only follow-up. See
 [validation](PHASE4_VALIDATION.md) for final backend/build results and successful
 hosted Ubuntu CI for implementation `5ce836b`
 ([run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003)). Qualified scoring is now available as
@@ -149,6 +152,16 @@ No normal tenant edits or existing-account password changes; no external AI
 calls or ordinary-organization scoring enablement. The fixture temporarily enables
 the synthetic test organization's setting, verifies partial scoring, and rolls it
 back off before teardown. The real worker job also survives leaving/reopening Settings.
+
+The expanded opt-in checks verify all seven domain cards, persistent mode after
+reload, the other administrator's Dashboard, the other organization's unchanged
+setting, automatic withdrawal of stale scores through real state polling, and
+conflicting evidence shown as **Review required**. They cancel disabling first,
+then confirm **Use findings-based baseline** in the UI and verify both sessions
+return to the current baseline without deleting the saved qualification or job.
+Invalidated domains show **Insufficient evidence** until reevaluation, not numeric
+zero/100. No application code or ordinary-organization settings are changed by
+this follow-up. New test assertions are locally verified, not yet hosted-CI verified.
 
 Full-size local SA01 read-only measurements are a separate opt-in command:
 `node scripts/browser-evidence-http.cjs` (or `--cancel-only`). This requires the

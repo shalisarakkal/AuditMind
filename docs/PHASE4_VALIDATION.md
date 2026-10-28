@@ -1,5 +1,48 @@
 # Phase 4 remediation workflow validation
 
+## Post-push Chrome opt-in verification — 28 October 2026
+
+At application commit `b0f5e2e` (runtime implementation `5ce836b`), rebuilt the
+dedicated `.next-acceptance` production bundle and ran
+`node scripts/browser-evidence-acceptance.cjs` using installed Chrome
+**155.0.8059.85**, real API/worker/PostgreSQL and 100,000 isolated synthetic assets.
+The expanded runner passed **11 scenarios**. Artifacts:
+`temp/testing/evidence-review/phase3_browser_b14e2037e28e/results.json` and PNGs.
+
+- Default-off baseline matches its existing score; opening Settings/Dashboard
+  queues no automatic evaluation.
+- Explicit application confirmation and Cancel, admin-only mode changes, reload
+  persistence, second-session propagation and other-organization isolation pass.
+- With one qualified domain, its existing score is **86**, six domains are
+  **Not assessed**, and the overall is **Not assessed**, not a partial aggregate.
+- A real concurrent inventory write invalidates eligibility. The already-open
+  second Dashboard's normal state polling withdraws the old score without reload:
+  all seven domains show **Insufficient evidence** and evaluation is required.
+- Conflicting evidence displays **Review required**, with no numeric score.
+- Cancelling disable leaves opt-in enabled. Confirming **Use findings-based
+  baseline** restores both sessions and survives reload; qualification version 5
+  and the last evaluation remain. The changed synthetic inventory's baseline is
+  compared with its current API result, not the pre-mutation score.
+- Concurrent approval returns 200/409 without lost edits; read-only/tenant guards,
+  durable navigation, revoke/rebind/conflict and zero AI usage still pass.
+
+The first expanded run failed because the new test expected **Not assessed**
+for invalidated domains. API/UI correctly use **Insufficient evidence** until a
+current evaluation is available. Corrected only that test expectation and checked
+the API's `limited` / `evaluation_required` contract; the fresh 11-scenario run
+above passes. Initial artifact `phase3_browser_11c0ca1ae4a1` is retained, not
+claimed as successful. No application behavior was changed or failure waived.
+
+The runner rolls the synthetic setting back off and removes its schema/accounts/
+processes. Normal demo settings/data/credentials were not changed; live readiness
+remains green and ports 3014/8012 were released. Normal generated route types were
+regenerated after the isolated build, leaving the demo bundle untouched. Only
+browser-test coverage and verification documentation changed in this follow-up;
+full backend/frontend suites were not rerun, and the new test assertions have
+not yet run in hosted CI. This passes a synthetic Chrome opt-in gate, not
+all-seven-domain operational acceptance, sustained multi-tenant load, production
+deployment or default-on approval. Keep normal organizations off pending those gates.
+
 ## Background evidence evaluation and Dashboard pilot — 28 October 2026
 
 Hosted prerequisite verified before implementation: exact SHA

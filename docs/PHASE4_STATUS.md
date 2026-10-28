@@ -34,6 +34,18 @@ tab to load the restarted production build.
 Contract and limits: [background evaluation](BACKGROUND_EVIDENCE_EVALUATION.md).
 Earlier unavailable/unpushed/0030 statements below are dated historical checkpoints.
 
+Post-push Chrome follow-up (28 October): expanded acceptance passes **11 scenarios**
+against the unchanged application runtime, including reload and second-session
+mode persistence, organization isolation, actual polling withdrawal of stale
+scores, conflicting evidence display and UI-confirmed rollback to baseline. The
+synthetic setting was restored off and the fixture removed; normal organizations
+remain off. At this local-verification checkpoint the browser assertions have
+not yet run in hosted CI; committing/pushing and verifying that run is the next gate.
+Details and artifact paths:
+[post-push verification](PHASE4_VALIDATION.md#post-push-chrome-opt-in-verification--28-october-2026).
+This closes the requested synthetic Chrome check, not all-seven-domain operational
+review, sustained-load acceptance, production deployment or default-on approval.
+
 ## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
 
 28 October acceptance: real Chrome/proxy/API scans of SA01 completed in

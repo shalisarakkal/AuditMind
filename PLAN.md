@@ -2000,6 +2000,13 @@ lint and isolated production build passed. No backend contract changed.
     Admin opt-in remains off by default. No automatic full scans on refresh.
   - [x] Setting-gated synthetic pilot Chrome acceptance: seven dedicated worker/
     two-user checks and full 71-check browser regression; 465 frontend tests pass.
+  - [x] Post-push opt-in verification in installed Chrome (28 October): expanded
+    dedicated acceptance passes 11 scenarios against the unchanged runtime.
+    Checks reload/second-session persistence, tenant isolation, admin-only mode,
+    partial/conflicting/stale evidence display and confirmed UI rollback to baseline.
+    Synthetic setting restored off; schema/accounts/processes removed. Normal
+    organizations remain off. New browser assertions are locally verified;
+    commit/push/hosted verification follows. No broader rollout or production sign-off.
   - [x] Activate local 0031 build after idle checks; retain data/passwords and
     zero enabled organization scoring settings. Health/readiness are green.
   - [x] Real durable worker timing/navigation/deduplication/cancellation acceptance:
