@@ -28,7 +28,7 @@ def main():
     from app.models.membership import OrgMembership
     from app.models.enums import UserRole
     from app.core.security import hash_password
-    from sqlalchemy import create_engine, select, text, delete
+    from sqlalchemy import create_engine, select, text, delete, inspect
     from sqlalchemy.orm import Session
 
     emails = [f"evidence-http-{args.run_id}-{n}@example.com" for n in (1, 2)]
@@ -60,7 +60,10 @@ def main():
             else:
                 counts = {table: db.scalar(text(f"SELECT count(*) FROM {table} WHERE org_id=:org AND archived_at IS NULL"), {"org": org.id}) for table in ("assets", "findings")}
                 counts["ai_usage"] = db.scalar(text("SELECT count(*) FROM ai_usage WHERE org_id=:org"), {"org": org.id})
-                counts["active_jobs"] = sum(db.scalar(text(f"SELECT count(*) FROM {table} WHERE status IN ('pending','running')")) for table in ("scans", "reports", "archive_jobs"))
+                job_tables = ["scans", "reports", "archive_jobs", "knowledge_indexes"]
+                if inspect(engine).has_table("evidence_evaluations"):
+                    job_tables.append("evidence_evaluations")
+                counts["active_jobs"] = sum(db.scalar(text(f"SELECT count(*) FROM {table} WHERE status IN ('pending','running')")) for table in job_tables)
                 counts["active_inventory_connections"] = db.scalar(text("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND xact_start IS NOT NULL AND (query LIKE 'FETCH FORWARD%' OR query LIKE '%WITH inventory_hashes AS MATERIALIZED%')"))
                 counts["temp_bytes_database_wide"] = db.scalar(text("SELECT temp_bytes FROM pg_stat_database WHERE datname=current_database()"))
                 print(json.dumps(counts))

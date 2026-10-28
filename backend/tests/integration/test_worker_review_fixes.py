@@ -50,7 +50,15 @@ def test_queue_metrics_close_their_own_read_transaction(db_session, monkeypatch)
     assert len(sessions) == 1
     assert sessions[0].in_transaction() is False
     assert values == {"queue_imports_pending": 0, "queue_archives_pending": 0,
-        "queue_reports_pending": 0, "queue_total_pending": 0}
+        "queue_reports_pending": 0, "queue_evidence_pending": 0, "queue_total_pending": 0}
+    from app.models.organization import Organization
+    from app.models.evidence_evaluation import EvidenceEvaluation
+    org = Organization(name="Synthetic queue metrics")
+    db_session.add(org); db_session.flush()
+    db_session.add(EvidenceEvaluation(org_id=org.id)); db_session.commit()
+    runner._update_queue_metrics()
+    assert len(sessions) == 2 and not sessions[1].in_transaction()
+    assert values["queue_evidence_pending"] == values["queue_total_pending"] == 1
 
 
 @pytest.fixture

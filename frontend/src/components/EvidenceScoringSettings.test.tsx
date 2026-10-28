@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import EvidenceScoringSettings from "./EvidenceScoringSettings";
 import { mockApi } from "@/test/helpers";
+import type { EvidenceEvaluationJob } from "./EvidenceEvaluationPanel";
 
 function stream(data: unknown) {
   return new Response(JSON.stringify({ type: "progress", phase: "assets", processed: 2, total: 5, elapsed_seconds: 1 }) + "\n" + JSON.stringify({ type: "result", data }) + "\n", { headers: { "Content-Type": "application/x-ndjson" } });
@@ -11,6 +12,8 @@ function setup(editable = true, holdProgress = false) {
   const writes: unknown[] = [];
   let expensiveReads = 0;
   const saved = { rows: [] as unknown[], reads: 0, fail: false };
+  let mode = { evidence_qualified_enabled: false, version: 0, available: true };
+  let job: EvidenceEvaluationJob | null = null;
   function progressResponse(data: unknown, init: RequestInit) {
     if (!holdProgress) return stream(data);
     return new Response(new ReadableStream({ start(controller) {
@@ -19,10 +22,20 @@ function setup(editable = true, holdProgress = false) {
     } }), { headers: { "Content-Type": "application/x-ndjson" } });
   }
   mockApi({
+    "GET /orgs/org-1/scoring/settings": () => mode,
+    "PATCH /orgs/org-1/scoring/settings": init => { const body = JSON.parse(String(init.body)); writes.push({ mode: body }); mode = { ...mode, ...body, version: mode.version + 1 }; return mode; },
+    "GET /orgs/org-1/scoring/evaluations/current": () => job,
+    "POST /orgs/org-1/scoring/evaluations": () => {
+      expensiveReads++;
+      job = { id: "job-1", status: holdProgress ? "running" : "completed", created_at: new Date().toISOString(), run_started_at: new Date().toISOString(), cancel_requested_at: null,
+        can_cancel: holdProgress, is_current: !holdProgress, error_message: null, progress: { phase: "assets", processed: 2, total: 5 },
+        result: holdProgress ? null : { evaluated_at: new Date().toISOString(), assessment_status: "not_assessed", qualified_domain_count: 0, domains: [{ domain: "identity_access", reason_code: "no_evidence", eligible: false }] } };
+      return job;
+    },
+    "POST /orgs/org-1/scoring/evaluations/job-1/cancel": () => { job = { ...job!, status: "cancelled", can_cancel: false }; return job; },
     "GET /orgs/org-1/scoring/profiles": () => ({ profiles: { identity_access: ["access_review"] } }),
     "GET /orgs/org-1/scoring/qualifications": () => { saved.reads++; return saved.fail ? new Response(JSON.stringify({ detail: "Reload unavailable" }), { status: 500 }) : saved.rows; },
     "GET /orgs/org-1/scoring/progress/inventory": init => { expensiveReads++; return progressResponse({ inventory_sha256: "a".repeat(64), asset_count: 2, finding_count: 3 }, init); },
-    "GET /orgs/org-1/scoring/progress/evaluation": init => { expensiveReads++; return progressResponse({ assessment_status: "not_assessed", qualified_domain_count: 0, domains: [{ domain: "identity_access", reason_code: "no_evidence", eligible: false }] }, init); },
     "PUT /orgs/org-1/scoring/qualifications/identity_access": init => {
       const body = JSON.parse(String(init.body)); writes.push(body);
       return { ...body, domain: "identity_access", version: 1, status: "draft" };
@@ -48,28 +61,47 @@ describe("EvidenceScoringSettings", () => {
     if (kind === "inventory") { fireEvent.click(open); await screen.findByLabelText("Scope description"); }
     const region = screen.getByRole("region", { name: kind === "evaluation" ? "Organization-wide evidence evaluation" : "Domain qualification" });
     const progressName = kind === "evaluation" ? "Organization evaluation progress" : "Inventory loading progress";
-    fireEvent.click(within(region).getByRole("button", { name: kind === "evaluation" ? "Evaluate evidence across all domains" : "Load current inventory" }));
+    const submit = within(region).getByRole("button", { name: kind === "evaluation" ? "Evaluate evidence across all domains" : "Load current inventory" });
+    await waitFor(() => expect(submit).toBeEnabled()); fireEvent.click(submit);
     const status = await within(region).findByRole("status", { name: progressName });
     await waitFor(() => expect(status).toHaveTextContent("2 / 5 records"));
     const cancel = within(status).getByRole("button", { name: "Cancel operation" });
-    expect(cancel).toBeEnabled(); expect(open).toBeDisabled();
+    expect(cancel).toBeEnabled();
+    if (kind === "inventory") expect(open).toBeDisabled();
+    else expect(open).toBeEnabled(); // A background job does not lock the editor.
     expect(screen.getAllByRole("status", { name: progressName })).toHaveLength(1);
     const other = screen.getByRole("region", { name: kind === "evaluation" ? "Domain qualification" : "Organization-wide evidence evaluation" });
     expect(within(other).queryByRole("status", { name: progressName })).not.toBeInTheDocument();
     fireEvent.click(cancel);
-    expect(await within(region).findByRole("alert")).toHaveTextContent(/cancelled/i);
+    if (kind === "inventory") expect(await within(region).findByRole("alert")).toHaveTextContent(/cancelled/i);
+    else await within(region).findByText(/Evaluation cancelled/);
     await waitFor(() => expect(open).toBeEnabled());
     expect(within(region).queryByRole("button", { name: "Cancel operation" })).not.toBeInTheDocument();
-    expect(status).toHaveTextContent("Stopped");
+    expect(status).toHaveTextContent(kind === "inventory" ? "Stopped" : "cancelled");
   });
-  it("keeps scoring unavailable and expensive checks explicit", async () => {
+  it("keeps scoring off by default and expensive checks explicit", async () => {
     const state = setup();
-    expect(screen.getByRole("checkbox")).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("checkbox")).toBeEnabled());
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
     await waitFor(() => expect(screen.getByRole("button", { name: "Open / reload domain" })).toBeEnabled());
     expect(state.reads()).toBe(0);
     fireEvent.click(screen.getByRole("button", { name: "Evaluate evidence across all domains" }));
     expect(await screen.findByText(/Coverage assessment: not assessed/)).toBeInTheDocument();
     expect(state.reads()).toBe(1);
+  });
+  it("requires application confirmation before a versioned mode change", async () => {
+    const state = setup();
+    const toggle = screen.getByRole("checkbox");
+    await waitFor(() => expect(toggle).toBeEnabled());
+    fireEvent.click(toggle);
+    let dialog = screen.getByRole("dialog", { name: "Change Dashboard scoring mode?" });
+    expect(state.writes).toHaveLength(0); expect(toggle).not.toBeChecked();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(state.writes).toHaveLength(0);
+    fireEvent.click(toggle); dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Enable evidence-qualified scoring" }));
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(state.writes).toEqual([{ mode: { expected_version: 0, evidence_qualified_enabled: true } }]);
   });
   it("saves a versioned inventory-bound draft without enabling scoring", async () => {
     const state = setup();

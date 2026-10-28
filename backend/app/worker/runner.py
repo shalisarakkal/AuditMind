@@ -39,13 +39,15 @@ from app.models.archive import ArchiveJob
 from app.models.enums import ReportStatus, ScanStatus
 from app.models.event import WorkerStatus
 from app.models.report import Report
+from app.models.evidence_evaluation import EvidenceEvaluation
+from app.services import evidence_jobs
 from app.models.knowledge import KnowledgeIndex
 from app.services import knowledge_service
 from app.models.scan import Scan
 from app.services import archive_service, import_staging, ingestion_background, platform, report_service
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
-from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, REPORT_JOB, DOCUMENT_JOB, job_is_running, job_running
+from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, REPORT_JOB, DOCUMENT_JOB, EVIDENCE_JOB, job_is_running, job_running
 from app.services.ingestion_service import IngestionError, detect_format, fail_import, process_import
 from app.services.sessions import purge_old_sessions
 
@@ -132,9 +134,12 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
         .where(KnowledgeIndex.status == "pending").order_by(KnowledgeIndex.created_at)
         .limit(1).with_for_update(skip_locked=True)).first()
     job = _oldest_job(db, low_priority=False)
-    if scan is None and report is None and document is None and job is None:
+    evaluation = db.execute(select(EvidenceEvaluation.id, EvidenceEvaluation.created_at)
+        .where(EvidenceEvaluation.status == "pending").order_by(EvidenceEvaluation.created_at)
+        .limit(1).with_for_update(skip_locked=True)).first()
+    if scan is None and report is None and document is None and job is None and evaluation is None:
         job = _oldest_job(db, low_priority=True)
-    if scan is None and report is None and document is None and job is None:
+    if scan is None and report is None and document is None and job is None and evaluation is None:
         db.rollback()
         return None
 
@@ -149,6 +154,8 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
         candidates.append(("document", document.id, document.created_at))
     if job is not None:
         candidates.append(("archive", job.id, job.started_at))
+    if evaluation is not None:
+        candidates.append(("evidence", evaluation.id, evaluation.created_at))
 
     candidates.sort(key=lambda c: c[2])
     kind, item_id, _ = candidates[0]
@@ -160,6 +167,9 @@ def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
     elif kind == "document":
         db.execute(update(KnowledgeIndex).where(KnowledgeIndex.id == item_id)
                    .values(status="running", heartbeat_at=now, run_started_at=now))
+    elif kind == "evidence":
+        db.execute(update(EvidenceEvaluation).where(EvidenceEvaluation.id == item_id)
+            .values(status="running", heartbeat_at=now, run_started_at=now))
     else:
         db.execute(update(ArchiveJob).where(ArchiveJob.id == item_id).values(status=ScanStatus.running, heartbeat_at=now))
 
@@ -192,11 +202,14 @@ def run_once(db: Session) -> bool:
         elif kind == "document":
             with job_running(db, DOCUMENT_JOB, job_id):
                 knowledge_service.process_index(db, job_id)
+        elif kind == "evidence":
+            with job_running(db, EVIDENCE_JOB, job_id):
+                evidence_jobs.process_job(db, job_id)
         else:
             archive_service.run_job(db, job_id)
     except Exception:
         # Each runner has recorded its failure (and its event) already.
-        if kind in {"report", "document"}:
+        if kind in {"report", "document", "evidence"}:
             logger.error("%s job %s failed; see its recorded status", kind, job_id)
         else:
             logger.exception("%s job %s failed", kind, job_id)
@@ -351,6 +364,21 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
         else:
             index.status = "failed"
             index.error_message = "Indexing interrupted too many times; retry after checking the worker"
+    for evaluation in db.scalars(select(EvidenceEvaluation).where(EvidenceEvaluation.status == "running",
+            func.coalesce(EvidenceEvaluation.heartbeat_at, EvidenceEvaluation.run_started_at, EvidenceEvaluation.created_at) < stale)
+            .with_for_update(skip_locked=True)).all():
+        if running_here == ("evidence", evaluation.id) or job_is_running(db, EVIDENCE_JOB, evaluation.id):
+            continue
+        evaluation.result = None
+        if evaluation.cancel_requested_at is not None:
+            evaluation.status, evaluation.completed_at = "cancelled", now
+        elif evaluation.retry_count < MAX_RESUMES:
+            evaluation.status, evaluation.retry_count = "pending", evaluation.retry_count + 1
+            evaluation.heartbeat_at = evaluation.run_started_at = None
+            evaluation.progress = None
+        else:
+            evaluation.status, evaluation.completed_at = "failed", now
+            evaluation.error_message = "Evidence evaluation interrupted too many times; retry after checking the worker."
     db.commit()
 
 
@@ -426,6 +454,8 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
                         model = Report
                     elif job[0] == "document":
                         model = KnowledgeIndex
+                    elif job[0] == "evidence":
+                        model = EvidenceEvaluation
                     else:
                         model = ArchiveJob
                     db.execute(update(model).where(model.id == job[1]).values(heartbeat_at=now))
@@ -445,10 +475,12 @@ def _update_queue_metrics() -> None:
         pending_imports = metrics_db.scalar(select(func.count(Scan.id)).where(Scan.status == ScanStatus.pending)) or 0
         pending_archives = metrics_db.scalar(select(func.count(ArchiveJob.id)).where(ArchiveJob.status == "pending")) or 0
         pending_reports = metrics_db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.pending)) or 0
+        pending_evidence = metrics_db.scalar(select(func.count(EvidenceEvaluation.id)).where(EvidenceEvaluation.status == "pending")) or 0
         set_metric("queue_imports_pending", pending_imports)
         set_metric("queue_archives_pending", pending_archives)
         set_metric("queue_reports_pending", pending_reports)
-        set_metric("queue_total_pending", pending_imports + pending_archives + pending_reports)
+        set_metric("queue_evidence_pending", pending_evidence)
+        set_metric("queue_total_pending", pending_imports + pending_archives + pending_reports + pending_evidence)
 
 
 def main() -> None:

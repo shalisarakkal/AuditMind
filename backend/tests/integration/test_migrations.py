@@ -74,6 +74,19 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
             assert connection.scalar(text("SELECT show_name_in_header FROM organizations WHERE id=:id"), {"id": org}) is True
             assert connection.scalar(text("SELECT header_logo_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
             assert connection.scalar(text("SELECT header_name_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
+            assert {"evidence_evaluations", "organization_evidence_revisions"} <= set(inspect(connection).get_table_names(schema=schema))
+            connection.execute(text("INSERT INTO organization_scoring_settings (org_id,evidence_qualified_enabled,version) VALUES (:id,true,5)"), {"id": org})
+            connection.execute(text("INSERT INTO assets (id,org_id,type,hostname,created_at) VALUES (:id,:org,'server','migration-evidence',now())"), {"id": uuid4(), "org": org})
+            assert connection.scalar(text("SELECT revision FROM organization_evidence_revisions WHERE org_id=:id"), {"id": org}) >= 1
+            connection.commit()
+            command.downgrade(config, "0030")
+            assert connection.execute(text("SELECT evidence_qualified_enabled,version FROM organization_scoring_settings WHERE org_id=:id"), {"id": org}).one() == (False, 6)
+            assert "evidence_evaluations" not in inspect(connection).get_table_names(schema=schema)
+            assert connection.scalar(text("SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=:schema AND t.tgname LIKE 'am_evidence_%'"), {"schema": schema}) == 0
+            connection.commit()
+            command.upgrade(config, "head")
+            connection.execute(text("DELETE FROM organization_scoring_settings WHERE org_id=:id"), {"id": org})
+            connection.commit()
             qualification = uuid4()
             connection.execute(text("""INSERT INTO domain_evidence_qualifications
                 (id,org_id,domain,policy_version,status,scope,rationale,updated_at)

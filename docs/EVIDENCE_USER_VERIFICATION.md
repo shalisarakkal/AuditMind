@@ -20,12 +20,16 @@ the original screen filter and application navigation should be unchanged.
 Chrome's own Headers and footers option controls its added URL/page/date lines;
 these are separate from the application's report-only print layout.
 
-## Dashboard evidence reviewer preview (updated 28 October 2026)
+## Dashboard evidence review and opt-in scoring (updated 28 October 2026)
 
-Current local acceptance: 1,335 full PostgreSQL tests, 456 frontend tests and
-six dedicated two-user Chrome scenarios pass; see [validation](PHASE4_VALIDATION.md)
-for exact commands, artifacts and the distinction from historical full-browser
-and hosted CI results. Qualified scoring remains off/unavailable.
+Current local browser acceptance: seven dedicated real-worker/two-user scenarios
+and 71 full regression checks pass, plus 465 frontend and 1,366 full PostgreSQL tests. See
+[validation](PHASE4_VALIDATION.md) for final backend/build results and the distinction
+from hosted CI for prerequisite `c7ee354`. Qualified scoring is now available as
+an admin opt-in but remains **off by default**. Verify in a synthetic organization
+before opting in real organization data. No AI calls or provider consent are needed.
+The local demo is on migration 0031. Refresh Chrome with **Ctrl+Shift+R** to load
+the new production-build UI before following these steps.
 
 Scope/reload clarification: **Evaluate evidence across all domains** is in the
 separate **Organization-wide evaluation** section, above the domain editor.
@@ -48,19 +52,21 @@ progress bar after counting completes. Counts include relevant lifecycle records
 Evaluation progress, errors and Cancel appear inside **Organization-wide
 evaluation**, below its action button. Inventory-loading progress/errors/Cancel
 appear next to **Load current inventory** in **Domain qualification**. Other
-controls are locked while processing; Cancel remains enabled. These statuses
-are not shown above the organization-wide evaluation area.
-Use **Cancel operation** to stop waiting without changing scores. A count may
+domain editor controls are locked during its synchronous inventory-binding action;
+they are not locked for a separate background evaluation. Cancel remains enabled
+for the authorized requester/admin. These statuses are not shown above their area.
+Use **Cancel operation** to request cancellation. A count may
 pause while PostgreSQL prepares/sorts the next population; the timer continues.
 Cancellation releases the database snapshot after its current fetch finishes;
 it does not instantly kill a running database statement. The 28 October Chrome
-check measured prompt UI recovery and approximately 28 s database cleanup.
+streaming check measured prompt UI recovery and approximately 28 s database cleanup;
+the durable worker has its own measurements in the linked performance record.
 Old v1 bindings require rebind/save/review after the v2 fingerprint update.
 See [performance measurements and limits](EVIDENCE_EVALUATION_PERFORMANCE.md).
 
 Open **Settings → Scoring and evidence review** as an organization administrator.
-This preview does not change Dashboard scores or saved reports; the scoring
-switch remains disabled. No inference is required.
+Leave the scoring switch off initially. Reviews/evaluation do not enable it
+automatically, and saved reports are never rewritten. No inference is required.
 
 1. Choose a domain and click **Open / reload domain**. The required objectives
    come from the backend policy. Enter the scope description and rationale.
@@ -80,7 +86,7 @@ switch remains disabled. No inference is required.
 5. Use **Evaluate evidence across all domains** to see current eligibility and reasons for
    each domain. A saved approval is not automatically current eligibility.
    Inventory/source changes or expiry can invalidate it. Evaluation does not
-   calculate or enable new Dashboard scores.
+   enable the scoring setting automatically.
 6. Revoke approved/conflicting records with a mandatory reason before revising
    an approved record. Concurrent edits produce a conflict rather than silently
    overwriting another user's work; preserve your edits and reload deliberately.
@@ -89,6 +95,41 @@ Non-admin members can inspect saved records and evaluate, but cannot edit or
 review. All entered/displayed times follow the browser time zone. Reloading a
 domain discards unsaved edits only after confirmation. Navigating away also
 discards unsaved edits; save first.
+
+### Verify background processing and the Dashboard setting in Chrome
+
+1. Click **Evaluate evidence across all domains** once. It should promptly show
+   queued/running status, then real phase/count/elapsed progress inside that section.
+   A stopped worker leaves it queued; run the worker to continue. Do not repeatedly
+   click expecting separate simultaneous scans.
+2. Navigate to Findings, then return to Settings. The same job/progress or completed
+   result should reappear. Changing the domain picker must not limit evaluation.
+   A second signed-in member joins the existing job; they cannot cancel someone
+   else's job unless they are an organization admin.
+3. After completion, record the qualified count and evaluated time. In the
+   Dashboard, with the switch still off, the heading says findings-based baseline.
+4. As an org admin, check **Evidence-qualified scoring**. In the application dialog,
+   try Cancel first: the setting must remain off. Repeat and confirm to enable it.
+   Go to Dashboard. It should identify the mode and qualified count; unqualified
+   domains are Not assessed / Insufficient evidence / Review required, not 100.
+   With only one qualified domain, that domain can score, but overall stays null.
+   All seven with compatible scope are required for an overall score.
+5. In a second browser profile/session, revoke an approval or change its bound
+   synthetic inventory/source. Refresh Dashboard (or wait up to ten seconds/on focus).
+   The old evaluation must no longer authorize scores; Settings should request
+   reevaluation. Rebind/review affected records before reevaluating. Expired review,
+   failed evaluation or cancellation must never authorize partial output.
+6. Test **Cancel operation** during a running job. It should acknowledge cancellation
+   and remain pending until the current database fetch drains, then show cancelled
+   with no partial result. No instant database-kill behavior is promised. An earlier
+   completed result can remain usable only if it is independently still current.
+7. Turn the setting off again and confirm. Baseline scores return; reviews and
+   saved reports remain. Other organizations keep their independent setting.
+
+There are no automatic full scans on Dashboard refresh. The browser polls cheap
+mode/revision status; failed verification hides scores. Background evaluation does
+not save unsaved edits or bypass operational human review. See
+[the background contract](BACKGROUND_EVIDENCE_EVALUATION.md) for pilot limits.
 
 ### Repeat the isolated two-user acceptance
 
@@ -104,7 +145,9 @@ The in-flight scan uses its original snapshot; the next evaluation rejects the
 changed binding. The test removes its schema/accounts/processes afterward;
 ignored screenshots/results remain under `temp/testing/evidence-review`.
 No normal tenant edits or existing-account password changes; no external AI
-calls or scoring enablement.
+calls or ordinary-organization scoring enablement. The fixture temporarily enables
+the synthetic test organization's setting, verifies partial scoring, and rolls it
+back off before teardown. The real worker job also survives leaving/reopening Settings.
 
 Full-size local SA01 read-only measurements are a separate opt-in command:
 `node scripts/browser-evidence-http.cjs` (or `--cancel-only`). This requires the

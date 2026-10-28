@@ -36,7 +36,9 @@ def _seed(db_session, org_id, severity, minutes_ago, domain=Domain.vulnerability
 
 
 def test_empty_org_is_not_assessed(client, admin):
-    body = _dashboard(client, admin).json()
+    response = _dashboard(client, admin)
+    assert response.headers["Cache-Control"] == "no-store"
+    body = response.json()
 
     assert body["assessment_status"] == "not_assessed"
     assert (body["overall_score"], body["overall_tier"]) == (None, None)

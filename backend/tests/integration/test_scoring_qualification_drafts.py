@@ -25,16 +25,17 @@ def draft(**overrides):
     return {"expected_version": 0, "scope": "All active organization assets", "rationale": "Draft only; operational review pending", **overrides}
 
 
-def test_settings_default_off_and_enable_is_blocked(client, owner):
+def test_settings_default_off_and_toggle_is_versioned(client, owner):
     headers, _, path = owner
     response = client.get(path + "/settings", headers=headers)
-    assert response.json() == {"evidence_qualified_enabled": False, "version": 0, "available": False}
+    assert response.json() == {"evidence_qualified_enabled": False, "version": 0, "available": True}
     assert response.headers["cache-control"] == "no-store"
-    assert client.patch(path + "/settings", headers=headers, json={"expected_version": 0, "evidence_qualified_enabled": True}).status_code == 409
     saved = client.patch(path + "/settings", headers=headers, json={"expected_version": 0, "evidence_qualified_enabled": False})
     assert saved.json()["version"] == 1
     assert client.patch(path + "/settings", headers=headers, json={"expected_version": 0, "evidence_qualified_enabled": False}).status_code == 409
     assert client.patch(path + "/settings", headers=headers, json={"expected_version": 1, "evidence_qualified_enabled": "false"}).status_code == 422
+    enabled = client.patch(path + "/settings", headers=headers, json={"expected_version": 1, "evidence_qualified_enabled": True})
+    assert enabled.json() == {"evidence_qualified_enabled": True, "version": 2, "available": True}
 
 
 def test_disable_can_roll_back_a_preexisting_enabled_row(client, owner, db_session):
@@ -43,7 +44,7 @@ def test_disable_can_roll_back_a_preexisting_enabled_row(client, owner, db_sessi
     db_session.add(OrganizationScoringSettings(org_id=uuid.UUID(org), evidence_qualified_enabled=True, version=3))
     db_session.commit()
     response = client.patch(path + "/settings", headers=headers, json={"expected_version": 3, "evidence_qualified_enabled": False})
-    assert response.json() == {"evidence_qualified_enabled": False, "version": 4, "available": False}
+    assert response.json() == {"evidence_qualified_enabled": False, "version": 4, "available": True}
     db_session.expire_all()
     assert db_session.get(OrganizationScoringSettings, uuid.UUID(org)).evidence_qualified_enabled is False
 
@@ -61,7 +62,9 @@ def test_admin_drafts_are_versioned_audited_and_do_not_affect_scores(client, own
     second = client.put(path + "/qualifications/network_config", headers=headers, json=draft(expected_version=1, rationale="Changed draft"))
     assert second.json()["version"] == 2
     assert client.get(path + "/qualifications", headers=headers).json() == [second.json()]
-    assert client.get(f"/api/v1/orgs/{org}/dashboard", headers=headers).json() == before
+    after = client.get(f"/api/v1/orgs/{org}/dashboard", headers=headers).json()
+    assert after.pop("evidence_revision") > before.pop("evidence_revision")
+    assert after == before
     events = db_session.query(Event).filter_by(item="Evidence qualification draft").all()
     assert len(events) == 2
     assert events[-1].details["after"]["version"] == 2

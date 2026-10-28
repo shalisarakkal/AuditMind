@@ -3,6 +3,14 @@
 Review synchronization (2026-10-22): Runtime clarification: FastAPI/Python, PostgreSQL/pgvector and a separate worker are implemented; Node microservices, general automated discovery and standalone AI analysis routes below are design context, not current endpoints. Dashboard scoring is deterministic; AI runs through report jobs.
 See [current code review and release gates](docs/RELEASE_READINESS.md).
 
+28 October 2026 local pilot: Dashboard scoring can additionally require current
+reviewed evidence behind an organization-admin **default-off** setting. A durable
+worker job evaluates complete inventory/source bindings; transactional database
+revision triggers plus policy/expiry checks invalidate cached eligibility.
+Dashboard reads do not run full inventory scans. Deterministic deductions/weights,
+saved reports and independent `/risk/score` snapshots retain their contracts.
+See [background evaluation and safe invalidation](docs/BACKGROUND_EVIDENCE_EVALUATION.md).
+
 ## Current release decision — 2026-10-21
 
 Core Phase 3 keeps `/risk/score` and dashboard scores deterministic. Claude/RAG

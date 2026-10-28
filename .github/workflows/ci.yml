@@ -122,8 +122,12 @@ jobs:
       - run: npm run build
         working-directory: frontend
       - run: node scripts/browser-finding-workflow.cjs
+      - name: Verify durable evidence evaluation and opt-in Dashboard scoring
+        run: node scripts/browser-evidence-acceptance.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-acceptance
-          path: temp/testing/finding-workflow
+          path: |
+            temp/testing/finding-workflow
+            temp/testing/evidence-review

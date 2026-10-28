@@ -33,6 +33,7 @@ async function free(port) {
       fs.closeSync(log);
     }
     start(python, [fixture, 'api', ...flags], 'api');
+    start(python, [fixture, 'worker', ...flags], 'worker');
     start(process.execPath, [path.join(root, 'frontend/node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '3014'], 'frontend', { AUDITMIND_ISOLATED_BUILD: '1', BACKEND_URL: 'http://127.0.0.1:8012', NEXT_PUBLIC_API_URL: '/api/v1' });
     await expect.poll(async () => { try { return (await fetch(base + '/api/v1/auth/options')).status; } catch { return 0; } }, { timeout: 45000 }).toBe(200);
     browser = await chromium.launch({ ...(process.env.AUDITMIND_BROWSER_CHANNEL === 'chromium' ? {} : { channel: 'chrome' }), headless: true });
@@ -82,8 +83,15 @@ async function free(port) {
       await who.page.getByRole('dialog', { name: dialogTitle, exact: true }).getByRole('button', { name: label, exact: true }).click();
     }
     async function evaluate(who) {
-      const region = who.panel.getByRole('region', { name: 'Organization-wide evidence evaluation', exact: true });
+      let region = who.panel.getByRole('region', { name: 'Organization-wide evidence evaluation', exact: true });
+      const accepted = who.page.waitForResponse(response => response.url().endsWith('/scoring/evaluations') && response.request().method() === 'POST');
       await region.getByRole('button', { name: 'Evaluate evidence across all domains', exact: true }).click();
+      assert.equal((await accepted).status(), 202);
+      // Leaving the page must not own/cancel a durable worker evaluation.
+      await who.page.goto(base + '/findings');
+      await expect.poll(async () => (await who.request(scoring + '/evaluations/current')).body?.status, { timeout: 30000 }).toBe('completed');
+      await who.page.goto(base + '/settings'); await open(who);
+      region = who.panel.getByRole('region', { name: 'Organization-wide evidence evaluation', exact: true });
       await expect(region.getByText(/Coverage assessment:/)).toBeVisible({ timeout: 30000 });
       return region;
     }
@@ -125,7 +133,9 @@ async function free(port) {
     await expect(loser.panel.getByText(/Saved status: approved.*Version 2/)).toBeVisible();
     const evaluation = await evaluate(loser);
     await expect(evaluation.getByText(/Coverage assessment:/)).toContainText('1 of 7 domains qualified');
-    assert.deepEqual((await a.request(org + '/dashboard')).body, initialDashboard.body);
+    const afterReviewDashboard = (await a.request(org + '/dashboard')).body;
+    assert.ok(afterReviewDashboard.evidence_revision > initialDashboard.body.evidence_revision);
+    assert.deepEqual({ ...afterReviewDashboard, evidence_revision: initialDashboard.body.evidence_revision }, initialDashboard.body);
     check('Two real administrators approve concurrently: one succeeds, one receives 409 without losing edits; reload sees version 2, eligibility is partial and Dashboard is unchanged');
     await loser.page.screenshot({ path: path.join(output, 'approved-partial.png'), fullPage: true });
 
@@ -141,8 +151,27 @@ async function free(port) {
     }
     const outsider = await actor('other');
     assert.equal((await outsider.request(scoring + '/evaluation')).status, 403);
-    assert.equal((await a.request(scoring + '/settings', 'PATCH', { expected_version: 0, evidence_qualified_enabled: true })).status, 409);
-    check('Viewer/auditor controls are read-only and server rejects all three write types; foreign organization is denied and scoring activation remains blocked');
+    check('Viewer/auditor controls are read-only and server rejects all three write types; foreign organization is denied');
+
+    // Confirm the setting in the real application; no default or automatic enable.
+    const toggle = loser.panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true });
+    await expect(toggle).not.toBeChecked();
+    await toggle.click();
+    let modeDialog = loser.page.getByRole('dialog', { name: 'Change Dashboard scoring mode?', exact: true });
+    await modeDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    assert.equal((await loser.request(scoring + '/settings')).body.evidence_qualified_enabled, false);
+    await toggle.click();
+    modeDialog = loser.page.getByRole('dialog', { name: 'Change Dashboard scoring mode?', exact: true });
+    await modeDialog.getByRole('button', { name: 'Enable evidence-qualified scoring', exact: true }).click();
+    await expect(toggle).toBeChecked();
+    await loser.page.goto(base + '/');
+    await expect(loser.page.getByTestId('overall-score')).toHaveText('Not assessed');
+    await expect(loser.page.getByText(/Evidence-qualified scoring · 1 of 7 domains qualified/)).toBeVisible();
+    assert.equal((await loser.request(org + '/dashboard')).body.overall_score, null);
+    await loser.page.screenshot({ path: path.join(output, 'qualified-dashboard-partial.png'), fullPage: true });
+    await loser.page.goto(base + '/settings'); await open(loser);
+    await expect(loser.panel.getByText(/Saved status: approved.*Version 2/)).toBeVisible();
+    check('Scoring remains off until an admin confirms; Cancel preserves mode, opt-in Dashboard shows partial coverage without an overall score');
 
     // Use a real streamed HTTP snapshot, no interception or artificial delay.
     const started = performance.now();
@@ -171,6 +200,9 @@ async function free(port) {
     const changed = (await b.request(scoring + '/evaluation')).body;
     assert.equal(changed.inventory.finding_count, 3);
     assert.equal(changed.domains.find(domain => domain.domain === 'network_config').reason_code, 'inventory_changed');
+    const staleDashboard = (await b.request(org + '/dashboard')).body;
+    assert.equal(staleDashboard.evaluation_state, 'not_current');
+    assert.ok(staleDashboard.domains.every(domain => domain.score === null));
     evidence.concurrentWrite = { evaluationMs: +(finished - started).toFixed(1), writeCompletedMs: +(writeFinished - started).toFixed(1), snapshotFindings: 2, nextEvaluationFindings: 3 };
     check('Concurrent inventory write finishes during a real scan: in-flight evaluation uses its original snapshot, next evaluation rejects the stale binding');
 
@@ -191,10 +223,11 @@ async function free(port) {
     check('Browser revoke, authoritative inventory rebind, new draft and two-source material-conflict review all persist; revoked/conflicting evidence cannot qualify');
     await loser.page.screenshot({ path: path.join(output, 'conflicting.png'), fullPage: true });
     const mode = (await a.request(scoring + '/settings')).body;
-    assert.equal(mode.evidence_qualified_enabled, false); assert.equal(mode.available, false);
+    assert.equal(mode.evidence_qualified_enabled, true); assert.equal(mode.available, true);
+    assert.equal((await a.request(scoring + '/settings', 'PATCH', { expected_version: mode.version, evidence_qualified_enabled: false })).status, 200);
     const stats = JSON.parse(cli('inspect')); assert.equal(stats.usage_count, 0);
     assert.deepEqual(evidence.errors, []);
-    check('No browser-native warnings, page errors, scoring activation or AI usage');
+    check('No browser-native warnings, page errors or AI usage; scoring rolled back to the default-off baseline after the isolated opt-in test');
   } catch (error) {
     evidence.failure = error.message;
     if (browser) try { await browser.contexts()[0]?.pages()[0]?.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }); } catch {}

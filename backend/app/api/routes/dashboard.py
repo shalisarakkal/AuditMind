@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, defer
 
@@ -16,6 +16,9 @@ from app.models.scan import Scan
 from app.schemas.dashboard import DashboardSummary, DomainScore, SecuritySummary
 from app.schemas.finding import FindingRead
 from app.schemas.scan import brief_scan
+from app.services import evidence_jobs
+from app.models.scoring_qualification import OrganizationScoringSettings
+from app.services.evidence_policy import POLICY_VERSION
 from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
 
 router = APIRouter(prefix="/orgs/{org_id}/dashboard", tags=["dashboard"])
@@ -40,8 +43,19 @@ def security_summary(org_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.get("", response_model=DashboardSummary)
 def get_dashboard(
-    org_id: uuid.UUID, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
+    org_id: uuid.UUID, response: Response, db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)
 ) -> DashboardSummary:
+    response.headers["Cache-Control"] = "no-store"
+    # Counts, mode, revision and cached qualification must describe one snapshot.
+    # Do not retain the authorization connection throughout the dashboard read.
+    engine = db.get_bind()
+    db.rollback()
+    with engine.connect().execution_options(isolation_level="REPEATABLE READ") as connection:
+        with Session(bind=connection) as snapshot:
+            return build_dashboard(org_id, snapshot)
+
+
+def build_dashboard(org_id: uuid.UUID, db: Session) -> DashboardSummary:
     """Scores computed live from the org's current findings, the most severe
     findings (newest first within a severity), and the latest scans. The
     database does the counting: an org can have hundreds of thousands of
@@ -81,16 +95,46 @@ def get_dashboard(
     empty = asset_count == 0 and not any(by_severity.values())
     status = "not_assessed" if empty else "findings_based"
 
+    settings_row = db.get(OrganizationScoringSettings, org_id)
+    enabled = settings_row.evidence_qualified_enabled if settings_row else False
+    current_revision = evidence_jobs.revision(db, org_id)
+    evaluated = evidence_jobs.current_result(db, org_id) if enabled else None
+    qualified = {d["domain"]: d for d in evaluated.result["domains"]} if evaluated else {}
+    count = sum(d["eligible"] for d in qualified.values())
+    qualified_status = evaluated.result["assessment_status"] if evaluated else "not_assessed"
+    domains = []
+    for domain, (score, tier, justification) in domain_scores.items():
+        if not enabled:
+            domains.append(DomainScore(domain=domain, score=None if empty else score, tier=None if empty else tier,
+                assessment_status=status, justification="No active assets or findings recorded. Not assessed." if empty else justification))
+            continue
+        coverage = qualified.get(domain.value)
+        eligible = bool(coverage and coverage["eligible"])
+        domains.append(DomainScore(domain=domain, score=score if eligible else None, tier=tier if eligible else None,
+            assessment_status="evidence_qualified" if eligible else "not_assessed", justification=justification if eligible else "Current operational evidence is required before assigning a score.",
+            evidence_status=coverage["evidence_status"] if coverage else "limited",
+            evidence_reason=coverage["reason_code"] if coverage else "evaluation_required",
+            qualification_id=coverage.get("qualification_id") if coverage else None,
+            qualification_version=coverage.get("version") if coverage else None,
+            qualification_scope=coverage.get("scope") if coverage else None,
+            reviewed_at=coverage.get("reviewed_at") if coverage else None,
+            expires_at=coverage.get("expires_at") if coverage else None,
+            observed_at=coverage.get("observed_at", []) if coverage else [],
+            source_references=coverage.get("source_references", []) if coverage else []))
+
     return DashboardSummary(
-        overall_score=None if empty else overall,
-        overall_tier=None if empty else overall_tier,
-        assessment_status=status,
-        domains=[
-            DomainScore(domain=domain, score=None if empty else score, tier=None if empty else tier,
-                        assessment_status=status,
-                        justification="No active assets or findings recorded. Not assessed." if empty else justification)
-            for domain, (score, tier, justification) in domain_scores.items()
-        ],
+        overall_score=overall if (qualified_status == "complete" if enabled else not empty) else None,
+        overall_tier=overall_tier if (qualified_status == "complete" if enabled else not empty) else None,
+        assessment_status=qualified_status if enabled else status,
+        scoring_mode="evidence_qualified" if enabled else "findings_based",
+        settings_version=settings_row.version if settings_row else 0,
+        evidence_revision=current_revision, qualified_domain_count=count,
+        evaluation_state=("current" if evaluated else "not_current") if enabled else "not_required",
+        qualification_evaluated_at=evaluated.result["evaluated_at"] if evaluated else None,
+        evaluation_id=evaluated.id if evaluated else None,
+        policy_version=POLICY_VERSION if enabled else None,
+        overall_reason=(evaluated.result.get("overall_reason") if evaluated else "evaluation_required") if enabled else None,
+        domains=domains,
         top_findings=[FindingRead.model_validate(f) for f in top],
         recent_scans=[brief_scan(s) for s in recent_scans],
         asset_count=asset_count,

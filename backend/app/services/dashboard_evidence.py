@@ -150,9 +150,19 @@ def validate_observations(db, row, now, *, lock=False):
 
 def domain_evaluation(db, row, domain, scope, now):
     def result(status, reason):
+        try:
+            observations = QualificationDraftUpdate(expected_version=row.version, scope=row.scope,
+                rationale=row.rationale, observations=row.observations).observations if row else []
+        except (ValueError, TypeError):
+            observations = []
         return {"domain": domain.value, "evidence_status": status, "reason_code": reason,
                 "eligible": status == "sufficient", "qualification_id": str(row.id) if row else None,
-                "version": row.version if row else None}
+                "version": row.version if row else None,
+                "scope": row.scope if row else None,
+                "reviewed_at": row.reviewed_at.isoformat() if row and row.reviewed_at else None,
+                "expires_at": row.expires_at.isoformat() if row and row.expires_at else None,
+                "observed_at": [o.observed_at.isoformat() for o in observations],
+                "source_references": [{"source_type": o.source_type, "source_id": str(o.source_id), "source_sha256": o.source_sha256} for o in observations]}
     if row is None:
         return result("insufficient", "no_evidence")
     if row.status not in ("approved", "conflicting"):

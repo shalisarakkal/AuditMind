@@ -14,6 +14,11 @@ the initial backend audit blocker. Phase 4 remains partial.
 
 Phase 4 progress and remaining work: [code-backed status and next milestone](docs/PHASE4_STATUS.md).
 
+Dashboard evidence pilot: [durable background evaluation and safe invalidation](docs/BACKGROUND_EVIDENCE_EVALUATION.md).
+Separate from AI reports, with an organization-admin setting **off by default**.
+Explicit evaluation survives navigation; qualified domains can score only while
+current evidence passes validation. No automatic Dashboard inventory scans.
+
 Latest local-testing UI: consistent date-picker contrast, inclusive browser-local
 workflow deadlines and safe row/bulk actions across Findings, Archived, Assets
 and Uploads. See [Chrome verification steps](docs/PHASE4_USER_VERIFICATION.md)

@@ -1,4 +1,4 @@
-"""Scope-bound evidence review APIs; dashboard activation remains unavailable."""
+"""Scope-bound evidence review, durable evaluation and opt-in Dashboard scoring."""
 import uuid
 import json
 import logging
@@ -16,15 +16,106 @@ from app.api.deps import require_org_member, require_org_role
 from app.db.session import get_db
 from app.models.enums import Domain, UserRole
 from app.models.finding import Finding
+from app.models.organization import Organization
+from app.models.user import User
+from app.models.evidence_evaluation import EvidenceEvaluation
 from app.models.membership import OrgMembership
 from app.models.scoring_qualification import DomainEvidenceQualification, OrganizationScoringSettings
 from app.schemas.scoring_qualification import QualificationDraftUpdate, QualificationRead, QualificationReview, QualificationRevocation, ScoringSettingsRead, ScoringSettingsUpdate
 from app.services.evidence_policy import POLICY_VERSION, PROFILES
 from app.services import dashboard_evidence as evidence
+from app.services import evidence_jobs
+from app.schemas.evidence_evaluation import EvidenceEvaluationRead
 from app.services.events import record_event
-from app.services.org_lock import lock_org
+from app.services.org_lock import lock_org, lock_org_jobs
 
 router = APIRouter(prefix="/orgs/{org_id}/scoring", tags=["scoring qualifications"])
+
+
+def admit_computation(db, org_id, member):
+    # Compute-only jobs preserve member/sysadmin read access, while fencing
+    # organization lifecycle and rechecking account/access after a lock wait.
+    from app.api.deps import authorize_org_write
+    if isinstance(member, OrgMembership):
+        return authorize_org_write(db, org_id, member.user_id, tuple(UserRole))
+    lock_org_jobs(db, org_id)
+    org = db.scalar(select(Organization).where(Organization.id == org_id)
+        .with_for_update(key_share=True).execution_options(populate_existing=True))
+    user = db.get(User, member.user_id, populate_existing=True)
+    if org is None or org.purge_requested_at is not None or user is None or not user.is_active or not user.is_sysadmin:
+        raise HTTPException(403, "Organization access changed; reload before retrying")
+    if org.archived_at is not None:
+        raise HTTPException(409, "Archived organizations cannot start or change evaluation jobs")
+    return member
+
+
+def job_response(db, row, member):
+    current = evidence_jobs.valid_result(row, evidence_jobs.revision(db, row.org_id))
+    return {name: getattr(row, name) for name in ("id", "org_id", "status", "created_at", "run_started_at",
+        "completed_at", "cancel_requested_at", "progress", "error_message")} | {
+        "is_current": current, "result": row.result if current else None,
+        "can_cancel": row.status in evidence_jobs.ACTIVE and (member.role == UserRole.admin or row.started_by == member.user_id)}
+
+
+@router.get("/dashboard-state")
+def dashboard_state(org_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                    _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    return consistent_read(db, org_id, evidence_jobs.dashboard_state)
+
+
+@router.post("/evaluations", response_model=EvidenceEvaluationRead, status_code=202)
+def queue_evaluation(org_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                     member: OrgMembership = Depends(require_org_member)):
+    member = admit_computation(db, org_id, member)
+    row = evidence_jobs.enqueue(db, org_id, member.user_id)
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return job_response(db, row, member)
+
+
+@router.get("/evaluations/current", response_model=EvidenceEvaluationRead | None)
+def latest_evaluation(org_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                      member: OrgMembership = Depends(require_org_member)):
+    row = db.scalar(select(EvidenceEvaluation).where(EvidenceEvaluation.org_id == org_id)
+        .order_by(EvidenceEvaluation.created_at.desc(), EvidenceEvaluation.id).limit(1))
+    response.headers["Cache-Control"] = "no-store"
+    return job_response(db, row, member) if row else None
+
+
+def get_job(db, org_id, job_id):
+    row = db.scalar(select(EvidenceEvaluation).where(EvidenceEvaluation.id == job_id,
+        EvidenceEvaluation.org_id == org_id).with_for_update().execution_options(populate_existing=True))
+    if row is None:
+        raise HTTPException(404, "Evidence evaluation not found")
+    return row
+
+
+@router.get("/evaluations/{job_id}", response_model=EvidenceEvaluationRead)
+def read_evaluation(org_id: uuid.UUID, job_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                    member: OrgMembership = Depends(require_org_member)):
+    row = db.scalar(select(EvidenceEvaluation).where(EvidenceEvaluation.id == job_id,
+        EvidenceEvaluation.org_id == org_id))
+    if row is None:
+        raise HTTPException(404, "Evidence evaluation not found")
+    response.headers["Cache-Control"] = "no-store"
+    return job_response(db, row, member)
+
+
+@router.post("/evaluations/{job_id}/cancel", response_model=EvidenceEvaluationRead)
+def cancel_evaluation(org_id: uuid.UUID, job_id: uuid.UUID, response: Response, db: Session = Depends(get_db),
+                       member: OrgMembership = Depends(require_org_member)):
+    member = admit_computation(db, org_id, member)
+    row = get_job(db, org_id, job_id)
+    if member.role != UserRole.admin and row.started_by != member.user_id:
+        raise HTTPException(403, "Only the requester or an organization administrator can cancel this evaluation")
+    if row.status in evidence_jobs.ACTIVE:
+        row.cancel_requested_at = datetime.now(timezone.utc)
+        if row.status == "pending":
+            row.status, row.completed_at = "cancelled", row.cancel_requested_at
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return job_response(db, row, member)
 
 
 class _ClosingStreamingResponse(StreamingResponse):
@@ -96,7 +187,7 @@ def consistent_read(db, org_id, evaluator):
 
 def settings_response(row: OrganizationScoringSettings | None) -> dict:
     return {"evidence_qualified_enabled": row.evidence_qualified_enabled if row else False,
-            "version": row.version if row else 0, "available": False}
+            "version": row.version if row else 0, "available": True}
 
 
 @router.get("/settings", response_model=ScoringSettingsRead)
@@ -112,20 +203,17 @@ def save_settings(org_id: uuid.UUID, payload: ScoringSettingsUpdate, response: R
     row = db.get(OrganizationScoringSettings, org_id, with_for_update=True, populate_existing=True)
     if payload.expected_version != (row.version if row else 0):
         raise HTTPException(409, "Scoring settings changed; reload before retrying")
-    if payload.evidence_qualified_enabled:
-        raise HTTPException(409, "Evidence-qualified scoring is unavailable until the reviewer workflow and live evaluator are complete")
     if row is None:
-        row = OrganizationScoringSettings(org_id=org_id, evidence_qualified_enabled=False, version=1)
+        row = OrganizationScoringSettings(org_id=org_id, evidence_qualified_enabled=payload.evidence_qualified_enabled, version=1)
         db.add(row)
         record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
-                     item="Dashboard scoring settings", details={"enabled": False, "version": 1})
-    elif row.evidence_qualified_enabled:
-        # Support fail-safe rollback of an imported/future-enabled row even
-        # while activation itself is unavailable in this staged increment.
-        row.evidence_qualified_enabled = False
+                     item="Dashboard scoring settings", details={"from": False, "enabled": payload.evidence_qualified_enabled, "version": 1})
+    elif row.evidence_qualified_enabled != payload.evidence_qualified_enabled:
+        previous = row.evidence_qualified_enabled
+        row.evidence_qualified_enabled = payload.evidence_qualified_enabled
         row.version += 1
         record_event(db, "settings_changed", org_id=org_id, actor=admin.user,
-                     item="Dashboard scoring settings", details={"from": True, "enabled": False, "version": row.version})
+                     item="Dashboard scoring settings", details={"from": previous, "enabled": row.evidence_qualified_enabled, "version": row.version})
     result = settings_response(row)
     db.commit()
     response.headers["Cache-Control"] = "no-store"

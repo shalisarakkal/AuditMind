@@ -117,14 +117,14 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     check('Product logo appears once in sidebar, not application header; organization identity remains and favicon serves correctly');
     const scoringMode=await admin.request(org+'/scoring/settings');
     assert.equal(scoringMode.status,200);
-    assert.deepEqual(scoringMode.body,{evidence_qualified_enabled:false,version:0,available:false});
+    assert.deepEqual(scoringMode.body,{evidence_qualified_enabled:false,version:0,available:true});
     const coverage=await admin.request(org+'/scoring/evaluation');
     assert.equal(coverage.status,200);
     assert.equal(coverage.body.assessment_status,'not_assessed');
     assert.equal(coverage.body.qualified_domain_count,0);
     assert.equal(coverage.body.domains.length,7);
     assert.ok(coverage.body.domains.every(domain=>!domain.eligible));
-    check('Evidence registry remains default-off/unavailable and empty live coverage cannot qualify any domain');
+    check('Evidence scoring remains default-off and empty live coverage cannot qualify any domain');
     await expect(p.getByRole('region',{name:'Security summary',exact:true})).toBeVisible();
     const card=p.getByRole('link',{name:/^Members added /});
     await expect(card).toBeVisible();
@@ -203,7 +203,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       assert.equal(progressFinding.status,201);
       await p.goto(base+'/settings');
       const reviewer=p.locator('section').filter({has:p.getByRole('heading',{name:'Scoring and evidence review',exact:true})});
-      await expect(reviewer.getByRole('checkbox')).toBeDisabled();
+      await expect(reviewer.getByRole('checkbox')).not.toBeChecked();
       await reviewer.getByRole('button',{name:'Open / reload domain'}).click();
       await reviewer.getByLabel('Scope description').fill('Entire synthetic organization');
       await reviewer.getByLabel('Evidence rationale').fill('Browser draft validation only');
@@ -231,7 +231,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       await expect(reviewer.getByText('Draft saved. Review the saved version before approving.',{exact:true})).toBeVisible();
       await expect(reviewer.getByRole('button',{name:'Approve saved evidence',exact:true})).toBeDisabled();
       await reviewer.getByRole('button',{name:'Evaluate evidence across all domains',exact:true}).click();
-      await expect(reviewer.getByText(/Coverage assessment:/)).toContainText('Dashboard scores are unchanged');
+      await expect(reviewer.getByText(/Coverage assessment:/)).toContainText('0 of 7 domains qualified');
       const organizationEvaluation=reviewer.getByRole('region',{name:'Organization-wide evidence evaluation'});
       await expect(organizationEvaluation.getByRole('status',{name:'Organization evaluation progress',exact:true})).toBeVisible();
       await expect(organizationEvaluation.getByRole('progressbar',{name:'Inventory records processed'})).toBeVisible();

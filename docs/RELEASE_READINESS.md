@@ -1,5 +1,16 @@
 # Release readiness and code review
 
+## Current local evidence-scoring increment — 28 October 2026
+
+Prerequisite pushed SHA `c7ee354` passed all four hosted Linux jobs in
+[run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185).
+Subsequent local edits implement durable evidence evaluation, transactional
+revision invalidation and Dashboard scoring behind the default-off organization
+setting. No production/default-on or live-AI rollout is approved. See the
+[current validation entry](PHASE4_VALIDATION.md) for fresh test/build/activation
+results, and [pilot contract/remaining gates](BACKGROUND_EVIDENCE_EVALUATION.md).
+Historical handoffs below do not validate an unpushed implementation SHA.
+
 ## Current scoped handoff — 26 October 2026
 
 Branding/auth/password UI and associated organization migrations passed final

@@ -182,6 +182,24 @@ def test_archiving_waits_for_running_jobs(client, db_session, root, acme):
     assert (resp.status_code, resp.json()["detail"]["code"]) == (409, "jobs_running")
 
 
+def test_evidence_job_blocks_archive_until_cancelled_and_is_purged(client, db_session, root, acme):
+    from app.models.evidence_evaluation import EvidenceEvaluation
+    org_id, ann = acme
+    path = f"/api/v1/orgs/{org_id}/scoring/evaluations"
+    job = client.post(path, headers=ann)
+    assert job.status_code == 202
+    refused = client.post(f"{P}/orgs/{org_id}/archive", headers=root)
+    assert (refused.status_code, refused.json()["detail"]["code"]) == (409, "jobs_running")
+    assert client.post(path + f"/{job.json()['id']}/cancel", headers=ann).status_code == 200
+    assert client.post(f"{P}/orgs/{org_id}/archive", headers=root).status_code == 200
+    assert client.post(path, headers=ann).status_code == 409
+    assert client.post(path, headers=root).status_code == 409
+    assert client.post(f"{P}/orgs/{org_id}/purge", json={"name": "Acme"}, headers=root).status_code == 202
+    assert drain(db_session) == 1
+    db_session.expire_all()
+    assert db_session.scalar(select(EvidenceEvaluation.id)) is None
+
+
 def test_purging_an_org(client, db_session, root, acme):
     org_id, ann = acme
     db_session.add(Asset(org_id=org_id, hostname="web-1", type="server"))

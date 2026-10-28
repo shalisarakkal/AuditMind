@@ -19,24 +19,39 @@ import {
 } from "@/lib/domain";
 import type { DashboardSummary } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { useDashboardState, type DashboardState } from "@/lib/useDashboardState";
 
 export default function DashboardPage() {
   const { selectedOrg } = useApp();
-  const { data, error, loading } = useApi<DashboardSummary>(`/orgs/${selectedOrg!.id}/dashboard`);
+  return <OrganizationDashboard key={selectedOrg!.id} orgId={selectedOrg!.id} orgName={selectedOrg!.name} />;
+}
+
+function OrganizationDashboard({ orgId, orgName }: { orgId: string; orgName: string }) {
+  const { state, error } = useDashboardState(orgId);
+  const identity = state ? `${orgId}:${state.settings_version}:${state.scoring_mode}:${state.scoring_mode === "evidence_qualified" ? `${state.evidence_revision}:${state.evaluation_id}` : "baseline"}` : null;
 
   return (
     <div className="min-w-0 space-y-8 [overflow-wrap:anywhere]">
       <div>
         <h1 className="text-2xl font-semibold text-white">Resilience dashboard</h1>
         <p className="mt-1 text-sm text-white/60">
-          {selectedOrg!.name} — scores are calculated live from current findings.
+          {orgName} — {!state ? "checking current scoring mode." : state.scoring_mode === "evidence_qualified" ? "scores require current reviewed evidence." : "findings-based baseline; not qualified evidence coverage."}
         </p>
       </div>
 
-      <StatusMessage loading={loading && !data} error={error} />
-      {data && <Dashboard data={data} />}
+      <StatusMessage loading={!state && !error} error={error} />
+      {state && identity && <CurrentDashboard key={identity} orgId={orgId} expected={state} />}
     </div>
   );
+}
+
+function CurrentDashboard({ orgId, expected }: { orgId: string; expected: DashboardState }) {
+  const { data, error, loading } = useApi<DashboardSummary>(`/orgs/${orgId}/dashboard`);
+  const matching = data && (data.scoring_mode ?? "findings_based") === expected.scoring_mode
+    && (data.settings_version ?? 0) === expected.settings_version
+    && (expected.scoring_mode !== "evidence_qualified" || (data.evidence_revision === expected.evidence_revision && (data.evaluation_id ?? null) === expected.evaluation_id));
+  return <><StatusMessage loading={loading && !data} error={error} />
+    {matching ? <Dashboard data={data} /> : data && <p role="status">Dashboard inputs changed. Waiting for the latest scoring state; no stale scores are shown.</p>}</>;
 }
 
 function Dashboard({ data }: { data: DashboardSummary }) {
@@ -46,6 +61,11 @@ function Dashboard({ data }: { data: DashboardSummary }) {
 
   return (
     <>
+      <p className="text-sm text-white/60">{data.scoring_mode === "evidence_qualified"
+        ? `Evidence-qualified scoring · ${data.qualified_domain_count ?? 0} of 7 domains qualified${data.qualification_evaluated_at ? ` · Last evaluated: ${formatDateTime(data.qualification_evaluated_at)}` : ""}`
+        : "Findings-based baseline"}</p>
+      {data.scoring_mode === "evidence_qualified" && data.evaluation_state !== "current" && <p role="status" className="text-sm text-white/70">A current evidence evaluation is required. <Link className="text-cyan underline" href="/settings">Open Settings</Link> to evaluate evidence. Unverified scores remain hidden.</p>}
+      {data.overall_reason === "scope_mismatch" && <p role="status" className="text-sm text-white/70">Qualified domain scopes differ. An overall score cannot be assigned.</p>}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="min-w-0 rounded-xl bg-navy-cyan-gradient p-4 sm:p-6 lg:col-span-2">
           <p className="text-sm text-white/80">Overall Resilience Score</p>
@@ -73,7 +93,9 @@ function Dashboard({ data }: { data: DashboardSummary }) {
         <h2 className="mb-3 text-lg font-medium text-white">Per-domain scores</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {domains.map((d) => (
-            <ScoreCard key={d.domain} label={DOMAIN_LABELS[d.domain]} score={d.score} tier={d.tier} title={d.justification} />
+            <ScoreCard key={d.domain} label={DOMAIN_LABELS[d.domain]} score={d.score} tier={d.tier}
+              unscoredLabel={d.evidence_status === "conflicting" ? "Review required" : d.evidence_status === "limited" ? "Insufficient evidence" : "Not assessed"}
+              title={`${d.justification}${d.evidence_reason ? ` Evidence: ${d.evidence_reason.replaceAll("_", " ")}.` : ""}${d.qualification_scope ? ` Scope: ${d.qualification_scope}.` : ""}`} />
           ))}
         </div>
       </section>

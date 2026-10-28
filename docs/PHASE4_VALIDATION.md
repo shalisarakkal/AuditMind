@@ -1,5 +1,93 @@
 # Phase 4 remediation workflow validation
 
+## Background evidence evaluation and Dashboard pilot — 28 October 2026
+
+Hosted prerequisite verified before implementation: exact SHA
+`c7ee354d8fe4331dd80e479889615ab2cf2ab8dd`,
+[run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185),
+conclusion **success** across frontend/browser/backend/backend-dependency-audit.
+The new increment below is local, uncommitted/unpushed and not covered by that CI run.
+
+Implemented migration 0031 with statement-trigger invalidation, durable worker jobs,
+cancel/recovery/deduplication/tenant guards, guarded cached eligibility, default-off
+admin opt-in, mode-aware Dashboard null/partial/complete aggregation and cheap
+browser state polling. No automated full scans on page load; no report/snapshot,
+weight or external-processing changes. [Detailed contract](BACKGROUND_EVIDENCE_EVALUATION.md).
+
+Final local results (earlier focused suites overlap and are not additive):
+
+- **1,366 full PostgreSQL tests passed in 849.31 s**, warnings as errors, zero
+  failures/errors/skips. Command from `backend`: `python -m pytest
+  --require-postgres -W error -q --tb=short
+  --junitxml=../temp/testing/background-evidence-backend-final-20261028.xml`.
+  Includes the exact terminal lifecycle count, cache/expiry/policy/source invalidation,
+  complete/partial/scope-mismatch/real-zero aggregation, default-off rollback,
+  worker metrics/recovery/cancel, tenant/write-admission and populated migration tests.
+  Disposable `auditmind_test/public` restored to **0031**, **35 tables**, repeated
+  upgrade no-op and clean Alembic drift.
+- 113 focused PostgreSQL tests passed in 120.14 s before final invalidation review;
+  subsequent migration/trigger/platform/admission focus: 66 passed in 94.74 s.
+- 465 frontend tests passed; lint/TypeScript and isolated production build passed.
+  Normal production build also passed; generated next-env paths restored normally.
+- Seven dedicated real-worker/two-admin Chrome scenarios passed (latest rebuild):
+  `temp/testing/evidence-review/phase3_browser_7d99f99efb76/results.json`.
+  Covers queued evaluation surviving navigation, explicit mode confirmation/cancel,
+  1-of-7 partial Dashboard scoring, concurrent review 200/409, source mutation and
+  revocation invalidating cached eligibility, and role/tenant restrictions.
+  100,000 isolated synthetic assets; setting rolled back off before teardown.
+- Full existing installed-Chrome regression: 71 checks passed (latest rebuild),
+  `temp/testing/finding-workflow/phase3_browser_56650f93d1a6`;
+  no page/native-dialog errors or AI usage. Includes mobile/Axe/selection/archive.
+  The browser CI configuration now runs the dedicated evidence suite after the
+  full workflow suite and uploads both artifact folders. This new step is not
+  covered by the successful earlier `c7ee354` run; hosted verification needs a push.
+- Isolated production build passed. Scoped high-severity Bandit passed; its static,
+  schema-quoted trigger installer has a medium/low-confidence SQL-formatting finding,
+  reviewed as identifier quoting over fixed DDL, not user-supplied SQL.
+  Final full-app high-severity Bandit, `pip check`, tracked/new task-file secret
+  guards, script syntax, parsed CI YAML and whitespace checks pass. This was a
+  scoped implementation review, not an independent security audit or load certification.
+
+Normal demo was checked idle (zero active jobs/cursors and zero enabled scoring
+settings), upgraded to **0031** and restarted with the production build. Existing
+inventory/accounts/passwords retained; all settings remain off. All **28 evidence
+triggers** are present in `auditmind_demo`; `/health` and `/ready` are green.
+After the final green suite, the idle stack was restarted with the unchanged
+frontend build to load the final API cache headers. Authenticated live Dashboard
+check returned HTTP 200, `Cache-Control: no-store`, findings-based mode and the
+retained 2,798,320 assets. Settings remained off; temporary check accounts were
+removed. Refresh Chrome with Ctrl+Shift+R after this production-build restart.
+
+Initial full backend run: **1,364 passed, one failed** in 818.14 s. The failure was
+the existing exact queue-metrics assertion not expecting `queue_evidence_pending`.
+Updated it to verify both zero and one queued evaluation and proper session cleanup.
+Fresh worker/background/platform focus then passed **67 tests in 95.78 s**.
+The fresh 1,366-pass full rerun above supersedes that initial failed run; no
+failures were waived. Historical sections below refer
+to the boundaries and test totals at those checkpoints, not the current contract.
+
+The first durable full-size attempt exposed a reporting defect: the final 44
+lifecycle rows were fingerprinted, but the half-second progress throttle suppressed
+their short final batch (displayed 6,374,161 / 6,374,205). Completion now force-flushes
+the exact terminal count. A deterministic service-clock regression covers 44 rapid
+lifecycle records; after correcting its synthetic event setup, it passed. The idle
+demo API/worker were restarted without rebuilding the unchanged frontend, and the
+real full-size measurement was repeated successfully. The failed attempt is retained at
+`temp/testing/evidence-http/3c8fb3799082cb772f9b45be/results.json`; it is not claimed
+as successful performance acceptance.
+
+The repeated real Chrome/proxy/API/worker check passed all five measurement checks:
+`temp/testing/evidence-http/9848f5c3a47cc455fd194e33/results.json`. Both scans reached
+**6,374,205 records** with identical fingerprints: browser completion **115.353 /
+111.645 s**, worker **112.8 / 110.2 s**, 202 acknowledgement **70.5 / 115 ms**.
+The second viewer shared the existing job; navigation did not stop it. Concurrent
+cheap state read: 64.5 ms. Cancellation acknowledgement 68.4 ms; database drain
+25.756 s, no partial result. No active jobs/cursors remained; inventory/AI usage
+unchanged; both temporary viewers removed. No cache flush, builds or regression
+suites overlapped timed processing. These are local first/repeated measurements,
+not controlled cold/warm or production capacity acceptance. Final full backend
+rerun started after timed processing finished.
+
 ## Evidence qualification review — stage two, 27 October 2026
 
 Backend-only, not activated in demo: migration 0030, current organization operational

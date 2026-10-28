@@ -7,12 +7,13 @@ import { useApi } from "@/lib/useApi";
 import { DOMAIN_LABELS, DOMAIN_ORDER } from "@/lib/domain";
 import type { Domain } from "@/lib/types";
 import FindingActionDialog from "./FindingActionDialog";
+import EvidenceEvaluationPanel from "./EvidenceEvaluationPanel";
 
 type Observation = { objective: string; source_type: "finding" | "document_version"; source_id: string; source_sha256: string; observed_at: string };
 type Qualification = { domain: Domain; version: number; status: string; scope: string; rationale: string; inventory_sha256: string | null; observations: Observation[]; review_note: string | null; expires_at: string | null };
 type Inventory = { inventory_sha256: string; asset_count: number; finding_count: number };
-type Evaluation = { evaluated_at?: string; assessment_status: string; qualified_domain_count: number; domains: { domain: Domain; eligible: boolean; reason_code: string; version: number | null }[] };
-type Confirmation = { title: string; description: string; label: string; domain: Domain; perform(): Promise<void> };
+type Confirmation = { title: string; description: string; label: string; domain: Domain | null; perform(): Promise<void> };
+type Mode = { evidence_qualified_enabled: boolean; version: number; available: boolean };
 const field = "w-full rounded-md border border-white/20 bg-navy px-3 py-2 text-white";
 const button = "rounded-md border border-cyan px-3 py-2 text-sm text-cyan disabled:opacity-40";
 const words = (value: string) => value.replaceAll("_", " ");
@@ -21,10 +22,11 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
   const base = `/orgs/${orgId}/scoring`;
   const profiles = useApi<{ profiles: Record<Domain, string[]> }>(`${base}/profiles`);
   const records = useApi<Qualification[]>(`${base}/qualifications`);
+  const mode = useApi<Mode>(`${base}/settings`);
   const [domain, setDomain] = useState<Domain>("identity_access");
   const [draft, setDraft] = useState<Qualification | null>(null);
   const [inventory, setInventory] = useState<Inventory | null>(null);
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [evaluationRefresh, setEvaluationRefresh] = useState(0);
   const [scope, setScope] = useState("");
   const [rationale, setRationale] = useState("");
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -52,7 +54,7 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
     window.requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus(); });
   }
   const [progress, setProgress] = useState<EvidenceProgress | null>(null);
-  const [scanKind, setScanKind] = useState<"inventory" | "evaluation" | null>(null);
+  const [scanKind, setScanKind] = useState<"inventory" | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const started = useRef(0);
   const operation = useRef<AbortController | null>(null);
@@ -62,7 +64,7 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
     const timer = window.setInterval(() => setElapsed(Math.floor((performance.now() - started.current) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
-  async function scan<T>(kind: "inventory" | "evaluation") {
+  async function scan<T>(kind: "inventory") {
     const controller = new AbortController();
     operation.current = controller;
     setScanKind(kind);
@@ -108,7 +110,7 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
   }
   const blocked = busy || confirmation !== null;
   const locked = !editable || draft?.status === "approved";
-  const scanFeedback = progress && <div className="space-y-2 text-sm" role="status" aria-label={scanKind === "evaluation" ? "Organization evaluation progress" : "Inventory loading progress"}>
+  const scanFeedback = progress && <div className="space-y-2 text-sm" role="status" aria-label="Inventory loading progress">
     <p>{busy ? "Processing" : error ? "Stopped" : "Finished"}: {words(progress.phase)} · {(progress.processed ?? 0).toLocaleString()} / {progress.total == null ? "counting records" : progress.total.toLocaleString()} records · {elapsed}s elapsed</p>
     {busy && <p className="text-white/60">Counts update after each completed batch. Counting, preparing the scan and checking qualifications may take time between updates.</p>}
     {progress.total != null && progress.total > 0 && <progress aria-label="Inventory records processed" className="w-full accent-cyan" max={progress.total} value={progress.processed ?? 0} />}
@@ -118,21 +120,22 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
   </div>;
   return <section className="min-w-0 space-y-4 rounded-xl border border-white/15 p-5">
     <h2 className="text-lg font-medium">Scoring and evidence review</h2>
-    <label className="flex items-center gap-2"><input type="checkbox" disabled checked={false} readOnly /> Evidence-qualified scoring (not yet available)</label>
-    <p className="text-sm text-white/60">Review evidence coverage here without changing Dashboard scores or saved reports. Approval is not a statement that controls pass. No AI calls are made.</p>
+    <label className="flex items-center gap-2"><input type="checkbox" disabled={blocked || !editable || !mode.data?.available} checked={mode.data?.evidence_qualified_enabled ?? false} onChange={() => {
+      if (!mode.data) return;
+      const enabled = !mode.data.evidence_qualified_enabled, version = mode.data.version;
+      ask({ title: "Change Dashboard scoring mode?", domain: null,
+        description: enabled ? "Enable evidence-qualified scoring for this organization? Only domains with current reviewed evidence receive scores. Partial coverage has no overall score. Saved reports and AI consent are unchanged."
+          : "Return this organization to the findings-based baseline? Qualification records and saved reports are retained. Baseline scores are not evidence of control coverage.",
+        label: enabled ? "Enable evidence-qualified scoring" : "Use findings-based baseline", perform: async () => {
+          try { await api.patch<Mode>(`${base}/settings`, { expected_version: version, evidence_qualified_enabled: enabled }); setMessage("Dashboard scoring mode saved."); }
+          finally { mode.reload(); }
+        } });
+    }} /> Evidence-qualified scoring</label>
+    <p className="text-sm text-white/60">Off by default. Approval confirms evidence coverage, not that controls pass. Background evaluation can authorize Dashboard scores only while this organization's setting is enabled. Saved reports are unchanged. No AI calls are made.</p>
     {!editable && <p className="text-sm text-white/60">Read-only: an organization administrator manages qualifications.</p>}
-    {(profiles.error || records.error || (!scanKind && error)) && <p role="alert" className="text-red-300">{(!scanKind && error) || profiles.error || records.error}</p>}
+    {(mode.error || profiles.error || records.error || (!scanKind && error)) && <p role="alert" className="text-red-300">{(!scanKind && error) || mode.error || profiles.error || records.error}</p>}
     {message && !scanKind && <p role="status" className="text-cyan">{message}</p>}
-    <section aria-label="Organization-wide evidence evaluation" className="space-y-3 rounded-lg border border-white/15 p-4">
-      <h3 className="font-medium">Organization-wide evaluation</h3>
-      <p className="text-sm text-white/60">Checks all seven domains across this organization. The domain selected below does not limit this evaluation. Unsaved edits are not included; Dashboard scores are unchanged.</p>
-      <button className={button} type="button" disabled={blocked} onClick={() => run(async () => { setEvaluation(null); setEvaluation(await scan<Evaluation>("evaluation")); })}>Evaluate evidence across all domains</button>
-      {scanKind === "evaluation" && scanFeedback}
-      {evaluation ? <div className="space-y-2"><p>Coverage assessment: {words(evaluation.assessment_status)} · {evaluation.qualified_domain_count} of 7 domains qualified. Dashboard scores are unchanged.</p>
-        {evaluation.evaluated_at && <p className="text-sm text-white/60">Last evaluated: {new Date(evaluation.evaluated_at).toLocaleString()}. Results reflect that completed evaluation.</p>}
-        <ul>{evaluation.domains.map(d => <li key={d.domain}>{DOMAIN_LABELS[d.domain]}: {words(d.reason_code)}{d.eligible ? " (eligible)" : " (not eligible)"}</li>)}</ul>
-      </div> : <p className="text-sm text-white/60">Current eligibility has not been evaluated. A saved approval alone does not establish current coverage.</p>}
-    </section>
+    <EvidenceEvaluationPanel key={orgId} orgId={orgId} disabled={blocked} refreshSignal={evaluationRefresh} />
     <section aria-label="Domain qualification" className="min-w-0 space-y-4">
       {busy && !progress && <p role="status">Working…</p>}
       <fieldset disabled={blocked} className="min-w-0 space-y-4 disabled:opacity-60">
@@ -181,7 +184,7 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
         </li>)}</ul>
         <button className={button} type="button" disabled={locked || !scope.trim() || !rationale.trim()} onClick={() => run(async () => {
           const saved = await api.put<Qualification>(`${base}/qualifications/${domain}`, { expected_version: draft?.version ?? 0, scope, rationale, observations, inventory_sha256: inventory?.inventory_sha256 ?? draft?.inventory_sha256 ?? null });
-          setDraft(saved); setScope(saved.scope); setRationale(saved.rationale); setObservations(saved.observations); setInventory(null); setEvaluation(null); records.reload(); setMessage("Draft saved. Review the saved version before approving.");
+          setDraft(saved); setScope(saved.scope); setRationale(saved.rationale); setObservations(saved.observations); setInventory(null); setEvaluationRefresh(v => v + 1); records.reload(); setMessage("Draft saved. Review the saved version before approving.");
         })}>Save draft</button>
         {editable && draft && <div className="space-y-3 border-t border-white/15 pt-4">
           <p className="text-sm text-white/60">Review actions apply to saved version {draft.version} only, not unsaved edits. All three objectives need fresh evidence; expiry must be within 90 days of every observation.</p>
@@ -194,18 +197,18 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
               description: `Confirm ${DOMAIN_LABELS[domain]} evidence, saved version ${draft.version}. This does not change scores. Unsaved edits are not included.`,
               label: decision === "approve" ? "Approve saved evidence" : "Record material conflict", perform: async () => {
               const saved = await api.post<Qualification>(`${base}/qualifications/${domain}/review`, { expected_version: draft.version, inventory_sha256: draft.inventory_sha256, decision, expires_at: new Date(expires).toISOString(), note, operational_review: true, covers_entire_inventory: true, conflicts_reviewed: true });
-              setDraft(saved); setNote(""); setExpires(""); setAttested(false); records.reload(); setEvaluation(null); setMessage("Review recorded. Evaluate evidence across all domains to check eligibility.");
+              setDraft(saved); setNote(""); setExpires(""); setAttested(false); records.reload(); setEvaluationRefresh(v => v + 1); setMessage("Review recorded. Evaluate evidence across all domains to check eligibility.");
             } })}>{decision === "approve" ? "Approve saved evidence" : "Record material conflict"}</button>)}
           </>}
           {["approved", "conflicting"].includes(draft.status) && <button className={button} type="button" disabled={!note.trim()} onClick={() => ask({
             title: "Revoke qualification?", domain, description: `Revoke ${DOMAIN_LABELS[domain]} evidence, saved version ${draft.version}? This does not change scores.`,
             label: "Revoke qualification", perform: async () => {
-            setDraft(await api.post<Qualification>(`${base}/qualifications/${domain}/revoke`, { expected_version: draft.version, note })); setNote(""); setExpires(""); setAttested(false); records.reload(); setEvaluation(null); setMessage("Qualification revoked.");
+            setDraft(await api.post<Qualification>(`${base}/qualifications/${domain}/revoke`, { expected_version: draft.version, note })); setNote(""); setExpires(""); setAttested(false); records.reload(); setEvaluationRefresh(v => v + 1); setMessage("Qualification revoked.");
           } })}>Revoke qualification</button>}
         </div>}
       </fieldset>}
     </section>
-    {confirmation && <FindingActionDialog title={confirmation.title} orgName={DOMAIN_LABELS[confirmation.domain]} onClose={cancelConfirmation}>
+    {confirmation && <FindingActionDialog title={confirmation.title} orgName={confirmation.domain ? DOMAIN_LABELS[confirmation.domain] : "Dashboard scoring"} onClose={cancelConfirmation}>
       <p className="mb-4 text-sm text-white/80">{confirmation.description}</p>
       <div className="flex flex-wrap gap-3">
         <button type="button" data-confirm-cancel className={button} onClick={cancelConfirmation}>Cancel</button>

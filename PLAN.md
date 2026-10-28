@@ -1948,15 +1948,16 @@ lint and isolated production build passed. No backend contract changed.
   scope and maximum 90-day policy (27 October 2026), with a temporary per-org
   Settings → Scoring switch, off by default. Global default/switch removal needs
   later explicit approval after pilot confidence.
-- [ ] Implement/review/test qualified domain and partial-overall scoring after approval.
+- [x] Implement/review/test qualified domain and partial-overall scoring locally
+  behind the approved default-off setting; production/default-on rollout remains separate.
   - [x] Backend draft foundation locally: migration 0029, tenant settings default
     off/unavailable, versioned source-bound drafts, admin authorization and audit.
     Approval/revocation is delivered in the next stage; enablement remains blocked.
   - [x] Operational document sources, immutable inventory-scope bindings, live
     qualification/expiry/conflict evaluation and approval/revocation implemented
     locally behind unavailable/default-off activation; demo upgraded to 0030.
-  - [ ] Benchmark/optimize large-inventory evaluation with safe invalidation before
-    connecting it to dashboard refreshes or enabling pilot scoring mode.
+  - [x] Benchmark/optimize explicit local large-inventory evaluation. Prior 0030
+    measurements below are historical; 0031 adds durable jobs and revisions.
     - [x] Local v2 compact PostgreSQL fingerprint and streamed progress increment:
       SA01 100.203 s vs original 462.203 s; all 6,374,205 inventory/lifecycle rows
       counted. No caching/sampling. Binding version change requires re-review.
@@ -1993,26 +1994,48 @@ lint and isolated production build passed. No backend contract changed.
     Test DB restored to 0030 with clean drift. Approved local check-in follows
     four reviewed scopes: backend `0191f85`, Settings `aeb62a8`, presentation
     `0f4acb1`, and acceptance/docs containing this record. No push/new hosted CI.
-  - [ ] Mode-aware Dashboard aggregation, safe background/revision invalidation
-    strategy and setting-gated pilot acceptance. No automatic full scans on refresh.
+  - [x] Implement mode-aware Dashboard aggregation and durable background evaluation
+    with transactional statement-level revision invalidation, policy/expiry checks,
+    cancellation/recovery and one active job per organization (migration 0031).
+    Admin opt-in remains off by default. No automatic full scans on refresh.
+  - [x] Setting-gated synthetic pilot Chrome acceptance: seven dedicated worker/
+    two-user checks and full 71-check browser regression; 465 frontend tests pass.
+  - [x] Activate local 0031 build after idle checks; retain data/passwords and
+    zero enabled organization scoring settings. Health/readiness are green.
+  - [x] Real durable worker timing/navigation/deduplication/cancellation acceptance:
+    exact 6,374,205 records, 115.353/111.645 s, 70.5/115 ms acknowledgement.
+    Final short-batch reporting defect fixed and regression tested; no partial
+    result on cancellation, no remaining readers or AI calls. Local measurements
+    are not controlled cold/warm or production guarantees.
+  - [x] Fresh full regression: 1,366 PostgreSQL tests in 849.31 s, warnings as
+    errors and zero failures/errors/skips; 465 frontend tests, lint/TypeScript,
+    isolated/normal builds, 71 full Chrome + seven dedicated evidence checks.
+    Test DB restored to 0031 (35 tables), clean drift. High-severity Bandit,
+    dependency consistency, script/CI syntax and tracked/new-file secret checks pass.
+  - [ ] Commit/push the reviewed background/Dashboard increment, then verify hosted
+    Linux CI for its exact SHA (including the new dedicated evidence browser step).
 - [x] Review exact scope/secrets and check in completed work in scoped commits.
-- [x] Push reviewed commits and verify hosted CI through `ceef079`; successful
-  per-SHA evidence is linked above. New qualification work is not yet pushed.
+- [x] Push reviewed qualification commits through `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd`
+  and verify all four hosted Linux jobs passed in
+  [CI run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185).
+  Verification preceded the new background/Dashboard increment; that work is local
+  and not yet committed/pushed or covered by hosted CI.
 
-Next design increment: [Dashboard evidence-qualified scoring contract](docs/DASHBOARD_EVIDENCE_SCORING_DESIGN.md)
+Current scoring increment: [Dashboard evidence-qualified scoring contract](docs/DASHBOARD_EVIDENCE_SCORING_DESIGN.md)
 is approved for staged local implementation, reusing existing seven report coverage
-profiles. No partial-evidence dashboard scoring behavior has changed yet. Admin
-reviewer authority and organization-wide scope are approved; qualification records,
-audited default-off setting and reviewer preview are implemented locally. Automatic
-Dashboard integration and broader rollout/load acceptance remain pending; local
-manual HTTP/concurrent-read/cancellation acceptance is complete. Details:
+profiles. Current increment implements evidence-gated domain/overall scoring only
+behind the explicit default-off admin setting, durable worker jobs and safe
+revision/policy/expiry invalidation. Normal organizations remain baseline/off.
+Broader production load/default-on rollout remains pending; do not autoqueue
+full scans on Dashboard refresh. Current contract/limits:
+[background evaluation](docs/BACKGROUND_EVIDENCE_EVALUATION.md). Measurements:
 [evidence evaluation performance](docs/EVIDENCE_EVALUATION_PERFORMANCE.md).
 
-Empty-organization safeguard: dashboard API explicitly returns `not_assessed`
+Historical empty-organization safeguard checkpoint (baseline/off mode): dashboard API explicitly returns `not_assessed`
 with null overall/domain scores and tiers when active assets AND findings are
 both zero; UI displays neutral Not assessed labels in existing cards. No database
 migration. Asset-only/partial evidence, risk snapshots and saved reports retain
-their existing contracts pending separate domain-coverage design. Frontend 434
+their existing contracts at this checkpoint, before the opt-in mode above. Frontend 434
 tests passed; 61 focused PostgreSQL scoring/dashboard/archive tests and 70 Chrome
 checks passed; lint/build/activation pass. The 61 include the initial 9 dashboard
 tests, not a fresh full backend run. Earlier 1,281 full-backend results are historical.

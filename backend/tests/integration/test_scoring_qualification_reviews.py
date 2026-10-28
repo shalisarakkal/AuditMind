@@ -195,8 +195,8 @@ def test_review_is_audited_partial_and_does_not_enable_dashboard(client, reviewe
     assert result.headers["cache-control"] == "no-store"
     assert result.json()["qualified_domain_count"] == 1
     assert result.json()["assessment_status"] == "partial"
-    assert client.get(reviewer[2] + "/settings", headers=reviewer[0]).json()["available"] is False
-    assert client.patch(reviewer[2] + "/settings", headers=reviewer[0], json={"expected_version": 0, "evidence_qualified_enabled": True}).status_code == 409
+    mode = client.get(reviewer[2] + "/settings", headers=reviewer[0]).json()
+    assert mode["available"] is True and mode["evidence_qualified_enabled"] is False
 
 
 @pytest.mark.parametrize("field", ["operational_review", "covers_entire_inventory", "conflicts_reviewed"])

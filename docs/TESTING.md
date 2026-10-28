@@ -508,6 +508,42 @@ Later note-discovery/mixed-selection follow-up: **326 frontend tests**, lint,
 TypeScript/build, **21 installed Chrome checks** and **29 focused PostgreSQL
 workflow tests** passed. The earlier **1,153 full backend** result remains the
 last full-suite checkpoint, not a fresh full run for these presentation changes.
+## Background evaluation / opt-in Dashboard checks (28 October 2026)
+
+Current contract: [durable jobs and safe invalidation](BACKGROUND_EVIDENCE_EVALUATION.md).
+Run PostgreSQL suites with `--require-postgres -W error`; new integration coverage
+is in `test_background_evidence.py`, lifecycle checks in `test_platform_api.py`,
+and populated migration 0031 downgrade/upgrade/drift in `test_migrations.py`.
+All default-off baseline tests remain required. Never overlap a public-schema
+backend suite with an isolated browser fixture.
+
+Installed Chrome: `node scripts/browser-evidence-acceptance.cjs` starts a real worker
+in an isolated synthetic schema and tests navigation-resume, partial scoring after
+explicit admin opt-in, review/invalidation/permissions and mode rollback. Full
+regression: `node scripts/browser-finding-workflow.cjs`. Build the isolated frontend
+first using the procedure in [validation](PHASE4_VALIDATION.md).
+The browser CI job now runs these two suites sequentially and retains both artifact
+folders; hosted execution of this new CI step remains unverified until approved push.
+
+`node scripts/browser-evidence-http.cjs` now measures durable worker jobs against
+the idle synthetic SA01 demo: 202 acknowledgment, completion/records, navigation,
+two-viewer job deduplication, cheap state-read latency and real cancellation. Use
+`--cancel-only` for the latter. It creates/removes its own temporary viewers,
+preserves inventory and keeps scoring off. Do not run alongside benchmarks/imports
+or full backend tests. Previous stream-protocol timings remain historical.
+
+Final backend regression: **1,366 passed in 849.31 s**, PostgreSQL required,
+warnings as errors, zero failures/errors/skips. Test DB restored to 0031 (35 tables),
+repeated upgrade no-op and clean drift. Frontend: 465 tests, lint/TypeScript and
+both isolated/normal production builds passed; dedicated Chrome seven checks,
+full browser 71 checks and full-size worker five measurement checks passed.
+The first full-run legacy metrics assertion and final short-batch progress defect
+were fixed and included in the green rerun, not waived. Results/artifact paths are in
+[the current validation entry](PHASE4_VALIDATION.md). Hosted Linux CI succeeded
+for pushed prerequisite `c7ee354` in
+[run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185);
+that run does not validate subsequent local implementation edits.
+
 ## Evidence qualification backend checkpoints (27 October 2026)
 
 Backend registry/review stages: 1,327 full PostgreSQL tests passed, followed by

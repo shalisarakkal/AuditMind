@@ -726,7 +726,8 @@ An organization with **zero active assets and zero active findings** displays
 scores or risk tiers. Archived records do not count as active data. This is a
 narrow empty-data safeguard: asset-only or partially covered organizations still
 use the existing findings-based baseline, which is not proof of evidence coverage.
-Domain coverage/partial scoring is a separate pending design task.
+The optional evidence-qualified mode below changes this interpretation only when
+an organization administrator explicitly enables it.
 
 Dashboard and browser Reports retain their original compact layout. Only score
 and risk-tier text colors indicate risk: Critical red, High orange, Medium amber,
@@ -734,3 +735,33 @@ Low green. No new colored card backgrounds, bordered badges or explanatory
 blocks are added. Existing textual tier labels remain; color is not the sole cue.
 Scores and thresholds are unchanged. Evidence coverage/confidence remain separate;
 unscored report domains stay neutral. Downloaded templates are unchanged.
+
+## Evidence-qualified Dashboard pilot
+
+Under **Settings → Scoring and evidence review**, an organization admin can enable
+**Evidence-qualified scoring** after confirming the change. It is **off by default**.
+Off means the findings-based baseline described above; on means current reviewed
+evidence is required before a domain receives a score. This does not change saved
+reports, scoring deductions or domain weights, and it makes no AI calls.
+
+Use **Evaluate evidence across all domains** to queue an organization-wide worker
+job. The selected domain below only controls the qualification editor. Evaluation
+uses saved records across all seven domains. Its status, processed/total count,
+elapsed time and Cancel remain in the Organization-wide evaluation section.
+You can navigate away and reopen Settings to follow the same job. Simultaneous
+requests share an active job; only its requester or an org admin may cancel it.
+Keep the worker running. Cancellation waits for the current database fetch and
+never publishes a partial result.
+
+With the setting on, eligible domain scores use the existing baseline calculation;
+missing/stale/expired/conflicting evidence stays unscored. The overall score needs
+all seven qualified domains with compatible scope, not just the selected domain.
+Material inventory/source/review changes invalidate cached eligibility; rebind and
+review affected qualifications where needed, then evaluate again. Dashboard does
+not trigger a full scan automatically. An open Dashboard checks current mode and
+evidence state every ten seconds/on focus, so another user's change is not an
+instant server-pushed update. Failed verification hides scores.
+
+Turning the setting off restores baseline interpretation without deleting reviews.
+Follow [the Chrome walkthrough](EVIDENCE_USER_VERIFICATION.md) using synthetic test
+data first. Production rollout/default-on adoption remains a separate decision.

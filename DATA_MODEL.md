@@ -1,5 +1,19 @@
 # Data Model – AI Cyber Resilience Auditor
 
+Dashboard evidence pilot (migrations 0029–0031): `organization_scoring_settings`
+holds a default-false enablement flag and expected version;
+`domain_evidence_qualifications` holds one source-/inventory-bound versioned review
+per organization/domain. `evidence_evaluations` holds durable worker lifecycle,
+progress and structured eligibility results; a partial unique index allows one
+pending/running job per organization. `organization_evidence_revisions` stores a
+transactionally incremented bigint per organization, maintained by statement-level
+triggers over material inputs. Cached eligibility is valid only at that revision,
+current policy/evaluator identity and unexpired review window. Scores themselves
+remain live deterministic calculations. Downgrading 0031 disables enabled scoring
+settings before dropping its job/revision structures. See
+[the exact contract](docs/BACKGROUND_EVIDENCE_EVALUATION.md); models/Alembic govern
+actual columns rather than the conceptual entities below.
+
 Migration 0024 adds nine search indexes, not data columns: six pg_trgm GIN indexes
 (finding description/category/source, asset hostname/IP/cloud ID), an active
 assignee index and two sparse active deadline-search indexes. Concurrent creation,

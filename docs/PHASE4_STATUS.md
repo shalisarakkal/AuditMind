@@ -1,5 +1,36 @@
 # Phase 4 status and next milestone
 
+## Current increment — durable evaluation and default-off Dashboard pilot
+
+28 October: pushed through `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd` and
+verified [hosted Linux CI run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185)
+completed successfully: frontend, browser, backend and backend-dependency-audit.
+This verification preceded implementation below; it does not certify new local edits.
+
+Migration 0031, durable worker evaluation, transactional statement-level revision
+invalidation, expiry/policy checks and mode-aware Dashboard aggregation are now
+implemented locally. The admin setting is available but remains off by default;
+normal organizations have not been opted in. No automatic inventory scan runs on
+Dashboard refresh. Missing/stale/partial evidence cannot silently authorize an
+overall score. Reports, risk snapshots, weights and workflow policy are unchanged.
+Seven dedicated two-user Chrome checks and the full 71-check browser suite pass;
+465 frontend tests, lint/TypeScript and production builds pass. The idle normal
+demo was upgraded to 0031 and restarted, retaining data/passwords and zero enabled
+scoring settings. Health/readiness are green. Durable jobs processed all 6,374,205
+SA01 records in 115.353/111.645 s (first/repeat), acknowledging in 70.5/115 ms.
+Shared-job navigation and real cancellation also pass; these are local observations,
+not production guarantees. Fresh full backend regression: **1,366 passed in
+849.31 s**, warnings as errors, zero failures/errors/skips. Test DB restored to
+0031, 35 tables, clean drift. Static/dependency/secret/whitespace gates pass. This
+increment is locally verified but not yet committed or pushed; its new dedicated
+browser CI step still needs hosted verification after an approved push.
+Final authenticated live Dashboard/readiness checks pass with `no-store` responses,
+retained inventory and all scoring settings off. Hard-refresh an existing Chrome
+tab to load the restarted production build.
+
+Contract and limits: [background evaluation](BACKGROUND_EVIDENCE_EVALUATION.md).
+Earlier unavailable/unpushed/0030 statements below are dated historical checkpoints.
+
 ## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
 
 28 October acceptance: real Chrome/proxy/API scans of SA01 completed in

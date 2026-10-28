@@ -315,12 +315,25 @@ export type ImportProgress = {
   rows_total?: number;
 };
 
-export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier | null; assessment_status?: "not_assessed" | "findings_based"; justification: string };
+export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier | null; assessment_status?: "not_assessed" | "findings_based" | "evidence_qualified"; justification: string;
+  evidence_status?: "insufficient" | "limited" | "conflicting" | "sufficient" | null; evidence_reason?: string | null;
+  qualification_scope?: string | null; reviewed_at?: string | null; expires_at?: string | null };
 
 export type DashboardSummary = {
   overall_score: number | null;
   overall_tier: RiskTier | null;
-  assessment_status?: "not_assessed" | "findings_based";
+  assessment_status?: "not_assessed" | "findings_based" | "partial" | "complete";
+  scoring_mode?: "findings_based" | "evidence_qualified";
+  settings_version?: number;
+  evidence_revision?: number;
+  qualified_domain_count?: number;
+  evaluation_state?: "not_required" | "current" | "not_current";
+  qualification_evaluated_at?: string | null;
+  evaluation_id?: string | null;
+  baseline_method?: string;
+  policy_version?: string | null;
+  aggregation_version?: string;
+  overall_reason?: string | null;
   domains: DomainScore[];
   top_findings: Finding[];
   recent_scans: Scan[];

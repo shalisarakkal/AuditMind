@@ -1,13 +1,30 @@
 # Dashboard evidence-qualified scoring — approved staged contract
 
-Updated 28 October 2026. **Backend registry and operational review stages implemented
-locally, including the reviewer UI. Scoring-mode activation and qualified Dashboard scores remain pending.**
+Updated 28 October 2026. **Registry/review UI, durable background evaluation, safe
+revision invalidation and opt-in Dashboard integration implemented locally. The
+setting remains off by default; production/default-on rollout is not approved.**
 User approved the recommended approach with a temporary setting controlling adoption.
 Organization administrators approve/revoke qualifications within their organization;
 auditors/viewers cannot approve or change scoring mode. Retain the existing maximum
 90-day qualification policy, same-scope requirements and all-seven aggregation gate.
 
-### Stage-two implementation boundary
+### Current implementation boundary
+
+Migration 0031 adds one active durable evaluation per organization and transactional
+statement-trigger evidence revisions. A worker evaluates a complete snapshot;
+changed inputs supersede its result, and all later reads independently check
+revision/policy/expiry and result integrity. The admin setting is now available
+with expected-version confirmation/audit, but remains false by default. Dashboard
+reads never fingerprint inventory or enqueue evaluations automatically.
+
+When enabled, only current eligible domains receive baseline deterministic scores;
+unqualified domains are null. The overall score is null unless all seven domains
+qualify with compatible scope. Existing deductions, weights, saved reports and
+risk snapshots are unchanged. Turning off restores baseline interpretation.
+The browser checks cheap state every ten seconds/on focus and hides mismatched
+or unverifiable scores. See [job/invalidation contract and limits](BACKGROUND_EVIDENCE_EVALUATION.md).
+
+### Stage-two implementation history (before 0031)
 
 Performance follow-up: inventory binding now uses explicit v2 PostgreSQL JSONB
 row hashing and a compact materialized/sorted projection; old v1 bindings require
@@ -81,12 +98,12 @@ Source lookup rejects foreign/archived findings; saves verify objective/domain/h
 and actual timezone-qualified observation dates. Operational documents, immutable
 inventory scope fingerprints, live invalidation/expiry, approval/revocation and
 dashboard aggregation are subsequent increments, not implied by draft validation.
-No existing report/provider flag or live scoring behavior is changed.
+No existing report/provider flag or live scoring behavior was changed in stage one.
 
 ## Existing behavior and reuse
 
-The dashboard now suppresses scores only when active assets AND findings are zero.
-Nonempty organizations still use the findings-based deterministic baseline; an
+With the new setting off, the dashboard suppresses scores when active assets AND
+findings are zero. Nonempty organizations use the findings-based deterministic baseline; an
 unobserved domain can therefore score 100. Do not describe that as qualified coverage.
 
 Reports already implement opt-in schema 3 qualification in

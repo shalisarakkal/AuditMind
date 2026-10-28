@@ -66,6 +66,7 @@ IMPORT_JOB = 2
 ARCHIVE_JOB = 3
 REPORT_JOB = 4
 DOCUMENT_JOB = 5
+EVIDENCE_JOB = 6
 
 
 def _job_key(job_id: uuid.UUID) -> int:
