@@ -1,5 +1,118 @@
 # Verify the evidence-aware reporting changes
 
+UI text/time follow-up (27 October): application headings, report filters and
+shared table/section labels use sentence case instead of forced all caps. Names,
+acronyms, authored report titles and evidence text retain their original case.
+Report **Captured** timestamps use browser-local date/time; original UTC values
+remain in technical provenance and exports. Known UTC selection semantics are
+rephrased as an explicit scope explanation, without changing saved boundaries.
+
+Report priority-filter contrast follow-up (27 October): in a completed report's
+Prioritized Remediation Roadmap, select All, Critical, High and Medium. The active
+option should have a cyan background and readable navy text; exactly one option
+is selected. This is presentation-only and does not change saved report content.
+
+Report Print follow-up: open a report, choose a priority filter, then click
+**Print**. Chrome preview should contain only the report (including every
+remediation priority), without sidebar, application header, Back link, filters,
+Print or Download buttons. Text is black on white for printing. Cancel preview:
+the original screen filter and application navigation should be unchanged.
+Chrome's own Headers and footers option controls its added URL/page/date lines;
+these are separate from the application's report-only print layout.
+
+## Dashboard evidence reviewer preview (updated 28 October 2026)
+
+Current local acceptance: 1,335 full PostgreSQL tests, 456 frontend tests and
+six dedicated two-user Chrome scenarios pass; see [validation](PHASE4_VALIDATION.md)
+for exact commands, artifacts and the distinction from historical full-browser
+and hosted CI results. Qualified scoring remains off/unavailable.
+
+Scope/reload clarification: **Evaluate evidence across all domains** is in the
+separate **Organization-wide evaluation** section, above the domain editor.
+It always checks all seven domains for the selected organization, regardless of
+the domain picker. It uses saved records, not unsaved editor changes.
+
+**Open / reload domain** fetches the latest saved qualification/version for the
+chosen domain, or opens an empty local draft when none exists. It does not scan
+inventory, save, approve, or change scores. An application-styled confirmation
+dialog appears only when there are actual unsaved edits: **Discard and reload**
+loads the saved record; **Cancel** or Escape keeps your edits. Cancel receives
+initial focus, and the modal blocks background interaction. No browser popup is
+used. Review/conflict/revocation confirmations in this panel use the same
+application dialog. Read-only/unchanged reloads do not prompt. Switching domains
+also protects unsaved edits. A failed reload leaves the existing form intact.
+
+Performance/progress follow-up: Load current inventory and Evaluate evidence
+across all domains display a processed/total count, current phase, elapsed timer and
+progress bar after counting completes. Counts include relevant lifecycle records.
+Evaluation progress, errors and Cancel appear inside **Organization-wide
+evaluation**, below its action button. Inventory-loading progress/errors/Cancel
+appear next to **Load current inventory** in **Domain qualification**. Other
+controls are locked while processing; Cancel remains enabled. These statuses
+are not shown above the organization-wide evaluation area.
+Use **Cancel operation** to stop waiting without changing scores. A count may
+pause while PostgreSQL prepares/sorts the next population; the timer continues.
+Cancellation releases the database snapshot after its current fetch finishes;
+it does not instantly kill a running database statement. The 28 October Chrome
+check measured prompt UI recovery and approximately 28 s database cleanup.
+Old v1 bindings require rebind/save/review after the v2 fingerprint update.
+See [performance measurements and limits](EVIDENCE_EVALUATION_PERFORMANCE.md).
+
+Open **Settings → Scoring and evidence review** as an organization administrator.
+This preview does not change Dashboard scores or saved reports; the scoring
+switch remains disabled. No inference is required.
+
+1. Choose a domain and click **Open / reload domain**. The required objectives
+   come from the backend policy. Enter the scope description and rationale.
+2. Click **Load current inventory** to bind the entire organization inventory.
+   This and **Evaluate evidence across all domains** scan inventory on demand and may be
+   slow in SA01. They never run automatically on page load.
+3. Add observations: choose an objective, source type, the Finding ID copied from
+   Findings (or an organization-policy **document version** UUID), and the actual
+   observation time. **Validate source and add** retrieves its current hash.
+   Source validation does not establish that it satisfies the objective: that
+   requires the administrator's operational review.
+4. **Save draft**. Incomplete drafts are allowed. To approve, cover all three
+   objectives with current evidence, supply a review note and expiry, and confirm
+   the whole-inventory operational/conflict review. Approval applies to the saved
+   version only, not unsaved edits. Expiry cannot exceed the evidence's 90-day
+   freshness window. A conflict requires at least two distinct sources.
+5. Use **Evaluate evidence across all domains** to see current eligibility and reasons for
+   each domain. A saved approval is not automatically current eligibility.
+   Inventory/source changes or expiry can invalidate it. Evaluation does not
+   calculate or enable new Dashboard scores.
+6. Revoke approved/conflicting records with a mandatory reason before revising
+   an approved record. Concurrent edits produce a conflict rather than silently
+   overwriting another user's work; preserve your edits and reload deliberately.
+
+Non-admin members can inspect saved records and evaluate, but cannot edit or
+review. All entered/displayed times follow the browser time zone. Reloading a
+domain discards unsaved edits only after confirmation. Navigating away also
+discards unsaved edits; save first.
+
+### Repeat the isolated two-user acceptance
+
+Use the isolated build procedure in [Phase 4 validation](PHASE4_VALIDATION.md),
+then run `node scripts/browser-evidence-acceptance.cjs` from the repository root.
+Ports 3014/8012 must be free; do not overlap another PostgreSQL backend suite.
+The opt-in fixture creates 100,000 synthetic assets in its own guarded local
+test schema and uses two real administrators plus viewer/auditor/foreign-tenant
+sessions. It checks normal UI source validation, concurrent saved-version
+approval (one success, one 409), retained edits/reload, partial eligibility,
+revocation, rebind/conflict, permissions and an inventory write during evaluation.
+The in-flight scan uses its original snapshot; the next evaluation rejects the
+changed binding. The test removes its schema/accounts/processes afterward;
+ignored screenshots/results remain under `temp/testing/evidence-review`.
+No normal tenant edits or existing-account password changes; no external AI
+calls or scoring enablement.
+
+Full-size local SA01 read-only measurements are a separate opt-in command:
+`node scripts/browser-evidence-http.cjs` (or `--cancel-only`). This requires the
+running local demo, verifies no jobs or inventory scans are active, creates two
+temporary viewer accounts and removes them afterward. It performs expensive real
+scans and preserves inventory; do not run during imports or other benchmarks.
+[Recorded results and limits](EVIDENCE_EVALUATION_PERFORMANCE.md).
+
 For the newly committed Phase 4 changes, start with the detailed
 [Chrome walkthrough and phase summary](PHASE4_USER_VERIFICATION.md). It covers
 workflow, selection/archive, dates, search, shared UI and two-user conflicts.

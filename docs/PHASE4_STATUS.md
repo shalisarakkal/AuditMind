@@ -1,12 +1,106 @@
 # Phase 4 status and next milestone
 
+## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
+
+28 October acceptance: real Chrome/proxy/API scans of SA01 completed in
+116.524/110.537 s (first/repeated) and 135.653/133.253 s (two simultaneous
+viewers). All reached 6,374,205 records with identical fingerprints. These are
+uncontrolled local cache/load conditions, not a production performance guarantee.
+A deeper Cancel check found an idle transaction leak; explicit shielded iterator
+cleanup fixed it. Real post-fix Cancel restored the UI in 38.9 ms and drained the
+current database fetch in ~27.8 s. Both ASGI disconnect regression cases pass.
+
+Six focused installed-Chrome reviewer checks also pass with 100,000 isolated
+synthetic assets: two independent admins approving the same version (200/409),
+edits preserved/reload, partial eligibility, revoke/rebind/material conflict,
+viewer/auditor/tenant restrictions and an inventory write during a consistent
+evaluation snapshot. No scores, saved reports or ordinary-tenant evidence records
+were changed by these tests. No AI usage; test schemas/accounts were removed.
+Broader production/load acceptance and mode-aware Dashboard aggregation remain
+pending; qualified scoring stays off/unavailable. See
+[performance measurements](EVIDENCE_EVALUATION_PERFORMANCE.md).
+
+Fresh final regression (28 October): **1,335 full PostgreSQL tests** pass in
+753.92 s with warnings treated as errors and zero skips; **456 frontend tests**,
+lint, TypeScript/isolated production build, high-severity Bandit and secret/
+whitespace guards pass. The disposable test DB is restored to 0030 (33 public
+tables, clean drift). The approved local check-in uses four reviewed scopes in
+[validation](PHASE4_VALIDATION.md): backend `0191f85`, Settings `aeb62a8`,
+presentation `0f4acb1`, followed by the acceptance/documentation commit containing
+this record. Nothing pushed; hosted CI remains pending for these commits.
+Earlier uncommitted/unpushed statements below describe historical checkpoints.
+
+28 October progress placement: evaluation status, scan errors and Cancel now sit
+inside Organization-wide evaluation; inventory loading has its own local feedback
+beside Load current inventory. Cancel remains usable outside locked editing
+fieldsets. Latest UI validation: 456 tests, lint/build and 12 focused Chrome checks.
+
+Evidence-panel discard, review/conflict and revocation confirmations now use
+the application modal, not browser popups. Cancel/Escape retain edits; focus and
+background interaction are managed consistently with other action dialogs.
+Latest UI validation: 454 tests, lint/build and 11 focused Chrome/Axe checks pass.
+
+UI scope clarification: **Evaluate evidence across all domains** is separate from
+the domain editor. Open/reload fetches the latest saved domain record; read-only
+and unchanged forms no longer show an unsaved-edits popup. Actual unsaved edits
+are protected on reload/domain switch, and failed reloads preserve the form.
+Latest UI validation: 451 tests, lint/build and 10 focused Chrome checks passed.
+
+Performance/progress increment: PostgreSQL v2 row fingerprints with compact
+materialized sorting reduced the local SA01 evaluation from 462.203 s to
+100.203 s (6,374,161 inventory rows plus 44 lifecycle events). Cache/load conditions
+differ; this is not a controlled production guarantee. Load/evaluate now stream
+actual progress with a live elapsed timer and cancellation. Old v1 bindings
+require rebind/review. Qualified scoring remains off/unavailable; automatic
+Dashboard integration and broader rollout/performance gates remain pending.
+See [measurement detail](EVIDENCE_EVALUATION_PERFORMANCE.md).
+
+Reviewer preview is now available locally at Settings → Scoring and evidence
+review. It supports current-policy objectives, validated source bindings,
+inventory-bound drafts, saved-version approval/conflict/revocation, and explicit
+eligibility evaluation. Non-admin members are read-only. The demo was idle before
+upgrade to 0030 and restart; data/accounts were retained. Frontend 437 tests,
+TypeScript/lint and production build passed. Nine focused installed-Chrome checks
+passed, including inventory-bound draft save, incomplete approval prevention and
+explicit evaluation. Broader review/revocation browser acceptance and mode-aware
+Dashboard aggregation remain pending. Scoring activation is still
+unavailable; large-inventory evaluation is manual, not automatic.
+
+The backend-only paragraphs below describe earlier stage checkpoints.
+
+Stage two now adds current organization operational document versions, streamed
+inventory/lifecycle bindings, admin review/revocation and expiry/conflict integrity
+evaluation. Approval/revocation is implemented in backend APIs only. Repeatable-read
+evaluation avoids mixed snapshots; source review follows worker lock ordering.
+Migration 0030 is isolated-test only. UI, mode enablement and Dashboard scoring
+remain pending, as does large-inventory performance work before dashboard wiring.
+Fresh backend validation: 1,327 full PostgreSQL tests passed, followed by 55 focused
+tests after final lock-order/provenance/downgrade hardening; counts overlap.
+Chrome regression: 71 checks passed against the new backend, including the
+default-off guard; no reviewer UI acceptance is implied. High-severity Bandit and
+secret/whitespace gates pass. The stage-one paragraph
+below is historical; current qualified scoring is still off.
+
+Migration 0029 and draft APIs are implemented locally. Default-off scoring settings
+report unavailable and reject enabling; no switch is visible in UI. Organization
+admins can save versioned source-bound drafts with audit history; member reads and
+tenant/lifecycle rules are enforced. Drafts cannot be approved or affect scores.
+Finding references only in this stage; operational documents, inventory scope,
+live evaluator, approval/revocation, Settings/reviewer UI and Dashboard aggregation
+remain pending. Demo remains unchanged at 0028; no automatic activation/migration.
+Validation: 1,296 full PostgreSQL tests passed, then 24 focused tests passed after
+adding rollback hardening (overlapping, not additive). Migration round trip/drift
+passed; disposable test database restored to 0029. Bandit high-severity/secret and
+whitespace gates passed. Uncommitted/unpushed; hosted CI has not tested this stage.
+
 ## Hosted CI follow-up — mobile dashboard
 
-`387f72c` is pushed but hosted browser acceptance failed mobile dashboard width.
-Local fix uses shrinkable grid tracks, wrapping and mobile padding, not clipping.
-434 frontend tests, full Chrome 70 checks, bundled Chromium focused 7 checks,
-lint and builds pass; corrected demo is running. Fix remains uncommitted/unpushed;
-hosted Ubuntu acceptance must be rerun after approval. See latest validation.
+**Closed:** fix committed/pushed as `ceef079`. All four ubuntu-latest jobs passed
+in [CI run 40559697870](https://github.com/shalisarakkal/AuditMind/actions/runs/40559697870)
+on 27 October 2026: full PostgreSQL backend **1,284 tests**, frontend **434 tests**,
+Chromium **70 checks**, lint/build and dependency audits. The 320/390px mobile
+regressions pass without clipping. This supersedes the browser failure at
+`387f72c`. The corrected demo is running; broader production exclusions remain.
 
 ## Current local closure review — 27 October 2026
 
@@ -37,14 +131,18 @@ not a fresh full run of the current tree. See [validation](PHASE4_VALIDATION.md)
 
 Still open:
 
-- [ ] Approve [evidence-qualified dashboard contract](DASHBOARD_EVIDENCE_SCORING_DESIGN.md),
-  reviewer authority and organization-wide scope, then implement qualifications
-  and partial-domain/overall scoring. Asset-only domains can still baseline at 100.
+- [x] Approve [evidence-qualified dashboard contract](DASHBOARD_EVIDENCE_SCORING_DESIGN.md),
+  organization-admin reviewer authority, organization-wide scope and 90-day policy,
+  with a temporary default-off organization setting (27 October 2026).
+- [ ] Implement qualification records/reviewer workflow, audited versioned mode
+  setting and partial-domain/overall scoring. Asset-only domains can still baseline
+  at 100 today; approval changes documentation, not running behavior. Global default
+  adoption/removing the setting needs separate approval after successful pilots.
 - [x] Review exact commit scope/secrets and check in completed work in scoped groups.
   Backend duplicate policy: `d26f525`; empty dashboard API: `e2288a6`; shared
   frontend: `b223613`; acceptance/documentation accompany this closure record.
-- [ ] Push the reviewed commits after approval and verify hosted CI; no push
-  performed by this check-in. Local credentials/original branding files excluded.
+- [x] Push reviewed commits through `ceef079` and verify all hosted CI jobs passed.
+  Local credentials/original branding files excluded. Per-SHA evidence is above.
 - [ ] Existing broader Phase 4 exclusions, live-provider approval, production
   operations and Future items remain unchanged. No whole-phase closure implied.
 

@@ -1932,23 +1932,81 @@ lint and isolated production build passed. No backend contract changed.
 
 - [x] Fix dashboard mobile grid/text overflow locally; preserve desktop layout,
   add 320/390px wrapping regression checks (434 frontend tests, 70 Chrome checks).
-- [ ] Commit/push mobile fix after review and confirm hosted Ubuntu acceptance;
-  `387f72c` browser failure means earlier local closure is not hosted sign-off.
+- [x] Review, commit/push mobile fix and confirm hosted Ubuntu acceptance at
+  `ceef07984a04935b6d78e473699ef08a8f3fadb1`:
+  [CI run 40559697870](https://github.com/shalisarakkal/AuditMind/actions/runs/40559697870)
+  completed successfully on 27 October 2026. All four jobs passed: full PostgreSQL
+  backend 1,284 tests, frontend 434 tests, Chromium 70 checks (including 320/390px
+  mobile checks), lint/build and dependency audits. Supersedes the failed browser
+  result for `387f72c`; no production/live-AI release approval is implied.
 
 - [x] Retain former layout; apply shared risk-tier text colors only.
 - [x] Implement explicit empty-organization Not assessed API/UI handling.
 - [x] PostgreSQL/frontend/Chrome regression, production build and local activation.
 - [x] Draft evidence-qualified dashboard contract using existing report profiles.
-- [ ] Approve qualification contract, reviewer authority and organization-wide scope.
+- [x] Approve qualification contract, admin reviewer authority, organization-wide
+  scope and maximum 90-day policy (27 October 2026), with a temporary per-org
+  Settings → Scoring switch, off by default. Global default/switch removal needs
+  later explicit approval after pilot confidence.
 - [ ] Implement/review/test qualified domain and partial-overall scoring after approval.
+  - [x] Backend draft foundation locally: migration 0029, tenant settings default
+    off/unavailable, versioned source-bound drafts, admin authorization and audit.
+    Approval/revocation is delivered in the next stage; enablement remains blocked.
+  - [x] Operational document sources, immutable inventory-scope bindings, live
+    qualification/expiry/conflict evaluation and approval/revocation implemented
+    locally behind unavailable/default-off activation; demo upgraded to 0030.
+  - [ ] Benchmark/optimize large-inventory evaluation with safe invalidation before
+    connecting it to dashboard refreshes or enabling pilot scoring mode.
+    - [x] Local v2 compact PostgreSQL fingerprint and streamed progress increment:
+      SA01 100.203 s vs original 462.203 s; all 6,374,205 inventory/lifecycle rows
+      counted. No caching/sampling. Binding version change requires re-review.
+      Controlled cold/warm and production-load acceptance remain rollout gates;
+      do not wire automatic Dashboard scans or enable qualified scoring yet.
+    - [x] 28 October real authenticated Chrome/proxy/API acceptance: 116.524 s
+      first pass, 110.537 s repeat; simultaneous viewers 135.653/133.253 s.
+      All four scans reached 6,374,205 records with identical fingerprints.
+      These are not controlled cold-cache or production measurements.
+    - [x] Exercise cancellation during database work; fix iterator cleanup that
+      retained an idle transaction. Both ASGI disconnect regression cases pass;
+      real Cancel recovers the UI in 38.9 ms and releases the database reader
+      after its current fetch (~27.8 s including polling). Not an instant DB kill.
+    - [x] Clarify UI scope: organization-wide evaluation is separate from the
+      domain qualification editor. Open/reload fetches the latest saved record;
+      only unsaved edits require discard confirmation, never read-only reloads.
+      This changes presentation/read behavior, not qualification/scoring rules.
+    - [x] Evidence-panel warnings use application-styled modal confirmations
+      (discard, review/conflict and revocation), not browser popups. Cancel/Escape
+      preserve edits; the confirmed action retains its original domain/version.
+    - [x] 28 October: progress, scan errors and Cancel are local to their action:
+      evaluation inside Organization-wide evaluation; inventory loading beside
+      Load current inventory. Cancel remains outside disabled editing fieldsets.
+  - [x] Settings evidence reviewer preview, source validation, draft/review/revoke
+    controls and explicit coverage evaluation; 437 frontend tests and build pass.
+  - [x] Reviewer Chrome acceptance with two independent organization admins:
+    simultaneous saved-version approval (200/409 with edits retained), reload,
+    partial eligibility, revoke/rebind/conflict, read-only/tenant guards and a
+    real concurrent inventory write/snapshot invalidation. Six focused checks,
+    100,000 isolated synthetic assets; no paid inference or scoring activation.
+  - [x] Fresh 28 October full regression/review: 1,335 PostgreSQL tests (zero
+    failures/errors/skips), 456 frontend tests, lint/TypeScript/isolated build,
+    scoped Bandit, dependency consistency and secret/whitespace checks pass.
+    Test DB restored to 0030 with clean drift. Approved local check-in follows
+    four reviewed scopes: backend `0191f85`, Settings `aeb62a8`, presentation
+    `0f4acb1`, and acceptance/docs containing this record. No push/new hosted CI.
+  - [ ] Mode-aware Dashboard aggregation, safe background/revision invalidation
+    strategy and setting-gated pilot acceptance. No automatic full scans on refresh.
 - [x] Review exact scope/secrets and check in completed work in scoped commits.
-- [ ] Push the reviewed commits and verify hosted CI for this tree (separate approval).
+- [x] Push reviewed commits and verify hosted CI through `ceef079`; successful
+  per-SHA evidence is linked above. New qualification work is not yet pushed.
 
 Next design increment: [Dashboard evidence-qualified scoring contract](docs/DASHBOARD_EVIDENCE_SCORING_DESIGN.md)
-is drafted for approval, reusing existing seven report coverage profiles. No
-partial-evidence dashboard scoring behavior has changed. Reviewer authority,
-organization-wide scope and persisted qualification workflow require approval
-before implementation.
+is approved for staged local implementation, reusing existing seven report coverage
+profiles. No partial-evidence dashboard scoring behavior has changed yet. Admin
+reviewer authority and organization-wide scope are approved; qualification records,
+audited default-off setting and reviewer preview are implemented locally. Automatic
+Dashboard integration and broader rollout/load acceptance remain pending; local
+manual HTTP/concurrent-read/cancellation acceptance is complete. Details:
+[evidence evaluation performance](docs/EVIDENCE_EVALUATION_PERFORMANCE.md).
 
 Empty-organization safeguard: dashboard API explicitly returns `not_assessed`
 with null overall/domain scores and tiers when active assets AND findings are
@@ -1962,6 +2020,13 @@ tests, not a fresh full backend run. Earlier 1,281 full-backend results are hist
 Per user feedback, preserve the former compact layout and dashboard gradient;
 change score/tier text colors only: Critical/red, High/orange, Medium/amber,
 Low/green. No new badges, tinted domain surfaces or explanatory blocks.
+
+27 October UI follow-up: report-only print layout, readable selected report
+priority, browser-local Captured timestamps, explicit UTC selection-scope wording,
+sentence-case report/page labels and removal of shared forced all-caps styling.
+Display only: original report content, exports and stored values unchanged.
+Latest frontend 442 tests, lint/build and nine focused Chrome checks pass; these
+focused checks are not a rerun of the full browser/backend suites.
 Evidence and confidence remain separate; missing report scores stay neutral.
 No scoring thresholds, stored
 assessments, or exported report templates changed. Frontend: 433 tests passed;

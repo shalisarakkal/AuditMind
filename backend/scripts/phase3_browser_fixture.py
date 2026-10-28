@@ -21,6 +21,7 @@ def main():
     parser.add_argument('action', choices=['prepare', 'api', 'worker', 'inspect', 'cleanup'])
     parser.add_argument('--schema', required=True)
     parser.add_argument('--workflow', action='store_true', help='Enable isolated Phase 4 acceptance organization switching')
+    parser.add_argument('--evidence', action='store_true', help='Seed two reviewers and synthetic inventory for evidence acceptance')
     args = parser.parse_args()
     if not re.fullmatch(r'phase3_browser_[a-f0-9]{12}', args.schema):
         raise SystemExit('Invalid isolated fixture schema')
@@ -111,19 +112,39 @@ def main():
             with Session(engine) as db:
                 alpha, beta = Organization(name='Phase3 Alpha'), Organization(name='Phase3 Beta')
                 db.add_all([alpha, beta]); db.flush()
-                for role in ('admin', 'auditor', 'viewer', 'other'):
+                for role in ('admin', 'auditor', 'viewer', 'other') + (('reviewer',) if args.evidence else ()):
                     user = User(email=f'{role}@phase3.example', name=f'Fixture {role}')
                     db.add(user); db.flush(); accounts.set_password(db, user, password)
                     db.add(OrgMembership(user_id=user.id, org_id=beta.id if role == 'other' else alpha.id,
-                        role=UserRole.admin if role == 'other' else UserRole(role)))
+                        role=UserRole.admin if role in ('other', 'reviewer') else UserRole(role)))
                     if args.workflow and role == 'admin':
                         db.add(OrgMembership(user_id=user.id, org_id=beta.id, role=UserRole.admin))
+                finding_ids = []
+                if args.evidence:
+                    from app.models.enums import Severity
+                    from app.models.finding import Finding
+                    assert db.scalar(text('SELECT current_schema()')) == args.schema
+                    # Compactly generated, isolated synthetic data only. Enough
+                    # rows for a real streamed read/concurrent-write overlap.
+                    db.execute(text("""
+                        INSERT INTO assets (id, org_id, type, hostname, details, created_at)
+                        SELECT md5(:prefix || n::text)::uuid, :org, 'server',
+                               'evidence-host-' || n::text,
+                               jsonb_build_object('synthetic', repeat(md5(n::text), 32)), now()
+                        FROM generate_series(1, 100000) AS n
+                    """), {'prefix': args.schema, 'org': alpha.id})
+                    for number in (1, 2):
+                        finding = Finding(org_id=alpha.id, domain=Domain.network_config,
+                            severity=Severity.high, source='manual',
+                            description=f'Synthetic evidence observation {number}')
+                        db.add(finding); db.flush(); finding_ids.append(str(finding.id))
                 db.commit()
                 if args.workflow:
                     platform_user = User(email='platform@phase3.example', name='Fixture platform', is_sysadmin=True)
                     db.add(platform_user); db.flush(); accounts.set_password(db, platform_user, password)
                     db.commit()
-                print(json.dumps({'password': password, 'org': str(alpha.id), 'other_org': str(beta.id)}))
+                print(json.dumps({'password': password, 'org': str(alpha.id), 'other_org': str(beta.id),
+                    **({'finding_ids': finding_ids} if args.evidence else {})}))
         elif args.action == 'inspect':
             from app.models.report import Report
             from app.models.ai_usage import AIUsage

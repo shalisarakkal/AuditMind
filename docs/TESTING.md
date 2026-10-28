@@ -508,6 +508,17 @@ Later note-discovery/mixed-selection follow-up: **326 frontend tests**, lint,
 TypeScript/build, **21 installed Chrome checks** and **29 focused PostgreSQL
 workflow tests** passed. The earlier **1,153 full backend** result remains the
 last full-suite checkpoint, not a fresh full run for these presentation changes.
+## Evidence qualification backend checkpoints (27 October 2026)
+
+Backend registry/review stages: 1,327 full PostgreSQL tests passed, followed by
+55 focused tests after final review hardening (overlapping, not additive).
+71 installed-Chrome regression checks passed with new default-off/empty-coverage
+API guards (`phase3_browser_e493ebae1bcc`). Reviewer UI and Dashboard integration
+are not implemented or enabled; no fresh frontend-unit count is claimed.
+Migration round trips/drift, high-severity Bandit and secret/whitespace checks pass.
+Disposable test DB restored to 0030; demo unchanged. Hosted ceef079 results are
+historical and do not validate this uncommitted/unpushed backend work.
+
 # Empty-dashboard regression follow-up (27 October 2026)
 
 Latest increment: 434 frontend tests passed, ESLint and production builds passed.
@@ -516,3 +527,63 @@ initial 9 dashboard tests and is not a replacement for the historical full suite
 Chrome: 70 checks passed (`phase3_browser_61c079037c36`).
 The API/UI now distinguish completely empty active organizations from numeric
 scores. Asset-only/partial-evidence baseline scoring is deliberately unchanged.
+# Evidence reviewer preview validation (27 October 2026)
+
+Latest full checkpoint (28 October): **1,335 PostgreSQL tests passed in 753.92 s**
+with `--require-postgres -W error`, zero skips/failures/errors. Includes the two
+new real-ASGI disconnect cleanup regressions. Disposable local test DB restored
+to head 0030, 33 public tables, clean Alembic drift. **456 frontend tests**, lint,
+TypeScript/isolated build, scoped high-severity Bandit, dependency consistency and
+tracked/new task-file secret checks pass. This replaces earlier full counts for
+the current local work; it is not evidence of hosted CI for an unpushed SHA.
+The subsequent approved local check-in separates backend, Settings, presentation
+and acceptance/docs scopes; see [commit record](PHASE4_VALIDATION.md). No push or
+new hosted CI execution is included.
+
+28 October real-service follow-up: authenticated Chrome/Next/API scans complete
+6,374,205 SA01 records in 116.524/110.537 s sequentially and 135.653/133.253 s
+for simultaneous viewers. Fingerprints/counts agree; these are uncontrolled
+local-cache measurements. In-flight cancellation exposed an idle transaction leak;
+shielded iterator cleanup and two PostgreSQL/ASGI regression cases fix it.
+Post-fix real Cancel restores the UI promptly; DB cleanup waits for the current
+fetch (~27.8 s with polling), not an immediate statement kill.
+
+Six focused Chrome checks pass in an isolated 100,000-asset schema: two independent
+admins' concurrent review (200/409), retained edits/reload, permissions, partial
+eligibility, concurrent inventory publication/snapshot invalidation, revoke/rebind
+and material conflict. No ordinary inventory mutation, AI usage or scoring
+enablement. Repeat with `node scripts/browser-evidence-acceptance.cjs` after the
+isolated build, sequentially with backend suites. Performance/cancellation runner:
+`node scripts/browser-evidence-http.cjs` (or `--cancel-only`) against the idle demo.
+Artifacts, commands and limitations:
+[Phase 4 validation](PHASE4_VALIDATION.md),
+[performance](EVIDENCE_EVALUATION_PERFORMANCE.md).
+Frontend recheck: 456 tests, lint, TypeScript and isolated production build pass;
+high-severity Bandit and tracked/new task-file secret guards pass.
+
+28 October contextual progress: 456 frontend tests, lint/build and 12 focused
+Chrome checks passed. Includes operation-local status/errors, correct DOM
+ownership, held-stream cancellation while editing is disabled and retained
+evidence-dialog accessibility. No backend logic changed in this UI increment.
+
+Application-confirmation follow-up: 454 frontend tests, lint/build and 11 focused
+Chrome checks passed. Includes app-modal Axe scan, Escape/focus restoration,
+confirmed discard and saved-version action confirmation. Earlier UI counts
+below are historical, not additive or replacements for full backend acceptance.
+
+Latest scope/reload clarification: 451 frontend tests, lint/build and 10 focused
+Chrome checks passed. Includes fresh version reads, dirty-form protection,
+read-only no-popup reload and organization-wide evaluation independent of the
+domain editor. These are focused UI results, not a new full backend run.
+
+Later performance/progress increment: 447 frontend tests, 49 focused PostgreSQL
+qualification tests, lint/build and 9 focused Chrome checks passed. A subsequent
+3-test stream follow-up overlaps those backend results. This is not a new full
+backend or full browser run. [Measurement scope, protocol and limitations](EVIDENCE_EVALUATION_PERFORMANCE.md).
+
+Frontend: 437 tests passed, lint/TypeScript and production build passed. Nine
+focused installed-Chrome checks passed, including inventory-bound draft save,
+incomplete approval prevention and manual eligibility evaluation. These overlap
+earlier login/dashboard checks and are not additive to the historical 71-check
+full browser run. No inference calls; scoring activation remains unavailable.
+Walkthrough: [evidence reviewer preview](EVIDENCE_USER_VERIFICATION.md).

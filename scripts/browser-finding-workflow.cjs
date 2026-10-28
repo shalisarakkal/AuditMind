@@ -115,6 +115,16 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     const iconResponse=await p.request.get(base+'/branding/favicon.svg');
     assert.equal(iconResponse.status(),200); assert.ok((await iconResponse.text()).includes('<svg'));
     check('Product logo appears once in sidebar, not application header; organization identity remains and favicon serves correctly');
+    const scoringMode=await admin.request(org+'/scoring/settings');
+    assert.equal(scoringMode.status,200);
+    assert.deepEqual(scoringMode.body,{evidence_qualified_enabled:false,version:0,available:false});
+    const coverage=await admin.request(org+'/scoring/evaluation');
+    assert.equal(coverage.status,200);
+    assert.equal(coverage.body.assessment_status,'not_assessed');
+    assert.equal(coverage.body.qualified_domain_count,0);
+    assert.equal(coverage.body.domains.length,7);
+    assert.ok(coverage.body.domains.every(domain=>!domain.eligible));
+    check('Evidence registry remains default-off/unavailable and empty live coverage cannot qualify any domain');
     await expect(p.getByRole('region',{name:'Security summary',exact:true})).toBeVisible();
     const card=p.getByRole('link',{name:/^Members added /});
     await expect(card).toBeVisible();
@@ -158,6 +168,113 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     assert.deepEqual(Object.keys(await probe.json()).sort(),['checks','status']);
     check('Dashboard security counts deep-link to the exact Activity window; clear removes it; readiness response is redacted');
     // Focused cross-browser diagnostics still use the real isolated services.
+    if (process.env.AUDITMIND_BROWSER_PRINT_ONLY === '1') {
+      await p.route('**/api/v1/orgs/*/reports/print-fixture', route=>route.fulfill({json:{
+        id:'print-fixture',org_id:seed.org,title:'Synthetic print acceptance',status:'completed',
+        frameworks:'SYNTHETIC',generated_at:'2026-10-27T12:00:00Z',assessment_type:'synthetic_mock',
+        data:{overall_score:null,overall_tier:null,assessment_status:'partial',domains:[],
+          executive_summary:'Synthetic summary for print validation',resilience_summary:'Limited evidence',
+          provenance:{assessment_type:'synthetic_mock',schema_version:3,model:'synthetic',captured_at:'2026-10-23T16:56:58.129864+00:00',period_semantics:'currently active findings created within inclusive UTC dates; current inventory'},compliance_citations:[],
+          remediations:[{title:'Unfiltered high action',priority:'High',domain:'network_config',description:'Preserve in print',related_controls:[]}]}
+      }}));
+      await p.goto(base+'/reports/print-fixture');
+      await expect(p.getByRole('heading',{name:'Synthetic print acceptance',exact:true})).toBeVisible();
+      const localCaptured=await p.evaluate(()=>new Date('2026-10-23T16:56:58.129864+00:00').toLocaleString());
+      await expect(p.getByText('Captured: '+localCaptured,{exact:true})).toBeVisible();
+      await expect(p.getByText(/Date boundaries were evaluated in UTC/)).toBeVisible();
+      await expect(p.getByRole('heading',{name:'Executive summary',exact:true})).toBeVisible();
+      await p.getByRole('button',{name:'Critical',exact:true}).click();
+      await expect(p.getByRole('heading',{name:'Unfiltered high action',exact:true})).toBeHidden();
+      await p.emulateMedia({media:'print'});
+      await expect(p.getByRole('heading',{name:'Unfiltered high action',exact:true})).toBeVisible();
+      await expect(p.getByRole('button',{name:'Print',exact:true})).toBeHidden();
+      await expect(p.getByRole('link',{name:'Back to reports list'})).toBeHidden();
+      await expect(p.locator('aside')).toBeHidden();
+      assert.equal(await p.locator('.report-print h1').evaluate(el=>getComputedStyle(el).color),'rgb(0, 0, 0)');
+      await p.pdf({path:path.join(output,'report-only.pdf'),format:'A4'});
+      await p.emulateMedia({media:'screen'});
+      await expect(p.getByRole('button',{name:'Print',exact:true})).toBeVisible();
+      await expect(p.getByRole('heading',{name:'Unfiltered high action',exact:true})).toBeHidden();
+      check('Chrome print hides application shell/actions, includes filtered-out report content, and restores screen filtering');
+      return;
+    }
+    if (process.env.AUDITMIND_BROWSER_EVIDENCE_ONLY === '1') {
+      const progressFinding=await admin.request(list,'POST',{domain:'network_config',severity:'high',description:'Synthetic progress count fixture',source:'manual'});
+      assert.equal(progressFinding.status,201);
+      await p.goto(base+'/settings');
+      const reviewer=p.locator('section').filter({has:p.getByRole('heading',{name:'Scoring and evidence review',exact:true})});
+      await expect(reviewer.getByRole('checkbox')).toBeDisabled();
+      await reviewer.getByRole('button',{name:'Open / reload domain'}).click();
+      await reviewer.getByLabel('Scope description').fill('Entire synthetic organization');
+      await reviewer.getByLabel('Evidence rationale').fill('Browser draft validation only');
+      const inventorySection=reviewer.getByRole('region',{name:'Domain qualification',exact:true});
+      const heldInventoryRoute=async route=>{
+        await new Promise(resolve=>setTimeout(resolve,5000));
+        await route.fulfill({status:200,contentType:'application/x-ndjson',body:'\n'}).catch(()=>{});
+      };
+      await p.route('**/scoring/progress/inventory',heldInventoryRoute);
+      await inventorySection.getByRole('button',{name:'Load current inventory',exact:true}).click();
+      const loadingStatus=inventorySection.getByRole('status',{name:'Inventory loading progress',exact:true});
+      await expect(loadingStatus).toBeVisible();
+      await expect(loadingStatus.getByRole('button',{name:'Cancel operation',exact:true})).toBeEnabled();
+      await expect(inventorySection.getByRole('button',{name:'Open / reload domain',exact:true})).toBeDisabled();
+      await loadingStatus.getByRole('button',{name:'Cancel operation',exact:true}).click();
+      await expect(inventorySection.getByRole('alert')).toContainText('cancelled');
+      await p.unroute('**/scoring/progress/inventory',heldInventoryRoute);
+      check('Inventory loading status/Cancel remain inside domain qualification; Cancel is enabled while editing controls are locked');
+      await reviewer.getByRole('button',{name:'Load current inventory',exact:true}).click();
+      await expect(reviewer.getByText('Current inventory loaded. Save the draft to bind it.',{exact:true})).toBeVisible();
+      const inventoryProgress=inventorySection.getByRole('progressbar',{name:'Inventory records processed'});
+      await expect(inventoryProgress).toBeVisible();
+      assert.equal(await inventoryProgress.getAttribute('value'),await inventoryProgress.getAttribute('max'));
+      await reviewer.getByRole('button',{name:'Save draft',exact:true}).click();
+      await expect(reviewer.getByText('Draft saved. Review the saved version before approving.',{exact:true})).toBeVisible();
+      await expect(reviewer.getByRole('button',{name:'Approve saved evidence',exact:true})).toBeDisabled();
+      await reviewer.getByRole('button',{name:'Evaluate evidence across all domains',exact:true}).click();
+      await expect(reviewer.getByText(/Coverage assessment:/)).toContainText('Dashboard scores are unchanged');
+      const organizationEvaluation=reviewer.getByRole('region',{name:'Organization-wide evidence evaluation'});
+      await expect(organizationEvaluation.getByRole('status',{name:'Organization evaluation progress',exact:true})).toBeVisible();
+      await expect(organizationEvaluation.getByRole('progressbar',{name:'Inventory records processed'})).toBeVisible();
+      await expect(inventorySection.getByRole('status',{name:'Organization evaluation progress',exact:true})).toHaveCount(0);
+      await expect(organizationEvaluation.getByRole('button',{name:'Evaluate evidence across all domains',exact:true})).toBeVisible();
+      assert.equal(await organizationEvaluation.locator('select').count(),0);
+      await p.screenshot({path:path.join(output,'evidence-reviewer.png'),fullPage:true});
+      check('Settings reviewer saves a bound draft; incomplete approval stays disabled; evaluation leaves scoring unchanged');
+      let nativeWarnings=0;
+      p.on('dialog',async dialog=>{nativeWarnings++; await dialog.dismiss();});
+      const priorScope=await reviewer.getByLabel('Scope description').inputValue();
+      await reviewer.getByLabel('Scope description').fill('Unsaved application dialog check');
+      await reviewer.getByRole('button',{name:'Open / reload domain',exact:true}).click();
+      let discard= p.getByRole('dialog',{name:'Discard unsaved edits?',exact:true});
+      await expect(discard).toBeVisible();
+      await expect(discard.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
+      await expect(reviewer.getByRole('button',{name:'Open / reload domain',exact:true})).toBeDisabled();
+      const discardAxe=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+      assert.deepEqual(discardAxe.violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)})),[]);
+      await p.screenshot({path:path.join(output,'evidence-discard-dialog.png')});
+      await p.keyboard.press('Escape');
+      await expect(discard).toHaveCount(0);
+      await expect(reviewer.getByLabel('Scope description')).toHaveValue('Unsaved application dialog check');
+      await expect(reviewer.getByRole('button',{name:'Open / reload domain',exact:true})).toBeFocused();
+      await reviewer.getByRole('button',{name:'Open / reload domain',exact:true}).click();
+      discard=p.getByRole('dialog',{name:'Discard unsaved edits?',exact:true});
+      await discard.getByRole('button',{name:'Discard and reload',exact:true}).click();
+      await expect(reviewer.getByLabel('Scope description')).toHaveValue(priorScope);
+      assert.equal(nativeWarnings,0);
+      check('Evidence discard warning is an accessible application dialog; Escape preserves edits/focus and confirmed reload restores saved content without browser popups');
+      const readOnly=await session('viewer'); await readOnly.page.goto(base+'/settings');
+      const readOnlySection=readOnly.page.locator('section').filter({has:readOnly.page.getByRole('heading',{name:'Scoring and evidence review',exact:true})});
+      await readOnlySection.getByRole('button',{name:'Open / reload domain',exact:true}).click();
+      await expect(readOnlySection.getByLabel('Scope description')).toBeDisabled();
+      let discardDialogs=0;
+      readOnly.page.on('dialog',async dialog=>{discardDialogs++; await dialog.dismiss();});
+      const reloadResponse=readOnly.page.waitForResponse(response=>response.url().endsWith('/scoring/qualifications') && response.request().method()==='GET');
+      await readOnlySection.getByRole('button',{name:'Open / reload domain',exact:true}).click();
+      assert.equal((await reloadResponse).status(),200);
+      assert.equal(discardDialogs,0);
+      check('Organization evaluation is separate from domain editing; read-only reload fetches fresh data without a discard popup');
+      return;
+    }
     if (process.env.AUDITMIND_BROWSER_DASHBOARD_ONLY === '1') return;
     await p.goto(base+'/settings');
     await expect(p.getByText('No organization logo set.',{exact:true})).toBeVisible();

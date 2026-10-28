@@ -1,6 +1,74 @@
 # Phase 4 remediation workflow validation
 
+## Evidence qualification review — stage two, 27 October 2026
+
+Backend-only, not activated in demo: migration 0030, current organization operational
+document sources, organization-wide inventory/material-history fingerprints, admin
+review/revocation, complete-objective attestations and expiry/conflict evaluation.
+Scope provenance retains the fingerprint/version and population counts, not a full
+historical inventory manifest. Missing/stale/changed/foreign evidence fails closed.
+Evaluation reads one repeatable-read snapshot; review locks inventory publication
+and follows document-parent-before-version worker ordering. Review validity is
+90 elapsed days (2,160 hours), with a DST database-boundary regression.
+
+Full PostgreSQL regression: **1,327 passed** in 699.32 seconds. Final review then
+hardened document lock ordering, retained scope-summary provenance and downgrade
+handling; fresh combined draft/review/dashboard/migration regression passed
+**55 tests**, including the new lock-order test (overlapping, not additive).
+High-severity Bandit, whitespace and secret checks passed. Mode remains unavailable/off;
+UI, dashboard aggregation and large-inventory optimization remain pending. No
+inference, demo migration, restart, commit or push is part of this stage.
+Existing-UI Chrome regression with the new backend: **71 checks passed**, including
+new default-off/unavailable and empty-coverage API checks; no AI usage or page errors.
+Artifacts: `temp/testing/finding-workflow/phase3_browser_e493ebae1bcc`.
+Disposable auditmind_test/public restored to **0030**, 33 tables; repeated upgrade
+is a no-op and Alembic drift check passed. Demo remains at 0028 and was not restarted.
+This is not acceptance of a reviewer UI, which remains unimplemented. No frontend
+source changes; prior 434 frontend-unit results remain historical, not rerun here.
+
+## Evidence scoring registry — stage one, 27 October 2026
+
+Local backend foundation, not activated in demo: migration 0029, default-off and
+unavailable settings API, versioned/admin-only qualification drafts, member reads,
+source-finding hashes and tenant/lifecycle admission fences. No approval route,
+live evaluator, qualified dashboard scores, Settings switch or inference enabled.
+Draft sources currently support findings only; document evidence and immutable
+inventory scope are subsequent work. No existing report schema/score was changed.
+
+Initial focused PostgreSQL dashboard/draft/migration run: 21 passed, including
+upgrade/downgrade/re-upgrade, legacy report preservation and Alembic drift check.
+Additional foreign-source/concurrent-creation tests are included in the ensuing
+full run. A timestamp-format comparison initially failed because PostgreSQL used
+a session-local offset; API updated_at output now normalizes the same instant to
+UTC and the focused rerun passed. High-severity Bandit gate and secret guard pass.
+Full PostgreSQL suite: **1,296 passed** in 653.25 seconds. Code review then added
+fail-safe disabling for a pre-existing enabled settings row and a regression case;
+the final focused draft/dashboard/migration run passed **24 tests**, including that
+addition and concurrent creation. These focused results overlap the full run and
+are not additive. High-severity Bandit, whitespace and secret checks passed again.
+Disposable auditmind_test/public restored to Alembic head **0029**, 33 tables;
+repeated upgrade is a no-op and drift check passed. Demo/normal databases were
+not migrated or reset, and no inference/paid calls were made.
+Earlier hosted 1,284 backend, 434 frontend and 70 Chromium results below apply to
+ceef079, not this new registry. No frontend code changed or new browser-visible
+workflow was delivered in this stage; reviewer UI/Chrome acceptance remain pending.
+
 ## Hosted mobile-overflow follow-up — 27 October 2026
+
+**Closed with hosted evidence:** fix `ceef07984a04935b6d78e473699ef08a8f3fadb1`
+was reviewed, committed and pushed. [Run 40559697870](https://github.com/shalisarakkal/AuditMind/actions/runs/40559697870)
+completed successfully; all four jobs ran on ubuntu-latest and passed:
+
+- Full PostgreSQL backend suite: **1,284 passed** in 478.63 seconds.
+- Frontend: **434 passed** across 44 files; lint, production build and audit passed.
+- Chromium browser acceptance: **70 checks passed**, including 320/390px dashboard
+  document-width and wrapping checks. Hosted artifact schema:
+  `phase3_browser_76a60651b286` (browser-acceptance artifact in the linked run).
+- Backend dependency audit: passed; backend dependency consistency check passed.
+
+These are fresh hosted totals for this SHA, distinct from earlier 61 focused or
+1,281 historical backend results and local Chrome runs. Counts are not additive.
+Mobile-fix verification is closed; no production deployment or live-AI sign-off.
 
 Hosted run `40553450269` for `387f72c` failed the browser job's dashboard mobile
 width assertion on ubuntu-latest; frontend and backend dependency-audit jobs passed.
@@ -26,7 +94,7 @@ width checks; `temp/testing/finding-workflow/phase3_browser_0bb4a8d62c13`.
 Normal production build and idle demo restart passed; no data/password resets.
 An initial baseline diagnostic run later failed an unrelated password-toggle
 assertion; the rebuilt complete Chrome rerun passed. Hosted Linux verification
-of the fix remains pending a separately approved commit/push.
+subsequently passed for `ceef079`, as recorded above.
 
 ## Empty-organization dashboard safeguard — 27 October 2026
 
@@ -1212,3 +1280,146 @@ accounts and a uniquely named schema, disables external credentials/HTTP and nev
 requests inference. It cleans only its own schema/processes; artifacts remain ignored.
 No real account passwords are needed or changed. Close that dedicated shell after
 testing so acceptance-only environment values do not affect normal development.
+
+## Evidence reviewer UI follow-up — 27 October 2026
+
+### 28 October real HTTP and two-user acceptance
+
+The live local Chrome/Next/API checks completed four full SA01 evaluations:
+116.524/110.537 s sequentially and 135.653/133.253 s simultaneously. Each processed
+all 6,374,205 records, returned identical fingerprints and left inventory/AI usage
+unchanged. This is repeated local-cache evidence, not controlled cold-cache or
+production acceptance. Artifact: `temp/testing/evidence-http/ac002e283bcb407b6e722576`.
+
+Cancellation during database work exposed a retained idle transaction. The route
+now explicitly closes its synchronous snapshot iterator in shielded response
+cleanup. Two real PostgreSQL/ASGI disconnect tests pass, covering disconnect-task
+cancellation and send failure. Live post-fix cancellation restores the UI in
+38.9 ms and releases the reader after its current fetch, ~27.8 s including polling.
+Artifact: `temp/testing/evidence-http/447bbaf0ba1f93a7628b3de7`.
+This is not an immediate database statement cancellation. Demo services were
+restarted only after verifying no import/report/archive jobs; existing data and
+account passwords were retained.
+
+`node scripts/browser-evidence-acceptance.cjs` passed **six focused Chrome checks**
+against its own local test schema with 100,000 synthetic assets. Two independent
+admins submit the same saved-version approval concurrently: exactly 200/409;
+the losing browser keeps edits and deliberately reloads version 2. The suite
+checks partial eligibility without Dashboard changes, server-enforced viewer and
+auditor read-only roles/foreign-tenant denial, real inventory-write overlap
+(91.8 ms write completion during a 1,705 ms scan), snapshot consistency, subsequent
+stale-binding rejection, revoke/rebind/material conflict and no native warnings,
+page errors, scoring activation or inference. Its schema/processes/accounts were
+removed. Artifact: `temp/testing/evidence-review/phase3_browser_3ddd814e9605`.
+These six scenarios are not a rerun of the historical full browser suite.
+
+Opt-in repeat commands: `node scripts/browser-evidence-http.cjs` against the idle
+running demo, or `--cancel-only`; then the isolated reviewer command above.
+Build `.next-acceptance` first with the documented isolated environment values.
+Do not overlap isolated acceptance with public-schema PostgreSQL test suites.
+
+Latest frontend recheck: **456 tests**, ESLint and isolated production build /
+TypeScript pass. High-severity Bandit for the evidence route/service also passes.
+Fresh full PostgreSQL run: **1,335 passed in 753.92 s**, zero failures/errors/skips,
+using `python -m pytest --require-postgres -W error -q
+--junitxml=../temp/testing/evidence-backend-20261028.xml` from `backend`.
+The two disconnect regressions are included in that total, not additive. The
+disposable test database was restored to migration **0030**, 33 public tables,
+with no Alembic drift. `pip check`, tracked/new task-file secret checks and
+`git diff --check` passed. No push or fresh hosted CI claim; the subsequently
+approved local check-in is recorded below.
+
+Review scope included qualification authorization/tenant boundaries, optimistic
+versions and write admission, inventory/source integrity and repeatable reads,
+expiry/downgrade handling, stream disconnect/error cleanup, browser confirmation
+ownership and unchanged default-off scoring/report behavior. The cancellation
+transaction leak discovered by real-service testing was corrected, regression
+tested and rechecked in Chrome. This is a scoped code/acceptance review, not a
+claim of an independent security audit or production load certification.
+
+Approved local check-in boundaries (28 October; not pushed):
+
+1. `0191f85` Backend registry/review/evaluator: migrations 0029/0030, models/schemas/routes,
+   registration, fingerprint/progress cleanup and PostgreSQL regressions.
+2. `aeb62a8` Settings reviewer: evidence component/tests, versioned actions/application
+   confirmations, operation-local progress, stream client/parser and tests.
+3. `0f4acb1` Presentation-only follow-ups: report print/filter contrast, local timestamps,
+   known scope/enum labels and shared sentence-case headings with tests.
+4. This acceptance/documentation commit: opt-in HTTP/reviewer harnesses, guarded fixtures,
+   recorded results, verification instructions and roadmap state.
+
+Exclude `.env`, `SIGN_IN.txt`, test artifacts, generated builds/type paths,
+unrelated `cline.json` and unapproved/untracked branding assets. A future approved
+push still needs hosted CI verification for its own SHA; `ceef079` is historical.
+
+28 October contextual-progress follow-up: 456 frontend tests, lint/TypeScript
+and production build passed. Twelve focused Chrome checks passed
+(`phase3_browser_58598e808b6e`), including evaluation progress inside its own
+section and inventory-loading status/Cancel inside domain qualification.
+Held-stream tests verify Cancel remains enabled while editing is locked, errors
+stay in the owning area and cancellation returns control without partial results.
+The current demo evaluation was not interrupted; the restart occurred after no
+active cursor requests/background jobs remained. No backend/scoring changes or
+new full-backend/full-browser acceptance are implied.
+
+Application-confirmation follow-up: 454 frontend tests, lint/TypeScript and
+production build passed. Eleven focused Chrome checks passed
+(`phase3_browser_9991cf55fa21`), including app-styled discard confirmation,
+Cancel-first focus, Escape preserving edits/restoring focus, confirmed reload,
+no browser warning and a clean Axe scan. Evidence review/conflict/revocation
+also use app confirmations; component tests assert no write before confirmation
+and frozen expected-version payloads. The Settings purge-log link now has an
+underline after the Axe check flagged color-only identification. No backend,
+authorization or scoring-rule change; no new full-backend run is claimed.
+
+Scope/reload UX follow-up: 451 frontend tests and lint passed; production build
+passed. Ten focused installed-Chrome checks passed (`phase3_browser_ac90e6cbc152`),
+including the separate organization-wide evaluation section and fresh read-only
+reload without a discard popup. Component coverage verifies clean reload, latest
+server version, Cancel preserving edits, failed reload preserving edits and
+confirmed discard. Evaluation preserves unsaved editor content and ignores it
+when checking saved organization evidence. No backend/scoring/authorization rule
+changes or new full-backend/full-browser run are implied.
+
+Performance/progress follow-up: 49 focused PostgreSQL qualification tests and
+447 frontend tests passed; lint and production build passed. After releasing the
+authorization read transaction before streaming, 3 focused stream tests also
+passed (overlapping, not additive). Tests cover whole-snapshot reads, nested JSON
+change detection, ordering stability, old-version rejection, explicit stream
+errors/truncation/cancellation and unchanged scoring. No new full-backend run is
+claimed. SA01 measurement and controlled-benchmark caveats are recorded in
+[performance detail](EVIDENCE_EVALUATION_PERFORMANCE.md).
+Nine focused installed-Chrome checks passed (`phase3_browser_b32ac6b0ca49`),
+including a nonempty synthetic inventory, visible progress bar reaching the
+actual total, versioned draft save and unchanged scoring. This is not a new
+full browser suite. High-severity Bandit checks passed for the changed backend
+route/service. The disposable test database was restored to migration 0030.
+
+Subsequent display-only casing/time increment: 442 frontend tests and lint passed;
+production build passed. Nine focused installed-Chrome checks passed, including
+browser-local Captured time, sentence-case report heading, explicit UTC scope
+explanation and retained report-only printing (`phase3_browser_6becbf62a66e`).
+Shared table/filter/section all-caps transforms were removed; report/page labels
+and known risk enums use sentence case. Names, acronyms, original authored text,
+technical provenance, saved date boundaries and downloadable exports are unchanged.
+The demo restart retained data/accounts. No backend behavior or inference change.
+
+Subsequent report-print increment: all 439 frontend tests passed (including 15
+focused ReportViewer tests); lint and production build passed. Nine focused installed-Chrome checks passed
+(`temp/testing/finding-workflow/phase3_browser_5a7fd04a2664`), including report-only
+print media, hidden application navigation/actions, all-priority content despite
+screen filtering, black print text and restoration of screen filtering. Generated
+Chrome PDF is retained in that ignored artifact folder. These focused checks
+overlap earlier browser checks; they are not an additional full-suite run.
+
+Settings reviewer preview: 437 frontend tests passed (including 3 new component
+tests for default-off/explicit expensive reads, versioned draft save and read-only
+roles). TypeScript, lint and production build passed. Demo upgraded to 0030 and
+restarted after confirming no pending/running imports, archive jobs or reports.
+No inference calls. This does not replace the earlier 1,327 full backend run / 55
+focused backend follow-up. Nine focused installed-Chrome checks passed, including
+the reviewer draft/inventory/evaluation path; artifacts:
+`temp/testing/finding-workflow/phase3_browser_fb17678b8ea6`.
+This is a focused run, not a rerun of the full 71-check browser suite or exhaustive
+approval/revocation browser acceptance.
+Dashboard scoring integration and performance acceptance remain pending.
