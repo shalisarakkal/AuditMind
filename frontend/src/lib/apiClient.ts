@@ -102,9 +102,9 @@ export function refreshAccessToken(background = false): Promise<Token | null> {
   return refreshing;
 }
 
-type RequestOptions = { background?: boolean; headers?: Record<string, string> };
+type RequestOptions = { background?: boolean; headers?: Record<string, string>; signal?: AbortSignal };
 
-async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}, raw = false): Promise<T> {
   let payload: BodyInit | undefined;
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -126,8 +126,10 @@ async function request<T>(method: string, path: string, body?: unknown, options:
         headers: token ? { ...headers, Authorization: `Bearer ${token}` } : headers,
         body: payload,
         credentials: "same-origin",
+        signal: options.signal,
       });
     } catch {
+      if (options.signal?.aborted) throw new Error("Evidence operation cancelled. No scoring changes were made.");
       throw new ApiError(0, UNREACHABLE);
     }
   };
@@ -159,6 +161,7 @@ async function request<T>(method: string, path: string, body?: unknown, options:
     }
     throw new ApiError(res.status, errorMessage(data, res.statusText), detail);
   }
+  if (raw) return res as T;
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
@@ -190,6 +193,7 @@ function errorMessage(data: unknown, fallback: string): string {
 }
 
 export const api = {
+  stream: (path: string, signal?: AbortSignal) => request<Response>("GET", path, undefined, { signal }, true),
   get: <T>(path: string, options?: RequestOptions) => request<T>("GET", path, undefined, options),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("POST", path, body, options),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),

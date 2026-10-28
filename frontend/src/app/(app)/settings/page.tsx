@@ -8,6 +8,7 @@ import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import { useApp } from "@/context/AppContext";
 import { PageHeader } from "@/components/ListPage";
 import OrganizationLogoSettings from "@/components/OrganizationLogo";
+import EvidenceScoringSettings from "@/components/EvidenceScoringSettings";
 
 export default function SettingsPage() {
   const { selectedOrg } = useApp();
@@ -17,6 +18,7 @@ export default function SettingsPage() {
     <div className="min-w-0 w-full space-y-8">
       <PageHeader title="Settings" orgName={org.name} total={undefined} noun="settings" />
       <OrganizationLogoSettings key={org.id} orgId={org.id} name={org.name} editable={org.role === "admin"} />
+      <EvidenceScoringSettings key={`scoring-${org.id}`} orgId={org.id} editable={org.role === "admin"} />
 
       <section className="space-y-3">
         <div>
@@ -56,7 +58,7 @@ export default function SettingsPage() {
         <h2 className="text-lg font-medium text-white">Purge log</h2>
         <p className="text-sm text-white/60">
           What was deleted for good (by an admin, or at the end of the retention period) is in Activity:{" "}
-          <Link href="/activity?type=purge" className="text-cyan hover:underline">
+          <Link href="/activity?type=purge" className="text-cyan underline">
             see purges
           </Link>
           .
