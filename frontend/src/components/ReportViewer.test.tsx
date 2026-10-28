@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ReportViewer } from "./ReportViewer";
 import type { AuditReport } from "@/lib/types";
@@ -22,6 +22,39 @@ function report(count?: number, baseline?: number): AuditReport {
 }
 
 describe("assessment interpretation", () => {
+  it("localizes Captured while preserving the original provenance and authored content", () => {
+    const value = report();
+    const captured = "2026-10-23T16:56:58.129864+00:00";
+    value.data!.provenance!.captured_at = captured;
+    value.data!.provenance!.period_semantics = "currently active findings created within inclusive UTC dates; current inventory";
+    const original = JSON.stringify(value);
+    render(<ReportViewer report={value} />);
+    expect(screen.getByText(`Captured: ${new Date(captured).toLocaleString()}`)).toBeVisible();
+    expect(screen.getByText(/Date boundaries were evaluated in UTC/)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Executive summary" })).toBeVisible();
+    expect(JSON.stringify(value)).toBe(original);
+  });
+  it("retains all remediation content for report-only printing despite screen filters", () => {
+    const { container } = render(<ReportViewer report={report()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Critical" }));
+    expect(container.querySelector(".report-print")).toBeInTheDocument();
+    expect(container.querySelectorAll(".report-remediation")).toHaveLength(3);
+    expect(container.querySelectorAll(".report-remediation.hidden")).toHaveLength(3);
+    expect(container.querySelector(".report-remediation")).toHaveClass("print:block");
+  });
+  it("keeps the selected priority readable using the configured cyan color", () => {
+    render(<ReportViewer report={report()} />);
+    const all = screen.getByRole("button", { name: "All" });
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(all).toHaveClass("bg-cyan", "text-navy");
+    for (const priority of ["Critical", "High", "Medium", "All"]) {
+      const target = screen.getByRole("button", { name: priority });
+      fireEvent.click(target);
+      expect(target).toHaveAttribute("aria-pressed", "true");
+      expect(target).toHaveClass("bg-cyan", "text-navy");
+      expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
+    }
+  });
   it("links domain evidence and remediation findings using the report organization", () => {
     const value = report();
     value.data!.domains[0].evidence_finding_ids = ["domain-finding"];
@@ -50,7 +83,7 @@ describe("assessment interpretation", () => {
     expect(screen.getByText("Partial AI assessment — overall score unavailable")).toBeVisible();
     expect(screen.getByText("Not scored")).toBeVisible();
     expect(screen.getByText("Specific coverage explanation")).toBeVisible();
-    expect(screen.queryByText("HIGH Risk Tier")).not.toBeInTheDocument();
+    expect(screen.queryByText("High risk tier")).not.toBeInTheDocument();
     expect(screen.queryByText("0/100")).not.toBeInTheDocument();
     expect(screen.queryByText(/legacy assessment/)).not.toBeInTheDocument();
   });

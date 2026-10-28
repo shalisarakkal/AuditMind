@@ -113,7 +113,7 @@ describe("ReportsPage", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Audit Reports")).toBeInTheDocument();
+      expect(screen.getByText("Audit reports")).toBeInTheDocument();
       expect(screen.getByText("Q3 Executive Cyber Resilience Audit")).toBeInTheDocument();
     });
 
@@ -324,7 +324,7 @@ describe("ReportsPage", () => {
 
     expect(screen.getByRole("dialog", { name: "Generate AI audit report" })).toBeInTheDocument();
 
-    const submitBtn = screen.getByRole("button", { name: "Generate Report" });
+    const submitBtn = screen.getByRole("button", { name: "Generate report" });
     await waitFor(() => expect(submitBtn).toBeEnabled());
     fireEvent.click(submitBtn);
 
@@ -344,11 +344,11 @@ describe("ReportsPage", () => {
       },
     });
     fireEvent.click(await screen.findByText("+ Generate report"));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Generate Report" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate report" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
     await screen.findByText(/Cannot reach the AuditMind API/);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Generate Report" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate report" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
     await waitFor(() => expect(keys).toHaveLength(2));
     expect(keys[0]).toBeTruthy();
     expect(keys[0]).toBe(keys[1]);
@@ -398,7 +398,7 @@ describe("ReportsPage", () => {
     expect(screen.getByRole("note")).toHaveTextContent("does not evaluate CIS, NIST, or ISO controls");
     expect(screen.queryByText("Compliance Frameworks (RAG Standards)")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Report title"), { target: { value: "Rule-based preview" } });
-    fireEvent.click(screen.getByRole("button", { name: "Generate Test Report" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate test report" }));
 
     await waitFor(() => expect(generated).toBe(true));
     const request = fetchMock.mock.calls.find(
@@ -444,9 +444,9 @@ describe("ReportsPage", () => {
 
     expect(screen.getByText("Q3 Executive Cyber Resilience Audit")).toBeInTheDocument();
     expect(screen.getByText("82")).toBeInTheDocument();
-    expect(screen.getAllByText("LOW Risk Tier").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Low risk tier").length).toBeGreaterThan(0);
     expect(screen.getByText(/Overall organizational cyber resilience score is 82\/100/)).toBeInTheDocument();
-    expect(screen.getByText("IDENTITY ACCESS")).toBeInTheDocument();
+    expect(screen.getAllByText("Identity access").length).toBeGreaterThan(0);
     expect(screen.getByText("Enforce Hardware-backed MFA for Cloud Admins")).toBeInTheDocument();
     expect(screen.getAllByText("CIS-5.2").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Model-estimated confidence: 80% (not calibrated)")).toBeInTheDocument();
@@ -465,7 +465,7 @@ describe("ReportsPage", () => {
     });
     render(<ReportViewer report={{ ...SAMPLE_REPORT, data: { ...data,
       overall_score: 35, overall_tier: "high", remediations } }} />);
-    expect(screen.getAllByText("HIGH Risk Tier").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("High risk tier").length).toBeGreaterThan(0);
     expect(screen.getByText("Confidence: not recorded")).toBeInTheDocument();
     expect(screen.getByText(/No specific finding references recorded/)).toBeInTheDocument();
   });

@@ -329,7 +329,7 @@ function MapEditor(props: MapEditorProps) {
       <p className="mt-1 text-xs text-white/50">{props.help}</p>
 
       <div className="mt-4 space-y-2">
-        <p className="text-xs uppercase tracking-wide text-white/50">This organization</p>
+        <p className="text-xs tracking-wide text-white/50">This organization</p>
         <PairRows
           rows={rows}
           onChange={setRows}
@@ -355,7 +355,7 @@ function MapEditor(props: MapEditorProps) {
       </div>
 
       <div className="mt-5">
-        <p className="text-xs uppercase tracking-wide text-white/50">Inherited (built-in and server defaults)</p>
+        <p className="text-xs tracking-wide text-white/50">Inherited (built-in and server defaults)</p>
         <ul className="mt-2 grid max-h-48 gap-1 overflow-auto text-sm text-white/70 sm:grid-cols-2">
           {inherited.map(([key, value]) => (
             <li key={key}>

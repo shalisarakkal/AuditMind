@@ -16,3 +16,42 @@ body {
 input[type="date"] {
   color-scheme: dark;
 }
+
+/* Print the complete report, not its surrounding application workspace.
+ * Scope every rule to report pages so other browser printing is unaffected. */
+@media print {
+  body:has(.report-print) {
+    background: white !important;
+    color: black !important;
+  }
+  body:has(.report-print) :not(.report-print):not(.report-print *):not(:has(.report-print)) {
+    display: none !important;
+  }
+  body:has(.report-print) :has(.report-print) {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .report-print, .report-print * {
+    color: black !important;
+    background: transparent !important;
+    border-color: #bbb !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    max-height: none !important;
+  }
+  .report-print button, .report-print .report-print-controls {
+    display: none !important;
+  }
+  .report-print .report-remediation {
+    display: block !important;
+  }
+  .report-print h1, .report-print h2, .report-print h3 {
+    break-after: avoid;
+  }
+}

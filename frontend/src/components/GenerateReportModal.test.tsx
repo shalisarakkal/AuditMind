@@ -16,20 +16,20 @@ describe("Report generation dialog", () => {
       "GET /orgs/sa02/documents/settings": () => ({ report_granted: false }),
     });
     const view = render(<GenerateReportModal {...base} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate report" })).toBeEnabled());
     view.rerender(<GenerateReportModal {...base} orgId="sa02" orgName="SA02" />);
-    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate report" })).toBeDisabled();
     await screen.findByText(/not approved for SA02/);
     view.rerender(<GenerateReportModal {...base} isOpen={false} />);
     approved = false;
     view.rerender(<GenerateReportModal {...base} />);
-    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate report" })).toBeDisabled();
     await screen.findByText(/not approved for SA01/);
   });
   it("wraps Tab and Shift+Tab inside the dialog", () => {
     render(<GenerateReportModal {...base} mode="rule_based_test" />);
     const first = screen.getByRole("button", { name: "Close report generation" });
-    const last = screen.getByRole("button", { name: "Generate Test Report" });
+    const last = screen.getByRole("button", { name: "Generate test report" });
     last.focus();
     fireEvent.keyDown(last, { key: "Tab" });
     expect(first).toHaveFocus();
@@ -41,7 +41,7 @@ describe("Report generation dialog", () => {
     mockApi({ "GET /orgs/sa01/documents/settings": () => ({ report_granted: false }) });
     render(<GenerateReportModal {...base} onGenerate={generate} />);
     expect(screen.getByLabelText("Report title")).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate report" })).toBeDisabled();
     expect(await screen.findByText(/not approved for SA01/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Review consent in Documents" })).toHaveAttribute("href", "/documents?org=sa01");
     fireEvent.submit(screen.getByLabelText("Report title").closest("form")!);
@@ -60,10 +60,10 @@ describe("Report generation dialog", () => {
     mockApi({ "GET /orgs/sa01/documents/settings": () => failed ? json({ detail: "Unavailable" }, 503) : { report_granted: true, report_target: "test-target" } });
     render(<GenerateReportModal {...base} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Unavailable");
-    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate report" })).toBeDisabled();
     failed = false;
     fireEvent.click(screen.getByRole("button", { name: "Retry approval check" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate Report" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate report" })).toBeEnabled());
     expect(screen.getByRole("group", { name: "Frameworks" })).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe("Report generation dialog", () => {
     const generate = vi.fn(() => new Promise<void>(done => { resolve = done; }));
     const close = vi.fn();
     render(<GenerateReportModal {...base} onGenerate={generate} onClose={close} />);
-    const submit = screen.getByRole("button", { name: "Generate Report" });
+    const submit = screen.getByRole("button", { name: "Generate report" });
     await waitFor(() => expect(submit).toBeEnabled());
     for (const checkbox of screen.getAllByRole("checkbox")) await user.click(checkbox);
     await user.click(submit);
@@ -95,7 +95,7 @@ describe("Report generation dialog", () => {
     let approved = true;
     mockApi({ "GET /orgs/sa01/documents/settings": () => ({ report_granted: approved }) });
     render(<GenerateReportModal {...base} onGenerate={async () => { approved = false; throw new Error("Consent revoked"); }} />);
-    const submit = screen.getByRole("button", { name: "Generate Report" });
+    const submit = screen.getByRole("button", { name: "Generate report" });
     await waitFor(() => expect(submit).toBeEnabled());
     fireEvent.click(submit);
     expect(await screen.findByRole("alert")).toHaveTextContent("Consent revoked");
@@ -122,7 +122,7 @@ describe("Report generation dialog", () => {
     const generate = vi.fn().mockResolvedValue(undefined);
     render(<GenerateReportModal {...base} mode="rule_based_test" onGenerate={generate} />);
     expect(screen.getByRole("note")).toHaveTextContent("does not use AI or an external provider");
-    fireEvent.click(screen.getByRole("button", { name: "Generate Test Report" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate test report" }));
     await waitFor(() => expect(generate).toHaveBeenCalledWith(expect.objectContaining({ frameworks: [] }), "rule_based_test"));
     expect(fetchMock).not.toHaveBeenCalled();
   });

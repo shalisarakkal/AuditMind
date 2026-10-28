@@ -87,13 +87,13 @@ export default function ReportDetailPage() {
   if (error || !report) {
     return (
       <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
-        <h2 className="text-lg font-semibold text-red-400">Report Not Found</h2>
+        <h2 className="text-lg font-semibold text-red-400">Report not found</h2>
         <p className="mt-2 text-sm text-white/60">{error || "The requested report could not be found."}</p>
         <Link
           href="/reports"
           className="mt-4 inline-block rounded-lg bg-white/10 px-4 py-2 text-xs font-medium text-white hover:bg-white/20"
         >
-          ← Back to Reports
+          ← Back to reports
         </Link>
       </div>
     );
@@ -103,7 +103,7 @@ export default function ReportDetailPage() {
     <div className="space-y-6">
       <div>
         <Link href="/reports" className="text-xs text-cyan-400 hover:underline">
-          ← Back to Reports List
+          ← Back to reports list
         </Link>
       </div>
       {downloadError && <p role="alert" className="text-sm text-red-300">{downloadError}</p>}

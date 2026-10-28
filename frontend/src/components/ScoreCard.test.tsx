@@ -11,7 +11,7 @@ describe("risk-tier presentation", () => {
     ["low", "Low risk", "emerald"],
   ] as const)("renders %s with the original layout and shared text color", (tier, label, color) => {
     render(<ScoreCard label="Domain" score={15} tier={tier} />);
-    expect(screen.getByText(tier).className).toContain(`text-${color}-`);
+    expect(screen.getByText(tier.charAt(0).toUpperCase() + tier.slice(1)).className).toContain(`text-${color}-`);
     expect(screen.getByText("15")).toBeVisible();
     expect(screen.getByText("Domain").parentElement).toHaveClass("bg-white/5", "border-white/10");
     expect(riskTierStyle(tier.toUpperCase())).toEqual(riskTierStyle(tier));

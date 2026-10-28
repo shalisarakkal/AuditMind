@@ -62,7 +62,7 @@ export default function ImportProfilesPanel({ orgId, isAdmin }: Props) {
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left text-sm">
-          <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/50">
+          <thead className="bg-white/5 text-xs tracking-wide text-white/50">
             <tr>
               <th className="px-4 py-2">Format</th>
               <th className="px-4 py-2">Reads</th>

@@ -78,7 +78,7 @@ export function ListTable({ children, fixed = false, className = "" }: { childre
   );
 }
 
-export const THEAD = "bg-white/5 text-xs uppercase tracking-wide text-white/50";
+export const THEAD = "bg-white/5 text-xs tracking-wide text-white/50";
 export const ROW = "border-t border-white/10 text-white/80";
 /** A header cell with no sort (a column that isn't sortable, or actions). */
 export const TH = "px-4 py-2";

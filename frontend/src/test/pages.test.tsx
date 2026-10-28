@@ -421,7 +421,7 @@ describe("Dashboard page", () => {
     await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => summary });
 
     expect(await screen.findByTestId("overall-score")).toHaveTextContent("87");
-    expect(screen.getByText("low risk tier")).toBeInTheDocument();
+    expect(screen.getByText("Low risk tier")).toBeInTheDocument();
     expect(screen.getByText("12 assets · 9 findings")).toBeInTheDocument();
     // Domain cards follow the canonical order, not the API's.
     const labels = screen.getAllByText(/^(Identity & Access|Network & Config)$/).map((el) => el.textContent);

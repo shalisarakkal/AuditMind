@@ -314,7 +314,7 @@ function EventDetailsPanel({ details }: { details: EventDetails }) {
   const top = (title: string, part?: { distinct: string; top: { value: string; events: number }[] }) =>
     part && part.top.length > 0 ? (
       <div>
-        <p className="text-xs uppercase tracking-wide text-white/50">
+        <p className="text-xs tracking-wide text-white/50">
           {title} ({part.distinct} in all)
         </p>
         <ul className="mt-1 space-y-0.5 text-xs">
@@ -335,7 +335,7 @@ function EventDetailsPanel({ details }: { details: EventDetails }) {
       </div>
       {details.examples && details.examples.length > 0 && (
         <div>
-          <p className="text-xs uppercase tracking-wide text-white/50">Example events</p>
+          <p className="text-xs tracking-wide text-white/50">Example events</p>
           <pre className="mt-1 max-h-64 overflow-auto rounded bg-navy p-2 text-xs text-white/70">
             {details.examples.map((example) => JSON.stringify(example)).join("\n")}
           </pre>

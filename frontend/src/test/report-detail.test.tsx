@@ -30,7 +30,7 @@ describe("report detail lifecycle", () => {
     if (missing === "organization") state.org = null; else state.id = "";
     const get = vi.spyOn(apiClient, "get");
     render(<ReportDetailPage />);
-    expect(await screen.findByRole("heading", { name: "Report Not Found" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Report not found" })).toBeVisible();
     expect(get).not.toHaveBeenCalled();
   });
 
@@ -47,7 +47,7 @@ describe("report detail lifecycle", () => {
   it.each([new Error("Access denied"), "opaque failure"])("shows a safe load failure", async error => {
     vi.spyOn(apiClient, "get").mockRejectedValue(error);
     render(<ReportDetailPage />);
-    expect(await screen.findByRole("heading", { name: "Report Not Found" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Report not found" })).toBeVisible();
     expect(screen.getByText(error instanceof Error ? error.message : "Failed to load report")).toBeVisible();
   });
 

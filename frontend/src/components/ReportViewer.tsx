@@ -5,6 +5,7 @@ import { reportErrorMessage } from "@/lib/report";
 import { AuditReport, AuditReportSnapshot } from "@/lib/types";
 import FindingReference from "./FindingReference";
 import { riskTierStyle } from "@/lib/domain";
+import { enumLabel, capturedTime, reportScope } from "@/lib/presentation";
 
 type Props = {
   report: AuditReport;
@@ -62,13 +63,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
   }) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="report-print space-y-6">
       {/* Top Banner & Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-white/10 bg-[#0e1626] p-6 shadow-lg">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold text-white tracking-tight">{report.title}</h1>
-            <span className="rounded-full bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 text-xs font-semibold text-cyan-400">
+            <span className="rounded-full bg-cyan/10 border border-cyan/20 px-2.5 py-0.5 text-xs font-semibold text-cyan">
               {syntheticMock ? "Synthetic mock · No AI calls" : ruleBasedTest ? "Rule-based test · No AI" : "AI Audit"}
             </span>
           </div>
@@ -100,7 +101,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center gap-2 rounded-lg bg-cyan-500 px-3.5 py-2 text-xs font-medium text-black hover:bg-cyan-400 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-cyan px-3.5 py-2 text-xs font-medium text-navy hover:bg-cyan/90 transition-colors"
           >
             <span>Print</span>
           </button>
@@ -116,13 +117,13 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
             <p>External processing: none. AI and embedding providers were not called.</p>
             <p>Framework control evaluation: not performed.</p>
             <p>Method: {data.provenance?.method} · Version: {data.provenance?.version}</p>
-            <p>Captured: {data.provenance?.captured_at}</p>
-            <p>{data.provenance?.period_semantics}</p>
+            <p>Captured: {capturedTime(data.provenance?.captured_at)}</p>
+            <p>{reportScope(data.provenance?.period_semantics)}</p>
           </div>
         ) : data.provenance?.model ? <>
           <p>Model: {data.provenance.model} · Prompt: {data.provenance.prompt_version}</p>
-          <p>Captured: {data.provenance.captured_at}</p>
-          <p>{data.provenance.period_semantics}</p>
+          <p>Captured: {capturedTime(data.provenance.captured_at)}</p>
+          <p>{reportScope(data.provenance.period_semantics)}</p>
           <p>Sampled findings: {sampleCount ?? "not recorded"} of {data.total_findings}. {sampleCount == null ? "Sampling coverage is not recorded." : sampleCount < data.total_findings ? "The model did not receive every finding." : sampleCount === data.total_findings ? "All counted findings were included; text may still be limited." : "Sampling counts are inconsistent; inspect captured evidence."}</p>
           {data.provenance.evidence_limitation && <p role="status" className="text-amber-300">{data.provenance.evidence_limitation}</p>}
           <details><summary>Captured evidence details</summary><pre className="max-h-96 overflow-auto whitespace-pre-wrap">{JSON.stringify(data.provenance, null, 2)}</pre></details>
@@ -132,7 +133,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col justify-between rounded-xl border border-white/20 bg-white/5 p-6">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-white/60">
+            <span className="text-xs font-semibold tracking-wide text-white/60">
               {syntheticMock ? "Simulated score (not a real assessment)" : ruleBasedTest ? "Deterministic test score" : "AI resilience score (advisory)"}
             </span>
             <div className="mt-3 flex items-baseline gap-3">
@@ -142,7 +143,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
           </div>
           <div className="mt-4 border-t border-white/10 pt-3">
             <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-bold ${currentTierStyle.text}`}>
-              {overallScore != null && overallTier ? `${overallTier} Risk Tier` : "No overall risk tier assigned"}
+              {overallScore != null && overallTier ? `${enumLabel(overallTier)} risk tier` : "No overall risk tier assigned"}
             </span>
             <p className="mt-1 text-xs text-white/50">
               {ruleBasedTest
@@ -159,8 +160,8 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
 
         {/* Executive Summary */}
         <div className="lg:col-span-2 rounded-xl border border-white/10 bg-[#0e1626] p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
-            Executive Summary
+          <h2 className="text-sm font-semibold tracking-wide text-cyan">
+            Executive summary
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-white/90">
             {data.executive_summary}
@@ -173,11 +174,11 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
 
       {/* Domain Breakdown */}
       <div className="rounded-xl border border-white/10 bg-[#0e1626] p-6">
-        <h2 className="text-base font-semibold text-white mb-4">Domain Resilience Breakdown</h2>
+        <h2 className="text-base font-semibold text-white mb-4">Domain resilience breakdown</h2>
         {!ruleBasedTest && <p className="mb-4 text-xs text-white/70">Domain scores are advisory AI judgments. Read the complete justification for evidence limitations.</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.domains?.map((d) => {
-            const domainName = d.domain.replace("_", " ").toUpperCase();
+            const domainName = enumLabel(d.domain);
             const style = riskTierStyle(d.score == null ? null : d.tier);
             return (
               <div key={d.domain} className="rounded-lg border border-white/5 bg-white/[0.02] p-4 flex flex-col justify-between">
@@ -209,33 +210,35 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       <div className="rounded-xl border border-white/10 bg-[#0e1626] p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 mb-4">
           <div>
-            <h2 className="text-base font-semibold text-white">Prioritized Remediation Roadmap</h2>
+            <h2 className="text-base font-semibold text-white">Prioritized remediation roadmap</h2>
             <p className="text-xs text-white/50">Actions ranked by security impact and mitigation value</p>
             {!ruleBasedTest && <p className="mt-2 text-xs text-white/70">Confidence is model-estimated evidential support, not a calibrated probability of compliance or remediation success, and not evidence completeness.</p>}
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white/5 rounded-lg p-1 border border-white/10">
+          <div className="report-print-controls flex items-center gap-1.5 bg-white/5 rounded-lg p-1 border border-white/10">
             {["ALL", "CRITICAL", "HIGH", "MEDIUM"].map((prio) => (
               <button
                 key={prio}
+                type="button"
+                aria-pressed={activePriority === prio}
                 onClick={() => setActivePriority(prio)}
                 className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                   activePriority === prio
-                    ? "bg-cyan-500 text-black font-semibold"
+                    ? "bg-cyan text-navy font-semibold"
                     : "text-white/60 hover:text-white"
                 }`}
               >
-                {prio}
+                {enumLabel(prio)}
               </button>
             ))}
           </div>
         </div>
 
         <div className="space-y-3">
-          {filteredRemediations.length === 0 ? (
-            <p className="text-xs text-white/50 py-4 text-center">No remediation actions matching the selected filter.</p>
-          ) : (
-            filteredRemediations.map((r, idx) => {
+          {filteredRemediations.length === 0 && (
+            <p className="report-print-controls text-xs text-white/50 py-4 text-center">No remediation actions matching the selected filter.</p>
+          )}
+          {(data.remediations || []).map((r, idx) => {
               const prioUpper = r.priority.toUpperCase();
               const isCrit = prioUpper === "CRITICAL";
               const isHigh = prioUpper === "HIGH";
@@ -248,19 +251,19 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
               return (
                 <div
                   key={idx}
-                  className="rounded-lg border border-white/5 bg-white/[0.02] p-4 hover:border-white/10 transition-colors"
+                  className={`report-remediation rounded-lg border border-white/5 bg-white/[0.02] p-4 hover:border-white/10 transition-colors ${activePriority !== "ALL" && prioUpper !== activePriority ? "hidden print:block" : ""}`}
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2.5">
                       <span className={`rounded border px-2 py-0.5 text-xs font-bold ${prioBadge}`}>
-                        {r.priority}
+                        {enumLabel(r.priority)}
                       </span>
                       <h3 className="text-sm font-semibold text-white">{r.title}</h3>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-white/50">
                       <span>Effort: <strong className="text-white/80">{r.estimated_effort}</strong></span>
                       <span>•</span>
-                      <span>Domain: <strong className="text-white/80">{r.domain.replace("_", " ")}</strong></span>
+                      <span>Domain: <strong className="text-white/80">{enumLabel(r.domain)}</strong></span>
                     </div>
                   </div>
 
@@ -274,7 +277,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2 text-[11px] text-white/50">
                     <div>
-                      Expected Impact: <span className="text-emerald-400/90">{r.expected_impact}</span>
+                      Expected impact: <span className="text-emerald-400/90">{r.expected_impact}</span>
                     </div>
                     {r.related_controls?.length > 0 && (
                       <div className="flex items-center gap-1.5">
@@ -282,7 +285,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                         {r.related_controls.map((ctrl) => (
                           <span
                             key={ctrl}
-                            className="rounded bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-400 border border-cyan-500/20"
+                            className="rounded bg-cyan/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan border border-cyan/20"
                           >
                             {ctrl}
                           </span>
@@ -292,15 +295,14 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
                   </div>
                 </div>
               );
-            })
-          )}
+            })}
         </div>
       </div>
 
       {/* Compliance Citations */}
       {data.compliance_citations && data.compliance_citations.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-[#0e1626] p-6">
-          <h2 className="text-base font-semibold text-white mb-1">Compliance & Standards Evidence (RAG)</h2>
+          <h2 className="text-base font-semibold text-white mb-1">Compliance &amp; standards evidence (RAG)</h2>
           <p className="text-xs text-white/50 mb-4">Framework controls cited during automated reasoning</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

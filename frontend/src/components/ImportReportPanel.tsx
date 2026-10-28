@@ -117,7 +117,7 @@ function NoteList({ title, rows, total }: { title: string; rows: RowNote[]; tota
       </summary>
       <div className="mt-1 max-h-64 overflow-auto" role="region" aria-label={title}>
         <table className="w-full table-fixed text-left">
-          <thead className="text-xs uppercase tracking-wide text-white/50">
+          <thead className="text-xs tracking-wide text-white/50">
             <tr>
               <th className="w-16 py-1 pr-4">Row</th>
               <th className="py-1 pr-4">Item</th>
@@ -154,7 +154,7 @@ function RowTable({
     <div className="mt-3 max-h-64 overflow-auto" aria-label={title} role="region">
       <p className={`mb-1 text-xs font-medium ${tone === "error" ? "text-red-300" : "text-amber-200"}`}>{title}</p>
       <table className="w-full table-fixed text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-white/50">
+        <thead className="text-xs tracking-wide text-white/50">
           <tr>
             <th className="w-16 py-1 pr-4">Row</th>
             <th className="py-1">{tone === "error" ? "Problem" : "Warning"}</th>

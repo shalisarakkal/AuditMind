@@ -133,7 +133,7 @@ function ReportGenerationDialog({ orgId, orgName, canApprove, mode = "ai", onClo
           <button type="button" disabled={submitting} onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50">Cancel</button>
           <button type="submit" disabled={submitting || !ready} aria-describedby={mode === "ai" ? prerequisiteId : undefined}
             className="rounded-md bg-cyan px-3 py-1.5 text-sm font-medium text-navy hover:opacity-90 disabled:opacity-50">
-            {submitting ? "Queueing…" : mode === "ai" ? "Generate Report" : "Generate Test Report"}
+            {submitting ? "Queueing…" : mode === "ai" ? "Generate report" : "Generate test report"}
           </button>
         </footer>
       </form>

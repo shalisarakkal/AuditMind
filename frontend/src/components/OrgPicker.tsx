@@ -16,7 +16,7 @@ export default function OrgPicker() {
 
   return (
     <div className="space-y-2">
-      <label htmlFor="org-picker" className="block text-xs uppercase tracking-wide text-white/50">
+      <label htmlFor="org-picker" className="block text-xs tracking-wide text-white/50">
         Organization
       </label>
       <select

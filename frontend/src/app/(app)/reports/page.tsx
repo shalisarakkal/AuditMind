@@ -191,7 +191,7 @@ function Reports() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Audit Reports"
+        title="Audit reports"
         total={page?.total}
         noun="reports"
         orgName={org.name}

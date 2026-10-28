@@ -54,7 +54,7 @@ export default function Sidebar() {
       {orgs.length > 0 && <NavList items={NAV_ITEMS} pathname={pathname} />}
       {me?.is_sysadmin && (
         <div className={orgs.length > 0 ? "mt-6" : ""}>
-          <p className="mb-1 px-3 text-xs uppercase tracking-wide text-white/50">Platform</p>
+          <p className="mb-1 px-3 text-xs tracking-wide text-white/50">Platform</p>
           <NavList items={PLATFORM_ITEMS} pathname={pathname} label="Platform" />
         </div>
       )}
