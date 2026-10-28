@@ -13,6 +13,7 @@ const base = 'http://localhost:3014';
 const flags = ['--schema', schema, '--workflow', '--evidence'];
 const cli = action => execFileSync(python, [fixture, action, ...flags], { cwd: path.join(root, 'backend'), windowsHide: true, encoding: 'utf8' });
 const evidence = { schema, checks: [], errors: [], externalInference: false };
+if (process.argv.includes('--load') && !process.argv.includes('--pilot')) throw new Error('--load requires the isolated --pilot');
 const children = [];
 function check(name) { evidence.checks.push(name); console.log('PASS ' + name); }
 async function free(port) {
@@ -153,8 +154,10 @@ async function free(port) {
     check('Two real administrators approve concurrently: one succeeds, one receives 409 without losing edits; reload sees version 2, eligibility is partial and Dashboard is unchanged');
     await loser.page.screenshot({ path: path.join(output, 'approved-partial.png'), fullPage: true });
 
+    const readers = [];
     for (const role of ['viewer', 'auditor']) {
       const reader = await actor(role); await open(reader);
+      readers.push(reader);
       await expect(reader.panel.getByLabel('Scope description')).toBeDisabled();
       await expect(reader.panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true })).toBeDisabled();
       await expect(reader.panel.getByRole('button', { name: 'Revoke qualification', exact: true })).toHaveCount(0);
@@ -306,6 +309,11 @@ async function free(port) {
     assert.deepEqual((await a.request(otherScoring + '/settings')).body, otherMode);
     await loser.page.screenshot({ path: path.join(output, 'restored-baseline-dashboard.png'), fullPage: true });
     check('Disable Cancel preserves opt-in; confirmed UI rollback persists after reload, restores both sessions to current baseline and retains qualifications');
+    if (process.argv.includes('--pilot')) {
+      const platform = process.argv.includes('--load') ? await actor('platform') : null;
+      await require('./evidence-pilot.cjs')({ base, seed, primary: outsider, observer: a, evidence, output, check,
+        loadActors: platform ? [b, ...readers, platform, outsider, a] : null });
+    }
     const stats = JSON.parse(cli('inspect')); assert.equal(stats.usage_count, 0);
     assert.deepEqual(evidence.errors, []);
     check('No browser-native warnings, page errors or AI usage; scoring rolled back to the default-off baseline after the isolated opt-in test');

@@ -2005,8 +2005,19 @@ lint and isolated production build passed. No backend contract changed.
     Checks reload/second-session persistence, tenant isolation, admin-only mode,
     partial/conflicting/stale evidence display and confirmed UI rollback to baseline.
     Synthetic setting restored off; schema/accounts/processes removed. Normal
-    organizations remain off. New browser assertions are locally verified;
-    commit/push/hosted verification follows. No broader rollout or production sign-off.
+    organizations remain off. Committed/pushed as `898b309`; all four hosted
+    Ubuntu jobs passed in [run 40769552484](https://github.com/shalisarakkal/AuditMind/actions/runs/40769552484).
+    No broader rollout or production sign-off.
+  - [x] Controlled synthetic seven-domain Chrome pilot: 17 local scenarios with
+    `--pilot --load`, genuine zero and weighted complete aggregation, real expiry,
+    six-domain/no-overall reevaluation, re-review and incompatible scope checks.
+    A bounded six-account/two-organization 60-second exercise completed 360 measured
+    reads (p95 171.8 ms) and eight worker jobs without HTTP errors/tenant crossover.
+    Fixture/settings restored and removed. CI includes correctness-only `--pilot`;
+    this is not real evidence approval or sustained production capacity acceptance.
+  - [ ] Before broader rollout, define and validate representative concurrent-user,
+    inventory-size, duration and latency/resource targets in the intended environment;
+    obtain operational evidence review. Keep default-off until separately approved.
   - [x] Activate local 0031 build after idle checks; retain data/passwords and
     zero enabled organization scoring settings. Health/readiness are green.
   - [x] Real durable worker timing/navigation/deduplication/cancellation acceptance:

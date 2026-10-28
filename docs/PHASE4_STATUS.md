@@ -39,12 +39,25 @@ against the unchanged application runtime, including reload and second-session
 mode persistence, organization isolation, actual polling withdrawal of stale
 scores, conflicting evidence display and UI-confirmed rollback to baseline. The
 synthetic setting was restored off and the fixture removed; normal organizations
-remain off. At this local-verification checkpoint the browser assertions have
-not yet run in hosted CI; committing/pushing and verifying that run is the next gate.
+remain off. Committed/pushed as `898b30993da03b4323101daf52a533768d2a6bed`;
+all four hosted Ubuntu jobs passed in
+[run 40769552484](https://github.com/shalisarakkal/AuditMind/actions/runs/40769552484),
+including the expanded browser assertions. This closes that hosted gate.
 Details and artifact paths:
 [post-push verification](PHASE4_VALIDATION.md#post-push-chrome-opt-in-verification--28-october-2026).
 This closes the requested synthetic Chrome check, not all-seven-domain operational
 review, sustained-load acceptance, production deployment or default-on approval.
+
+Subsequent browser-only pilot: **17 local Chrome scenarios pass** using
+`--pilot --load`: all-seven-domain UI approval/weighted aggregation, genuine zero,
+real review expiry, six-domain/no-overall reevaluation, re-review and scope mismatch,
+plus a bounded 60-second six-account/two-organization exercise. Its 360 measured
+reads all succeeded (p95 171.8 ms); eight worker jobs completed with exact counts.
+Both synthetic settings were switched off and the fixture removed. CI now includes
+the correctness-only `--pilot` variant (16 scenarios); load remains local opt-in.
+See latest validation for the complete artifact and initial test-only 403 correction.
+This is software-behavior acceptance with synthetic approvals, not real operational
+evidence sign-off or sustained production-load/default-on approval.
 
 ## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
 

@@ -2,6 +2,43 @@
 
 Updated 28 October 2026. Local synthetic SA01 benchmark; qualified scoring remains off.
 
+## Bounded isolated two-organization exercise — 28 October
+
+Separate from the SA01 measurements below, the guarded local fixture command
+`node scripts/browser-evidence-acceptance.cjs --pilot --load` passed 17 Chrome
+scenarios. Artifact:
+`temp/testing/evidence-review/phase3_browser_084264a7927c/results.json`.
+Six independent accounts (including a read-only platform administrator) read two
+synthetic organizations for **60.317 seconds**, at approximately one measured
+request/account/second, while one real worker processed eight explicit evaluations
+in four paired waves. Alpha is baseline/off, with 100,000 assets; Beta is temporarily
+qualified/on, with 19 synthetic findings and all seven reviewed domains. Mode and
+organization identity are checked on responses. Both finish off before fixture removal.
+
+| Measured request | Count | p50 | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| Dashboard state | 120 | 105.1 ms | 184.3 ms | 225.6 ms |
+| Dashboard | 120 | 110.0 ms | 160.5 ms | 214.3 ms |
+| Current evaluation | 120 | 44.3 ms | 120.6 ms | 174.7 ms |
+| Combined | 360 | 92.5 ms | 171.8 ms | 225.6 ms |
+
+All measured requests succeeded; no tenant/mode crossover was observed. All eight
+jobs completed with terminal counts equal to totals: **100,004 records** per Alpha
+job (worker 1.6–1.7 s) and **38** per Beta job (reported 0.0 s at 0.1 s resolution).
+Per-wave observation includes shared-worker queueing and polling, approximately
+1.98–2.17 s, not independent Beta computation latency. Additional ordinary browser
+polls/job-control requests are not included in the 360-request table. Browser
+errors and AI usage are zero. No other local builds/regression suites or benchmark
+scans overlapped the measured workload; no cache flush was performed.
+
+This is a bounded local correctness/responsiveness sample, not sustained or
+representative production-load acceptance, cold-cache latency, memory/temp-disk
+capacity, throughput saturation or fair scheduling certification. The intended
+deployment topology, realistic concurrent-user/inventory sizes, test duration and
+latency/resource budgets must be agreed and measured before broader rollout.
+The application default remains off. The CI `--pilot` variant omits `--load`:
+hosted correctness acceptance must not be advertised as these local timings.
+
 ## Implementation
 
 Current evaluation delivery (migration 0031): explicit organization-wide evaluation

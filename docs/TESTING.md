@@ -1,5 +1,26 @@
 # Testing strategy and measured coverage
 
+## Evidence-scoring pilot commands
+
+After the isolated production build described in
+[Phase 4 validation](PHASE4_VALIDATION.md), run from the repository root:
+
+- `node scripts/browser-evidence-acceptance.cjs`: 11 opt-in/permission/partial/
+  invalidation/rollback scenarios (hosted Ubuntu verified at `898b309`).
+- `node scripts/browser-evidence-acceptance.cjs --pilot`: additionally exercises
+  all seven profile approvals, genuine zero, weighted complete aggregation, real
+  expiry, re-review and incompatible scopes. This is the CI correctness variant.
+- `node scripts/browser-evidence-acceptance.cjs --pilot --load`: also measures a
+  bounded 60-second, six-account/two-organization mixed-read workload with four
+  waves of paired worker evaluations. Local opt-in only; no production-load claim.
+
+All variants share a unique, guarded local `auditmind_test` schema and use real
+Chrome/API/worker/PostgreSQL with external HTTP blocked. They restore synthetic
+settings off and remove their fixture; artifacts remain under
+`temp/testing/evidence-review`. Ports 3014/8012 must be free. Do not overlap
+public-schema backend tests or performance benchmarks. See
+[the latest dated results](PHASE4_VALIDATION.md) rather than adding historical counts.
+
 ## Latest drag/drop regression — 27 October 2026
 
 **428 frontend tests passed** (70.39s), lint and isolated build/TypeScript passed.

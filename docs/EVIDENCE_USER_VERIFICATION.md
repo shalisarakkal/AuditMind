@@ -22,9 +22,11 @@ these are separate from the application's report-only print layout.
 
 ## Dashboard evidence review and opt-in scoring (updated 28 October 2026)
 
-Latest post-push local acceptance: **11 dedicated Chrome real-worker/two-user
-scenarios** pass, including mode persistence, cross-session invalidation, tenant
-isolation and confirmed UI rollback. The implementation checkpoint also passed
+Latest local acceptance: **17 dedicated Chrome scenarios** pass with `--pilot --load`,
+including seven-domain/real-zero/weighted aggregation, real review expiry, scope
+mismatch and a bounded six-account/two-organization exercise. The earlier 11
+opt-in/isolation/rollback scenarios passed hosted Ubuntu CI at `898b309`.
+The implementation checkpoint also passed
 71 full regression checks, 465 frontend and 1,366 full PostgreSQL tests; those
 broader suites were not rerun for the browser-only follow-up. See
 [validation](PHASE4_VALIDATION.md) for final backend/build results and successful
@@ -161,7 +163,26 @@ then confirm **Use findings-based baseline** in the UI and verify both sessions
 return to the current baseline without deleting the saved qualification or job.
 Invalidated domains show **Insufficient evidence** until reevaluation, not numeric
 zero/100. No application code or ordinary-organization settings are changed by
-this follow-up. New test assertions are locally verified, not yet hosted-CI verified.
+this follow-up. These 11 scenarios also passed hosted Ubuntu CI at `898b309`
+([run 40769552484](https://github.com/shalisarakkal/AuditMind/actions/runs/40769552484)).
+
+To extend the same guarded synthetic fixture to all seven domains, run
+`node scripts/browser-evidence-acceptance.cjs --pilot`. It adds explicit UI
+approvals for all profiles, weighted overall/genuine-zero checks, a real
+short-lived review that expires without a patched clock, re-review and scope
+mismatch. The fixture then turns both organizations off before removal.
+The CI browser job runs this correctness-only variant. These synthetic approvals
+test software behavior, not the adequacy of real operational evidence.
+
+For a separate bounded local concurrency exercise, use
+`node scripts/browser-evidence-acceptance.cjs --pilot --load`. Six independent
+accounts read two synthetic organizations for 60 seconds while eight worker
+evaluations run in four waves. It records per-endpoint latency/counts and checks
+HTTP success, mode/organization isolation and exact terminal record counts.
+`--load` requires `--pilot`; it is deliberately not part of hosted correctness CI.
+Do not overlap local backend suites or other benchmarks. This small local exercise
+does not establish sustained production capacity; agree representative workloads,
+duration and service targets before broader rollout. No normal tenant is enabled.
 
 Full-size local SA01 read-only measurements are a separate opt-in command:
 `node scripts/browser-evidence-http.cjs` (or `--cancel-only`). This requires the

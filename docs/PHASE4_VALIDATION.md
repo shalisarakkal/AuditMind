@@ -1,5 +1,55 @@
 # Phase 4 remediation workflow validation
 
+## Seven-domain synthetic pilot and bounded concurrency — 28 October 2026
+
+After all four hosted Ubuntu jobs passed for `898b309` in
+[run 40769552484](https://github.com/shalisarakkal/AuditMind/actions/runs/40769552484),
+extended the browser-only acceptance against the unchanged application runtime.
+Installed Chrome **155.0.8059.85**, real API/worker/PostgreSQL:
+`node scripts/browser-evidence-acceptance.cjs --pilot --load` passed **17 scenarios**.
+Artifact: `temp/testing/evidence-review/phase3_browser_084264a7927c/results.json`.
+The correctness-only `--pilot` variant has 16 scenarios and is now required by CI;
+the bounded load variant remains opt-in, not a hosted performance gate.
+
+The second guarded synthetic organization has 19 findings, covering all seven
+profiles and 21 objective observations. All source records are seeded before
+review so approvals bind one inventory. UI source validation, inventory binding,
+saved-version approval and application mode confirmation authorize seven domains.
+Independent expected deductions/weights give identity/access **0**, the other six
+domains **86**, overall **68.8** (display **69**, Medium), in both administrator
+sessions. A genuine zero remains numeric/Critical, not Not assessed.
+
+A real 45-second review expires without patched clocks, direct database updates
+or intercepted HTTP. Normal polling withdraws the complete cached result;
+explicit reevaluation retains six qualified domains and no overall score.
+UI revoke/re-review restores complete coverage. Deliberately different declared
+scopes leave all seven domain scores present but overall null with the visible
+scope explanation. Restoring the declared scope and reevaluating restores the
+overall. Both synthetic organizations finish off; qualifications remain until
+fixture removal. Browser errors/native dialogs and AI usage are zero; the schema,
+accounts and test processes are removed afterward. No runtime code, normal tenant
+data/settings/credentials, weights or provider consent changed.
+
+The six-account/two-organization bounded exercise ran **60.317 seconds**, with
+**360 successful measured reads**, eight completed worker evaluations in four
+waves and no observed tenant/mode crossover. Read p50 **92.5 ms**, p95 **171.8 ms**,
+maximum **225.6 ms**. Each Alpha job processed exactly **100,004** records and each
+Beta job **38**; all terminal counts matched totals. Worker elapsed Alpha
+**1.6–1.7 s**, Beta below the progress timer's 0.1-second resolution. Background
+UI polls/job-control requests are additional to the 360 measured reads.
+This is a small local warm/uncontrolled-cache exercise, not sustained production
+capacity, cold-cache, peak-memory/temp-disk, fairness or deployment acceptance.
+Agree representative user/inventory sizes, duration and service targets before
+the production gate; normal organizations remain default-off.
+
+The first new pilot artifact `phase3_browser_66d75a661413` failed only at its final
+self-check: it used the Beta-only administrator to inspect Alpha's off setting,
+correctly receiving 403. Changed the test to use the existing authorized observer;
+no application permission was relaxed. The fresh 17-scenario pass above supersedes
+that attempt. Target guards, Node syntax, CI YAML parsing and whitespace checks
+pass. Full local backend/frontend suites were not rerun for this test-only increment;
+their hosted execution at `898b309` is the preceding gate, not a claim about a later SHA.
+
 ## Post-push Chrome opt-in verification — 28 October 2026
 
 At application commit `b0f5e2e` (runtime implementation `5ce836b`), rebuilt the
@@ -38,8 +88,10 @@ processes. Normal demo settings/data/credentials were not changed; live readines
 remains green and ports 3014/8012 were released. Normal generated route types were
 regenerated after the isolated build, leaving the demo bundle untouched. Only
 browser-test coverage and verification documentation changed in this follow-up;
-full backend/frontend suites were not rerun, and the new test assertions have
-not yet run in hosted CI. This passes a synthetic Chrome opt-in gate, not
+full backend/frontend suites were not rerun locally. Subsequently committed and
+pushed as `898b30993da03b4323101daf52a533768d2a6bed`; all four hosted Ubuntu jobs
+passed in [run 40769552484](https://github.com/shalisarakkal/AuditMind/actions/runs/40769552484),
+including the expanded browser suite. This passes a synthetic Chrome opt-in gate, not
 all-seven-domain operational acceptance, sustained multi-tenant load, production
 deployment or default-on approval. Keep normal organizations off pending those gates.
 
