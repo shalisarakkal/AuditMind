@@ -1,6 +1,7 @@
 from app.db.base_class import Base
 from app.models.organization import Organization
 from app.models.organization_logo import OrganizationLogo
+from app.models.scoring_qualification import OrganizationScoringSettings, DomainEvidenceQualification
 from app.models.user import User
 from app.models.membership import OrgMembership
 from app.models.asset import Asset
@@ -22,6 +23,8 @@ from app.models.session import PasswordHistory, PlatformSetting, UserSession
 from app.models.import_staging import ImportStagingChunk, ImportStagingState
 
 __all__ = [
+    "OrganizationScoringSettings",
+    "DomainEvidenceQualification",
     "ImportStagingChunk",
     "ImportStagingState",
     "Base",

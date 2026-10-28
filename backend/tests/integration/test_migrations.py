@@ -74,6 +74,27 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
             assert connection.scalar(text("SELECT show_name_in_header FROM organizations WHERE id=:id"), {"id": org}) is True
             assert connection.scalar(text("SELECT header_logo_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
             assert connection.scalar(text("SELECT header_name_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
+            qualification = uuid4()
+            connection.execute(text("""INSERT INTO domain_evidence_qualifications
+                (id,org_id,domain,policy_version,status,scope,rationale,updated_at)
+                VALUES (:id,:org,'network_config','domain-evidence-v1','conflicting','all','migration test',NOW())"""),
+                {"id": qualification, "org": org})
+            connection.commit()
+            command.downgrade(config, "0029")
+            assert connection.execute(text("SELECT status,version FROM domain_evidence_qualifications WHERE id=:id"),
+                {"id": qualification}).one() == ("draft", 2)
+            connection.commit()
+            command.upgrade(config, "head")
+            assert connection.scalar(text("SELECT reviewed_at FROM domain_evidence_qualifications WHERE id=:id"), {"id": qualification}) is None
+            assert {"organization_scoring_settings", "domain_evidence_qualifications"} <= set(inspect(connection).get_table_names(schema=schema))
+            connection.execute(text("INSERT INTO organization_scoring_settings (org_id) VALUES (:id)"), {"id": org})
+            assert connection.scalar(text("SELECT evidence_qualified_enabled FROM organization_scoring_settings WHERE org_id=:id"), {"id": org}) is False
+            connection.commit()
+            command.downgrade(config, "0028")
+            assert "organization_scoring_settings" not in inspect(connection).get_table_names(schema=schema)
+            assert connection.scalar(text("SELECT title FROM reports WHERE id=:id"), {"id": report}) == "Legacy report"
+            connection.commit()
+            command.upgrade(config, "head")
             assert {index["name"] for index in inspect(connection).get_indexes("reports", schema=schema)} >= {
                 "ix_reports_org_created", "ix_reports_org_status",
             }

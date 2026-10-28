@@ -21,6 +21,7 @@ from app.api.routes import (
     reports,
     risk,
     scans,
+    scoring_qualifications,
 )
 from app.core.config import check_secret_key, settings
 from app.core.middleware import SecurityHeadersMiddleware, UploadSizeLimitMiddleware
@@ -73,6 +74,7 @@ app.include_router(ai.router, prefix=api_router_prefix)
 app.include_router(archive.router, prefix=api_router_prefix)
 app.include_router(events.router, prefix=api_router_prefix)
 app.include_router(documents.router, prefix=api_router_prefix)
+app.include_router(scoring_qualifications.router, prefix=api_router_prefix)
 
 
 @app.get("/metrics", include_in_schema=False)
