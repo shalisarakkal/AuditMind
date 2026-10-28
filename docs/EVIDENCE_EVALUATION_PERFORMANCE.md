@@ -5,11 +5,11 @@ Updated 28 October 2026. Local synthetic SA01 benchmark; qualified scoring remai
 ## Bounded isolated two-organization exercise — 28 October
 
 Separate from the SA01 measurements below, the guarded local fixture command
-`node scripts/browser-evidence-acceptance.cjs --pilot --load` passed 17 Chrome
+`node scripts/browser-evidence-acceptance.cjs --pilot --load` passed 18 Chrome
 scenarios. Artifact:
-`temp/testing/evidence-review/phase3_browser_084264a7927c/results.json`.
+`temp/testing/evidence-review/phase3_browser_cc7ee25d0010/results.json`.
 Six independent accounts (including a read-only platform administrator) read two
-synthetic organizations for **60.317 seconds**, at approximately one measured
+synthetic organizations for **60.323 seconds**, at approximately one measured
 request/account/second, while one real worker processed eight explicit evaluations
 in four paired waves. Alpha is baseline/off, with 100,000 assets; Beta is temporarily
 qualified/on, with 19 synthetic findings and all seven reviewed domains. Mode and
@@ -17,16 +17,16 @@ organization identity are checked on responses. Both finish off before fixture r
 
 | Measured request | Count | p50 | p95 | Maximum |
 | --- | ---: | ---: | ---: | ---: |
-| Dashboard state | 120 | 105.1 ms | 184.3 ms | 225.6 ms |
-| Dashboard | 120 | 110.0 ms | 160.5 ms | 214.3 ms |
-| Current evaluation | 120 | 44.3 ms | 120.6 ms | 174.7 ms |
-| Combined | 360 | 92.5 ms | 171.8 ms | 225.6 ms |
+| Dashboard state | 120 | 104.6 ms | 192.8 ms | 258.5 ms |
+| Dashboard | 120 | 117.2 ms | 183.2 ms | 211.2 ms |
+| Current evaluation | 120 | 43.3 ms | 74.1 ms | 174.0 ms |
+| Combined | 360 | 89.9 ms | 182.1 ms | 258.5 ms |
 
 All measured requests succeeded; no tenant/mode crossover was observed. All eight
 jobs completed with terminal counts equal to totals: **100,004 records** per Alpha
-job (worker 1.6–1.7 s) and **38** per Beta job (reported 0.0 s at 0.1 s resolution).
+job (worker 1.6–1.8 s) and **38** per Beta job (reported 0.0 s at 0.1 s resolution).
 Per-wave observation includes shared-worker queueing and polling, approximately
-1.98–2.17 s, not independent Beta computation latency. Additional ordinary browser
+1.95–2.16 s, not independent Beta computation latency. Additional ordinary browser
 polls/job-control requests are not included in the 360-request table. Browser
 errors and AI usage are zero. No other local builds/regression suites or benchmark
 scans overlapped the measured workload; no cache flush was performed.

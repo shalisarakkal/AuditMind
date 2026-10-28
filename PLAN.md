@@ -2015,6 +2015,11 @@ lint and isolated production build passed. No backend contract changed.
     reads (p95 171.8 ms) and eight worker jobs without HTTP errors/tenant crossover.
     Fixture/settings restored and removed. CI includes correctness-only `--pilot`;
     this is not real evidence approval or sustained production capacity acceptance.
+  - [x] Correct test-only native date normalization exposed by hosted browser run
+    40772491131 at `1763434`. Canonical browser-local values and deterministic
+    :00/:01/:45 checks; fresh local Chrome `--pilot --load`: 18 scenarios pass,
+    360 reads/eight jobs with p95 182.1 ms. CI correctness variant has 17 scenarios;
+    retain failed-run evidence and verify the correction at its own pushed SHA.
   - [ ] Before broader rollout, define and validate representative concurrent-user,
     inventory-size, duration and latency/resource targets in the intended environment;
     obtain operational evidence review. Keep default-off until separately approved.

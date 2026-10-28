@@ -59,6 +59,15 @@ See latest validation for the complete artifact and initial test-only 403 correc
 This is software-behavior acceptance with synthetic approvals, not real operational
 evidence sign-off or sustained production-load/default-on approval.
 
+Portability follow-up: hosted browser run 40772491131 at `1763434` exposed a
+test-only exact-minute date normalization mismatch (:00 seconds are removed by
+the native input). Reproduced locally and corrected the test formatter; deterministic
+:00/:01/:45 native-input checks added. Fresh local acceptance passes **18 scenarios**
+with `--pilot --load` (CI correctness variant: 17), zero browser errors/AI usage
+and fixture removal. The repeat load sample had p95 182.1 ms over 360 reads; normal
+organizations remain off. The initial hosted failure is retained in validation;
+the correction must be verified at its own pushed SHA, not inferred from the local pass.
+
 ## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
 
 28 October acceptance: real Chrome/proxy/API scans of SA01 completed in

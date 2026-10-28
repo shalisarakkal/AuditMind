@@ -5,6 +5,14 @@ const { expect } = require('../frontend/node_modules/playwright/test');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const weights = { identity_access: .20, network_config: .15, vulnerability_management: .15,
   backup_recovery: .15, monitoring_detection: .15, incident_response: .10, compliance_alignment: .10 };
+// Serializable into the browser's own time zone. Native datetime-local inputs
+// normalize :00 seconds away; Playwright rejects a non-canonical fill value.
+function browserLocalInput(timestamp) {
+  const value = new Date(timestamp);
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  const local = value.toISOString().slice(0, 19);
+  return local.endsWith(':00') ? local.slice(0, 16) : local;
+}
 
 module.exports = async function evidencePilot({ base, seed, primary, observer, loadActors, evidence, output, check }) {
   assert.equal(base, 'http://localhost:3014');
@@ -51,7 +59,7 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
       for (const [index, objective] of objectives.entries()) {
         await panel.getByRole('combobox', { name: /^Objective/ }).selectOption(objective);
         await panel.getByLabel('Source UUID', { exact: true }).fill(sources[domain][index % 2]);
-        const observed = await page.evaluate(() => { const value = new Date(); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 19); });
+        const observed = await page.evaluate(browserLocalInput, Date.now());
         await panel.getByLabel('Observed at', { exact: true }).fill(observed);
         await panel.getByRole('button', { name: 'Validate source and add', exact: true }).click();
         await expect(panel.getByLabel('Source UUID', { exact: true })).toHaveValue('');
@@ -61,10 +69,7 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
     const version = (stored?.version ?? 0) + 1;
     await expect(panel.getByText(new RegExp('Saved status: draft.*Version ' + version))).toBeVisible();
     await panel.getByLabel('Review / revocation note').fill('Synthetic administrator approval for test coverage only');
-    const expiry = await page.evaluate(ms => {
-      const value = new Date(Date.now() + ms); value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
-      return value.toISOString().slice(0, 19);
-    }, expiryMs);
+    const expiry = await page.evaluate(browserLocalInput, Date.now() + expiryMs);
     await panel.getByLabel('Review expiry').fill(expiry);
     await panel.getByRole('checkbox', { name: /I reviewed operational evidence/ }).check();
     await dialogAction('Approve saved evidence', 'Approve saved evidence?');
@@ -95,6 +100,18 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
     await expect(toggle).toBeChecked({ checked: enabled });
     assert.equal((await request(primary, scoring + '/settings')).evidence_qualified_enabled, enabled);
   }
+  const probe = await primary.context.newPage();
+  try {
+    await probe.setContent('<input type="datetime-local">');
+    for (const seconds of [0, 1, 45]) {
+      const timestamp = await probe.evaluate(value => new Date(2026, 10, 4, 16, 34, value).getTime(), seconds);
+      const formatted = await probe.evaluate(browserLocalInput, timestamp);
+      assert.equal(formatted, '2026-11-04T16:34' + (seconds ? ':' + String(seconds).padStart(2, '0') : ''));
+      await probe.locator('input').fill(formatted);
+      await expect(probe.locator('input')).toHaveValue(formatted);
+    }
+  } finally { await probe.close(); }
+  check('Browser-local native date inputs accept exact-minute and nonzero-second timestamps without normalization errors');
   const profiles = (await request(primary, scoring + '/profiles')).profiles;
   const domains = Object.keys(weights);
   assert.deepEqual([...Object.keys(profiles)].sort(), [...domains].sort());

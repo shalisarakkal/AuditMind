@@ -9,10 +9,11 @@ After the isolated production build described in
   invalidation/rollback scenarios (hosted Ubuntu verified at `898b309`).
 - `node scripts/browser-evidence-acceptance.cjs --pilot`: additionally exercises
   all seven profile approvals, genuine zero, weighted complete aggregation, real
-  expiry, re-review and incompatible scopes. This is the CI correctness variant.
+  expiry, re-review, incompatible scopes and canonical native date input at exact
+  minutes/nonzero seconds. This is the 17-scenario CI correctness variant.
 - `node scripts/browser-evidence-acceptance.cjs --pilot --load`: also measures a
   bounded 60-second, six-account/two-organization mixed-read workload with four
-  waves of paired worker evaluations. Local opt-in only; no production-load claim.
+  waves of paired worker evaluations (18 scenarios). Local opt-in only; no production-load claim.
 
 All variants share a unique, guarded local `auditmind_test` schema and use real
 Chrome/API/worker/PostgreSQL with external HTTP blocked. They restore synthetic

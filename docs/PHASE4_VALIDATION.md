@@ -1,5 +1,33 @@
 # Phase 4 remediation workflow validation
 
+## Native-date portability correction — 28 October 2026
+
+Hosted browser [run 40772491131](https://github.com/shalisarakkal/AuditMind/actions/runs/40772491131)
+at `1763434` passed the 71-check workflow suite and first ten evidence scenarios,
+then failed the new pilot's `datetime-local` fill at `2026-11-04T16:34:00`.
+Native Chromium normalizes zero seconds to `2026-11-04T16:34`; Playwright compares
+the supplied/stored strings and raises Malformed value. Reproduced independently
+in installed Chrome: minute-only, :01 and :45 fills pass; :00 normalizes and fails
+Playwright's exact comparison. This was a test-harness minute-boundary issue, not
+an application date/API defect or a reason to bypass the UI.
+
+The test formatter now uses the browser's local time zone and canonical native
+format: omit zero seconds, retain nonzero seconds. Added deterministic native-input
+checks at :00, :01 and :45. No application code, validation, clock or CI assertions
+were disabled. Fresh full local command `node scripts/browser-evidence-acceptance.cjs
+--pilot --load` passes **18 scenarios** with zero browser errors/AI usage and full
+fixture removal. Artifact:
+`temp/testing/evidence-review/phase3_browser_cc7ee25d0010/results.json`.
+The CI correctness-only `--pilot` variant now has **17 scenarios**.
+
+The fresh bounded exercise completed **360 reads / eight jobs / six accounts /
+two organizations in 60.323 s**, with read p50 **89.9 ms**, p95 **182.1 ms**, maximum
+**258.5 ms**. Counts were again exactly 100,004/38 per Alpha/Beta job; worker Alpha
+1.6–1.8 s. Both settings were restored off before removal. These remain small local,
+uncontrolled-cache measurements, not production acceptance. The earlier successful
+17-scenario sample below remains historical evidence; the failed hosted attempt is
+not reported as green. The pushed correction requires its own hosted verification.
+
 ## Seven-domain synthetic pilot and bounded concurrency — 28 October 2026
 
 After all four hosted Ubuntu jobs passed for `898b309` in

@@ -22,7 +22,7 @@ these are separate from the application's report-only print layout.
 
 ## Dashboard evidence review and opt-in scoring (updated 28 October 2026)
 
-Latest local acceptance: **17 dedicated Chrome scenarios** pass with `--pilot --load`,
+Latest local acceptance: **18 dedicated Chrome scenarios** pass with `--pilot --load`,
 including seven-domain/real-zero/weighted aggregation, real review expiry, scope
 mismatch and a bounded six-account/two-organization exercise. The earlier 11
 opt-in/isolation/rollback scenarios passed hosted Ubuntu CI at `898b309`.
@@ -171,7 +171,8 @@ To extend the same guarded synthetic fixture to all seven domains, run
 approvals for all profiles, weighted overall/genuine-zero checks, a real
 short-lived review that expires without a patched clock, re-review and scope
 mismatch. The fixture then turns both organizations off before removal.
-The CI browser job runs this correctness-only variant. These synthetic approvals
+The CI browser job runs this correctness-only variant (17 scenarios, including
+canonical native date input at exact minutes/nonzero seconds). These synthetic approvals
 test software behavior, not the adequacy of real operational evidence.
 
 For a separate bounded local concurrency exercise, use
