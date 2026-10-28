@@ -4,12 +4,15 @@
 
 Prerequisite pushed SHA `c7ee354` passed all four hosted Linux jobs in
 [run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185).
-Subsequent local edits implement durable evidence evaluation, transactional
+Subsequent implementation `5ce836ba6dd00f026eb5490f37da8b4e8f249a27` is committed,
+pushed and passed all four hosted Ubuntu jobs in
+[run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003),
+including the new dedicated evidence browser suite. It implements durable evidence evaluation, transactional
 revision invalidation and Dashboard scoring behind the default-off organization
 setting. No production/default-on or live-AI rollout is approved. See the
 [current validation entry](PHASE4_VALIDATION.md) for fresh test/build/activation
 results, and [pilot contract/remaining gates](BACKGROUND_EVIDENCE_EVALUATION.md).
-Historical handoffs below do not validate an unpushed implementation SHA.
+Historical handoffs below are not substitutes for this exact-SHA verification.
 
 ## Current scoped handoff — 26 October 2026
 

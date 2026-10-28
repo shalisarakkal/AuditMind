@@ -5,7 +5,10 @@
 28 October: pushed through `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd` and
 verified [hosted Linux CI run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185)
 completed successfully: frontend, browser, backend and backend-dependency-audit.
-This verification preceded implementation below; it does not certify new local edits.
+That prerequisite verification preceded implementation below. The feature itself
+is committed/pushed as `5ce836ba6dd00f026eb5490f37da8b4e8f249a27`; all four hosted
+Ubuntu jobs passed in [run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003),
+including the new dedicated evidence-evaluation browser step.
 
 Migration 0031, durable worker evaluation, transactional statement-level revision
 invalidation, expiry/policy checks and mode-aware Dashboard aggregation are now
@@ -22,8 +25,8 @@ Shared-job navigation and real cancellation also pass; these are local observati
 not production guarantees. Fresh full backend regression: **1,366 passed in
 849.31 s**, warnings as errors, zero failures/errors/skips. Test DB restored to
 0031, 35 tables, clean drift. Static/dependency/secret/whitespace gates pass. This
-increment is locally verified but not yet committed or pushed; its new dedicated
-browser CI step still needs hosted verification after an approved push.
+increment is now checked in, pushed and hosted-CI verified. The documentation-only
+closure records that exact implementation SHA; it does not change runtime code.
 Final authenticated live Dashboard/readiness checks pass with `no-store` responses,
 retained inventory and all scoring settings off. Hard-refresh an existing Chrome
 tab to load the restarted production build.

@@ -523,7 +523,8 @@ explicit admin opt-in, review/invalidation/permissions and mode rollback. Full
 regression: `node scripts/browser-finding-workflow.cjs`. Build the isolated frontend
 first using the procedure in [validation](PHASE4_VALIDATION.md).
 The browser CI job now runs these two suites sequentially and retains both artifact
-folders; hosted execution of this new CI step remains unverified until approved push.
+folders. Hosted execution passed for `5ce836b` in
+[run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003).
 
 `node scripts/browser-evidence-http.cjs` now measures durable worker jobs against
 the idle synthetic SA01 demo: 202 acknowledgment, completion/records, navigation,
@@ -539,10 +540,10 @@ both isolated/normal production builds passed; dedicated Chrome seven checks,
 full browser 71 checks and full-size worker five measurement checks passed.
 The first full-run legacy metrics assertion and final short-batch progress defect
 were fixed and included in the green rerun, not waived. Results/artifact paths are in
-[the current validation entry](PHASE4_VALIDATION.md). Hosted Linux CI succeeded
-for pushed prerequisite `c7ee354` in
-[run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185);
-that run does not validate subsequent local implementation edits.
+[the current validation entry](PHASE4_VALIDATION.md). All four hosted Linux jobs
+succeeded for the pushed implementation `5ce836ba6dd00f026eb5490f37da8b4e8f249a27`
+in [run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003).
+The earlier prerequisite run for `c7ee354` is historical, not the evidence for this feature.
 
 ## Evidence qualification backend checkpoints (27 October 2026)
 

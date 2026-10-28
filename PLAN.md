@@ -2012,14 +2012,19 @@ lint and isolated production build passed. No backend contract changed.
     isolated/normal builds, 71 full Chrome + seven dedicated evidence checks.
     Test DB restored to 0031 (35 tables), clean drift. High-severity Bandit,
     dependency consistency, script/CI syntax and tracked/new-file secret checks pass.
-  - [ ] Commit/push the reviewed background/Dashboard increment, then verify hosted
-    Linux CI for its exact SHA (including the new dedicated evidence browser step).
+  - [x] Review/commit/push the background/Dashboard increment as
+    `5ce836ba6dd00f026eb5490f37da8b4e8f249a27` and verify hosted Ubuntu CI:
+    [run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003)
+    completed successfully on 28 October 2026. All four jobs passed: backend,
+    frontend, browser (including the new dedicated evidence suite), and dependency/
+    security audit. This closes the hosted verification item, not production,
+    sustained-load or default-on rollout gates. Scoring remains off by default.
 - [x] Review exact scope/secrets and check in completed work in scoped commits.
 - [x] Push reviewed qualification commits through `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd`
   and verify all four hosted Linux jobs passed in
   [CI run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185).
-  Verification preceded the new background/Dashboard increment; that work is local
-  and not yet committed/pushed or covered by hosted CI.
+  That prerequisite verification preceded the background/Dashboard increment;
+  its own successful `5ce836b` verification is recorded above.
 
 Current scoring increment: [Dashboard evidence-qualified scoring contract](docs/DASHBOARD_EVIDENCE_SCORING_DESIGN.md)
 is approved for staged local implementation, reusing existing seven report coverage

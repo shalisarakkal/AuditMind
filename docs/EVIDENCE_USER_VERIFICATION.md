@@ -24,8 +24,9 @@ these are separate from the application's report-only print layout.
 
 Current local browser acceptance: seven dedicated real-worker/two-user scenarios
 and 71 full regression checks pass, plus 465 frontend and 1,366 full PostgreSQL tests. See
-[validation](PHASE4_VALIDATION.md) for final backend/build results and the distinction
-from hosted CI for prerequisite `c7ee354`. Qualified scoring is now available as
+[validation](PHASE4_VALIDATION.md) for final backend/build results and successful
+hosted Ubuntu CI for implementation `5ce836b`
+([run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003)). Qualified scoring is now available as
 an admin opt-in but remains **off by default**. Verify in a synthetic organization
 before opting in real organization data. No AI calls or provider consent are needed.
 The local demo is on migration 0031. Refresh Chrome with **Ctrl+Shift+R** to load

@@ -6,7 +6,14 @@ Hosted prerequisite verified before implementation: exact SHA
 `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd`,
 [run 40706817185](https://github.com/shalisarakkal/AuditMind/actions/runs/40706817185),
 conclusion **success** across frontend/browser/backend/backend-dependency-audit.
-The new increment below is local, uncommitted/unpushed and not covered by that CI run.
+The background/Dashboard increment was subsequently reviewed, committed and pushed
+as **`5ce836ba6dd00f026eb5490f37da8b4e8f249a27`** (48 scoped files). Its own hosted
+Ubuntu [run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003)
+completed **successfully** on 28 October 2026: backend, frontend, browser and
+backend-dependency-audit all passed. The browser job executed both the full workflow
+suite and the new durable-evidence/opt-in-scoring suite successfully. This closes
+the feature's hosted verification gate. Subsequent closure documentation does not
+alter runtime/CI code; production, sustained-load and default-on rollout remain unapproved.
 
 Implemented migration 0031 with statement-trigger invalidation, durable worker jobs,
 cancel/recovery/deduplication/tenant guards, guarded cached eligibility, default-off
@@ -40,7 +47,8 @@ Final local results (earlier focused suites overlap and are not additive):
   no page/native-dialog errors or AI usage. Includes mobile/Axe/selection/archive.
   The browser CI configuration now runs the dedicated evidence suite after the
   full workflow suite and uploads both artifact folders. This new step is not
-  covered by the successful earlier `c7ee354` run; hosted verification needs a push.
+  covered by the successful earlier `c7ee354` run; it is now verified by the
+  successful `5ce836b` run linked above.
 - Isolated production build passed. Scoped high-severity Bandit passed; its static,
   schema-quoted trigger installer has a medium/low-confidence SQL-formatting finding,
   reviewed as identifier quoting over fixed DDL, not user-supplied SQL.

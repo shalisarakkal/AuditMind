@@ -153,7 +153,10 @@ report or archive jobs; the demo restart retained existing data/accounts.
 
 Durable background jobs and safely invalidated revisions are now implemented;
 manual full-inventory scans remain explicit. Before broader rollout, measure peak
-temporary-disk/CPU use and sustained multi-tenant load, and run hosted acceptance
-for the actual new commit. Controlled cold-cache measurements remain unperformed.
+temporary-disk/CPU use and sustained multi-tenant load. Hosted functional CI is
+green for implementation `5ce836b`
+([run 40749424003](https://github.com/shalisarakkal/AuditMind/actions/runs/40749424003));
+that is not hosted performance acceptance. Future implementation changes need
+their own hosted verification. Controlled cold-cache measurements remain unperformed.
 Keep the setting off by default and do not add automatic Dashboard scans on the
 strength of these local measurements.
