@@ -6,6 +6,36 @@ import { json, renderSignedIn } from "@/test/helpers";
 const empty = { version: null, image_data_url: null };
 const saved = { version: "v1", image_data_url: "data:image/png;base64,iVBORw0KGgo=" };
 
+it.each([
+  ["large.png", "image/png", 2 * 1024**2 + 1],
+  ["vector.svg", "image/svg+xml", 4],
+] as const)("rejects invalid logo metadata immediately (%s) without replacement", async (name, type, size) => {
+  const { fetchMock } = await renderSignedIn(<OrganizationLogoSettings orgId="org-1" name="Acme" editable />, "admin", {
+    "GET /orgs/org-1/logo": () => saved,
+    "GET /orgs/org-1/branding": () => ({ show_name_in_header: true }),
+  });
+  await screen.findByAltText("Acme logo");
+  const file = new File(["fixture"], name, { type });
+  Object.defineProperty(file, "size", { value: size });
+  fireEvent.change(screen.getByLabelText("Organization logo file"), { target: { files: [file] } });
+  expect(screen.getByRole("alert")).toHaveTextContent("up to 2 MiB");
+  expect(screen.getByRole("button", { name: "Save logo" })).toBeDisabled();
+  expect(screen.getByAltText("Acme logo")).toHaveAttribute("src", saved.image_data_url);
+  expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+});
+
+it("permits the exact logo size boundary for server content validation", async () => {
+  await renderSignedIn(<OrganizationLogoSettings orgId="org-1" name="Acme" editable />, "admin", {
+    "GET /orgs/org-1/logo": () => empty,
+    "GET /orgs/org-1/branding": () => ({ show_name_in_header: true }),
+  });
+  await screen.findByText("No organization logo set.");
+  const file = new File(["fixture"], "logo.png", { type: "image/png" });
+  Object.defineProperty(file, "size", { value: 2 * 1024**2 });
+  fireEvent.change(screen.getByLabelText("Organization logo file"), { target: { files: [file] } });
+  expect(screen.getByRole("button", { name: "Save logo" })).toBeEnabled();
+});
+
 it.each([["small", "text-base"], ["medium", "text-xl"], ["large", "text-2xl"]])("renders %s company name typography", async (size, className) => {
   await renderSignedIn(<OrganizationIdentity orgId="org-1" name="Acme" />, "viewer", {
     "GET /orgs/org-1/logo": () => empty,

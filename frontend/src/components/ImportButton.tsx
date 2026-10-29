@@ -7,6 +7,7 @@ import { useImports } from "@/context/ImportsContext";
 import { ApiError, api } from "@/lib/apiClient";
 import { formatDateTime } from "@/lib/domain";
 import { isFileDrop } from "@/lib/fileDrop";
+import { formatFileLimit, importFileError, type UploadLimits } from "@/lib/uploadValidation";
 import {
   GENERIC_ASSETS,
   GENERIC_FINDINGS,
@@ -51,6 +52,8 @@ export default function ImportButton(props: ImportButtonProps) {
 function ImportQueue(props: ImportButtonProps) {
   const [batch, setBatch] = useState<{ id: number; file: File; single: boolean }[]>([]);
   const picker = useRef<HTMLInputElement>(null);
+  const uploadButton = useRef<HTMLButtonElement>(null);
+  const restoreUploadFocus = useRef(false);
   const dropArea = useRef<HTMLDivElement>(null);
   const receiveDrop = useRef<(files: File[]) => void>(() => {});
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,10 @@ function ImportQueue(props: ImportButtonProps) {
   const [states, setStates] = useState<Record<number, QueueState>>({});
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
-  const [confirmClose, setConfirmClose] = useState(false);
+  const receiving = useRef(false);
+  const mounted = useRef(true);
+  const [checkingFiles, setCheckingFiles] = useState(false);
+  const [importLimit, setImportLimit] = useState<number | null>(null);
   const [selectedDuplicates, setSelectedDuplicates] = useState<Set<number>>(new Set());
   const active = useRef(false);
   const stop = useRef(false);
@@ -69,14 +75,27 @@ function ImportQueue(props: ImportButtonProps) {
     setStates(previous => previous[id]?.ready === state.ready && previous[id]?.failed === state.failed && previous[id]?.busy === state.busy && previous[id]?.duplicate === state.duplicate && previous[id]?.error === state.error
       ? previous : { ...previous, [id]: state });
   }, []);
-  useEffect(() => () => { stop.current = true; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { stop.current = true; mounted.current = false; };
+  }, []);
   const ready = batch.filter(item => states[item.id]?.ready);
   const failed = ready.filter(item => states[item.id]?.failed);
   const freshReady = ready.filter(item => !states[item.id]?.failed);
   const duplicates = batch.filter(item => states[item.id]?.duplicate);
   const duplicateTargets = duplicates.filter(item => selectedDuplicates.has(item.id));
   const attention = batch.filter(item => !states[item.id]?.ready && !states[item.id]?.busy && !states[item.id]?.duplicate);
-  const anyBusy = Object.values(states).some(state => state.busy);
+  const anyBusy = batch.some(item => states[item.id]?.busy);
+  const queueLocked = running || anyBusy || checkingFiles;
+  useEffect(() => {
+    // Chrome blurs a disabled picker trigger during the asynchronous metadata
+    // check. Restore it after the whole queue closes, not between queue views.
+    if (batch.length || queueLocked) restoreUploadFocus.current = true;
+    else if (restoreUploadFocus.current) {
+      restoreUploadFocus.current = false;
+      uploadButton.current?.focus();
+    }
+  }, [batch.length, queueLocked]);
   useEffect(() => {
     if (batch.length || !progress) return;
     const timer = setTimeout(() => setProgress(""), 3000);
@@ -89,8 +108,7 @@ function ImportQueue(props: ImportButtonProps) {
     setSelectedDuplicates(previous => { const next = new Set(previous); next.delete(id); return next; });
   }
   function cancelQueue() {
-    if (active.current || anyBusy) return;
-    setConfirmClose(false);
+    if (active.current || anyBusy || receiving.current) return;
     setBatch([]);
     controls.current.clear();
     setStates({});
@@ -99,11 +117,11 @@ function ImportQueue(props: ImportButtonProps) {
     setError(null);
   }
   function skipDuplicates() {
-    if (active.current || anyBusy) return;
+    if (active.current || anyBusy || receiving.current) return;
     duplicateTargets.forEach(item => remove(item.id));
   }
   async function runBatch(mode: "ready" | "failed" | "duplicates" = "ready") {
-    if (active.current || anyBusy) return;
+    if (active.current || anyBusy || receiving.current) return;
     const targets = mode === "duplicates" ? duplicateTargets : mode === "failed" ? failed : freshReady;
     if (!targets.length) return;
     active.current = true;
@@ -130,14 +148,36 @@ function ImportQueue(props: ImportButtonProps) {
       setRunning(false);
     }
   }
-  function receive(files: File[], singleSelection = true) {
-    if (active.current || anyBusy) return;
+  async function receive(files: File[], singleSelection = true) {
+    if (active.current || anyBusy || receiving.current || !files.length) return;
     if (files.length > 20 || batch.length + files.length > 20) { setError("Choose at most 20 files at a time."); return; }
     setError(null);
-    const additions = files.map(file => ({ id: ++sequence.current, file, single: singleSelection && files.length === 1 }));
-    setBatch(previous => [...previous, ...additions]);
+    receiving.current = true;
+    setCheckingFiles(true);
+    try {
+      // No file bytes in this request. Reject metadata before sniffing columns
+      // or starting a POST, using the configured ceiling rather than a guess.
+      const limits = await api.get<UploadLimits>("/upload-limits");
+      if (!limits || !Number.isSafeInteger(limits.import_max_bytes) || limits.import_max_bytes <= 0) throw new Error("Upload limit is unavailable");
+      if (!mounted.current) return;
+      setImportLimit(limits.import_max_bytes);
+      const rejected: string[] = [];
+      const valid = files.filter(file => {
+        const problem = importFileError(file, limits.import_max_bytes);
+        if (problem) rejected.push(problem);
+        return !problem;
+      });
+      setError(rejected.length ? rejected.join(" ") : null);
+      const additions = valid.map(file => ({ id: ++sequence.current, file, single: singleSelection && files.length === 1 }));
+      setBatch(previous => [...previous, ...additions]);
+    } catch (invalid) {
+      if (mounted.current) setError(`Could not check the upload limit: ${(invalid as Error).message}. Please select the files again to retry; no file was submitted.`);
+    } finally {
+      receiving.current = false;
+      if (mounted.current) setCheckingFiles(false);
+    }
   }
-  useEffect(() => { receiveDrop.current = files => receive(files, false); });
+  useEffect(() => { receiveDrop.current = files => { void receive(files, false); }; });
   useEffect(() => {
     const receivePageDrop = (event: DragEvent) => {
       if (!isFileDrop(event)) return;
@@ -157,23 +197,20 @@ function ImportQueue(props: ImportButtonProps) {
   }, []);
   return <div ref={dropArea} aria-label="File upload area" onDragOver={event => { if (isFileDrop(event.nativeEvent)) event.preventDefault(); }} onDrop={event => {
     if (!isFileDrop(event.nativeEvent)) return;
-    event.preventDefault(); event.stopPropagation(); receive(Array.from(event.dataTransfer.files), false);
+    event.preventDefault(); event.stopPropagation(); void receive(Array.from(event.dataTransfer.files), false);
   }} className="self-start">
-    <input ref={picker} type="file" multiple accept={props.accept} className="hidden" data-testid={`${props.kind}-file-input`} disabled={running || anyBusy}
-      onChange={event => { receive(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
-    <button type="button" disabled={running || anyBusy || batch.length > 0} onClick={() => picker.current?.click()}
+    <input ref={picker} type="file" multiple accept={props.accept} className="hidden" data-testid={`${props.kind}-file-input`} disabled={queueLocked}
+      onChange={event => { void receive(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+    <button ref={uploadButton} type="button" disabled={queueLocked || batch.length > 0} onClick={() => picker.current?.click()}
       className="h-10 rounded-md bg-cyan px-4 text-sm font-medium text-navy disabled:opacity-60">{props.label}</button>
-    {batch.length > 0 && <FindingActionDialog title="Upload files" orgName="Review each file's source before uploading. Up to 20 files; each has its own report."
-      onClose={() => setConfirmClose(true)}>
-    <div aria-busy={running || anyBusy} className="space-y-3">
-    {confirmClose && <section role="alert" className="rounded-lg border border-amber-300/40 p-3 text-sm">
-      <p>Close and remove all remaining files from this queue? Submitted imports will not be cancelled.</p>
-      <div className="mt-2 flex gap-4">
-        <button type="button" onClick={cancelQueue} className="text-cyan">Close and remove queued files</button>
-        <button type="button" onClick={() => setConfirmClose(false)} className="text-cyan">Keep reviewing</button>
-      </div>
-    </section>}
+    {checkingFiles && <p role="status" className="mt-2 text-xs text-white/60">Checking file sizes against the configured upload limit. No file content is being uploaded.</p>}
+    {batch.length > 0 && <FindingActionDialog title="Upload files"
+      orgName="Review each file's source before uploading. Up to 20 files; each has its own report."
+      onClose={cancelQueue}>
+    <div aria-busy={running || anyBusy || checkingFiles} className="space-y-3">
+    <div className="min-w-0 space-y-3">
     <p className="text-xs text-white/60">Ready: {ready.length - failed.length} · Submission failed: {failed.length} · Already uploaded: {duplicates.length} · Source needs attention: {attention.length}</p>
+    {importLimit !== null && <p className="text-xs text-white/60">Asset/finding import limit: {formatFileLimit(importLimit)} per file. Documents have a separate 10 MiB limit.</p>}
     {[
       { title: "Ready files", items: freshReady },
       { title: "Submission failed", items: failed },
@@ -184,41 +221,43 @@ function ImportQueue(props: ImportButtonProps) {
       ...(group.title && group.items.length ? [<h3 key={`heading-${group.title}`} className="text-sm font-medium text-white/80">{group.title} ({group.items.length})</h3>] : []),
       ...group.items.map(item => <SingleImportButton {...props} key={`${props.orgId}-${item.id}`} initialFile={item.file}
       shortSourceLabel={item.single} autoUpload={item.single && props.profiles !== null && !props.profiles?.length}
-      locked={running} register={control => register(item.id, control)}
+      locked={queueLocked} register={control => register(item.id, control)}
       onSkipped={reason => setProgress(`Skipped ${item.file.name}: ${reason}`)}
       onSettled={() => remove(item.id)} />),
     ])}
     {duplicates.length > 0 && <section aria-label="Already uploaded files" className="space-y-3 rounded-lg border border-amber-300/30 bg-amber-300/5 p-3">
       <h3 className="font-medium text-amber-200">Already uploaded ({duplicates.length})</h3>
       <p className="text-xs text-white/70">Other ready files have not been blocked. Select files to skip or upload again. Upload anyway starts another import; it does not promise to update existing records.</p>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={running || anyBusy} checked={duplicates.length > 0 && duplicateTargets.length === duplicates.length}
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={queueLocked} checked={duplicates.length > 0 && duplicateTargets.length === duplicates.length}
         onChange={event => setSelectedDuplicates(event.target.checked ? new Set(duplicates.map(item => item.id)) : new Set())} />Select all already uploaded files</label>
       {duplicates.map(item => {
         const previous = states[item.id].duplicate!;
         return <div key={item.id} className="rounded border border-white/10 p-2">
-          <label className="flex items-start gap-2 text-sm"><input type="checkbox" disabled={running || anyBusy} checked={selectedDuplicates.has(item.id)}
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" disabled={queueLocked} checked={selectedDuplicates.has(item.id)}
             onChange={event => setSelectedDuplicates(current => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} /><span className="min-w-0 break-all">{item.file.name}</span></label>
           <p className="mt-1 text-xs text-white/60">Previously uploaded by {previous.imported_by}{previous.imported_at ? ` on ${formatDateTime(previous.imported_at)}` : ""}</p>
           {states[item.id].error && <p role="alert" className="text-xs text-red-300">{states[item.id].error}</p>}
         </div>;
       })}
       <div className="flex flex-wrap gap-3">
-        <button type="button" disabled={running || anyBusy || !duplicateTargets.length} onClick={skipDuplicates} className="text-sm text-white/70 disabled:opacity-60">Skip selected ({duplicateTargets.length})</button>
-        <button type="button" disabled={running || anyBusy || !duplicateTargets.length} onClick={() => void runBatch("duplicates")} className="rounded-md border border-cyan px-3 py-2 text-sm text-cyan disabled:opacity-60">Upload selected anyway ({duplicateTargets.length})</button>
+        <button type="button" disabled={queueLocked || !duplicateTargets.length} onClick={skipDuplicates} className="text-sm text-white/70 disabled:opacity-60">Skip selected ({duplicateTargets.length})</button>
+        <button type="button" disabled={queueLocked || !duplicateTargets.length} onClick={() => void runBatch("duplicates")} className="rounded-md border border-cyan px-3 py-2 text-sm text-cyan disabled:opacity-60">Upload selected anyway ({duplicateTargets.length})</button>
       </div>
     </section>}
-    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+    {error && <p role="alert" className="text-sm text-red-300 [overflow-wrap:anywhere]">{error}</p>}
     <div className="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 pt-4">
-      <button type="button" data-confirm-cancel disabled={running || anyBusy} onClick={() => setConfirmClose(true)} className="text-sm text-white/70 disabled:opacity-60">Close</button>
-      {(freshReady.length > 0 || running) && <button type="button" disabled={running || anyBusy || !freshReady.length} onClick={() => void runBatch()}
+      <p className="basis-full text-xs text-white/60">Cancelling removes remaining files from this queue. Submitted uploads continue; local files are unchanged.</p>
+      <button type="button" data-confirm-cancel disabled={queueLocked} onClick={cancelQueue} className="text-sm text-white/70 disabled:opacity-60">Cancel queued uploads</button>
+      {(freshReady.length > 0 || running) && <button type="button" disabled={queueLocked || !freshReady.length} onClick={() => void runBatch()}
         className="rounded-md bg-cyan px-3 py-2 text-sm font-medium text-navy disabled:opacity-60">Upload all ready files ({freshReady.length})</button>}
-      {failed.length > 0 && <button type="button" disabled={running || anyBusy} onClick={() => void runBatch("failed")} className="text-sm text-cyan disabled:opacity-60">Retry failed ({failed.length})</button>}
+      {failed.length > 0 && <button type="button" disabled={queueLocked} onClick={() => void runBatch("failed")} className="text-sm text-cyan disabled:opacity-60">Retry failed ({failed.length})</button>}
       {running && <button type="button" onClick={() => { stop.current = true; setProgress("Stopping after the current submission. Accepted uploads are not cancelled."); }} className="text-sm text-cyan">Stop remaining uploads</button>}
     </div>
     {progress && <p role="status" className="text-right text-sm text-white/60">{progress}</p>}
     </div>
+    </div>
     </FindingActionDialog>}
-    {!batch.length && error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+    {!batch.length && error && <p role="alert" className="max-w-md text-sm text-red-300 [overflow-wrap:anywhere]">{error}</p>}
     {!batch.length && progress && <p role="status" className="fixed bottom-4 right-4 z-50 max-w-md rounded-lg border border-cyan/30 bg-navy p-3 text-sm text-white shadow-lg">{progress}</p>}
   </div>;
 }

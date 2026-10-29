@@ -30,6 +30,37 @@ function routes(documents = [DOCUMENT]) {
 }
 
 describe("Documents UI permissions and states", () => {
+  it.each([false, true])("rejects an oversized document immediately without a version request (platform=%s)", async platform => {
+    const { fetchMock } = await renderSignedIn(<DocumentsLibrary orgId={platform ? undefined : "org-1"} writable platform={platform} />, "admin", {
+      ...routes(), "GET /platform/documents": () => ({ items: [], total: 0 }),
+      "GET /platform/documents/facets": () => ({ framework: [] }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+    const form = screen.getByRole("form", { name: "Upload document" });
+    const file = new File(["Synthetic policy"], "oversized.md", { type: "text/markdown" });
+    Object.defineProperty(file, "size", { value: 10 * 1024**2 + 1 });
+    fireEvent.change(within(form).getByLabelText("UTF-8 text or Markdown, up to 10 MiB"), { target: { files: [file] } });
+    expect(within(form).getByRole("alert")).toHaveTextContent("oversized.md exceeds the 10 MiB file limit");
+    expect(within(form).getByRole("button", { name: "Queue processing" })).toBeDisabled();
+    fireEvent.submit(form);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+    fireEvent.change(within(form).getByLabelText("UTF-8 text or Markdown, up to 10 MiB"), { target: { files: [new File(["Policy"], "valid.md")] } });
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Queue processing" })).toBeEnabled();
+    fireEvent.click(within(form).getByRole("button", { name: "Cancel upload" }));
+    expect(screen.queryByRole("form", { name: "Upload document" })).not.toBeInTheDocument();
+  });
+
+  it("explains that a JSON inventory is not a document, without submitting it", async () => {
+    const { fetchMock } = await renderSignedIn(<DocumentsLibrary orgId="org-1" writable />, "admin", routes());
+    fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+    const form = screen.getByRole("form", { name: "Upload document" });
+    fireEvent.change(within(form).getByLabelText("UTF-8 text or Markdown, up to 10 MiB"), { target: { files: [new File(["[]"], "cloud_assets.json")] } });
+    expect(within(form).getByRole("alert")).toHaveTextContent("Assets or Findings");
+    fireEvent.submit(form);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+  });
+
   it.each([false, true])("opens and hides a version preview beneath its own row (writable=%s)", async writable => {
     const { fetchMock } = await renderSignedIn(<DocumentsLibrary orgId="org-1" writable={writable} />, writable ? "admin" : "viewer", {
       ...routes([{ ...DOCUMENT, versions: [{ ...VERSION, indexes: [] }] }]),

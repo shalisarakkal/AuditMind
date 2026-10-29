@@ -26,6 +26,7 @@ import {
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
+import ListLoading from "@/components/ListLoading";
 import { useApp } from "@/context/AppContext";
 import { ASSET_TYPE_LABELS, canWrite } from "@/lib/domain";
 import { humanize } from "@/lib/importProfiles";
@@ -41,7 +42,7 @@ const PAGE_SIZE = 100;
 export default function AssetsPage() {
   const { selectedOrg } = useApp();
   return (
-    <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
+    <Suspense fallback={<ListLoading label="assets" initial />}>
       <Assets key={selectedOrg?.id} />
     </Suspense>
   );
@@ -101,7 +102,7 @@ function Assets() {
     });
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 [overflow-wrap:anywhere]">
       <PageHeader
         title="Assets"
         total={page?.total}
@@ -128,7 +129,9 @@ function Assets() {
       )}
       {bulk && <FindingActionDialog title={bulk.label} orgName={org.name} onClose={() => setBulk(null)}><BulkConfirm request={bulk} selection={selection} onClose={() => setBulk(null)} /></FindingActionDialog>}
 
-      <StatusMessage loading={loading && !page} error={error} />
+      <StatusMessage loading={false} error={error} />
+      {loading && <ListLoading label="assets" initial={!page} />}
+      {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry assets</button>}
       {page && (
         <ListTable>
             <thead className={THEAD}>

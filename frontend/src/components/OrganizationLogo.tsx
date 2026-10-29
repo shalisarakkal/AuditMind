@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { useApi } from "@/lib/useApi";
+import { LOGO_MAX_BYTES } from "@/lib/uploadValidation";
 import ConfirmPanel from "./ConfirmPanel";
 
 type Logo = { version: string | null; image_data_url: string | null };
@@ -166,7 +167,7 @@ export default function OrganizationLogoSettings({ orgId, name, editable }: { or
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled || removing}
           className="mt-1 block max-w-full text-sm text-white/70" onChange={event => {
             const next = event.target.files?.[0] ?? null; setError(null); setMessage("");
-            if (next && (next.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(next.type))) {
+            if (next && (next.size > LOGO_MAX_BYTES || !["image/png", "image/jpeg", "image/webp"].includes(next.type))) {
               setError("Choose a PNG, JPEG or WebP up to 2 MiB."); setFile(null); event.target.value = "";
             } else setFile(next);
           }} />

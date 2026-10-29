@@ -79,7 +79,7 @@ describe("archived orgs and the Sysadmin's pages", () => {
         </OrgGate>
       </AppProvider>,
     );
-    expect(await screen.findByRole("status")).toHaveTextContent("Acme Corp is archived, so it's read-only.");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Acme Corp is archived, so it's read-only."));
     expect(screen.getByText("page")).toBeInTheDocument();
   });
 

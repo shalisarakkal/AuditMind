@@ -91,7 +91,9 @@ def build_dashboard(org_id: uuid.UUID, db: Session) -> DashboardSummary:
         for severity, count in by_domain.items():
             by_severity[severity] += count
 
-    asset_count = db.query(func.count(Asset.id)).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar()
+    # Count rows without fetching UUIDs from the heap: existing active-asset
+    # indexes can serve an index-only count. IDs are non-null, so semantics match.
+    asset_count = db.query(func.count()).select_from(Asset).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar()
     empty = asset_count == 0 and not any(by_severity.values())
     status = "not_assessed" if empty else "findings_based"
 

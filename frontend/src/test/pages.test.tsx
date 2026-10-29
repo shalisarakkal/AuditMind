@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AssetsPage from "@/app/(app)/assets/page";
@@ -61,6 +61,34 @@ function lastQuery(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchM
   const urls = fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.includes(`${path}?`));
   return new URLSearchParams(urls.at(-1)?.split("?")[1]);
 }
+
+describe("Assets/Findings loading", () => {
+  it.each(["assets", "findings"] as const)("paints %s filters while data is delayed and replaces placeholders on completion", async kind => {
+    let finish!: (value: unknown) => void;
+    const pending = new Promise(resolve => { finish = resolve; });
+    await renderSignedIn(kind === "assets" ? <AssetsPage /> : <FindingsPage />, "viewer", {
+      [`GET /orgs/org-1/${kind}`]: () => pending,
+    });
+    expect(await screen.findByText(`Loading ${kind}…`)).toBeVisible();
+    expect(screen.getByRole("searchbox", { name: `Search ${kind}` })).toBeEnabled();
+    expect(screen.queryByText(kind === "assets" ? "No assets yet." : "No findings yet.")).not.toBeInTheDocument();
+    await act(async () => { finish({ items: [], total: 0, domain_counts: {} }); });
+    expect(await screen.findByText(kind === "assets" ? "No assets yet." : "No findings yet.")).toBeVisible();
+    expect(screen.queryByText(`Loading ${kind}…`)).not.toBeInTheDocument();
+  });
+
+  it.each(["assets", "findings"] as const)("offers retry for failed %s reads", async kind => {
+    let fail = true;
+    await renderSignedIn(kind === "assets" ? <AssetsPage /> : <FindingsPage />, "viewer", {
+      [`GET /orgs/org-1/${kind}`]: () => fail ? json({ detail: "List unavailable" }, 503) : { items: [], total: 0, domain_counts: {} },
+    });
+    expect(await screen.findByText("List unavailable")).toBeVisible();
+    expect(screen.queryByText(`Loading ${kind}…`)).not.toBeInTheDocument();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: `Retry ${kind}` }));
+    expect(await screen.findByText(kind === "assets" ? "No assets yet." : "No findings yet.")).toBeVisible();
+  });
+});
 
 describe("Assets page", () => {
   it("lists the org's assets and imports a file for admins", async () => {
@@ -391,6 +419,29 @@ describe("Findings page", () => {
 });
 
 describe("Dashboard page", () => {
+  it("paints the dashboard shell and independent security summary while scores are delayed", async () => {
+    let finish!: (value: DashboardSummary) => void;
+    const pending = new Promise<DashboardSummary>(resolve => { finish = resolve; });
+    await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => pending });
+    expect(screen.getByRole("heading", { name: "Resilience dashboard" })).toBeVisible();
+    expect(await screen.findByText("Loading dashboard…")).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Members added 0" })).toBeVisible();
+    expect(screen.queryByTestId("overall-score")).not.toBeInTheDocument();
+    await act(async () => { finish(summary); });
+    expect(await screen.findByTestId("overall-score")).toHaveTextContent("87");
+    expect(screen.queryByText("Loading dashboard…")).not.toBeInTheDocument();
+  });
+
+  it("replaces a failed load with a retry action instead of an endless spinner", async () => {
+    let fail = true;
+    await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => fail ? json({ detail: "Dashboard unavailable" }, 503) : summary });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Dashboard unavailable");
+    expect(screen.queryByText("Loading dashboard…")).not.toBeInTheDocument();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry dashboard" }));
+    expect(await screen.findByTestId("overall-score")).toHaveTextContent("87");
+  });
+
   it("renders empty organizations as not assessed without zero, perfect scores or risk labels", async () => {
     await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => ({
       overall_score: null, overall_tier: null, assessment_status: "not_assessed",

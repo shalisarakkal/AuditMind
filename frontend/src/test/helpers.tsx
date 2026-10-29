@@ -17,7 +17,11 @@ type Handler = (init: RequestInit) => unknown | Response | Promise<unknown | Res
  * Response. Returns the mock so tests can inspect calls. Unless routes say
  * otherwise, there's no session cookie: POST /auth/refresh is refused. */
 export function mockApi(routes: Record<string, Handler>) {
-  const all: Record<string, Handler> = { "POST /auth/refresh": () => json({ detail: NO_SESSION }, 401), ...routes };
+  const all: Record<string, Handler> = {
+    "POST /auth/refresh": () => json({ detail: NO_SESSION }, 401),
+    "GET /upload-limits": () => ({ import_max_bytes: 256 * 1024**2, document_max_bytes: 10 * 1024**2, logo_max_bytes: 2 * 1024**2 }),
+    ...routes,
+  };
   const fetchMock = vi.fn(async (url: string, init: RequestInit = {}) => {
     const key = `${init.method ?? "GET"} ${url.replace(API, "")}`;
     const handler = all[key] ?? all[key.split("?")[0]];

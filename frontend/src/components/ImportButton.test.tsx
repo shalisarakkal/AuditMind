@@ -1,5 +1,5 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import ImportButton from "@/components/ImportButton";
 import { json, renderSignedIn, requestInit, scan } from "@/test/helpers";
@@ -23,6 +23,66 @@ function calls(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchMock"
 }
 
 describe("ImportButton", () => {
+  it.each(["assets", "findings"] as const)("rejects oversized %s files at selection before content reads or POST", async kind => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind={kind} accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      "GET /upload-limits": () => ({ import_max_bytes: 1024, document_max_bytes: 10 * 1024**2, logo_max_bytes: 2 * 1024**2 }),
+    });
+    const file = new File(["type,hostname\nserver,large"], "oversized.csv");
+    Object.defineProperty(file, "size", { value: 1025 });
+    const sniff = vi.spyOn(file, "slice");
+    fireEvent.change(screen.getByTestId(`${kind}-file-input`), { target: { files: [file] } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("oversized.csv exceeds the 1 KiB file limit");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(sniff).not.toHaveBeenCalled();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
+  it("accepts a 251 MiB inventory against a configured 256 MiB ceiling without transferring file content", async () => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".json" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
+    const file = new File(['[{"type":"server","hostname":"test"}]'], "cloud_assets.json");
+    Object.defineProperty(file, "size", { value: 251 * 1024**2 });
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [file] } });
+    expect(await screen.findByRole("button", { name: "Upload all ready files (1)" })).toBeEnabled();
+    expect(screen.getByText(/Asset\/finding import limit: 256 MiB/)).toBeVisible();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
+  it("keeps valid files ready when the same selection contains an oversized or unsupported file", async () => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      "GET /upload-limits": () => ({ import_max_bytes: 100, document_max_bytes: 10 * 1024**2, logo_max_bytes: 2 * 1024**2 }),
+    });
+    const large = new File(["type,hostname\nserver,large"], "large.csv");
+    Object.defineProperty(large, "size", { value: 101 });
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [large, new File(["type,hostname\nserver,ok"], "ok.csv"), new File(["x"], "bad.exe")] } });
+    expect(await screen.findByRole("button", { name: "Upload all ready files (1)" })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("large.csv exceeds the 100 bytes file limit");
+    expect(screen.getByRole("alert")).toHaveTextContent("bad.exe: Unsupported file type");
+    expect(screen.getAllByRole("group", { name: "Upload options" })).toHaveLength(1);
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
+  it.each([0, -1, 1.5, null, Number.MAX_SAFE_INTEGER + 1])("does not guess a limit when metadata is invalid (%s)", async limit => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      "GET /upload-limits": () => ({ import_max_bytes: limit }),
+    });
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["type,hostname\nserver,a"], "a.csv")] } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Upload limit is unavailable");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
+  it("ignores a delayed file-limit response after the upload component is unmounted", async () => {
+    let finish!: (value: Response) => void;
+    const { fetchMock, unmount } = await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      "GET /upload-limits": () => new Promise<Response>(resolve => { finish = resolve; }),
+    });
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["type,hostname\nserver,a"], "a.csv")] } });
+    await screen.findByText(/Checking file sizes/);
+    unmount();
+    await act(async () => { finish(json({ import_max_bytes: 256 * 1024**2 })); });
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
   it("accepts multi-file drops outside the small upload button without navigation or duplicate delivery", async () => {
     await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
     fireEvent.drop(document.body, { dataTransfer: { files: [new File(["type,hostname\nserver,a"], "a.csv"), new File(["type,hostname\nserver,b"], "b.csv")] } });
@@ -60,14 +120,9 @@ describe("ImportButton", () => {
     const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
     fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [new File(["type,hostname\nserver,one"], "one.csv")] } });
     const dialog = await screen.findByRole("dialog", { name: "Upload files" });
-    expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Cancel queued uploads" })).toHaveFocus();
     await within(dialog).findByRole("group", { name: "Upload options" });
     fireEvent(dialog, new Event("cancel", { cancelable: true }));
-    expect(screen.getByText(/Close and remove all remaining files/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Keep reviewing" }));
-    expect(dialog).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    fireEvent.click(screen.getByRole("button", { name: "Close and remove queued files" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
   });
@@ -78,6 +133,83 @@ describe("ImportButton", () => {
       new File(["hostname,severity,description\ntwo,high,second"], "two.csv"),
     ] } });
   }
+
+  it.each(["assets", "findings"] as const)("cancels the %s queue in one click without a confirmation or submission", async kind => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind={kind} accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin");
+    const trigger = screen.getByRole("button", { name: "Upload file" });
+    trigger.focus();
+    fireEvent.change(screen.getByTestId(`${kind}-file-input`), { target: { files: [
+      new File(["type,hostname\nserver,one"], "one.csv"), new File(["type,hostname\nserver,two"], "two.csv"),
+    ] } });
+    await screen.findByLabelText("Source for two.csv");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(0);
+  });
+
+  it("locks all other row and bulk actions during an individual submission and retains accepted jobs when the queue closes", async () => {
+    let finish: (value: Response) => void = () => {};
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="findings" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      ...TRACK, "POST /orgs/org-1/findings/import": () => new Promise<Response>(resolve => { finish = resolve; }),
+    });
+    selectBatch();
+    await screen.findByLabelText("Source for two.csv");
+    const rows = screen.getAllByRole("group", { name: "Upload options" });
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "Upload" }));
+    await screen.findByText("Uploading…");
+    expect(within(rows[1]).getByRole("button", { name: "Upload" })).toBeDisabled();
+    expect(within(rows[1]).getByRole("button", { name: "Remove" })).toBeDisabled();
+    expect(screen.getByLabelText("Source for two.csv")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel queued uploads" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Upload all ready files/ })).toBeDisabled();
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
+    expect(screen.getByRole("dialog", { name: "Upload files" })).toBeInTheDocument();
+    finish(json({ scan_id: "s1", status: "pending", report: null }, 202));
+    await waitFor(() => expect(screen.queryByLabelText("Source for one.csv")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toEqual(["POST /orgs/org-1/findings/import"]);
+    expect(calls(fetchMock)).toContain("GET /orgs/org-1/scans/s1");
+  });
+
+  it("discards failed and duplicate queue entries without resubmitting them", async () => {
+    const { fetchMock } = await renderSignedIn(<ImportButton orgId="org-1" kind="findings" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      "POST /orgs/org-1/findings/import": init => ((init.body as FormData).get("file") as File).name === "one.csv"
+        ? json({ detail: "Temporary failure" }, 503)
+        : json({ detail: { imported_by: "Test member", imported_at: null } }, 409),
+    });
+    selectBatch();
+    fireEvent.click(await screen.findByRole("button", { name: "Upload all ready files (2)" }));
+    await screen.findByText(/0 submitted; 1 failed; 1 already uploaded/);
+    const duplicate = screen.getByLabelText("two.csv");
+    fireEvent.click(duplicate);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByText("one.csv: Temporary failure")).not.toBeInTheDocument();
+    expect(calls(fetchMock).filter(call => call.startsWith("POST"))).toHaveLength(2);
+  });
+
+  it("removes only the selected same-name row and uploads the remaining file once", async () => {
+    let submitted: File | null = null;
+    await renderSignedIn(<ImportButton orgId="org-1" kind="assets" accept=".csv" label="Upload file" profiles={BUILTIN_PROFILES} />, "admin", {
+      ...TRACK, "POST /orgs/org-1/assets/import": init => {
+        submitted = (init.body as FormData).get("file") as File;
+        return json({ scan_id: "s1", status: "pending", report: null }, 202);
+      },
+    });
+    const first = new File(["type,hostname\nserver,first"], "same.csv");
+    const second = new File(["type,hostname\nserver,second"], "same.csv");
+    fireEvent.change(screen.getByTestId("assets-file-input"), { target: { files: [first, second] } });
+    await screen.findByRole("button", { name: "Upload all ready files (2)" });
+    const rows = screen.getAllByRole("group", { name: "Upload options" });
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "Remove" }));
+    expect(screen.getAllByRole("group", { name: "Upload options" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(submitted).toBe(second);
+  });
 
   it("submits sequentially, locks sources, prevents double starts and stops unsent files", async () => {
     let finish: (value: Response) => void = () => {};
@@ -421,9 +553,7 @@ describe("ImportButton with import profiles", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Upload" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("first.csv: Unsupported file type");
 
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByText(/Submitted imports will not be cancelled/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Close and remove queued files" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
     pick("assets", "type,hostname\nserver,a\n", "second.csv");
     await screen.findByRole("group", { name: "Upload options" });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

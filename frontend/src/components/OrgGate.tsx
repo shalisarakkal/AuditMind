@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { useApp } from "@/context/AppContext";
 import { ACCOUNT_PATH, PLATFORM_PATH } from "@/lib/paths";
+import LoadingIndicator from "@/components/LoadingIndicator";
 
 /** Pages that don't belong to an org: they work with none selected (a new
  * Sysadmin has none, nor does someone removed from their last org). */
@@ -19,9 +20,10 @@ export default function OrgGate({ children }: { children: React.ReactNode }) {
   if (orgFree(path)) return <>{children}</>;
   if (orgsError) return <p className="text-sm text-red-300">Couldn&apos;t load your organizations: {orgsError}</p>;
   if (!selectedOrg) {
+    if (orgsLoading) return <LoadingIndicator label="Loading organization…" />;
     return (
       <p className="text-sm text-white/60">
-        {orgsLoading ? "Loading…" : "You don't belong to any organization. Ask your administrator to add you."}
+        You don&apos;t belong to any organization. Ask your administrator to add you.
       </p>
     );
   }

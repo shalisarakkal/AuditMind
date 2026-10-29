@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AuthGuard from "@/components/AuthGuard";
 import { AppProvider } from "@/context/AppContext";
 import { setToken } from "@/lib/apiClient";
-import { mockApi, org } from "@/test/helpers";
+import { json, mockApi, org } from "@/test/helpers";
 
 const replace = vi.fn();
 let pathname = "/";
@@ -28,6 +28,17 @@ describe("AuthGuard", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(screen.queryByText("secret dashboard")).not.toBeInTheDocument();
+  });
+
+  it("shows generic progress during session recovery without exposing protected content", async () => {
+    let finish!: (value: Response) => void;
+    mockApi({ "POST /auth/refresh": () => new Promise<Response>(resolve => { finish = resolve; }) });
+    render(<AppProvider><AuthGuard><p>secret dashboard</p></AuthGuard></AppProvider>);
+    expect(screen.getByRole("status")).toHaveTextContent("Opening AuditMind");
+    expect(screen.queryByText("secret dashboard")).not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+    await act(async () => { finish(json({ detail: "No session" }, 401)); });
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
   });
 
   it("renders the page for a signed-in user", async () => {

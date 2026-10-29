@@ -28,6 +28,7 @@ import {
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
 import { api } from "@/lib/apiClient";
+import { documentFileError } from "@/lib/uploadValidation";
 import { formatDateTime } from "@/lib/domain";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
@@ -68,6 +69,7 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
   const [bulkAction, setBulkAction] = useState<"retire" | "remove" | null>(null);
   const [replacement, setReplacement] = useState<Document | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const uploadTitle = useRef<HTMLInputElement>(null);
   const canManage = (document: Document) => writable && (platform ? document.org_id === null : document.org_id === orgId);
   const columns = writable ? 6 : 5;
@@ -98,7 +100,11 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
     if (!writable || busy) return;
     const form = event.currentTarget;
     const values = new FormData(form);
-    const file = values.get("file") as File;
+    const file = (form.elements.namedItem("file") as HTMLInputElement).files?.[0];
+    if (!file) { setFileError("Choose a UTF-8 text or Markdown file."); return; }
+    const invalid = documentFileError(file);
+    setFileError(invalid);
+    if (invalid) return;
     const fields: Record<string, string> = {};
     for (const [key, value] of values) if (key !== "file") fields[key] = String(value);
     if (replacement) fields.document_id = replacement.id;
@@ -129,7 +135,7 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
   }
   return <div className="space-y-4">
     <PageHeader title={platform ? "Shared standards" : "Documents"} total={data?.total} noun="documents" orgName={platform ? "the shared library" : (orgName ?? "this organization")} filtered={list.hasFilters} note="Only indexed, current sources are used for retrieval. Summaries are not official full standards."
-      action={writable && <button type="button" className={PRIMARY} disabled={busy} onClick={() => { setReplacement(null); setUploadOpen(true); }}>Upload document</button>} />
+      action={writable && <button type="button" className={PRIMARY} disabled={busy} onClick={() => { setFileError(null); setReplacement(null); setUploadOpen(true); }}>Upload document</button>} />
     {(message) && <p role="alert" className="text-red-300">{message}</p>}
     {!platform && orgId && <ConsentSettings key={orgId} orgId={orgId} writable={writable} />}
     {platform && writable && <><EmbeddingSettings /><button disabled={busy} className={SECONDARY} onClick={() => execute(() => api.post(`${base}/load-baseline`))}>Queue baseline: NIST catalog and CIS/ISO source references</button></>}
@@ -143,8 +149,11 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
         <label>Source reference<input className={`${INPUT} block w-full`} name="source" required maxLength={1000} /></label>
         <label>Content kind<select className={`${INPUT} block w-full`} name="content_kind"><option value="original_summary">Original summary</option>{!platform && <option value="organization_policy">Organization policy</option>}<option value="official">Authorized official text</option><option value="reference">Reference only (not retrieval evidence)</option></select></label>
         <label>Usage rights / authorization<input className={`${INPUT} block w-full`} name="rights" required maxLength={2000} /></label>
-        <label>UTF-8 text or Markdown, up to 10 MiB<input className="block" type="file" name="file" accept=".txt,.md,.markdown" required /></label>
-        <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><button className={PRIMARY} disabled={busy}>{busy ? "Queueing…" : "Queue processing"}</button><button type="button" className={SECONDARY} disabled={busy} onClick={() => { setReplacement(null); setUploadOpen(false); }}>Cancel upload</button></div>
+        <label>UTF-8 text or Markdown, up to 10 MiB<input key={replacement?.id ?? "new-document"} className="block" type="file" name="file" accept=".txt,.md,.markdown" required
+          aria-invalid={fileError ? true : undefined} aria-describedby={fileError ? "document-file-error" : undefined}
+          onChange={event => { const selected = event.target.files?.[0]; setFileError(selected ? documentFileError(selected) : null); }} /></label>
+        {fileError && <p id="document-file-error" role="alert" className="text-sm text-red-300 [overflow-wrap:anywhere] sm:col-span-2">{fileError}</p>}
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><button className={PRIMARY} disabled={busy || !!fileError}>{busy ? "Queueing…" : "Queue processing"}</button><button type="button" className={SECONDARY} disabled={busy} onClick={() => { setFileError(null); setReplacement(null); setUploadOpen(false); }}>Cancel upload</button></div>
       </form>
     </section>}
     {writable && confirm && <ConfirmPanel
@@ -236,7 +245,7 @@ function DocumentsList({ orgId, orgName, writable, platform = false }: LibraryPr
                 {preview?.scope === previewScope && preview.versionId === v.id ? "Hide preview" : "Preview"} v{v.number}
               </button>
               {canManage(d) && !v.purged_at && <>{!v.retired_at && <><button disabled={busy} className={ROW_ACTION} onClick={() => execute(() => api.post(`${base}/versions/${v.id}/reindex`))}>Index / retry</button><button disabled={busy} className={ROW_ACTION} onClick={() => execute(() => api.post(`${base}/versions/${v.id}/retire`))}>Retire</button></>}{v.retired_at && !v.current && <><button disabled={busy || isReactivationPending(v)} className={ROW_ACTION} onClick={() => reactivate(v, d.title)}>{isReactivationPending(v) ? "Reactivating…" : `Reactivate v${v.number}`}</button>{!isReactivationPending(v) && <button disabled={busy} className={ROW_ACTION_DANGER} onClick={() => setConfirm({ version: v, documentTitle: d.title })}>Remove</button>}</>}</>}
-            </div>)}{canManage(d) && <button disabled={busy} className={ROW_ACTION} onClick={() => { setReplacement(d); setUploadOpen(true); }}>New version</button>}</td>
+            </div>)}{canManage(d) && <button disabled={busy} className={ROW_ACTION} onClick={() => { setFileError(null); setReplacement(d); setUploadOpen(true); }}>New version</button>}</td>
           </tr>{preview?.scope === previewScope && preview.documentId === d.id && d.versions.filter(v => v.id === preview.versionId && !v.purged_at).map(v => <tr key={v.id}>
             <td colSpan={columns} className="px-4 pb-3"><DocumentPreview key={`${base}:${v.id}`} base={base} version={v} title={d.title} onClose={() => { setPreview(null); document.getElementById(`document-preview-toggle-${v.id}`)?.focus(); }} /></td>
           </tr>)}</Fragment>)}

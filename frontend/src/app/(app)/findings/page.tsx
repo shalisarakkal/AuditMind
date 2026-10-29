@@ -33,6 +33,7 @@ import {
 import { PickFilter, SortHeader, TextFilter, facetOptions } from "@/components/ListControls";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
+import ListLoading from "@/components/ListLoading";
 import { useApp } from "@/context/AppContext";
 import {
   DOMAIN_LABELS,
@@ -55,7 +56,7 @@ const DOMAIN_OPTIONS = DOMAIN_ORDER.map((d) => ({ value: d, label: DOMAIN_LABELS
 // The list reads its sort and filters from the page address.
 export default function FindingsPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-white/60">Loading…</p>}>
+    <Suspense fallback={<ListLoading label="findings" initial />}>
       <Findings />
     </Suspense>
   );
@@ -125,7 +126,7 @@ function Findings() {
   };
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-6 [overflow-wrap:anywhere]">
       <PageHeader
         title="Findings"
         total={page?.total}
@@ -138,7 +139,7 @@ function Findings() {
         }
         action={
           writer && (
-            <div className="flex flex-wrap items-start gap-3"><button type="button" className="h-10 shrink-0 rounded-md border border-cyan px-4 text-sm text-cyan" onClick={() => setAddingOrg(org.id)}>Add finding</button><ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} /></div>
+            <div className="flex min-w-0 flex-wrap items-start gap-3"><button type="button" className="min-h-10 max-w-full rounded-md border border-cyan px-4 py-2 text-sm text-cyan" onClick={() => setAddingOrg(org.id)}>Add finding</button><ImportButton orgId={org.id} kind="findings" accept=".csv,.json,.nessus" label="Upload file" profiles={profiles.data} /></div>
           )
         }
       />
@@ -176,7 +177,9 @@ function Findings() {
         )}
       </div>
 
-      <StatusMessage loading={loading && !page} error={error} />
+      <StatusMessage loading={false} error={error} />
+      {loading && <ListLoading label="findings" initial={!page} />}
+      {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry findings</button>}
       {page && (
         <ListTable fixed className="min-w-[1900px]">
             <thead className={THEAD}>

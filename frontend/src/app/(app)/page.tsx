@@ -4,6 +4,7 @@ import Link from "next/link";
 import { enumLabel } from "@/lib/presentation";
 
 import ScoreCard from "@/components/ScoreCard";
+import DashboardLoading from "@/components/DashboardLoading";
 import SecuritySummary from "@/components/SecuritySummary";
 import StatusMessage from "@/components/StatusMessage";
 import { useApp } from "@/context/AppContext";
@@ -39,18 +40,22 @@ function OrganizationDashboard({ orgId, orgName }: { orgId: string; orgName: str
         </p>
       </div>
 
-      <StatusMessage loading={!state && !error} error={error} />
+      <StatusMessage loading={false} error={error} />
+      {!state && !error && <DashboardLoading checking />}
       {state && identity && <CurrentDashboard key={identity} orgId={orgId} expected={state} />}
+      <DashboardSecuritySummary />
     </div>
   );
 }
 
 function CurrentDashboard({ orgId, expected }: { orgId: string; expected: DashboardState }) {
-  const { data, error, loading } = useApi<DashboardSummary>(`/orgs/${orgId}/dashboard`);
+  const { data, error, loading, reload } = useApi<DashboardSummary>(`/orgs/${orgId}/dashboard`);
   const matching = data && (data.scoring_mode ?? "findings_based") === expected.scoring_mode
     && (data.settings_version ?? 0) === expected.settings_version
     && (expected.scoring_mode !== "evidence_qualified" || (data.evidence_revision === expected.evidence_revision && (data.evaluation_id ?? null) === expected.evaluation_id));
-  return <><StatusMessage loading={loading && !data} error={error} />
+  return <><StatusMessage loading={false} error={error} />
+    {loading && !data && <DashboardLoading />}
+    {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry dashboard</button>}
     {matching ? <Dashboard data={data} /> : data && <p role="status">Dashboard inputs changed. Waiting for the latest scoring state; no stale scores are shown.</p>}</>;
 }
 
@@ -147,7 +152,6 @@ function Dashboard({ data }: { data: DashboardSummary }) {
         </section>
       </div>
 
-      <DashboardSecuritySummary />
     </>
   );
 }

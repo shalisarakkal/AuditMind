@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.responses import JSONResponse
 from app.services.readiness import readiness_checks
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +25,8 @@ from app.api.routes import (
     scoring_qualifications,
 )
 from app.core.config import check_secret_key, settings
-from app.core.middleware import SecurityHeadersMiddleware, UploadSizeLimitMiddleware
+from app.core.middleware import DOCUMENT_MAX_BYTES, SecurityHeadersMiddleware, UploadSizeLimitMiddleware
+from app.services.organization_logos import MAX_UPLOAD as LOGO_MAX_BYTES
 from app.core.observability import (
     ObservabilityMiddleware,
     log_structured,
@@ -76,6 +77,21 @@ app.include_router(archive.router, prefix=api_router_prefix)
 app.include_router(events.router, prefix=api_router_prefix)
 app.include_router(documents.router, prefix=api_router_prefix)
 app.include_router(scoring_qualifications.router, prefix=api_router_prefix)
+
+
+@app.get(f"{api_router_prefix}/upload-limits", tags=["uploads"])
+def upload_limits(response: Response) -> dict[str, int]:
+    """Non-sensitive browser preflight ceilings; no DB access or setting writes.
+
+    Server transport/parser limits remain authoritative. Imports use the actual
+    configured ceiling, not a frontend guess or a configuration/secret dump.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "import_max_bytes": settings.IMPORT_MAX_BYTES,
+        "document_max_bytes": DOCUMENT_MAX_BYTES,
+        "logo_max_bytes": LOGO_MAX_BYTES,
+    }
 
 
 @app.get("/metrics", include_in_schema=False, dependencies=[Depends(require_sysadmin)])
