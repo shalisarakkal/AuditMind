@@ -16,8 +16,13 @@ is pending implementation and verification.
 - [x] Full backend regression: 1,423 passed. Latest safeguards: 46 focused checks
   passed. Actual two-slot CLI acceptance: five checks passed, including forced
   interruption/recovery and tenant-safe updates. These are local results.
-- [ ] Activate after the current normal import finishes, compare snapshots,
-  then review/commit/push and verify hosted Linux CI.
+- [x] After the normal import finished, migrated to 0032 and restarted API/worker
+  with **one slot**. Counts and account/settings digests match; readiness passes.
+- [x] Hosted Linux verification for `45d0aec`: all four jobs pass in
+  [run 40921504212](https://github.com/shalisarakkal/AuditMind/actions/runs/40921504212).
+  Fresh 79 local Chrome checks also pass after fixing Linux Source overflow.
+- [ ] Restore normal frontend: build passes, but automatic approval review
+  blocked restart, so manual start is required. Parallel activation remains held.
 - Organization capacity is independent of slot count. Large SaaS scale testing
   remains on hold. [Configuration and limits](docs/WORKER_POOL.md).
 - [x] Reviewed and committed upload/loading (`831c67c`), import progress

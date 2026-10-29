@@ -3,6 +3,13 @@
 Review synchronization (2026-10-22): Runtime clarification: FastAPI/Python, PostgreSQL/pgvector and a separate worker are implemented; Node microservices, general automated discovery and standalone AI analysis routes below are design context, not current endpoints. Dashboard scoring is deterministic; AI runs through report jobs.
 See [current code review and release gates](docs/RELEASE_READINESS.md).
 
+29 October worker implementation: bounded threaded processing supports fair
+admission across organizations, with one queued job per scope. Normal/demo
+default remains **one slot**. SaaS scale work and parallel activation are on
+hold; platform-admin configuration is required before future rollout. This is
+not a distributed fleet or demonstrated SaaS capacity.
+See [worker design, limitations and verification](docs/WORKER_POOL.md).
+
 28 October 2026 local pilot: Dashboard scoring can additionally require current
 reviewed evidence behind an organization-admin **default-off** setting. A durable
 worker job evaluates complete inventory/source bindings; transactional database

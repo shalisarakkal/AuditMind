@@ -1,5 +1,9 @@
 # AuditMind AI
 
+Background processing: [worker configuration and current rollout hold](docs/WORKER_POOL.md).
+Keep normal/demo processing serial while validating single-organization use.
+Platform-admin concurrency controls and SaaS capacity verification remain pending.
+
 Product logo trials: [replaceable asset locations and instructions](docs/PRODUCT_BRANDING.md).
 
 Organization admins can manage [organization logos](docs/ORGANIZATION_LOGOS.md)

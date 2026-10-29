@@ -7,6 +7,20 @@ parallel activation; focus on single-organization behavior. Keep worker/demo
 default at one. A platform-admin concurrency setting remains required before
 future enablement. Environment configuration alone does not meet that request.
 
+After the normal import completed, migration 0032 and a **serial** API/worker
+restart passed readiness and snapshot comparisons: inventory counts and
+account/settings digests unchanged. Fix `45d0aec` passes 41 upload tests, lint,
+both builds and 79 fresh Chrome checks; hosted rerun remains pending. Automatic
+approval review rejected frontend restart ("blocked by policy"); port 3000 is
+currently stopped and needs manual start. The pending activation notes below
+describe the earlier checkpoint.
+
+Final hosted result: **all four Linux jobs pass** for `45d0aec`, including the
+real two-slot lifecycle test. [Run 40921504212](https://github.com/shalisarakkal/AuditMind/actions/runs/40921504212)
+closes code verification and supersedes the in-progress notes above. Normal
+frontend manual start and platform-admin concurrency controls remain pending;
+parallel rollout and SaaS scale work remain held.
+
 Configurable organization concurrency now retains one active queued job per
 organization with fair admission. Five actual CLI acceptance checks pass,
 including duplicate-pool refusal and recovery after termination; 46 latest

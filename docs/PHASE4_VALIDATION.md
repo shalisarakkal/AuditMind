@@ -16,6 +16,29 @@ The current normal import finished without interruption before a fresh snapshot:
 5 organizations, 6 users, 5,324,472 assets, 7,338,410 findings, 48 scans and 9 reports;
 all queues/staging empty, scoring overrides off, schema still 0031 at this point.
 
+Activation follow-up: migrated **0031 → 0032**; metadata check reports no pending
+operations. API/worker restarted with **one slot**, not two. `/ready` passes.
+Fresh snapshots have identical counts and account/settings digests; queues and
+staging remain empty, scoring stays off. Prior logs and frontend bundle retained.
+
+Fixed Source layout: lint, **41 upload tests**, isolated and normal production
+builds, **79 fresh Chrome checks** pass; fixture `phase3_browser_9121ac23303a`
+removed, no inference/page errors. Evidence pilot: **17 checks** pass, fixture
+`phase3_browser_6148d8294fe8` removed with both organizations default-off.
+
+Normal build: `XV-UgWZqpJE_XR6iPLipj`. Automatic approval review rejected both
+hidden launch and foreground npm start as "blocked by policy", without a
+specific reason. Frontend is stopped; API/serial worker are healthy. Process
+records exclude the stopped frontend. Manual recovery from `frontend`:
+`npm.cmd run start -- --hostname 127.0.0.1 --port 3000`.
+
+Hosted rerun for `45d0aec`:
+[40921504212](https://github.com/shalisarakkal/AuditMind/actions/runs/40921504212).
+Final result: **success**, all four Linux jobs complete: backend, frontend,
+dependency/security audit and browser (workflow, evidence pilot and pool
+lifecycle). This verifies code commit `45d0aec`; the following closeout commit
+changes documentation only. Normal frontend manual start remains pending.
+
 Local full regression: **1,423 passed in 903.34 seconds**, recorded in
 `temp/testing/worker-pool-full.xml`. This preceded the final startup guard and
 two extra safeguard tests; latest focused run: **46 passed in 53.15 seconds**.
