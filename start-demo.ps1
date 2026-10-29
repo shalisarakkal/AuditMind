@@ -1,4 +1,4 @@
-param([switch]$Stop, [switch]$SkipBuild)
+param([switch]$Stop, [switch]$SkipBuild, [ValidateRange(1,32)][int]$WorkerConcurrency = 2)
 
 $ErrorActionPreference = 'Stop'
 $demoRoot = $PSScriptRoot
@@ -20,10 +20,12 @@ function Stop-Demo {
 if ($Stop) { Stop-Demo; Write-Host 'Demo services stopped. Demo data retained.'; exit 0 }
 $previousBackendUrl = $env:BACKEND_URL
 $previousApiUrl = $env:NEXT_PUBLIC_API_URL
+$previousWorkerConcurrency = $env:WORKER_CONCURRENCY
 try {
 # Override stale personal frontend .env settings for both build and runtime.
 $env:BACKEND_URL = 'http://127.0.0.1:8000'
 $env:NEXT_PUBLIC_API_URL = '/api/v1'
+$env:WORKER_CONCURRENCY = [string]$WorkerConcurrency
 foreach ($port in @(3000, 8000)) {
     if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) {
         throw "Port $port is already in use. Stop its application (or this demo with -Stop) before starting."
@@ -86,4 +88,5 @@ try {
 } finally {
     $env:BACKEND_URL = $previousBackendUrl
     $env:NEXT_PUBLIC_API_URL = $previousApiUrl
+    $env:WORKER_CONCURRENCY = $previousWorkerConcurrency
 }

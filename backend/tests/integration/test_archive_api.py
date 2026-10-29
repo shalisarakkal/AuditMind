@@ -333,7 +333,14 @@ def test_the_workers_auto_purge_waits_behind_everything_else(client, admin, monk
     )
 
     with ingestion_background.open_session() as db:
-        first, second, third = claim_next(db), claim_next(db), claim_next(db)
+        first = claim_next(db)
+        assert claim_next(db) is None  # one active queued job in this organization
+        db.get(ArchiveJob, someones).status = ScanStatus.completed
+        db.commit()
+        second = claim_next(db)
+        db.get(Scan, upload_id).status = ScanStatus.completed
+        db.commit()
+        third = claim_next(db)
     # Oldest first among those, then System's purge (the oldest of all).
     assert [first, second, third] == [("archive", someones), ("import", upload_id), ("archive", queued.id)]
 

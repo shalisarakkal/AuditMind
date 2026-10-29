@@ -93,6 +93,9 @@ def test_the_oldest_waiting_job_goes_first(client, admin, monkeypatch, db_sessio
     first = _large_upload(client, admin, monkeypatch, name="first.csv")
     second = _large_upload(client, admin, monkeypatch, content=ASSETS + b"server,web-03\n", name="second.csv")
     assert runner.claim_next(db_session) == ("import", first)
+    assert runner.claim_next(db_session) is None  # same org stays queued until free
+    db_session.get(Scan, first).status = ScanStatus.completed
+    db_session.commit()
     assert runner.claim_next(db_session) == ("import", second)
     assert runner.claim_next(db_session) is None
 

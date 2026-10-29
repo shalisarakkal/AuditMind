@@ -2,10 +2,11 @@
 restore and purge jobs outside the web server, so pages stay fast while they
 run, plus the daily purge of archived items and old Activity events.
 
-The queue is the database: uploads waiting for it (scans with status
-pending) and archive jobs (archive_jobs, pending), oldest first, each taken
-with FOR UPDATE SKIP LOCKED so it runs once. A request that runs a small job
-itself takes it first the same way.
+The queue is the database. A bounded thread pool serves organization scopes
+least recently dispatched (unserved first), oldest job within each scope.
+Status + dispatch metadata are committed together under a short admission lock;
+each organization has at most one active queued job. Small synchronous API jobs
+retain their inventory locks. Each pool thread owns its own database Session.
 
 A thread checks in every HEARTBEAT_SECONDS (worker_status, and the running
 job's heartbeat_at), even while the main loop is busy in a long import. A
@@ -22,13 +23,16 @@ next start (each from where it got to).
 """
 
 import logging
+import os
 import signal
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from app.core.observability import increment_metric, set_metric, alert
 from sqlalchemy.orm import Session
@@ -44,6 +48,7 @@ from app.services import evidence_jobs
 from app.models.knowledge import KnowledgeIndex
 from app.services import knowledge_service
 from app.models.scan import Scan
+from app.models.organization import Organization
 from app.services import archive_service, import_staging, ingestion_background, platform, report_service
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
@@ -70,122 +75,112 @@ def _now() -> datetime:
 
 
 class _Current:
-    """What the worker is running, for the check-in thread."""
+    """Per-thread jobs, snapshotted together by the heartbeat thread."""
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.job: tuple[str, uuid.UUID] | None = None
+        self.jobs: dict[int, tuple[str, uuid.UUID]] = {}
 
     def set(self, job: tuple[str, uuid.UUID] | None) -> None:
         with self.lock:
-            self.job = job
+            if job is None:
+                self.jobs.pop(threading.get_ident(), None)
+            else:
+                self.jobs[threading.get_ident()] = job
 
     def get(self) -> tuple[str, uuid.UUID] | None:
         with self.lock:
-            return self.job
+            return self.jobs.get(threading.get_ident())
+
+    def all(self) -> list[tuple[str, uuid.UUID]]:
+        with self.lock:
+            return list(self.jobs.values())
 
 
 current = _Current()
 
 
-def _oldest_job(db: Session, low_priority: bool):
-    """The oldest waiting archive job: one someone started, or a System one
-    (the auto-purge) that has waited AUTO_PURGE_MAX_WAIT_MINUTES; or, with
-    `low_priority`, any System one."""
-    by_system = ArchiveJob.started_by.is_(None)
-    if not low_priority:
-        overdue = ArchiveJob.started_at <= _now() - timedelta(minutes=settings.AUTO_PURGE_MAX_WAIT_MINUTES)
-        by_system = ~by_system | overdue
-    return db.execute(
-        select(ArchiveJob.id, ArchiveJob.started_at)
-        .where(ArchiveJob.status == ScanStatus.pending, by_system)
-        .order_by(ArchiveJob.started_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    ).first()
+@contextmanager
+def _worker_lease():
+    """One healthy pool per database/schema, including serial CLI launches."""
+    with ingestion_background.open_session() as db:
+        engine = db.get_bind().engine
+    with engine.connect() as conn:
+        key = conn.scalar(select(func.hashtext(func.current_schema())))
+        acquired = conn.scalar(select(func.pg_try_advisory_lock(10, key)))
+        conn.commit()
+        if not acquired:
+            raise RuntimeError("A worker pool is already running for this installation")
+        pid = conn.scalar(select(func.pg_backend_pid()))
+        conn.commit()
+        try:
+            from app.models.worker_dispatch import WorkerDispatch
+            try:
+                conn.execute(select(WorkerDispatch.scope_id).limit(0))
+                conn.commit()
+            except Exception as exc:
+                raise RuntimeError("Worker schema is not ready; run alembic upgrade head before starting the pool") from exc
+            yield conn, pid
+        finally:
+            released = False
+            try:
+                if not conn.invalidated:
+                    conn.rollback()
+                    conn.execute(select(func.pg_advisory_unlock(10, key)))
+                    conn.commit()
+                    released = True
+            finally:
+                if not released:
+                    conn.invalidate()
 
 
-def _oldest_report_job(db: Session):
-    """The oldest waiting report generation job."""
-    return db.execute(
-        select(Report.id, Report.created_at)
-        .where(Report.status == ReportStatus.pending)
-        .order_by(Report.created_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    ).first()
+@contextmanager
+def _maintenance_guard(db):
+    """Only one maintenance/purge runner, even during pool restart overlap."""
+    with db.get_bind().engine.connect() as conn:
+        key = conn.scalar(select(func.hashtext(func.current_schema())))
+        acquired = conn.scalar(select(func.pg_try_advisory_lock(11, key)))
+        conn.commit()
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                conn.execute(select(func.pg_advisory_unlock(11, key)))
+                conn.commit()
+
+
 
 
 def claim_next(db: Session) -> tuple[str, uuid.UUID] | None:
-    """Take the oldest waiting job: ("import", scan id), ("report", report id),
-    or ("archive", job id). Committed as running, with a first check-in.
-    Jobs the system started (the daily auto-purge) are low priority: taken only
-    when no upload, report or job someone started waits, until they've waited
-    AUTO_PURGE_MAX_WAIT_MINUTES; then they take their turn by age."""
-    scan = db.execute(
-        select(Scan.id, Scan.started_at)
-        .where(Scan.status == ScanStatus.pending, Scan.source == "upload")
-        .order_by(Scan.started_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    ).first()
-    report = _oldest_report_job(db)
-    document = db.execute(select(KnowledgeIndex.id, KnowledgeIndex.created_at)
-        .where(KnowledgeIndex.status == "pending").order_by(KnowledgeIndex.created_at)
-        .limit(1).with_for_update(skip_locked=True)).first()
-    job = _oldest_job(db, low_priority=False)
-    evaluation = db.execute(select(EvidenceEvaluation.id, EvidenceEvaluation.created_at)
-        .where(EvidenceEvaluation.status == "pending").order_by(EvidenceEvaluation.created_at)
-        .limit(1).with_for_update(skip_locked=True)).first()
-    if scan is None and report is None and document is None and job is None and evaluation is None:
-        job = _oldest_job(db, low_priority=True)
-    if scan is None and report is None and document is None and job is None and evaluation is None:
-        db.rollback()
-        return None
-
-    now = _now()
-    # Find candidate with oldest timestamp
-    candidates = []
-    if scan is not None:
-        candidates.append(("import", scan.id, scan.started_at))
-    if report is not None:
-        candidates.append(("report", report.id, report.created_at))
-    if document is not None:
-        candidates.append(("document", document.id, document.created_at))
-    if job is not None:
-        candidates.append(("archive", job.id, job.started_at))
-    if evaluation is not None:
-        candidates.append(("evidence", evaluation.id, evaluation.created_at))
-
-    candidates.sort(key=lambda c: c[2])
-    kind, item_id, _ = candidates[0]
-
-    if kind == "import":
-        db.execute(update(Scan).where(Scan.id == item_id).values(status=ScanStatus.running, heartbeat_at=now))
-    elif kind == "report":
-        db.execute(update(Report).where(Report.id == item_id).values(status=ReportStatus.running, heartbeat_at=now, run_started_at=now))
-    elif kind == "document":
-        db.execute(update(KnowledgeIndex).where(KnowledgeIndex.id == item_id)
-                   .values(status="running", heartbeat_at=now, run_started_at=now))
-    elif kind == "evidence":
-        db.execute(update(EvidenceEvaluation).where(EvidenceEvaluation.id == item_id)
-            .values(status="running", heartbeat_at=now, run_started_at=now))
-    else:
-        db.execute(update(ArchiveJob).where(ArchiveJob.id == item_id).values(status=ScanStatus.running, heartbeat_at=now))
-
-    claimed = (kind, item_id)
-    db.commit()  # also lets go of the ones not taken
-    return claimed
+    """Atomically claim a runnable job, fairly across organization scopes."""
+    from app.worker.scheduler import claim
+    return claim(db, _now)
 
 
-def run_once(db: Session) -> bool:
+def run_once(db: Session, *, allow_org_purge: bool = True) -> bool:
     """Take and run one waiting job; else purge an org whose purge the
     Sysadmin asked for (it's already gone for everyone, so it waits its
     turn). False if there's nothing to do."""
     claimed = claim_next(db)
     if claimed is None:
+        if not allow_org_purge:
+            return False
+        # Preserve serial worker's idle-only purge behavior: do not delete a
+        # tenant while another pool slot is still processing any queued job.
+        if current.all():
+            return False
         try:
-            return platform.purge_next_org(db)
+            if db.scalar(select(Organization.id).where(Organization.purge_requested_at.is_not(None)).limit(1)) is None:
+                db.rollback()
+                return False
+            # Also cover jobs run by a synchronous API request or a draining
+            # predecessor pool. A queued tenant purge waits rather than racing.
+            for model in (Scan, ArchiveJob, Report, KnowledgeIndex, EvidenceEvaluation):
+                if db.scalar(select(model.id).where(model.status == "running").limit(1)) is not None:
+                    db.rollback()
+                    return False
+            with _maintenance_guard(db) as acquired:
+                return platform.purge_next_org(db) if acquired else False
         except Exception:
             # Carries on from where it stopped next time.
             logger.exception("Purging an organization failed")
@@ -435,9 +430,19 @@ def _sweep_uploads(db: Session) -> None:
 # --- The process --------------------------------------------------------------
 
 
-def _check_in(stop: threading.Event, started_at: datetime) -> None:
+def _check_in(stop: threading.Event, started_at: datetime, lease=None, stop_work=None) -> None:
     """Every HEARTBEAT_SECONDS: the worker's check-in, and the running job's."""
     while not stop.wait(HEARTBEAT_SECONDS):
+        if lease is not None:
+            try:
+                conn, expected_pid = lease
+                if conn.scalar(select(func.pg_backend_pid())) != expected_pid:
+                    raise RuntimeError("Worker pool leadership connection changed")
+                conn.commit()
+            except Exception:
+                logger.exception("Worker pool leadership lost; stopping new work")
+                stop_work.set()
+                return
         try:
             with ingestion_background.open_progress_session() as db:
                 now = _now()
@@ -446,8 +451,7 @@ def _check_in(stop: threading.Event, started_at: datetime) -> None:
                     .values(id=1, started_at=started_at, heartbeat_at=now)
                     .on_conflict_do_update(index_elements=["id"], set_={"heartbeat_at": now})
                 )
-                job = current.get()
-                if job is not None:
+                for job in current.all():
                     if job[0] == "import":
                         model = Scan
                     elif job[0] == "report":
@@ -483,7 +487,63 @@ def _update_queue_metrics() -> None:
         set_metric("queue_total_pending", pending_imports + pending_archives + pending_reports + pending_evidence)
 
 
-def main() -> None:
+def _run_loop(stop: threading.Event, *, maintenance: bool = True) -> None:
+    next_reap = _now()
+    next_housekeeping = _now() + FIRST_HOUSEKEEPING_AFTER
+    last_queue_check = _now()
+    failures = 0
+    try:
+        while not stop.is_set():
+            try:
+                with ingestion_background.open_session() as db:
+                    if maintenance:
+                        with _maintenance_guard(db) as acquired:
+                            if acquired and _now() >= next_reap:
+                                next_reap = _now() + REAP_EVERY
+                                reap_stale(db)
+                            if acquired and _now() >= next_housekeeping:
+                                next_housekeeping = _now() + HOUSEKEEPING_EVERY
+                                housekeeping(db)
+                    ran = run_once(db) if maintenance else run_once(db, allow_org_purge=False)
+                failures = 0
+            except Exception:
+                # The database restarting, say: wait, then carry on (longer
+                # each time it fails again, up to a minute).
+                failures += 1
+                wait = min(60, 2**failures)
+                logger.exception("Worker loop failed; trying again in %d s", wait)
+                stop.wait(wait)
+                # ADD THIS: Track worker failures
+                increment_metric("worker_failures")
+                continue
+            # ADD THIS: Check queue depth metrics periodically
+            if maintenance and _now() >= last_queue_check + timedelta(minutes=1):
+                try:
+                    _update_queue_metrics()
+                except Exception:
+                    logger.warning("Failed to check queue depth", exc_info=True)
+                last_queue_check = _now()
+            if not ran:
+                stop.wait(settings.WORKER_POLL_SECONDS)
+    finally:
+        current.set(None)
+
+
+def _run_pool(stop: threading.Event) -> None:
+    """Bound concurrent I/O jobs; each thread owns its own database Session."""
+    with ThreadPoolExecutor(max_workers=settings.WORKER_CONCURRENCY, thread_name_prefix="import-worker") as pool:
+        futures = [pool.submit(_run_loop, stop, maintenance=slot == 0) for slot in range(settings.WORKER_CONCURRENCY)]
+        try:
+            while not stop.wait(0.2):
+                for future in futures:
+                    if future.done():
+                        future.result()
+                        raise RuntimeError("Worker slot exited unexpectedly")
+        finally:
+            stop.set()
+
+
+def _serve(lease) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     check_secret_key(settings.SECRET_KEY)
     stop = threading.Event()
@@ -491,6 +551,8 @@ def main() -> None:
 
     def request_stop(signum, frame):
         if stop.is_set():
+            if settings.WORKER_CONCURRENCY > 1:
+                os._exit(130)  # Explicit second Ctrl+C: terminate all job threads.
             raise KeyboardInterrupt  # second Ctrl+C: stop now
         logger.info("Stopping once the running job is done (Ctrl+C again to stop now)")
         stop.set()
@@ -507,47 +569,41 @@ def main() -> None:
         )
         record_event(db, "worker_started", org_id=None)
         db.commit()
-    threading.Thread(target=_check_in, args=(stop, started_at), daemon=True).start()
-    logger.info("Background worker started; uploads wait in %s", settings.upload_dir)
+    heartbeat_stop = threading.Event()
+    heartbeat = threading.Thread(target=_check_in, args=(heartbeat_stop, started_at, lease, stop), daemon=True)
+    heartbeat.start()
+    logger.info("Background worker pool started with %d slots; uploads wait in %s", settings.WORKER_CONCURRENCY, settings.upload_dir)
 
-    next_reap = _now()
-    next_housekeeping = _now() + FIRST_HOUSEKEEPING_AFTER
-    last_queue_check = _now()
-    failures = 0
     try:
-        while not stop.is_set():
-            try:
-                with ingestion_background.open_session() as db:
-                    if _now() >= next_reap:
-                        next_reap = _now() + REAP_EVERY
-                        reap_stale(db)
-                    if _now() >= next_housekeeping:
-                        next_housekeeping = _now() + HOUSEKEEPING_EVERY
-                        housekeeping(db)
-                    ran = run_once(db)
-                failures = 0
-            except Exception:
-                # The database restarting, say: wait, then carry on (longer
-                # each time it fails again, up to a minute).
-                failures += 1
-                wait = min(60, 2**failures)
-                logger.exception("Worker loop failed; trying again in %d s", wait)
-                stop.wait(wait)
-                # ADD THIS: Track worker failures
-                increment_metric("worker_failures")
-                continue
-            # ADD THIS: Check queue depth metrics periodically
-            if _now() >= last_queue_check + timedelta(minutes=1):
-                try:
-                    _update_queue_metrics()
-                except Exception:
-                    logger.warning("Failed to check queue depth", exc_info=True)
-                last_queue_check = _now()
-            if not ran:
-                stop.wait(settings.WORKER_POLL_SECONDS)
+        if settings.WORKER_CONCURRENCY == 1:
+            _run_loop(stop)
+        else:
+            _run_pool(stop)
     finally:
         stop.set()
+        heartbeat_stop.set()
+        heartbeat.join(timeout=HEARTBEAT_SECONDS + 2)
         with ingestion_background.open_session() as db:
             record_event(db, "worker_stopped", org_id=None)
             db.commit()
         logger.info("Background worker stopped")
+
+
+def main() -> None:
+    # Jobs hold a main transaction and a job lock; progress/checkpoints use short
+    # extra sessions. Reserve headroom for heartbeats, leadership and maintenance.
+    # Only CLI's default session factory is rebound; isolated fixtures retain theirs.
+    worker_engine = None
+    from app.db.session import SessionLocal
+    previous_bind = SessionLocal.kw["bind"]
+    if settings.WORKER_CONCURRENCY > 1 and ingestion_background.open_session is ingestion_background._new_session:
+        worker_engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, hide_parameters=True,
+                                      pool_size=3 * settings.WORKER_CONCURRENCY + 4, max_overflow=0)
+        SessionLocal.configure(bind=worker_engine)
+    try:
+        with _worker_lease() as lease:
+            _serve(lease)
+    finally:
+        if worker_engine is not None:
+            SessionLocal.configure(bind=previous_bind)
+            worker_engine.dispose()

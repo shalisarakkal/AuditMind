@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     WORKER_STALE_SECONDS: int = Field(120, ge=30)
     # How often the worker looks for new jobs when it has none.
     WORKER_POLL_SECONDS: float = Field(2.0, gt=0)
+    # Concurrent queued jobs in one installation worker pool, not an org limit.
+    # Keep the existing serial default; operators opt in according to resources.
+    WORKER_CONCURRENCY: int = Field(1, ge=1, le=32)
     # The daily auto-purge's jobs wait until no upload or job someone started
     # is waiting; after this long they take their turn by age like any other
     # job, so a busy queue can't put them off for ever.

@@ -18,10 +18,11 @@ from sqlalchemy.orm import Session
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['prepare', 'api', 'worker', 'inspect', 'cleanup'])
+    parser.add_argument('action', choices=['prepare', 'api', 'worker', 'inspect', 'expire-pool-jobs', 'cleanup'])
     parser.add_argument('--schema', required=True)
     parser.add_argument('--workflow', action='store_true', help='Enable isolated Phase 4 acceptance organization switching')
     parser.add_argument('--evidence', action='store_true', help='Seed two reviewers and synthetic inventory for evidence acceptance')
+    parser.add_argument('--pool', action='store_true', help='Guarded two-slot worker lifecycle acceptance only')
     args = parser.parse_args()
     if not re.fullmatch(r'phase3_browser_[a-f0-9]{12}', args.schema):
         raise SystemExit('Invalid isolated fixture schema')
@@ -36,6 +37,8 @@ def main():
         CLAUDE_MODEL='claude-browser-fixture', ARCHIVE_AUTO_PURGE='false', WORKER_POLL_SECONDS='0.2',
         CORS_ORIGINS='http://localhost:3000,http://localhost:3014' if args.workflow else 'http://localhost:3000', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
         UPLOAD_DIR=str(Path(__file__).resolve().parents[2] / 'temp' / args.schema))
+    if args.pool:
+        os.environ.update(WORKER_CONCURRENCY='2', IMPORT_SYNC_MAX_BYTES='1')
     refreshed = Settings()
     for name in Settings.model_fields:
         setattr(settings, name, getattr(refreshed, name))
@@ -95,6 +98,29 @@ def main():
         uvicorn.run('app.main:app', host='127.0.0.1', port=8012)
         return
     if args.action == 'worker':
+        if args.pool:
+            import threading
+            from app.services import ingestion_service
+            original = ingestion_service._Publisher.__init__
+            lock = threading.Lock()
+            arrivals = []
+            run_id = secrets.token_hex(8)
+            folder = settings.upload_dir
+            folder.mkdir(parents=True, exist_ok=True)
+            def observe(self, db, org_id, *a, **kw):
+                with lock:
+                    pause = len(arrivals) < 2
+                    if pause:
+                        arrivals.append(str(org_id))
+                        (folder / 'pool-probe.json').write_text(json.dumps({'run': run_id, 'orgs': arrivals}))
+                if pause:
+                    until = time.monotonic() + 30
+                    while not (folder / 'pool-release.flag').exists():
+                        if time.monotonic() >= until:
+                            raise RuntimeError('Isolated pool test did not release its publishers')
+                        time.sleep(0.05)
+                original(self, db, org_id, *a, **kw)
+            ingestion_service._Publisher.__init__ = observe
         import runpy
         runpy.run_module('app.worker', run_name='__main__')
         return
@@ -148,9 +174,22 @@ def main():
         elif args.action == 'inspect':
             from app.models.report import Report
             from app.models.ai_usage import AIUsage
+            from app.models.scan import Scan
             with Session(engine) as db:
                 print(json.dumps({'reports': [{'title': r.title, 'status': r.status.value} for r in db.scalars(select(Report))],
-                    'usage_count': len(db.scalars(select(AIUsage)).all())}))
+                    'usage_count': len(db.scalars(select(AIUsage)).all()),
+                    **({'pool_scans': [{'filename': s.filename, 'retry_count': s.retry_count, 'status': s.status.value}
+                        for s in db.scalars(select(Scan))]} if args.pool else {})}))
+        elif args.action == 'expire-pool-jobs':
+            if not args.pool:
+                raise RuntimeError('Only allowed in the isolated pool lifecycle fixture')
+            from datetime import datetime, timedelta, timezone
+            from sqlalchemy import update
+            from app.models.scan import Scan
+            with engine.begin() as conn:
+                conn.execute(update(Scan).where(Scan.status == 'running').values(
+                    heartbeat_at=datetime.now(timezone.utc) - timedelta(seconds=settings.WORKER_STALE_SECONDS + 60)))
+            print('Expired only synthetic running import heartbeats for recovery verification')
         else:
             with engine.begin() as connection:
                 assert connection.scalar(text('select current_database()')) == 'auditmind_test'

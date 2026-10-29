@@ -22,11 +22,13 @@ from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
 from app.models.event import Event, WorkerStatus
 from app.models.session import PasswordHistory, PlatformSetting, UserSession
 from app.models.import_staging import ImportStagingChunk, ImportStagingState
+from app.models.worker_dispatch import WorkerDispatch
 from app.db.evidence_revision import register
 
 register(Base.metadata)
 
 __all__ = [
+    "WorkerDispatch",
     "OrganizationEvidenceRevision",
     "EvidenceEvaluation",
     "OrganizationScoringSettings",
