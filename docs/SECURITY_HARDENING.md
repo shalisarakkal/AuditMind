@@ -114,8 +114,8 @@ added. Dispositions describe the inspected data flows, not future code changes.
   exact production CORS origins, HTTPS/secure cookies, explicit trusted proxies
   and backend network isolation.
 - Production monitoring/export identity, external alert delivery and operational
-  security review. Hosted CI must verify the eventual hardening commit; the green
-  pilot SHA does not cover these unpushed changes.
+  security review. Implementation `cd31793` passed its own hosted CI; future
+  changes still require exact-SHA verification, not reuse of that result.
 
 ## Verification
 
@@ -135,8 +135,14 @@ Final regression: **1,409 full PostgreSQL tests** (778.01 s), **465 frontend
 tests**, lint, **71 Chrome workflow checks + 17 correctness-only evidence-pilot
 scenarios** pass. Both browser fixtures were removed; test public schema is
 0031/35 tables with clean drift. No scale/load variant or real AI calls ran.
-Normal demo readiness/frontend remain healthy without restart or settings/data
-changes. Activation and commit/push/new hosted CI remain separate handoff steps.
+Implementation `cd317934e5d7611735022fddc21865fe19660da9` is reviewed, committed,
+pushed and passed all four hosted Ubuntu jobs in
+[run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322).
+Authorized local activation then reused the existing frontend build, retaining
+schema 0031, counts, credentials/configuration and zero enabled scoring settings.
+Readiness and real pre-body 413/anonymous-metrics 401 checks pass, as does a fresh
+Chrome 156 login/proxy smoke. No normal data upload/sign-in or provider call was
+needed. [Detailed activation evidence](PHASE4_VALIDATION.md).
 
 Fresh core/development and optional-embeddings manifest audits report **no known
 vulnerabilities**; `pip check` reports no broken requirements. Audit reports:

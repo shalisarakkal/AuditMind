@@ -18,9 +18,14 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   lint, 71 workflow Chrome checks and 17 pilot correctness scenarios pass. Test
   fixtures removed; no AI usage. Dependency/high-severity/static/secret guards pass
   with lower-severity findings explicitly triaged, not suppressed.
-- [ ] Coordinate idle-window API/worker activation, review/commit/push and verify
-  new exact-SHA hosted CI. Distributed limits, malware integration and production
-  identity/secrets/CORS remain separate work.
+- [x] Reviewed, committed/pushed hardening as `cd317934e5d7611735022fddc21865fe19660da9`;
+  all four hosted Ubuntu jobs passed in
+  [run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322).
+- [x] Activated locally after fresh idle checks, using the existing frontend build.
+  Readiness, protected metrics, pre-body upload limits and a fresh Chrome smoke
+  pass. Counts/credentials/settings unchanged; schema remains 0031, scoring off.
+- [ ] Production-only hardening: distributed limits, malware integration and
+  actual service identity/storage/secrets/CORS policy remain separate work.
 - [ ] Full SaaS-scale testing is **on hold by agreement**. The planning target is
   1,000 organizations, 100 accounts and 100,000 assets each (100,000 accounts and
   100 million assets, before findings/history), not 100,000 concurrent users.

@@ -1,5 +1,17 @@
 # Release readiness and code review
 
+## Scoped hardening handoff closed — 28 October 2026
+
+Implementation `cd317934e5d7611735022fddc21865fe19660da9` is reviewed/pushed;
+all four Ubuntu jobs passed in
+[run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322).
+Local activation is complete with idle queues, unchanged schema/counts/credential
+and settings digests, zero enabled scoring settings, healthy readiness/proxy and
+fresh Chrome login smoke. The existing frontend build was reused. This is scoped
+application acceptance, not production certification. See
+[activation evidence](PHASE4_VALIDATION.md) and
+[remaining deployment security gates](SECURITY_HARDENING.md).
+
 ## Latest pilot closeout — 28 October 2026
 
 Pushed tip `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39` passed backend, frontend,
@@ -8,7 +20,7 @@ backend-dependency-audit and browser on Ubuntu in
 The browser artifact verifies 71 workflow checks and 17 evidence-pilot scenarios.
 This closes the test-portability gate, not Phase 4 or production acceptance.
 The subsequent local [security hardening increment](SECURITY_HARDENING.md) is
-implemented but not yet activated, committed/pushed or hosted-CI verified.
+activated, committed/pushed and hosted-CI verified at `cd31793` as recorded above.
 Shared rate limits, actual ACL validation, malware integration and production
 configuration remain separate gates. Full SaaS-scale testing is on hold
 pending capacity/workload design; default-off scoring and separate operational,

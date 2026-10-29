@@ -1,5 +1,53 @@
 # Phase 4 remediation workflow validation
 
+## Hardening hosted CI and local activation closeout — 28 October 2026
+
+Reviewed and pushed implementation `cd317934e5d7611735022fddc21865fe19660da9`.
+[Hosted Ubuntu run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322)
+completed successfully: **backend, frontend, backend-dependency-audit and browser**.
+The browser job passed both the workflow suite and correctness-only evidence
+pilot; the backend run also exercises the POSIX private-file permission assertions.
+The prior local 1,409/465/71+17 results below remain their own evidence, not newly
+rerun full suites after activation.
+
+Before activation, the three previously recorded local service processes were
+already absent and neither service port was listening; they were not stopped by
+the review/push/CI work. The cause of that earlier exit was not established.
+Fresh read-only checks confirmed zero pending/running imports, archive jobs,
+reports, knowledge indexes, evidence evaluations, organization purges or staged
+import state/chunks. `start-demo.ps1 -Stop` cleared stale process records, then
+`start-demo.ps1 -SkipBuild` brought API, worker and the retained frontend bundle
+back online. Existing demo accounts were retained; no password reset, re-seeding,
+frontend rebuild or schema change occurred. Alembic reported no new operations.
+Previous runtime records/logs are preserved in ignored
+`temp/auditmind-demo/pre-hardening-7486db761e764f54965ddf97c15209f6/`.
+
+Read-only before/after verification matched:
+
+- **5 organizations, 6 users, 5,324,472 assets, 7,333,030 findings, 40 scans,
+  13 reports, 5 knowledge documents / 5 versions** and zero qualification rows.
+- Internal digests of credentials, organization/branding/scoring/platform settings
+  and memberships unchanged; no credential/configuration values were displayed.
+- Schema **0031**, all queues/staging still empty, **zero enabled scoring settings**.
+
+Post-activation checks against the actual normal demo:
+
+- `/ready`: HTTP 200, database/uploads/worker all true; frontend API proxy HTTP 200.
+- Anonymous `/metrics`: **401** (not an exposed counter snapshot).
+- Organization/platform document requests over 11 MiB and logo requests over
+  3 MiB: **413 before sending any body**, retaining CORS/nosniff headers. These
+  probes create no uploads or tenant data; successful upload workflows were
+  separately verified by local and hosted acceptance, not by modifying real data.
+- Fresh installed **Chrome 156.0.8078.49**: login email/sign-in controls visible,
+  password masked, API proxy 200, zero page errors. No sign-in or data write.
+  The first Chrome launch exited before page creation; a clean launch and the
+  full smoke retry passed without changing application code or disabling checks.
+
+This completes the authorized local review/push/CI/activation increment. The
+documentation-only closeout does not alter runtime code. Production security
+gates remain in [SECURITY_HARDENING.md](SECURITY_HARDENING.md); no production
+deployment, provider calls, broader scoring enablement or SaaS load test occurred.
+
 ## Scoped security hardening — 28 October 2026
 
 Implemented after the pilot documentation closeout: current-platform-admin metrics,

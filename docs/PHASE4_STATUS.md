@@ -15,10 +15,18 @@ Fresh Chrome acceptance also passes **71 workflow checks + 17 correctness-only
 pilot scenarios**, zero page errors/AI usage and both synthetic fixtures removed.
 Core/dev, optional embeddings and frontend audits are clean; no SaaS-scale test ran.
 
-This code is not yet committed/pushed or activated in the normal demo. Shared
-multi-server limits, malware integration, actual service-account ACL validation
-and production secrets/CORS/proxy policy remain open. Full SaaS-scale testing is
-on hold; scoring remains default-off. These changes do not complete Phase 4.
+Reviewed, committed and pushed as `cd317934e5d7611735022fddc21865fe19660da9`.
+All four hosted Ubuntu jobs passed in
+[run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322).
+Authorized local activation is complete: queues idle, existing frontend build
+reused, schema unchanged at 0031, readiness green. Counts and internal credential/
+configuration digests match before/after; zero scoring settings enabled. Fresh
+installed Chrome 156 login/proxy smoke passes without account/data writes.
+
+Shared multi-server limits, malware integration, actual service-account ACL
+validation and production secrets/CORS/proxy policy remain open. Full SaaS-scale
+testing stays on hold; scoring remains default-off. This closes the scoped local
+hardening handoff, not Phase 4 or production readiness.
 
 ## Current increment — durable evaluation and default-off Dashboard pilot
 
@@ -401,7 +409,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Large-organization list performance | Partial | Indexed selective Findings search delivered; short/broad searches remain slow. Dashboard/list exact counts remain; estimated counts and cached facets not completed. |
 | Security hardening | Partial; scoped local increment implemented | Process-local sign-in/upload admission is bounded; all file transports have pre-parser byte limits; metrics require platform admin; checkpoints authenticate before deserialization. Lower-severity findings triaged without suppressions. Shared/distributed limits, malware integration, actual service-account ACL validation and production secrets/CORS remain open. See SECURITY_HARDENING.md. |
 | Observability | Test-verified; production acceptance pending | Structured logs/correlation, protected process-local metrics/alerts and tests exist. External telemetry/export identity, alert delivery/load and production monitoring are not certified. |
-| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates green at `0b1732f` (run 40774060584). Current hardening changes still need their own pushed-SHA CI. Medium/low SAST triage is documented in SECURITY_HARDENING.md; broader performance CI remains pending/on hold. |
+| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates green for hardening `cd31793` in run 40799748322. Medium/low SAST triage is documented without suppressions in SECURITY_HARDENING.md; broader performance CI remains pending/on hold. |
 | Multi-worker SaaS fairness/storage/scaling | Partial foundations; pending rollout | `FOR UPDATE SKIP LOCKED`, resumable jobs and heartbeat exist. Tenant-fair scheduling, autoscaling, separate worker groups, shared object storage and plan limits are not delivered as a SaaS operating model. |
 | Hosting/keyless provider auth/managed DB/backups/production operations | Hosting-dependent, not implemented/accepted | Hosting choice and separate deployment authorization required. Existing local test success is not backup/restore, workload-identity or production acceptance. |
 

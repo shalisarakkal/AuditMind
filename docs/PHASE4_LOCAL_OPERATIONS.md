@@ -1,5 +1,12 @@
 # Phase 4 local operations increment
 
+Hardening closeout (28 October): `cd31793` passed all four Ubuntu jobs in
+[run 40799748322](https://github.com/shalisarakkal/AuditMind/actions/runs/40799748322)
+and is activated locally using the existing frontend build. Readiness, protected
+metrics/upload limits and fresh Chrome login smoke pass; counts, credentials,
+configuration and default-off scoring are retained. Full details:
+[activation evidence](PHASE4_VALIDATION.md). Production security gates remain open.
+
 Current 28 October follow-up: the pilot's exact-SHA hosted verification is closed
 at `0b1732f` (all four Ubuntu jobs in run 40774060584). A separately tested
 [security hardening increment](SECURITY_HARDENING.md) adds protected metrics,
