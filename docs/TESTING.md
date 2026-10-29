@@ -1,5 +1,66 @@
 # Testing strategy and measured coverage
 
+## Worker pool verification — 29 October 2026
+
+Full backend regression: **1,423 passed**. After final startup/clock safeguards
+and two additional tests, **46 focused checks** passed. Actual CLI acceptance
+passed **five checks** in isolated schema `phase3_browser_cbea7bff590d`:
+cross-organization overlap, same-organization queuing, duplicate-pool rejection,
+forced interruption/recovery and tenant-safe updates with zero inference usage.
+Fixture cleanup completed. Tiny files establish correctness, not SaaS capacity.
+[Commands and configuration](WORKER_POOL.md).
+
+## Import states and timed progress — 29 October 2026
+
+Latest local checks: **507 frontend tests**, **132 targeted real-PostgreSQL/unit
+backend tests** across two runs, lint/TypeScript and both builds pass. Full workflow
+Chrome suite passes **79 checks**. Deterministic clock tests verify time-limited
+counts, sub-batch progress, immediate phase/final writing reports and no timestamp
+refresh for unchanged counts. Tracking tests verify actual persisted timestamp
+and retained atomicity/resume behavior. UI presentation fixtures distinguish
+queued/waiting/processing/completed/failed states and prove count/age/heartbeat/
+mobile/Axe behavior without importing 500K rows. A bounded 500K callback-loop and
+100-commit single-row DB microbenchmark is separate from correctness and scale
+testing. [Results, limitations and safe activation](PHASE4_VALIDATION.md).
+
+## One-step upload cancellation — 29 October 2026
+
+Fresh **501 frontend tests** and **78 Chrome checks**, lint/TypeScript and both
+builds pass after replacing the two-step Close design with direct Cancel queued
+uploads / idle Escape. Regressions retain busy guards and accepted-job tracking,
+and verify error/duplicate discard without resubmission. A real 20-file browser
+queue cancels without another dialog or POST; mobile/Axe/focus checks pass.
+[Evidence and activation](PHASE4_VALIDATION.md). No new hosted CI/backend run.
+
+## Assets/Findings loading — 29 October 2026
+
+Latest UI-only follow-up passes **501 frontend tests** and **78 Chrome checks**,
+lint, TypeScript and both builds. Held-list response scenarios verify initial
+loading, independent controls, refresh indication with previous rows retained,
+completion, mobile layout and Axe. Unit tests cover failed reads/retry on each
+page. [Artifacts and activation evidence](PHASE4_VALIDATION.md). No new hosted CI.
+
+## Dashboard responsiveness — 29 October 2026
+
+Latest local verification: **497 frontend tests**, **9 PostgreSQL Dashboard
+integration tests**, lint/TypeScript and both builds pass. The full workflow Chrome
+suite passes **76 checks**, including a held Dashboard response, independently
+loading security summary, hidden pending scores, mobile sizing and Axe. Generic
+session-loading protection, delayed success and error/retry have frontend tests.
+[Measured query timings, artifacts and earlier failures](PHASE4_VALIDATION.md).
+No new hosted-CI result; current changes remain uncommitted.
+
+## Upload dialog and metadata validation — 29 October 2026
+
+Fresh local checks: **494 frontend tests**, **53 focused backend tests**, lint,
+TypeScript and isolated/normal builds pass. `node scripts/browser-finding-workflow.cjs`
+passes **75 installed-Chrome checks**, including immediate size/type validation,
+mixed valid/invalid selections, no rejected-file POSTs, scrolled 20-file Close,
+focus restoration, mobile layout and Axe. Test fixtures are removed; normal demo
+activation/data integrity are separately verified. See
+[results, commands, limits and earlier failed attempts](PHASE4_VALIDATION.md).
+These uncommitted follow-up changes have no hosted-CI result yet.
+
 ## Security hardening
 
 The focused security suite covers pre-body admission/length checks for imports,

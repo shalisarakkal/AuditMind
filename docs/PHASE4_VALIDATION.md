@@ -1,5 +1,295 @@
 # Phase 4 remediation workflow validation
 
+## Bounded worker pool — 29 October 2026
+
+Local full regression: **1,423 passed in 903.34 seconds**, recorded in
+`temp/testing/worker-pool-full.xml`. This preceded the final startup guard and
+two extra safeguard tests; latest focused run: **46 passed in 53.15 seconds**.
+Actual two-slot CLI acceptance passed **five checks**; artifacts:
+`temp/testing/worker-pool/phase3_browser_cbea7bff590d/results.json`.
+It terminated only its owned isolated worker, resumed both interrupted imports,
+and verified tenant identities, one asset per tenant and final update values.
+No AI usage; fixture removed. Normal import has not been interrupted for
+activation. Migration 0032 and activation await idle checks; hosted CI awaits push.
+[Design, operating limits and verification commands](WORKER_POOL.md).
+
+Review split the implementation into `831c67c` (upload preflight, cancellation
+and loading), `f51fded` (import states and timed progress), and `2a8898f` (worker
+pool). A fresh Chrome workflow run passed **79 checks**, with no AI usage or
+page errors; fixture `phase3_browser_a9009969fec6` was removed. High-severity
+Bandit and the tracked-file secret guard pass. Earlier sections' uncommitted
+notes describe historical checkpoints; these changes are now committed.
+
+## Honest import states and timed progress — 29 October 2026
+
+Honored the request to wait: read-only normal-demo observation first found
+`network_scan500K.csv` running with reading 500,000/500,000 and a heartbeat. A later
+check found no pending/running imports **before source edits**. No import was
+stopped to publish this change. Fresh pre-activation checks again found all queues
+idle before restarting API/worker/frontend. Prior logs and frontend runtime bundle
+were backed up; no seed, schema migration or credential reset.
+
+The disclosure summary now counts actual states (`1 processing · 2 queued`, or
+all-success `3 imports completed`); failures/interruption/organization waits are
+separate. Cards and sidebar share classification. Only active work animates;
+queued/waiting icons are static. Progress text explicitly includes Preparing
+inventory matches and Saving changes, not just an apparently frozen reading count.
+Expanded cards show since-submission time (including queue time), real server
+progress-update age, and a recent-heartbeat versus checking-worker distinction
+when updates pause. No fabricated row movement or ETA. Local clocks tick only
+while expanded with ongoing imports, without network requests or session renewal.
+
+`ProgressReporter` rate-limits changed counts to about one second at row
+boundaries; phase changes/final writing counts report immediately, duplicate
+snapshots do not publish a fresh timestamp. Writing can report before 2,000 rows
+finish; reading still uses existing staged checkpoints under the time cap.
+Existing 2,000-row insertion/staging and 20,000-asset update batches, atomic
+commit, matching/locks, retries and heartbeats are unchanged. Browser polling
+remains two seconds **after the previous request completes**. Percentage jumps
+remain possible; writing 100% is not completion until saving succeeds.
+
+Fresh checks:
+
+- **507 frontend tests / 50 files**, 49.96 s; lint, TypeScript and isolated/normal
+  production builds pass. Covers summary counts, active/queued icons, update age,
+  heartbeat, completed/failed states, sidebar and existing tracking/session safety.
+- **132 targeted backend tests across two runs**: 11 progress/tracking/concurrency
+  tests (13.65 s), then 121 asset/finding/background/event/profile imports,
+  staged-resume, worker recovery and checkpoint-integrity tests (117.19 s).
+  Both use required real PostgreSQL. Not a new full-backend-suite claim.
+- **79 installed-Chrome checks** pass, zero page errors/AI usage and synthetic
+  fixture cleanup complete. Artifact:
+  `temp/testing/finding-workflow/phase3_browser_7894e72f410c/results.json`.
+  New presentation fixture holds one writing/two queued, checks icons and real
+  update-age/heartbeat wording, advances 378,000→400,000 (75→80%), then verifies
+  three completed reports and disclosure labels. 390/1440px screenshots and Axe
+  pass. Fixture uses intercepted read responses, not a real 500K-row import;
+  actual import correctness remains covered by real worker/API tests.
+
+Bounded local microbenchmark (`temp/testing/import-progress-bench.json`): three
+500,000-iteration samples per mode, median elapsed **0.11685 s** for the old batch
+callback loop vs **0.51639 s** timed reporting (~0.40 s extra). Fast-loop callback
+count dropped from 250 to 2; phase reports are additional. 100 actual single-row
+progress commits averaged **2.094 ms**, median **1.570 ms**, in a guarded temporary
+schema on local `auditmind_test`. The single-row schema was removed. These are
+small local measurements, not full-import/production/concurrency benchmarks or
+proof of zero overhead. No representative SaaS-scale test was run.
+
+Post-activation actual-demo Chrome login/proxy smoke and `/ready` pass. Service/
+build records match; read-only before/after snapshots match **5 organizations,
+6 users, 5,324,472 assets, 7,333,030 findings, 44 scans, 9 reports, 5 documents /
+5 versions**, zero qualifications, unchanged internal credential/settings digests,
+schema 0031, all queues/staging empty and scoring off. Historical counts in older
+entries preceded user imports; this is the fresh restart baseline. No normal
+tenant mutations/provider calls. Changes are uncommitted/unpushed; no new hosted
+CI, worker-concurrency rollout or broader scoring enablement.
+
+## One-step upload queue cancellation — 29 October 2026
+
+Removed the second Close confirmation per user feedback: cancelling a reversible
+pending queue did not warrant another decision screen. The footer now says
+**Cancel queued uploads** and explains that submitted uploads continue and local
+files are unchanged. One click, or idle Escape, clears remaining ready/error/
+duplicate entries and closes the dialog immediately. To resume those unsubmitted
+files later, select them again. Busy cancellation remains blocked; Stop remaining
+uploads still finishes the current submission before stopping the batch. Accepted
+imports stay tracked independently and focus returns to Upload file.
+
+- **501 frontend tests / 50 files** pass (49.34 s), lint/TypeScript and isolated/
+  normal production builds pass. Revised regressions cover immediate Cancel on
+  Assets/Findings, idle Escape, discarded error/duplicate entries, no extra POSTs,
+  and busy guards/accepted tracking. No redundant-confirmation tests are retained
+  as if that old behavior were still required.
+- **78 installed-Chrome checks** pass, zero page errors/AI usage, fixture cleanup
+  completed. Artifact: `temp/testing/finding-workflow/phase3_browser_60dd37bb942a/results.json`.
+  A scrolled 20-file queue cancels with one click and no second dialog or upload
+  POST. A reopened queue cancels with Escape; focus, mobile layout and Axe pass.
+  Screenshots: `upload-cancel-desktop.png`, `upload-cancel-mobile.png` in that folder.
+  One legacy check description in this run still says initial Close focus; its
+  actual assertion checks **Cancel queued uploads**, and the source description
+  is corrected. Upload/retry/duplicate/accepted-job checks also remain green.
+
+Only the frontend was restarted after idle/identity checks and completed runtime
+backup. API and worker retained. Ready checks and fresh actual-demo Chrome login/
+proxy smoke pass without sign-in or tenant writes; process/build records match.
+No backend/schema, permissions or scoring changes and no new backend test/hosted
+CI claim. This entry supersedes the older confirmation design below; old evidence
+is retained as history. Follow-up fixes/docs remain uncommitted/unpushed.
+
+## Assets and Findings loading — 29 October 2026
+
+Shared ListLoading uses the same accessible, reduced-motion-aware indicator as
+Dashboard. Initial reads paint decorative rows while heading/search remain
+available; refreshes announce Updating and retain the previous table until the
+new response arrives. Failed reads show Retry assets/findings. No fake records,
+counts or determinate percentages. Suspense fallbacks use the same component.
+Findings heading/action wrapping also fits the narrow remaining content column.
+No backend/query, authorization or scoring change in this follow-up.
+
+- **501 frontend tests / 50 files** pass (49.77 s); lint, TypeScript and isolated/
+  normal production builds pass. New tests hold initial list reads and exercise
+  failures/retry on both pages. Existing workflow/action protections still pass.
+- **78 installed-Chrome checks** pass, no page errors/AI calls, synthetic fixture
+  removed. Artifact: `temp/testing/finding-workflow/phase3_browser_a49e2991817c/results.json`.
+  New scenarios hold each list response, verify usable search/no real rows,
+  320/1440px fit and Axe, then release and repeat with a delayed filter request,
+  verifying Updating, previous table retention and enabled Clear filters.
+  Loading screenshots are in the same folder.
+- Earlier browser attempts (`phase3_browser_1f25d35a9354`,
+  `phase3_browser_63dc743b82cd`, `phase3_browser_1656362715e4`) exposed existing
+  narrow Findings action/heading overflow. First constrained the action, then
+  diagnostic bounds identified the heading; added wrapping and retained the
+  strict 320px assertion. Those attempts remain failed evidence, not green.
+
+Frontend runtime backup completed before rebuilding; final bundle activated at
+localhost:3000. API/worker were not restarted. `/ready` is green and fresh normal-
+demo Chrome login/proxy smoke passes without sign-in or data writes. Process/build
+records match. No backend tests were newly required/run for this UI-only delta;
+the preceding Dashboard PostgreSQL checks remain historical. Changes/docs remain
+uncommitted/unpushed and have no new hosted-CI result.
+
+## Dashboard first-load responsiveness — 29 October 2026
+
+Read-only SA01 profiling (2,798,320 active assets / 3,575,841 active findings)
+initially measured 6.845 s for summary construction: 5.171 s asset count and
+1.218 s finding aggregation. Replaced only Dashboard `COUNT(assets.id)` with
+`COUNT(*)`, retaining its explicit Asset FROM, organization/archive filters and
+repeatable-read snapshot. IDs are non-null, so the result is identical. This
+permits index-only counts using existing active-asset indexes, without adding
+indexes or writes. Paired warm-count timings were **0.613 s → 0.182 s**, both
+returning 2,798,320. These are local observations, not latency guarantees or a
+cold-cache benchmark. A subsequent complete summary took 9.528 s when finding
+aggregation took 8.963 s; faster asset counting does not eliminate that remaining
+variable cost. Ignored measurements: `temp/testing/dashboard-count-profile.json`
+and `dashboard-profile.json`. The first profiling helper needed model-registry
+imports corrected before any Dashboard timing could run; no tenant writes occurred.
+
+During session recovery, server HTML now contains generic Opening AuditMind
+progress, with protected content still gated. Once authorized, Dashboard heading,
+spinner and placeholder cards paint while live summary data loads. Security summary
+is requested independently. Placeholders contain no numeric scores or risk tiers;
+existing mode/revision/evaluation matching still gates real scores. Errors replace
+the spinner and offer Retry dashboard. Motion-safe animation respects reduced
+motion; placeholders shrink to the available width.
+
+- **497 frontend tests / 50 files** pass (53.53 s, four workers); **9 real
+  PostgreSQL Dashboard integration tests** pass with `--require-postgres` (12.80 s).
+  Lint, TypeScript, isolated and normal production builds pass.
+- **76 installed-Chrome checks** pass, zero page errors/provider usage and fixture
+  cleanup completed. `temp/testing/finding-workflow/phase3_browser_5f5380f52c0d/results.json`
+  includes a deliberately held summary response: title/skeleton and independent
+  security summary stay visible, pending scores absent, 320/1440px fit, Axe clean,
+  and loading is replaced on completion. Loading screenshots are in that folder.
+- Initial frontend run: 496/497 passed; an archived-banner assertion selected
+  the new temporary loading status. It now waits for the actual archived status.
+  Initial Chrome run `phase3_browser_c33a245dc7ce` caught fixed-width placeholder
+  overflow at 320px; added max-width/wrapping, retained and passed the assertion.
+
+After fresh idle checks and completed runtime backup, restarted API/frontend only;
+worker retained. Normal root HTML HTTP 200 contains session progress before JS,
+`/ready` database/uploads/worker true, fresh actual-demo anonymous Chrome smoke
+passes with no sign-in/data writes. Process/build records match. Fresh before/after
+snapshots match: 5 organizations, 6 users, 5,324,472 assets, 7,333,030 findings,
+40 scans, **8 reports**, 5 documents / 5 versions, no qualifications; internal
+credential/settings digests unchanged, schema 0031, queues idle, scoring off.
+The earlier upload closeout's 13-report count is historical, not this baseline.
+No normal tenant data writes, schema change, provider calls or SaaS-scale test.
+Further finding-aggregation tuning and hosted CI remain separate; uncommitted.
+
+## Upload fixes and local activation — 29 October 2026
+
+Completed the Close/dialog fixes described in the historical entry below, plus
+immediate browser metadata validation. Invalid document types or files over
+10 MiB disable Queue processing before a document/version request. Assets/
+Findings obtain the effective import ceiling from the new no-store read-only
+`/api/v1/upload-limits` endpoint, reject invalid files before content reads/POST,
+and keep valid files from mixed selections. Missing/invalid limits fail closed;
+late responses after organization/component unmount do not submit anything.
+The local demo import ceiling is 256 MiB, so a 251 MiB JSON inventory is allowed;
+it is not a valid oversized-document test. Logo metadata checks retain 2 MiB.
+Server transport/parser protections remain authoritative and unchanged.
+
+Fresh final verification:
+
+- **494 frontend tests / 50 files** pass (66.38 s), lint, TypeScript and isolated/
+  normal production builds pass. Focused upload component has 41 cases.
+- **53 focused backend tests** pass (0.82 s): upload-limit metadata, pre-body
+  hardening, logo transport and observability. The previous 1,409-test full
+  backend result remains historical; it was not rerun for this small endpoint.
+- **75 installed-Chrome workflow checks** pass with Chrome 156.0.8078.49, real
+  isolated API/worker/PostgreSQL, zero page errors and no AI usage. Fixture cleanup
+  completed. Artifact: `temp/testing/finding-workflow/phase3_browser_c8f74fc027c4/results.json`.
+  Includes immediate document errors/correction, valid-only mixed import queue,
+  no upload POSTs on rejected/discarded files, 20-file scrolled Close, safe focus,
+  desktop/mobile/Axe, duplicates, retries and existing workflow/role regressions.
+  Size-browser fixtures override File metadata without allocating/transmitting
+  huge bodies; exact server byte enforcement has separate backend tests.
+
+The first new browser attempt (`phase3_browser_5dd220b0b676`) correctly found a
+test observer counting normal `/auth/refresh` on navigation as a file submission;
+only that session-refresh endpoint is now excluded, all other POSTs still count.
+The second (`phase3_browser_be4dd3e8b573`) caught an actual focus regression: Chrome
+blurs the disabled Upload trigger during asynchronous preflight. Explicit focus
+restoration after the queue/check finishes fixed it; the full final suite passes
+without dropping that assertion. Earlier failures remain recorded, not green.
+
+After idle/identity checks, restarted only the API and frontend; worker retained
+throughout. Background launch of the frontend was rejected by execution policy;
+the standard managed `npm run start` succeeded. Frontend/proxy HTTP 200 and `/ready`
+database/uploads/worker all true. Normal-build backup completed before rebuilding;
+process/build records now match the running services. Fresh actual-demo Chrome
+login/proxy smoke passes without signing in or writing data:
+`temp/testing/runtime-upload-smoke.json` / `.png`.
+
+Read-only before/after snapshots match: **5 organizations, 6 users, 5,324,472 assets,
+7,333,030 findings, 40 scans, 13 reports, 5 knowledge documents / 5 versions**,
+zero qualifications, internal credential/settings digests unchanged, schema 0031,
+all queues/staging empty and zero enabled scoring settings. No seed, credential
+reset, normal tenant mutation, external provider call or SaaS-scale test. User
+verification is available at localhost:3000 after refreshing Chrome. Changes are
+uncommitted/unpushed; no new hosted-CI result is claimed.
+
+## Historical upload dialog attempt — 28 October 2026 (then activation incomplete)
+
+The ineffective-looking Close action displayed an inline warning above a long
+scrolled queue, or did nothing visibly when that warning was already open.
+It now switches the existing native dialog to a focused Close confirmation,
+hiding/disabling the retained queue until Keep reviewing/Escape or confirmed
+discard. File/source/error/duplicate selection state survives cancellation;
+accepted jobs and local files are untouched. Individual submissions also lock
+other row/bulk actions, matching batch submission behavior. New drops during
+confirmation are ignored without browser navigation.
+
+- **470 full frontend tests** pass (28.92 s); **31 focused upload tests** pass.
+- Lint, TypeScript and both isolated and normal production builds pass. An initial
+  build found an unsupported Testing Library query option in the new tests;
+  corrected that option without changing matching semantics or app validation.
+- **72 installed-Chrome checks** pass with Chrome 156, real isolated API/worker/
+  PostgreSQL, zero page errors/AI usage and successful fixture cleanup. Artifact:
+  `temp/testing/finding-workflow/phase3_browser_e1186083fffe/results.json`.
+  Includes Close from a scrolled 20-file queue, safe focus, Keep reviewing/Escape,
+  source preservation, zero discard submission requests, desktop/mobile layout
+  and Axe, plus upload/duplicate/workflow/role regression. The first browser
+  attempt (`phase3_browser_0c049f1d90c3`) stopped at a test-only assertion treating
+  fieldset as an interactive disabled control; replaced with the disabled attribute
+  plus checks on every actual button. No application guard was disabled.
+
+**Activation was blocked at the end of this earlier attempt.** The normal bundle compiled, but an
+initial process-record guard prevented the planned stop (nested PowerShell JSON
+array handling). The old-build backup copy did not complete and is not a verified
+rollback image. After correcting the record inspection, only the confirmed
+frontend PID 1796 was stopped during an idle/no-connection window. The environment
+then rejected both a background Start-Process and a normal npm startup command.
+No further startup alternatives were attempted after those policy rejections.
+Port 3000 was then not listening. API and worker were not stopped/restarted;
+`/ready` remains 200 with database/uploads/worker true. Read-only before/after
+counts and credential/settings digests match; all queues empty, schema 0031 and
+zero enabled scoring settings. No normal organization/data/provider operations.
+
+This historical startup problem is superseded by the successful activation and
+additional preflight changes in the 29 October entry above. It is not a new
+hosted-CI or full backend run.
+
 ## Hardening hosted CI and local activation closeout — 28 October 2026
 
 Reviewed and pushed implementation `cd317934e5d7611735022fddc21865fe19660da9`.

@@ -33,6 +33,14 @@ request duration, concurrent transfers or total temporary-disk consumption.
 An upstream proxy (including local Next rewrites) may buffer bytes before they
 reach the API; ingress limits must therefore also protect that upstream hop.
 
+29 October follow-up: browser metadata checks reject unsupported/oversized files
+before content reads/submission. `GET /api/v1/upload-limits` (under the configured
+API prefix) publishes only three non-sensitive byte ceilings, with `no-store`, no
+database access and no settings writes. This lets imports use `IMPORT_MAX_BYTES`
+instead of a guessed frontend constant. Fixed document/logo ceilings remain
+10/2 MiB. Client checks are usability safeguards, not authorization or a substitute
+for the transport/parser protections above; non-browser clients can bypass them.
+
 `UPLOAD_RATE_LIMIT_PER_MINUTE=120` admits attempts per client address per API
 process, across organizations/upload types. Invalid and unauthenticated attempts
 count. Rejection occurs before body reads: 429 with `Retry-After`. A hard

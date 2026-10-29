@@ -1,5 +1,11 @@
 # AuditMind user manual
 
+Background processing can run concurrently across organizations with a configured
+worker limit. Within one organization, accepted jobs remain queued behind the
+active job. This does not limit how many organizations can be registered, and
+browser submission is separate from background processing. Administrators:
+see [worker configuration and operating limits](WORKER_POOL.md).
+
 Password fields are hidden by default. Use **Show** beside a field to reveal it,
 then **Hide** to mask it again. This applies to sign-in, registration, current/new/
 confirmation passwords, and admin temporary-password handovers. Each field works
@@ -82,6 +88,24 @@ file; do not resubmit files already accepted. Shared proxy/NAT users may share
 the quota. Document files remain limited to 10 MiB and logo files to 2 MiB;
 transport limits also bound multipart overhead. These controls do not constitute
 malware scanning. [Security details](SECURITY_HARDENING.md).
+
+The browser now checks file type and size as soon as you choose or drop files,
+before reading import columns or sending file content. **Documents / Shared
+standards** accept only UTF-8 text or Markdown (`.txt`, `.md`, `.markdown`) up to
+**10 MiB**. A larger document shows an immediate error and disables **Queue
+processing**; choosing a valid file clears that error. CSV/JSON inventories belong
+in **Assets** or **Findings**, not Documents.
+
+Asset/finding imports accept `.csv`, `.json` and `.nessus` and use the server's
+configured import ceiling, displayed in the queue. The local demo ceiling is
+**256 MiB per file**: a 251 MiB JSON inventory is within that limit, not an oversized
+document test. The 10 MiB background-processing threshold is not the import size
+limit. In a mixed selection, invalid files are reported and excluded while valid
+files remain ready for review. If the browser cannot retrieve the current ceiling,
+it submits nothing; select the files again after the connection recovers. Logo
+uploads retain their immediate PNG/JPEG/WebP and **2 MiB** check. Server checks
+remain authoritative, including UTF-8/content validation and limits if settings
+change after selection.
 
 #### Job notifications
 
@@ -410,6 +434,14 @@ session requires sign-in; Retry does not bypass authorization.
 
 ## 4. Dashboard and scoring
 
+Opening the app shows a session-loading indicator while access is checked.
+The Dashboard then paints its heading and placeholder cards with a visible
+spinner while current scores and counts load. The security summary loads
+independently. Placeholders are not zero scores or assessments; actual scores
+appear only after the existing scoring-state checks pass. Large inventories can
+still take several seconds. A failed summary request shows **Retry dashboard**.
+Loading animation respects the browser's reduced-motion preference.
+
 Dashboard scores are deterministic, calculated live from currently active findings
 across identity/access, network configuration, vulnerability management, backup/
 recovery, monitoring/detection, incident response and compliance alignment.
@@ -429,6 +461,13 @@ separate snapshots and do not replace the deterministic `/risk/score` service.
 Legacy saved reports preserve their original scoring labels.
 
 ## 5. Assets, findings and imports
+
+Assets and Findings show a loading spinner and placeholder rows while their first
+list request runs. Search and page controls remain available. Later requests show
+**Updating assets…** or **Updating findings…** and retain the previous results
+until the new response arrives; those rows are not the new filtered result yet.
+Failed reads offer **Retry assets** / **Retry findings**. Placeholder rows are
+decorative, not inventory records, and animations respect reduced motion.
 
 **Assets** holds inventory; **Findings** holds security observations, their domain,
 severity, source and associated asset where known. Use search/column filters,
@@ -470,15 +509,43 @@ Chrome's address bar or tab strip, which the application cannot control.
 
 Selecting files opens **Upload files**, keeping the page header compact. Review
 the source on each file; **Detected** means its columns matched the source.
-Close (or Escape while idle) asks before removing remaining queued files.
-Keep reviewing retains them. Remove affects only that queued file; closing never
-cancels submitted imports. Upload is disabled until its source is compatible.
+**Cancel queued uploads** (or Escape while idle) immediately clears the remaining
+queue and closes the dialog, without another confirmation. It does not delete
+original files from your computer or cancel submitted imports. To return to these
+unsubmitted files later, select them again. The queue has initial keyboard focus
+on Cancel queued uploads, and cancelling returns focus to Upload file.
+Remove affects only its queued row, including when filenames are identical.
+Upload is disabled until its source is compatible.
 If no source matches, configure an import profile in Settings, convert the file,
 or remove it.
-The dialog cannot close during submission. Once every selected file is accepted,
+All other queue actions are locked during an individual or batch submission;
+Cancel/Escape cannot discard an in-flight request. **Stop remaining uploads** on
+a batch stops after the current submission, keeping unsent entries and leaving
+accepted imports running. **Retry failed** retries failed submissions only, not
+already accepted files. Once every selected file is accepted,
 it closes automatically; the submission notice disappears after 3 seconds.
 Background work continues independently. Use **Show progress and reports** while
 processing, or **Show reports** after completion. The expanded summary says **Hide**.
+The summary counts actual states, for example **1 processing · 2 queued**.
+Queued files have a static clock icon; only active work has an animated indicator
+(respecting reduced motion). Waiting on another import in the same organization
+is labelled **waiting**, not processing. Interrupted/failed imports are distinct;
+once all succeed the summary says **3 imports completed** (or the actual count).
+
+Active phases include Reading file, Preparing inventory matches, Writing rows
+and Saving changes. Writing progress is published at row boundaries about once
+per second when counts change, with immediate phase changes/final writing counts;
+the browser still polls two seconds after each completed check. Reading reports
+use existing staged checkpoints with the same time limit. Percentages may still
+jump between checks; counts are never interpolated. Writing 100% still requires
+saving before the job is complete.
+
+Expanded progress shows **Since submitted** (including queue time) and the age of
+the last real server progress update. The clock refreshes locally, without extra
+network requests. If updates pause, a note distinguishes a recent worker heartbeat
+from checking worker availability; an unavailable worker retains the existing
+interruption warning. A spinner indicates an active job, not guaranteed row
+movement during a database operation. Queued uploads are not doing row work yet.
 Expand the summary
 on Assets/Findings to inspect each file. Failures/interruption open the summary
 for attention; reports and errors remain available until explicitly dismissed.
@@ -490,7 +557,7 @@ for attention; reports and errors remain available until explicitly dismissed.
 3. Review the result: imported, updated/skipped and invalid rows are distinct.
    When selecting or dropping multiple files (up to 20), review each source and
    choose **Upload all ready files (N)** to submit them sequentially. Individual
-   Upload/Cancel controls remain available before the batch starts. Sources and
+   Upload/Remove controls remain available before the batch starts. Sources and
    queue changes are locked during submission. **Stop remaining uploads** stops
    after the current request; it does not cancel accepted jobs. Failed files stay
    in a **Submission failed** group for **Retry failed**. Duplicates do not stop

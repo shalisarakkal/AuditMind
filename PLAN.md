@@ -2,6 +2,92 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Bounded worker pool — 29 October 2026
+
+- [x] Configurable cross-organization concurrency, fair admission, one active
+  queued job per organization, duplicate-pool refusal and shared heartbeats.
+  Migration 0032 adds scheduling metadata only.
+- [x] Full backend regression: 1,423 passed. Latest safeguards: 46 focused checks
+  passed. Actual two-slot CLI acceptance: five checks passed, including forced
+  interruption/recovery and tenant-safe updates. These are local results.
+- [ ] Activate after the current normal import finishes, compare snapshots,
+  then review/commit/push and verify hosted Linux CI.
+- Organization capacity is independent of slot count. Large SaaS scale testing
+  remains on hold. [Configuration and limits](docs/WORKER_POOL.md).
+- [x] Reviewed and committed upload/loading (`831c67c`), import progress
+  (`f51fded`) and worker pool (`2a8898f`) separately. Fresh 79-check Chrome
+  workflow, high-severity Bandit and tracked-secret guard pass. Historical
+  uncommitted notes below are superseded by this checkpoint.
+
+## Honest import states and timed progress — 29 October 2026
+
+- [x] Waited for current imports to leave pending/running before making changes.
+  Summary/cards/sidebar distinguish processing, queued, organization waits,
+  interrupted, failed and completed; only active work animates.
+- [x] Timed changed-count reporting at row boundaries (about once/second), with
+  phase/final writing reports immediate. Added Preparing inventory matches and
+  server progress timestamps; poll interval remains two seconds after each request.
+  Expanded UI shows update age/since-submission without extra network calls.
+- [x] 507 frontend tests, 132 targeted backend tests, lint/TypeScript/builds and
+  79 Chrome checks pass; bounded CPU/single-row DB microbenchmark recorded.
+  Idle-verified runtime restart complete, snapshot counts/settings/credentials
+  unchanged. Docs updated; uncommitted/unpushed. No parallel-worker rollout.
+
+## Upload cancellation simplification — 29 October 2026
+
+- [x] Replaced Close plus its confirmation with **Cancel queued uploads**:
+  one click or idle Escape discards remaining entries. Submitted jobs continue;
+  local files are untouched. Busy submission guards and focus restoration remain.
+  This supersedes the earlier two-step Close design recorded below.
+- [x] Fresh 501 frontend tests, lint/TypeScript/builds and 78 Chrome checks pass.
+  Frontend activated; API/worker retained. Manual/conventions/evidence updated;
+  follow-up changes remain uncommitted/unpushed.
+
+## Assets and Findings loading — 29 October 2026
+
+- [x] Shared spinner/placeholder rows for initial loads; visible Updating state
+  with previous rows retained during filter/page refresh. Filters stay usable;
+  failed reads offer Retry. No placeholder records or query/scoring changes.
+- [x] Narrow Findings heading/action wrapping corrected. 501 frontend tests,
+  lint/TypeScript/builds and 78 Chrome checks pass; frontend activated, API/worker
+  retained. Documentation updated; changes remain uncommitted/unpushed.
+
+## Dashboard first-load responsiveness — 29 October 2026
+
+- [x] Read-only timing identified exact live inventory counts as the main cost.
+  Dashboard asset count now uses `COUNT(*)` with existing active-asset indexes,
+  preserving tenant/archive filters and snapshot semantics. No cache/migration.
+- [x] Server-rendered generic session progress, Dashboard spinner/placeholder
+  cards, independently loading security summary and failed-summary Retry action.
+  Reduced-motion and narrow-screen behavior covered; no provisional scores.
+- [x] 497 frontend tests, 9 PostgreSQL Dashboard integration tests, lint and both
+  builds pass; 76 Chrome checks pass. API/frontend activated; worker retained.
+  Data/settings/credentials match activation snapshots. See validation details.
+- [ ] Further optimization of million-row finding aggregation remains separate:
+  this change improves asset counting and visible responsiveness, not constant-
+  time Dashboard aggregation. Follow-up changes remain uncommitted/unpushed.
+
+## Upload dialog and file validation closeout — 29 October 2026
+
+- [x] Close now owns the dialog with focused confirmation, rather than showing
+  an off-screen banner. Keep reviewing/Escape preserve queue state; confirm
+  removes only remaining entries, never local files or accepted imports.
+- [x] Lock all queue actions during individual submissions as well as batches;
+  block new drops/actions during Close confirmation. Same-name row targeting,
+  retries, duplicates and Stop semantics covered by unit regressions.
+- [x] Immediate type/size validation for organization/shared documents and
+  Assets/Findings; mixed selections retain valid files. A read-only byte-ceiling
+  endpoint supplies the configured import limit (local demo: 256 MiB). Document
+  limit stays 10 MiB; logo checks stay 2 MiB. Server enforcement is unchanged.
+- [x] Fresh 494 frontend tests, 53 focused backend tests, lint, TypeScript and
+  isolated/normal production builds pass; 75 installed-Chrome checks pass,
+  including scrolled 20-file Close, preflight, focus and mobile/Axe checks.
+  Synthetic test fixture removed; earlier failed attempts remain documented.
+- [x] API and corrected frontend restarted, ready at localhost:3000; worker
+  retained throughout. Fresh Chrome smoke passes. Normal counts, credentials,
+  settings, schema 0031 and default-off scoring match before/after snapshots.
+  Documentation updated; these follow-up changes are not yet committed/pushed.
+
 ## Current closeout — 28 October 2026
 
 - [x] Hosted Linux verification closed for `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39`:

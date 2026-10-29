@@ -1,5 +1,91 @@
 # Phase 4 status and next milestone
 
+## Bounded worker pool — local verification, 29 October
+
+Configurable organization concurrency now retains one active queued job per
+organization with fair admission. Five actual CLI acceptance checks pass,
+including duplicate-pool refusal and recovery after termination; 46 latest
+focused backend checks pass. The full regression passed 1,423 tests before two
+final safeguard tests were added. A normal import is running: activation and
+migration remain pending idle checks. Hosted CI awaits a reviewed push.
+[Operator guide](WORKER_POOL.md).
+
+The earlier upload/loading/progress work is now committed as `831c67c` and
+`f51fded`; worker concurrency is `2a8898f`. Fresh Chrome workflow: **79 checks
+passed**, no inference or page errors, fixture removed. Earlier uncommitted
+notes below are historical. Runtime activation is still deferred for the active
+normal import; hosted verification has not yet completed.
+
+## Import progress clarity — locally verified and running, 29 October
+
+Current imports were allowed to finish before changes/restarts. Summary/cards/
+sidebar now separate queued, processing, organization-lock waiting, interrupted,
+failed and completed states; active work animates, queued/waiting work does not.
+Changed writing counts publish about once/second at row boundaries, plus immediate
+phase/final writing counts. Preparing inventory matches is explicit; real server
+update age and since-submission clocks appear on expanded progress. Existing
+two-second browser polling, import batching/atomicity and queue scheduling remain.
+
+Fresh **507 frontend tests**, **132 targeted backend tests**, lint/builds and
+**79 Chrome checks** pass. A small local microbenchmark measured ~0.4 s additional
+callback-loop elapsed time over 500,000 iterations, ~2 ms/progress DB commit;
+this is not a SaaS/end-to-end throughput guarantee. After idle checks, API/worker/
+frontend restarted; normal snapshots match. Uncommitted/unpushed; no broader
+scoring enablement, parallel-worker rollout or scale test. [Evidence](PHASE4_VALIDATION.md).
+
+## Upload queue cancellation — simplified and running, 29 October
+
+**Cancel queued uploads** replaces Close and immediately discards remaining
+entries without another confirmation. Idle Escape does the same. A short footer
+explains that submitted jobs continue and local files are unchanged. Cancellation
+remains blocked during active submission; focus returns to Upload file afterward.
+This supersedes the historical two-step Close design below. Fresh **501 frontend
+tests**, lint/TypeScript/builds and **78 Chrome checks** pass. Frontend activated,
+API/worker retained; uncommitted/unpushed. [Evidence](PHASE4_VALIDATION.md).
+
+## Assets/Findings loading — locally verified and running, 29 October
+
+Both lists now use the Dashboard's visible progress pattern: initial placeholder
+rows, Updating indicator with prior rows retained on refresh, and Retry for failed
+reads. Search remains usable; loading placeholders are not records. Narrow-screen
+heading/action wrapping is corrected. **501 frontend tests**, lint/TypeScript and
+builds pass; **78 Chrome checks** pass, including held list reads, filter refresh,
+320/1440px sizing and Axe. Frontend restarted and smoke verified; API/worker
+retained. This increment changes presentation only, not list query performance,
+permissions or scoring. Uncommitted; [evidence](PHASE4_VALIDATION.md).
+
+## Dashboard loading follow-up — locally verified and running, 29 October
+
+The first-load path now paints generic session progress followed by Dashboard
+placeholder cards and a spinner. Security summary loads independently; failed
+summary reads offer Retry. Exact asset counting uses an index-friendly `COUNT(*)`
+without changing results, snapshot consistency or qualification guards. No cache,
+index migration or scoring-policy change. Large finding aggregations can still
+take seconds. Fresh **497 frontend / 9 Dashboard PostgreSQL tests**, lint/builds
+and **76 Chrome checks** pass, including delayed-response loading/mobile/Axe.
+API/frontend restarted, worker retained, data/credential/settings snapshots match.
+Uncommitted/unpushed; [timings and evidence](PHASE4_VALIDATION.md).
+
+## Upload dialog and file validation — locally verified and running, 29 October
+
+Close confirmation now replaces the long queue view, focuses Keep reviewing and
+blocks other actions/drop intake. Keep reviewing or Escape preserves file/source/
+error/duplicate state; confirmed Close affects queued entries only. Individual
+submissions now lock other row/bulk actions too. Metadata checks reject invalid
+document/import files immediately; mixed import selections keep valid entries.
+A no-store read-only endpoint exposes effective byte ceilings without tenant data
+or settings writes. Local imports allow 256 MiB, documents 10 MiB, logos 2 MiB.
+**494 frontend tests**, **53 focused backend tests**, lint/TypeScript and isolated/
+normal production builds pass; **75 Chrome checks** pass, including preflight,
+20-file Close, focus and mobile/Axe verification. Synthetic fixture removed.
+
+The earlier startup block is resolved: API and frontend restarted and are ready
+at localhost:3000; the worker was retained throughout. Fresh actual-demo Chrome
+smoke passes. Counts/credentials/settings match before/after snapshots, queues
+are idle, schema remains 0031 and scoring off. No normal account reset, seed or
+provider call occurred. These fixes/docs remain uncommitted and have no new
+hosted-CI result. [Evidence and earlier failed attempts](PHASE4_VALIDATION.md).
+
 ## Current hardening increment — 28 October 2026
 
 Documentation closeout records green Linux CI at `0b1732f` below. The separate

@@ -16,6 +16,22 @@ submission closes the empty dialog and its success toast expires after 3 seconds
 Group import progress/reports into one expandable summary; automatically open
 for failed/interrupted imports or failed rows. Do not auto-dismiss errors/reports.
 
+Import summaries distinguish processing, queued, waiting on an organization,
+interrupted, failed and completed. Only active work animates; queued/waiting rows
+have a static clock. Sidebar labels use the same classification. Show/Hide labels
+follow disclosure state. Use real server progress timestamps for update age,
+not successful poll time; local age/elapsed ticks stop when the disclosure closes.
+Never fabricate row movement, completion or ETA. Slow updates with recent heartbeat
+are different from an unavailable worker. Worker progress writes are time-limited;
+browser polling remains two seconds after each completed request.
+
+Use **Cancel queued uploads**, not an ambiguous Close label. Idle cancellation
+and Escape immediately discard remaining queued entries without a second
+confirmation, restoring focus to Upload file. This reversible queue action does
+not delete local files or stop submitted jobs. Keep cancellation disabled during
+submission; Stop remaining uploads retains its separate after-current-request
+behavior. Show that submitted uploads continue in a short footer note.
+
 Shared Assets/Findings multi-file imports provide Upload all ready files (N),
 per-file source confirmation and separate reports. Submit sequentially, lock
 queue/source edits during a batch, prevent repeat starts and allow stopping
