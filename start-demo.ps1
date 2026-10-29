@@ -1,4 +1,4 @@
-param([switch]$Stop, [switch]$SkipBuild, [ValidateRange(1,32)][int]$WorkerConcurrency = 2)
+param([switch]$Stop, [switch]$SkipBuild, [ValidateRange(1,32)][int]$WorkerConcurrency = 1)
 
 $ErrorActionPreference = 'Stop'
 $demoRoot = $PSScriptRoot

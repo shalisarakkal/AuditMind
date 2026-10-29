@@ -532,8 +532,11 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(p.getByLabel('Source for oversized-assets.csv',{exact:true})).toHaveCount(0);
     await expect(p.getByLabel('Source for valid-assets.csv',{exact:true})).toBeVisible();
     await p.setViewportSize({width:320,height:844});
-    assert(await preflightQueue.evaluate(node=>node.scrollWidth<=node.clientWidth));
     await p.screenshot({path:path.join(output,'upload-preflight-mobile.png')});
+    const queueLayout=await preflightQueue.evaluate(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,
+      overflowing:[...node.querySelectorAll('*')].filter(child=>child.getBoundingClientRect().right>node.getBoundingClientRect().right)
+        .map(child=>({tag:child.tagName,className:child.className})).slice(0,8)}));
+    assert(queueLayout.scrollWidth<=queueLayout.width,JSON.stringify(queueLayout));
     await preflightQueue.getByRole('button',{name:'Cancel queued uploads',exact:true}).click();
     assert.deepEqual(invalidFilePosts,[]);
     p.off('request',observeInvalidPost);

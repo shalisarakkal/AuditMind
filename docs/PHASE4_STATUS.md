@@ -2,6 +2,11 @@
 
 ## Bounded worker pool — local verification, 29 October
 
+Latest user direction supersedes the rollout plan: hold SaaS scale work and
+parallel activation; focus on single-organization behavior. Keep worker/demo
+default at one. A platform-admin concurrency setting remains required before
+future enablement. Environment configuration alone does not meet that request.
+
 Configurable organization concurrency now retains one active queued job per
 organization with fair admission. Five actual CLI acceptance checks pass,
 including duplicate-pool refusal and recovery after termination; 46 latest

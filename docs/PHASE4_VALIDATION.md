@@ -2,6 +2,20 @@
 
 ## Bounded worker pool — 29 October 2026
 
+Hosted run [40911280217](https://github.com/shalisarakkal/AuditMind/actions/runs/40911280217)
+for `72b5706` passed backend, frontend and dependency/security jobs, but **failed
+browser verification**: Linux native Source controls overflowed the 320px upload
+queue. This run is not green. The fix makes the label wrap and the select shrink
+to its container; the existing overflow assertion is retained, with screenshot
+and layout diagnostics captured before assertion. Local lint, 41 upload tests
+and the isolated production build pass; fresh browser/hosted reruns are pending.
+
+Latest scope: keep normal/demo concurrency at **one**, hold SaaS load work and
+parallel activation. Platform-admin control is required before future rollout.
+The current normal import finished without interruption before a fresh snapshot:
+5 organizations, 6 users, 5,324,472 assets, 7,338,410 findings, 48 scans and 9 reports;
+all queues/staging empty, scoring overrides off, schema still 0031 at this point.
+
 Local full regression: **1,423 passed in 903.34 seconds**, recorded in
 `temp/testing/worker-pool-full.xml`. This preceded the final startup guard and
 two extra safeguard tests; latest focused run: **46 passed in 53.15 seconds**.

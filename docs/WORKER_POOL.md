@@ -2,8 +2,15 @@
 
 `WORKER_CONCURRENCY` controls simultaneous queued background jobs in one
 installation. It defaults to **1**, accepts **1–32**, and does not limit the
-number of organizations, users or registered assets. `start-demo.ps1` explicitly
-defaults to **2**; override its `-WorkerConcurrency` parameter when needed.
+number of organizations, users or registered assets. `start-demo.ps1` also
+defaults to **1**. Parallel rollout is on hold while single-organization behavior
+is validated. The two-slot setting is used only by the isolated acceptance test.
+
+Requested next control: a **platform-admin setting** for worker concurrency,
+with a default of one, bounded validation, safe changes while work is active,
+and audit history. That UI/database control is not implemented yet; an environment
+variable or launcher argument is not a substitute for it. Keep normal operation
+serial until that control is reviewed and verified.
 
 Different organizations can process concurrently. Each organization has at most
 one active queued job across imports, archive/restore/purge jobs, reports,

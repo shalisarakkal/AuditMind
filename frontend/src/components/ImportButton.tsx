@@ -392,14 +392,14 @@ function SingleImportButton({ orgId, kind, profiles, initialFile, onSettled, onS
             {pending.file.name}
           </span>
           <span className={`text-xs ${error ? "text-red-300" : readable ? "text-emerald-300" : "text-amber-200"}`}>{error ? "Submission failed" : readable ? "Ready" : "Source needs attention"}</span>
-          <label className="text-white/60">
+          <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-white/60">
             Source
           <select
             aria-label={initialFile && !shortSourceLabel ? `Source for ${initialFile.name}` : "Source"}
             value={source}
             disabled={locked || busy}
             onChange={(e) => setSource(e.target.value)}
-            className="max-w-64 rounded-md border border-white/15 bg-navy px-2 py-1 text-sm text-white focus:border-cyan focus:outline-none"
+            className="w-64 min-w-0 max-w-full rounded-md border border-white/15 bg-navy px-2 py-1 text-sm text-white focus:border-cyan focus:outline-none"
           >
             {choices.map((p) => (
               <option key={p.key} value={p.key}>

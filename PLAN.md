@@ -4,6 +4,12 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 ## Bounded worker pool — 29 October 2026
 
+Latest scope decision: **hold SaaS scale work and parallel rollout; focus on one
+organization**. Normal worker remains serial. Demo launcher default stays one.
+The implemented pool is not SaaS-capacity certification. A platform-admin
+concurrency setting is required before a future parallel rollout; this control
+is pending implementation and verification.
+
 - [x] Configurable cross-organization concurrency, fair admission, one active
   queued job per organization, duplicate-pool refusal and shared heartbeats.
   Migration 0032 adds scheduling metadata only.
