@@ -1,5 +1,6 @@
 import hashlib
 import os
+import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ IMPORT_RESPONSES = {
     400: {"description": "Unsupported file type"},
     409: {"description": "Ask policy: completed identical file needs confirm=true before reimport"},
     413: {"description": "File exceeds the upload size limit"},
+    429: {"description": "Process-local client-address upload limit reached; retry after Retry-After seconds"},
 }
 
 
@@ -198,9 +200,12 @@ async def _receive(file: UploadFile, max_bytes: int, keep_in_memory: int) -> _Re
                 raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=upload_limit_message())
             digest.update(chunk)
             if out is None and size > keep_in_memory:
-                settings.upload_dir.mkdir(parents=True, exist_ok=True)
-                path = settings.upload_dir / f"receiving-{uuid.uuid4()}.part"
-                out = path.open("wb")
+                settings.upload_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+                # Exclusive creation, unpredictable name, mode 0600 on POSIX.
+                # Windows permissions still depend on the directory's NTFS ACL.
+                out = tempfile.NamedTemporaryFile(mode="wb", prefix="receiving-", suffix=".part",
+                                                  dir=settings.upload_dir, delete=False)
+                path = Path(out.name)
                 out.writelines(chunks)
                 chunks = []
             if out is not None:

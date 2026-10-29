@@ -10,11 +10,14 @@ keep them in memory: same reading and checking, no database round trips.
 
 Chunks and state are pickled (the measured fastest way there and back:
 500K rows staged in ~14 s, read back in ~9 s; JSON took ~42 s and ~28 s).
-Only this app writes them, to its own unlogged tables, and reads them back
-moments later; something that can't be read back (the app changed in
-between) is dropped and the file read again.
+Only this app writes them, to its own unlogged tables. Every payload must
+authenticate before unpickling: an HMAC binds its bytes to the scan, settings
+fingerprint and state/chunk sequence. Unsigned legacy state is discarded and
+the original file reread. This does not make arbitrary pickle safe: the signing
+key and application remain trusted, and callers must never sign uploaded bytes.
 """
 
+import hmac
 import logging
 import pickle
 import uuid
@@ -26,6 +29,8 @@ from typing import Any, Generic, TypeVar
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -33,7 +38,37 @@ T = TypeVar("T")
 # Notes listed per kind in a report (errors, warnings, skipped rows).
 MAX_LISTED = 1000
 # Changing what's pickled changes this, so older staging is read again.
-STAGING_VERSION = 1
+STAGING_VERSION = 2
+_ENVELOPE = b"AMST\x02"
+_MAC_BYTES = 32
+
+
+class StagingIntegrityError(ValueError):
+    """A checkpoint failed authentication; never deserialize or publish it."""
+
+
+def _context(scan_id: uuid.UUID, fingerprint: str, slot: str) -> bytes:
+    return b"AuditMind:import-staging:v2\0" + scan_id.bytes + fingerprint.encode() + b"\0" + slot.encode() + b"\0"
+
+
+def _seal(value: Any, scan_id: uuid.UUID, fingerprint: str, slot: str) -> bytes:
+    # Only typed objects produced by this application's parser/checker may enter
+    # here. Never expose this signing function as an API for arbitrary bytes.
+    payload = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
+    signature = hmac.digest(settings.SECRET_KEY.encode(), _context(scan_id, fingerprint, slot) + payload, "sha256")
+    return _ENVELOPE + signature + payload
+
+
+def _unseal(data: bytes, scan_id: uuid.UUID, fingerprint: str, slot: str) -> Any:
+    data = bytes(data)  # PostgreSQL may return a memoryview.
+    if not data.startswith(_ENVELOPE) or len(data) <= len(_ENVELOPE) + _MAC_BYTES:
+        raise StagingIntegrityError("Unauthenticated import staging")
+    signature = data[len(_ENVELOPE):len(_ENVELOPE) + _MAC_BYTES]
+    payload = data[len(_ENVELOPE) + _MAC_BYTES:]
+    expected = hmac.digest(settings.SECRET_KEY.encode(), _context(scan_id, fingerprint, slot) + payload, "sha256")
+    if not hmac.compare_digest(signature, expected):
+        raise StagingIntegrityError("Unauthenticated import staging")
+    return pickle.loads(payload)
 
 
 @dataclass
@@ -148,7 +183,9 @@ class DbStaging:
         ).first()
         if row is not None and row.fingerprint == self.fresh.fingerprint:
             try:
-                state = pickle.loads(row.data)
+                state = _unseal(row.data, self.scan_id, self.fresh.fingerprint, "state")
+                if not isinstance(state, ReadState) or state.fingerprint != self.fresh.fingerprint:
+                    raise StagingIntegrityError("Incompatible import staging state")
                 logger.info("Import %s carries on after row %d", self.scan_id, state.last_row)
                 return state
             except Exception:
@@ -162,7 +199,8 @@ class DbStaging:
         if items:
             self.db.execute(
                 text("INSERT INTO import_staging_chunks (scan_id, seq, data) VALUES (:scan, :seq, :data)"),
-                {"scan": self.scan_id, "seq": state.next_seq, "data": pickle.dumps(items, pickle.HIGHEST_PROTOCOL)},
+                {"scan": self.scan_id, "seq": state.next_seq,
+                 "data": _seal(items, self.scan_id, state.fingerprint, f"chunk:{state.next_seq}")},
             )
             state.next_seq += 1
             state.items_staged += len(items)
@@ -175,7 +213,7 @@ class DbStaging:
             {
                 "scan": self.scan_id,
                 "fingerprint": state.fingerprint,
-                "data": pickle.dumps(state, pickle.HIGHEST_PROTOCOL),
+                "data": _seal(state, self.scan_id, state.fingerprint, "state"),
                 "now": datetime.now(timezone.utc),
             },
         )
@@ -196,7 +234,7 @@ class DbStaging:
             if chunk is None:
                 return
             seq = chunk.seq
-            yield from pickle.loads(chunk.data)
+            yield from _unseal(chunk.data, self.scan_id, self.fresh.fingerprint, f"chunk:{seq}")
 
 
 def discard(db: Session, scan_id: uuid.UUID) -> None:

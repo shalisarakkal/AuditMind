@@ -2,6 +2,34 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Current closeout — 28 October 2026
+
+- [x] Hosted Linux verification closed for `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39`:
+  [run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584)
+  passed backend, frontend, backend-dependency-audit and browser. Browser artifacts
+  confirm 71 workflow checks and 17 evidence-pilot scenarios, with fixture removal.
+- [x] Documentation distinguishes this successful correction from the historical
+  failed native-date test at `1763434`. Application runtime is unchanged.
+- [x] Review static findings and implement scoped local security hardening:
+  protected metrics, pre-body document limits/upload throttling, bounded limiter
+  buckets, private temporary files and authenticated import staging. See
+  [security boundaries and remaining deployment gates](docs/SECURITY_HARDENING.md).
+- [x] Scoped hardening regression: 1,409 PostgreSQL tests, 465 frontend tests,
+  lint, 71 workflow Chrome checks and 17 pilot correctness scenarios pass. Test
+  fixtures removed; no AI usage. Dependency/high-severity/static/secret guards pass
+  with lower-severity findings explicitly triaged, not suppressed.
+- [ ] Coordinate idle-window API/worker activation, review/commit/push and verify
+  new exact-SHA hosted CI. Distributed limits, malware integration and production
+  identity/secrets/CORS remain separate work.
+- [ ] Full SaaS-scale testing is **on hold by agreement**. The planning target is
+  1,000 organizations, 100 accounts and 100,000 assets each (100,000 accounts and
+  100 million assets, before findings/history), not 100,000 concurrent users.
+  Define concurrency, workload mix, hosting and service targets before that test.
+
+Scoring remains default-off; production deployment, live AI, operational evidence
+approval and broader scoring enablement are separate gates. Chronological entries
+below retain their original results and are not the current release status.
+
 ## How this works
 
 27 October drag/drop regression: restored page-wide Assets/Findings file intake
@@ -1802,9 +1830,11 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
       release (including the known `alembic` drift and the pgvector
       downgrade limit noted in Phase 2a)
 - [ ] Security hardening, the rest of it (CoPilotSuggestions): secrets in
-      the cloud's secret manager, with a rotation procedure; rate limits on
-      sign-in, uploads and Claude calls; upload checks (content type, a
-      malware-scanning policy); CORS reviewed for the production domain
+      the selected host's secret manager, with a rotation procedure; shared/
+      distributed sign-in/upload limits and tenant quotas beyond the local
+      admission/durable AI accounting already delivered; private malware scanning,
+      actual service-account ACL checks and production CORS/proxy review.
+      Current local controls and static triage: docs/SECURITY_HARDENING.md.
 - [x] Local observability implementation (CoPilotSuggestions): structured logs with request,
       job, org and user IDs to follow one action through web and worker;
       error tracking and alerts (worker not checking in, jobs failing
@@ -1821,12 +1851,13 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
       separate, opt-in performance suite with million-row files
       Browser/dependency/secret/high-severity Bandit gates are now configured;
       Linux execution and dependency remediation passed in hosted run
-      40377211631 at c008efc. Lower-severity static triage and opt-in performance
-      CI remain pending. See the dependency compatibility record.
+      40377211631 at c008efc; the latest pilot is green at `0b1732f`.
+      Lower-severity static triage is now documented in SECURITY_HARDENING.md;
+      broader opt-in performance CI remains pending/on hold.
 
 Work started on 2026-10-15:
 - Observability: implementing structured JSON logs with request/job/org/user correlation IDs, metrics for latency/queue depth/worker heartbeat/import throughput/failures, error aggregation and alerts (stale workers, repeated failures, storage pressure, provider outages), traceability from reports/findings back to source scans/prompts, and redaction rules for credentials/tokens/PII — per CoPilotSuggestions.md Section 9
-- Automated checks: backend/frontend, portable Linux browser acceptance and security scans passed hosted CI at c008efc. Opt-in performance CI and lower-severity static triage remain pending. See the current Phase 4 status matrix; historical delivery order is not current status.
+- Automated checks: backend/frontend, portable Linux browser acceptance and security scans passed hosted CI at `0b1732f`. Lower-severity static triage is documented; broader performance CI remains pending/on hold. See the current Phase 4 status matrix; historical delivery order is not current status.
 
 ## Phase 5 — Live connectors (not yet scheduled)
 
@@ -2019,7 +2050,8 @@ lint and isolated production build passed. No backend contract changed.
     40772491131 at `1763434`. Canonical browser-local values and deterministic
     :00/:01/:45 checks; fresh local Chrome `--pilot --load`: 18 scenarios pass,
     360 reads/eight jobs with p95 182.1 ms. CI correctness variant has 17 scenarios;
-    retain failed-run evidence and verify the correction at its own pushed SHA.
+    retained failed-run evidence; correction `0b1732f` passed all four hosted jobs
+    in [run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
   - [ ] Before broader rollout, define and validate representative concurrent-user,
     inventory-size, duration and latency/resource targets in the intended environment;
     obtain operational evidence review. Keep default-off until separately approved.

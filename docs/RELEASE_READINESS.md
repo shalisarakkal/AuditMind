@@ -1,5 +1,19 @@
 # Release readiness and code review
 
+## Latest pilot closeout — 28 October 2026
+
+Pushed tip `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39` passed backend, frontend,
+backend-dependency-audit and browser on Ubuntu in
+[run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
+The browser artifact verifies 71 workflow checks and 17 evidence-pilot scenarios.
+This closes the test-portability gate, not Phase 4 or production acceptance.
+The subsequent local [security hardening increment](SECURITY_HARDENING.md) is
+implemented but not yet activated, committed/pushed or hosted-CI verified.
+Shared rate limits, actual ACL validation, malware integration and production
+configuration remain separate gates. Full SaaS-scale testing is on hold
+pending capacity/workload design; default-off scoring and separate operational,
+production and live-AI approvals remain unchanged.
+
 ## Current local evidence-scoring increment — 28 October 2026
 
 Prerequisite pushed SHA `c7ee354` passed all four hosted Linux jobs in

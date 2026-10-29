@@ -1,5 +1,25 @@
 # Phase 4 status and next milestone
 
+## Current hardening increment — 28 October 2026
+
+Documentation closeout records green Linux CI at `0b1732f` below. The separate
+local hardening increment now adds platform-admin-only metrics, document
+pre-parser byte limits, bounded process-local upload admission, private exclusive
+temporary files and authenticated staged-import checkpoints. The first focused
+run passes 72 tests; full PostgreSQL regression passes **1,409**, frontend **465**
+and lint. Test DB is restored to 0031/35 tables with clean drift. Final evidence is in
+[validation](PHASE4_VALIDATION.md). Static inventory reviewed without suppressions:
+28 remaining findings (16 Medium / 12 Low / 0 High), with dispositions and
+residual trust documented in [security hardening](SECURITY_HARDENING.md).
+Fresh Chrome acceptance also passes **71 workflow checks + 17 correctness-only
+pilot scenarios**, zero page errors/AI usage and both synthetic fixtures removed.
+Core/dev, optional embeddings and frontend audits are clean; no SaaS-scale test ran.
+
+This code is not yet committed/pushed or activated in the normal demo. Shared
+multi-server limits, malware integration, actual service-account ACL validation
+and production secrets/CORS/proxy policy remain open. Full SaaS-scale testing is
+on hold; scoring remains default-off. These changes do not complete Phase 4.
+
 ## Current increment — durable evaluation and default-off Dashboard pilot
 
 28 October: pushed through `c7ee354d8fe4331dd80e479889615ab2cf2ab8dd` and
@@ -66,7 +86,20 @@ the native input). Reproduced locally and corrected the test formatter; determin
 with `--pilot --load` (CI correctness variant: 17), zero browser errors/AI usage
 and fixture removal. The repeat load sample had p95 182.1 ms over 360 reads; normal
 organizations remain off. The initial hosted failure is retained in validation;
-the correction must be verified at its own pushed SHA, not inferred from the local pass.
+correction `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39` subsequently passed all four
+hosted Ubuntu jobs in [run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
+Its Chromium 156 artifact confirms 17 pilot scenarios, zero browser errors and
+fixture removal; the 71-check workflow suite also passed. This closes the hosted
+verification gate without treating the earlier failed run as green.
+
+The full SaaS-scale exercise is **on hold by agreement**. The proposed planning
+target is 1,000 organizations with 100 accounts and 100,000 assets each: 100,000
+accounts and 100 million assets, excluding findings/history. Peak concurrency,
+workload mix, hosting/resource budgets and service targets remain to be defined.
+The six-account local sample does not validate that target. Security hardening is
+the next increment; normal organizations remain default-off.
+
+## Historical checkpoints (not current release status)
 
 ## Evidence-qualified scoring — local review/evaluation verified; scoring integration pending
 
@@ -364,11 +397,11 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Drag/drop and multiple-file import | Implemented locally | Independent per-file source/duplicate/cancel/error/report flow; 20 queued-card limit. |
 | Product/organization logos and common header branding | Implemented locally | Product mark in sidebar/authentication and browser icon; organization name/company logo only in header. Org-admin logo/visibility/name and image sizing, migrations 0025–0028; platform-admin product sizing with version checks. See ORGANIZATION_LOGOS.md / PRODUCT_BRANDING.md. |
 | Password visibility | Implemented locally | Shared masked-by-default keyboard-accessible Show/Hide on auth/change-password fields and temporary handovers; copy without reveal. Values/autocomplete/submission retained. |
-| Dependency readiness endpoint | Implemented locally | `/health` remains cheap; `/ready` checks PostgreSQL, upload access and worker freshness with redacted responses. Hosted acceptance pending. |
+| Dependency readiness endpoint | Test-verified; deployment acceptance pending | `/health` remains cheap; `/ready` checks PostgreSQL, upload access and worker freshness with redacted responses. Hosted correctness CI passed; real deployment probes/operations remain separate. |
 | Large-organization list performance | Partial | Indexed selective Findings search delivered; short/broad searches remain slow. Dashboard/list exact counts remain; estimated counts and cached facets not completed. |
-| Security hardening | Partial | Sign-in process-local limiter and durable AI accounting exist. Shared/distributed request limits, dedicated upload request throttling, malware policy, service-account ACL validation and production secrets/CORS need further work. File-size limits are not request-rate limits. |
-| Observability | Local implementation present; hosted acceptance pending | Structured logs/correlation, worker metrics/alerts and unit tests exist. Metrics are in-memory; external alert delivery/load/production monitoring is not certified. |
-| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates exercised. Clean-install failures corrected; Linux backend 1,244 passed, hosted browser/frontend/security passed. See dependency record for final run. Medium/low SAST triage and opt-in performance jobs remain pending. |
+| Security hardening | Partial; scoped local increment implemented | Process-local sign-in/upload admission is bounded; all file transports have pre-parser byte limits; metrics require platform admin; checkpoints authenticate before deserialization. Lower-severity findings triaged without suppressions. Shared/distributed limits, malware integration, actual service-account ACL validation and production secrets/CORS remain open. See SECURITY_HARDENING.md. |
+| Observability | Test-verified; production acceptance pending | Structured logs/correlation, protected process-local metrics/alerts and tests exist. External telemetry/export identity, alert delivery/load and production monitoring are not certified. |
+| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates green at `0b1732f` (run 40774060584). Current hardening changes still need their own pushed-SHA CI. Medium/low SAST triage is documented in SECURITY_HARDENING.md; broader performance CI remains pending/on hold. |
 | Multi-worker SaaS fairness/storage/scaling | Partial foundations; pending rollout | `FOR UPDATE SKIP LOCKED`, resumable jobs and heartbeat exist. Tenant-fair scheduling, autoscaling, separate worker groups, shared object storage and plan limits are not delivered as a SaaS operating model. |
 | Hosting/keyless provider auth/managed DB/backups/production operations | Hosting-dependent, not implemented/accepted | Hosting choice and separate deployment authorization required. Existing local test success is not backup/restore, workload-identity or production acceptance. |
 

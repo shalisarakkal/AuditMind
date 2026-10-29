@@ -73,6 +73,16 @@ schema is not migrated automatically. Scoring and existing report snapshots rema
 
 ### Manage a finding's workflow
 
+#### Upload protection
+
+Upload protection: imports, documents and logos share a per-address/process
+request quota (default 120 attempts/minute). If an upload reports 429/Too many
+upload requests, wait for the server's retry interval, then retry only the failed
+file; do not resubmit files already accepted. Shared proxy/NAT users may share
+the quota. Document files remain limited to 10 MiB and logo files to 2 MiB;
+transport limits also bound multipart overhead. These controls do not constitute
+malware scanning. [Security details](SECURITY_HARDENING.md).
+
 #### Job notifications
 
 Routine successful archive, restore and purge confirmations clear automatically

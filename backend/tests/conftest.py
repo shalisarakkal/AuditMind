@@ -18,7 +18,7 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services import ingestion_background  # noqa: E402
-from app.services.rate_limit import login_limiter  # noqa: E402
+from app.services.rate_limit import login_limiter, upload_limiter  # noqa: E402
 
 # The DB fixture creates and drops every table, so tests only ever use a
 # database named *_test (TEST_DATABASE_URL), never the app's own: falling back
@@ -109,6 +109,7 @@ def _sign_in_defaults(monkeypatch):
     monkeypatch.setattr(settings, "COOKIE_SECURE", False)
     monkeypatch.setattr(settings, "PUBLIC_SIGNUP", True)
     login_limiter.reset()
+    upload_limiter.reset()
 
 
 @pytest.fixture

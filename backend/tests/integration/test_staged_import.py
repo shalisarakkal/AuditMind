@@ -3,6 +3,7 @@ an upload in chunks into staging, carries on after a cut-off from its last
 chunk, and publishes all of it at once."""
 
 import os
+import pickle
 import subprocess
 import sys
 import uuid
@@ -163,6 +164,45 @@ def test_staging_that_cant_be_read_back_is_read_again(client, admin, monkeypatch
     _cut_off(db_session, scan_id)
     run_worker()
     assert db_session.get(Scan, scan_id).summary["created"] == 9
+
+
+def test_unsigned_checkpoint_is_never_unpickled_and_original_file_is_reread(client, admin, monkeypatch, db_session):
+    scan_id = _upload(client, admin)
+    restore = _crash_after(monkeypatch, 2)
+    with pytest.raises(KeyboardInterrupt):
+        run_worker()
+    restore()
+    fingerprint = db_session.execute(text("SELECT fingerprint FROM import_staging_state")).scalar_one()
+    legacy = pickle.dumps(import_staging.ReadState(fingerprint, import_staging.Identifiers(20)))
+    db_session.execute(text("UPDATE import_staging_state SET data = :data"), {"data": legacy})
+    db_session.commit()
+    original = import_staging.pickle.loads
+    def guarded(data):
+        assert bytes(data) != legacy, "Unsigned legacy payload must never be deserialized"
+        return original(data)
+    monkeypatch.setattr(import_staging.pickle, "loads", guarded)
+    read = _record_reads(monkeypatch)
+    _cut_off(db_session, scan_id)
+    assert run_worker() == 1
+    assert read == list(range(2, 11))
+    assert db_session.get(Scan, scan_id).summary["created"] == 9
+    assert _staged(db_session) == (0, 0)
+
+
+def test_tampered_chunk_fails_without_partial_publication(client, admin, monkeypatch, db_session):
+    scan_id = _upload(client, admin)
+    restore = _crash_after(monkeypatch, 2)
+    with pytest.raises(KeyboardInterrupt):
+        run_worker()
+    restore()
+    db_session.execute(text("UPDATE import_staging_chunks SET data = :data WHERE seq = 1"),
+                       {"data": pickle.dumps([StagedRow(2, None, [])])})
+    db_session.commit()
+    _cut_off(db_session, scan_id)
+    assert run_worker() == 1
+    assert db_session.get(Scan, scan_id).status == ScanStatus.failed
+    assert db_session.query(Asset).count() == 0
+    assert _staged(db_session) == (0, 0)
 
 
 def test_cut_off_too_often_fails_and_drops_its_staging(client, admin, monkeypatch, db_session):

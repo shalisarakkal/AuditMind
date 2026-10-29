@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.core import observability as telemetry
 from app.core.config import settings
+from app.api.deps import require_sysadmin
 from app.main import app
 
 
@@ -49,10 +50,16 @@ def observed_app():
 def test_application_startup_health_and_metrics():
     with TestClient(app) as client:
         assert client.get("/health").json() == {"status": "ok"}
-        response = client.get("/metrics")
-        assert response.status_code == 200
-        assert isinstance(response.json()["request_latency_seconds"], float)
-        assert response.headers["x-content-type-options"] == "nosniff"
+        assert client.get("/metrics").status_code == 401
+        app.dependency_overrides[require_sysadmin] = lambda: object()
+        try:
+            response = client.get("/metrics")
+            assert response.status_code == 200
+            assert isinstance(response.json()["request_latency_seconds"], float)
+            assert response.headers["x-content-type-options"] == "nosniff"
+            assert response.headers["cache-control"] == "no-store"
+        finally:
+            app.dependency_overrides.pop(require_sysadmin)
 
 
 def test_timer_accumulates_monotonic_seconds(monkeypatch):

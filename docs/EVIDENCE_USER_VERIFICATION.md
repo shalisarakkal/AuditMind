@@ -26,6 +26,9 @@ Latest local acceptance: **18 dedicated Chrome scenarios** pass with `--pilot --
 including seven-domain/real-zero/weighted aggregation, real review expiry, scope
 mismatch and a bounded six-account/two-organization exercise. The earlier 11
 opt-in/isolation/rollback scenarios passed hosted Ubuntu CI at `898b309`.
+The latest `0b1732f` hosted Ubuntu run also passed all **17 correctness-only pilot
+scenarios** and the **71-check workflow suite**; see
+[run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
 The implementation checkpoint also passed
 71 full regression checks, 465 frontend and 1,366 full PostgreSQL tests; those
 broader suites were not rerun for the browser-only follow-up. See

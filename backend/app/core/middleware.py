@@ -5,16 +5,40 @@ from typing import Any
 from starlette.exceptions import HTTPException
 
 from app.core.config import settings
+from app.services.rate_limit import upload_limiter
 
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]
 Receive = Callable[[], Awaitable[Message]]
 Send = Callable[[Message], Awaitable[None]]
 
-IMPORT_PATH_SUFFIXES = ("/assets/import", "/findings/import", "/imports")
 # Room for the multipart envelope around the file itself; the exact file
 # limit is enforced again when the endpoint reads the upload.
 _MULTIPART_OVERHEAD_BYTES = 1024 * 1024
+DOCUMENT_MAX_BYTES = 10 * 1024 * 1024
+
+
+def _upload_budget(path: str) -> tuple[int, str] | None:
+    """Only file-bearing endpoints, including their trailing-slash redirect.
+
+    Keep metadata/search/lifecycle requests outside the upload budget. Limits
+    are checked before Starlette can parse/spool an unauthenticated body.
+    """
+    path = path.rstrip("/")
+    prefix = settings.API_V1_STR.rstrip("/")
+    if not path.startswith(prefix + "/"):
+        return None
+    parts = path[len(prefix) + 1:].split("/")
+    org = len(parts) >= 3 and parts[0] == "orgs" and bool(parts[1])
+    if (org and parts[2:] == ["documents"]) or parts == ["platform", "documents"]:
+        return (DOCUMENT_MAX_BYTES + _MULTIPART_OVERHEAD_BYTES,
+                "Document request exceeds the 11 MiB transport limit (file limit: 10 MiB)")
+    if org and parts[2:] == ["logo"]:
+        return (2 * 1024 * 1024 + _MULTIPART_OVERHEAD_BYTES,
+                "Logo request exceeds the 3 MiB transport limit (file limit: 2 MiB)")
+    if org and tuple(parts[2:]) in (("assets", "import"), ("findings", "import"), ("imports",)):
+        return settings.IMPORT_MAX_BYTES + _MULTIPART_OVERHEAD_BYTES, upload_limit_message()
+    return None
 
 
 class _TooLarge(HTTPException):
@@ -25,7 +49,7 @@ class _TooLarge(HTTPException):
 
 
 class UploadSizeLimitMiddleware:
-    """Rejects import uploads over IMPORT_MAX_BYTES while they arrive.
+    """Bound and throttle imports, documents and logos before body parsing.
 
     FastAPI parses (and spools) a multipart body before any dependency runs,
     auth included, so without this anyone could make the server store an
@@ -37,15 +61,19 @@ class UploadSizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        logo = scope.get("path", "").startswith(f"{settings.API_V1_STR}/orgs/") and scope.get("path", "").endswith("/logo")
-        if not (
-            scope["type"] == "http" and scope["method"] == "POST" and (logo or scope["path"].endswith(IMPORT_PATH_SUFFIXES))
-        ):
+        budget = _upload_budget(scope.get("path", "")) if scope["type"] == "http" and scope["method"] == "POST" else None
+        if budget is None:
             await self.app(scope, receive, send)
             return
 
-        limit = (2 * 1024 * 1024 if logo else settings.IMPORT_MAX_BYTES) + _MULTIPART_OVERHEAD_BYTES
-        detail = "Logo request exceeds the 3 MiB transport limit (file limit: 2 MiB)" if logo else upload_limit_message()
+        # The ASGI client address is supplied by the server's trusted-proxy
+        # configuration, not an arbitrary X-Forwarded-For request header.
+        client = scope.get("client")
+        retry_after = upload_limiter.hit(str(client[0]) if client else "unknown")
+        if retry_after is not None:
+            await _reject(send, "Too many upload requests; wait before retrying", status=429, retry_after=retry_after)
+            return
+        limit, detail = budget
         declared = dict(scope["headers"]).get(b"content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
             await _reject(send, detail)
@@ -82,13 +110,18 @@ def upload_limit_message() -> str:
     return f"File exceeds the {limit // (1024 * 1024)} MB upload limit"
 
 
-async def _reject(send: Send, detail: str | None = None) -> None:
+async def _reject(send: Send, detail: str | None = None, *, status: int = 413,
+                  retry_after: int | None = None) -> None:
     body = json.dumps({"detail": detail or upload_limit_message()}).encode()
+    headers = [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
+               (b"cache-control", b"no-store")]
+    if retry_after is not None:
+        headers.append((b"retry-after", str(retry_after).encode()))
     await send(
         {
             "type": "http.response.start",
-            "status": 413,
-            "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
+            "status": status,
+            "headers": headers,
         }
     )
     await send({"type": "http.response.body", "body": body})

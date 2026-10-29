@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from app.services.readiness import readiness_checks
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.deps import require_sysadmin
 from app.api.routes import (
     ai,
     archive,
@@ -77,15 +78,15 @@ app.include_router(documents.router, prefix=api_router_prefix)
 app.include_router(scoring_qualifications.router, prefix=api_router_prefix)
 
 
-@app.get("/metrics", include_in_schema=False)
-def metrics() -> dict[str, Any]:
-    """Expose process-local counters as JSON for internal monitoring.
+@app.get("/metrics", include_in_schema=False, dependencies=[Depends(require_sysadmin)])
+def metrics() -> JSONResponse:
+    """Expose process-local counters only to an authenticated platform admin.
 
     This is intentionally simple and in-memory; for production deployment,
     integrate with Prometheus, Datadog, or similar.
     """
     from app.core.observability import get_metrics
-    return get_metrics()
+    return JSONResponse(content=get_metrics(), headers={"Cache-Control": "no-store"})
 
 
 def get_current_metrics() -> dict[str, Any]:

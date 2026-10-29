@@ -1,5 +1,13 @@
 # Phase 4 local operations increment
 
+Current 28 October follow-up: the pilot's exact-SHA hosted verification is closed
+at `0b1732f` (all four Ubuntu jobs in run 40774060584). A separately tested
+[security hardening increment](SECURITY_HARDENING.md) adds protected metrics,
+pre-parser document limits, process-local upload admission, bounded limiter
+buckets, exclusive temporary files and authenticated staging. Deployment-specific
+ACLs, shared quotas and malware integration remain open. Earlier "not yet
+verified"/"triage pending" statements below are historical checkpoints.
+
 Subsequent branding increment implements [organization logos](ORGANIZATION_LOGOS.md)
 with migration 0025. Statements below that logos are pending describe this earlier
 checkpoint. Hosted CI was subsequently verified at c008efc; it is not still pending.

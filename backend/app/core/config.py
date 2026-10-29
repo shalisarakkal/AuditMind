@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # address> so each person's own address is counted (127.0.0.1, the
     # frontend's own proxy in development, is trusted by default).
     LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(20, ge=1)
+    # Pre-body upload admission per client address and API process, across all
+    # organizations/upload types. Not a distributed/proxy-level rate limit.
+    UPLOAD_RATE_LIMIT_PER_MINUTE: int = Field(120, ge=1, le=10000)
     # Days a temporary password (set by an admin) can be used to sign in.
     TEMP_PASSWORD_DAYS: int = Field(7, ge=1)
     # A session's last activity is saved at most this often (seconds).

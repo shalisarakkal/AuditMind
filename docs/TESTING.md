@@ -1,5 +1,16 @@
 # Testing strategy and measured coverage
 
+## Security hardening
+
+The focused security suite covers pre-body admission/length checks for imports,
+organization/platform documents and logos; forwarded-header spoof resistance;
+bounded/concurrent limiter buckets; real metrics-session authorization; temporary
+file permissions/cleanup; checkpoint authentication, context substitution,
+unsigned legacy resume and atomic tampered-chunk rejection. No real HTTP/provider
+calls are permitted by the backend fixtures. See the exact command and remaining
+production gates in [security hardening](SECURITY_HARDENING.md), and fresh full
+regression results in [validation](PHASE4_VALIDATION.md).
+
 ## Evidence-scoring pilot commands
 
 After the isolated production build described in
@@ -11,6 +22,8 @@ After the isolated production build described in
   all seven profile approvals, genuine zero, weighted complete aggregation, real
   expiry, re-review, incompatible scopes and canonical native date input at exact
   minutes/nonzero seconds. This is the 17-scenario CI correctness variant.
+  Verified on hosted Ubuntu at `0b1732f` in
+  [run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
 - `node scripts/browser-evidence-acceptance.cjs --pilot --load`: also measures a
   bounded 60-second, six-account/two-organization mixed-read workload with four
   waves of paired worker evaluations (18 scenarios). Local opt-in only; no production-load claim.

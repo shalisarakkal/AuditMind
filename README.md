@@ -108,6 +108,12 @@ backend itself with the visitor's address (`X-Forwarded-For`, and uvicorn's
 `COOKIE_SECURE=true`. Through the frontend's own forwarding every request looks as if
 it came from one address, which the per-address sign-in limit would count together.
 
+Upload attempts also have a pre-body per-address/process limit (default 120 per
+minute, `UPLOAD_RATE_LIMIT_PER_MINUTE`); excess attempts return 429 with
+`Retry-After`. `/metrics` requires a current platform-admin session. These are
+local hardening measures, not distributed SaaS controls or production acceptance;
+see [security boundaries and deployment gates](docs/SECURITY_HARDENING.md).
+
 ### The first accounts
 
 Sign-up is closed unless `PUBLIC_SIGNUP=true`. Create the Sysadmin on the server, never

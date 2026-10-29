@@ -1,5 +1,62 @@
 # Phase 4 remediation workflow validation
 
+## Scoped security hardening — 28 October 2026
+
+Implemented after the pilot documentation closeout: current-platform-admin metrics,
+document pre-parser body budgets, shared-per-address/process upload admission with
+429/Retry-After, hard-bounded limiter buckets, exclusive private temporary files
+and context-authenticated staged checkpoints (format v2). No frontend, dependency
+or schema migration; normal demo processes/data/settings/credentials remain untouched.
+Source contracts, static triage and deployment gates: [security hardening](SECURITY_HARDENING.md).
+
+Initial focused PostgreSQL/unit run: **72 passed in 17.42 s**, warnings as errors
+and required PostgreSQL. Fresh Bandit 1.9.4 inventory: **16 Medium / 12 Low / zero
+High** (initial 17 Medium / 12 Low); no suppressions or weakened gates. Core/dev
+and optional-embeddings manifest audits: **no known vulnerabilities**; `pip check`,
+tracked-secret and whitespace guards pass. Fresh full backend regression:
+**1,409 passed in 778.01 s**, required PostgreSQL/warnings-as-errors, zero
+failures/errors/skips. Disposable `auditmind_test/public` restored to **0031**,
+**35 tables**, and Alembic reports no new upgrade operations. **465 frontend tests**
+passed in 68.68 s; lint passed. No frontend source or build changed.
+
+Fresh installed Chrome **155.0.8059.85**, real hardened API/worker/PostgreSQL and
+the unchanged isolated frontend production bundle:
+
+- **71 workflow checks passed**, zero page errors and no AI usage. Artifact:
+  `temp/testing/finding-workflow/phase3_browser_d49dab919264/results.json`.
+- **17 evidence-pilot correctness scenarios passed** (`--pilot`, **without
+  `--load`**), zero browser errors/AI usage, both synthetic settings restored off
+  and fixture removed. Artifact:
+  `temp/testing/evidence-review/phase3_browser_5d0ca58bce55/results.json`.
+
+Both named test schemas are absent after cleanup; public test schema remains
+0031/35 tables. Fresh `npm audit --audit-level=high`: **zero vulnerabilities**;
+Bandit high-severity gate, secret and whitespace guards pass. These commands do
+not suppress the documented lower-severity findings. Normal demo `/ready` remains
+green (database/uploads/worker true), frontend login HTTP 200; no normal processes
+were restarted, credentials/data/settings changed or real provider calls made.
+
+Review conclusion: local scoped implementation/regression gates pass. Broader
+production security remains partial as documented. Activation, commit/push and
+new exact-SHA hosted CI remain next handoff gates, not evidence implied by the
+earlier green pilot SHA. SaaS-scale testing stays on hold and scoring default-off.
+
+## Hosted pilot closeout — 28 October 2026
+
+Exact pushed SHA `0b1732fcbf6fb3b32b512999649a9c17fcc0ef39` passed all four
+Ubuntu jobs (backend, frontend, backend-dependency-audit, browser) in
+[run 40774060584](https://github.com/shalisarakkal/AuditMind/actions/runs/40774060584).
+Downloaded browser artifact: `temp/testing/ci-0b1732f/browser/evidence-review/`.
+Chromium **156.0.8078.4** completed **17 pilot scenarios**, zero browser errors,
+no failure and `isolatedSchemaRemoved: true`. The **71-check** workflow suite
+also passed. This verifies the native-date correction on Linux; the failed
+`1763434` attempt below remains historical evidence, not a successful run.
+
+No application runtime, production data or scoring default changed. The full
+SaaS-scale test is on hold by agreement pending representative concurrency,
+workload, hosting and service targets. Neither the hosted correctness run nor
+the bounded local exercise certifies production capacity or broader enablement.
+
 ## Native-date portability correction — 28 October 2026
 
 Hosted browser [run 40772491131](https://github.com/shalisarakkal/AuditMind/actions/runs/40772491131)
@@ -26,7 +83,8 @@ two organizations in 60.323 s**, with read p50 **89.9 ms**, p95 **182.1 ms**, ma
 1.6–1.8 s. Both settings were restored off before removal. These remain small local,
 uncontrolled-cache measurements, not production acceptance. The earlier successful
 17-scenario sample below remains historical evidence; the failed hosted attempt is
-not reported as green. The pushed correction requires its own hosted verification.
+not reported as green. The correction's subsequent successful hosted verification
+is recorded above at its exact SHA.
 
 ## Seven-domain synthetic pilot and bounded concurrency — 28 October 2026
 

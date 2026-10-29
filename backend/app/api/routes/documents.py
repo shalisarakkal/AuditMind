@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role, require_sysadmin
 from app.api.paging import DateRange, PageParams, SortOrder, any_of, contains, date_range, one_of, ordered, page_params
+from app.core.middleware import DOCUMENT_MAX_BYTES as MAX_DOCUMENT_BYTES
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.knowledge import EmbeddingProfile, KnowledgeConsent, KnowledgeDocument, KnowledgeIndex, KnowledgeVersion, utcnow
@@ -21,7 +22,6 @@ from app.services.events import record_event
 from app.services.org_lock import lock_org_configuration
 
 router = APIRouter(tags=["documents"])
-MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
 
 class ConsentChange(BaseModel):
