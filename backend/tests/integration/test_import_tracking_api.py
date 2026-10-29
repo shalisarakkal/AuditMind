@@ -72,6 +72,10 @@ def _record_progress(monkeypatch) -> list[tuple[str, int, int]]:
     def record(scan_id, phase, done, total):
         reports.append((phase, done, total))
         write_progress(scan_id, phase, done, total)
+        with ingestion_background.open_progress_session() as db:
+            saved = db.get(Scan, scan_id).progress
+            assert saved["phase"] == phase and saved["rows_done"] == done
+            assert datetime.fromisoformat(saved["updated_at"]).tzinfo is not None
 
     monkeypatch.setattr(ingestion_background, "write_progress", record)
     return reports
@@ -82,17 +86,13 @@ def test_a_background_import_reports_each_stage(client, admin, monkeypatch):
 
     scan_id = _import(client, admin)
 
-    assert reports == [
-        # The reading total is an estimate from how far into the file it is;
-        # a file this small is read in one go, so it's the rows so far.
-        ("reading", 2, 2),
-        ("reading", 4, 4),
-        ("reading", 5, 5),
-        ("writing", 2, 5),
-        ("writing", 4, 5),
-        ("writing", 5, 5),
-        ("saving", 0, 0),
-    ]
+    assert reports[0][0] == "reading"
+    assert ("preparing", 0, 5) in reports
+    assert ("writing", 0, 5) in reports
+    assert ("writing", 5, 5) in reports
+    assert reports[-1] == ("saving", 0, 0)
+    # Intermediate counts are time-limited, not tied to the tiny test batch size.
+    assert all(0 <= done <= total for _, done, total in reports)
     [scan] = _scans(client, admin)
     assert scan["id"] == scan_id
     assert scan["status"] == "completed"
@@ -111,13 +111,11 @@ def test_a_tool_exports_rows_are_counted_once_with_their_findings(client, admin,
 
     assert resp.status_code == 202, resp.text
     run_worker()
-    assert reports == [
-        ("reading", 2, 2),  # the total is estimated from how far into the file it is
-        ("reading", 3, 3),
-        ("writing", 2, 3),  # each row with its asset and findings
-        ("writing", 3, 3),
-        ("saving", 0, 0),
-    ]
+    assert reports[0][0] == "reading"
+    assert ("preparing", 0, 3) in reports
+    assert ("writing", 0, 3) in reports
+    assert ("writing", 3, 3) in reports  # file rows, not assets plus findings
+    assert reports[-1] == ("saving", 0, 0)
 
 
 def test_the_tracker_lists_running_imports_and_my_undismissed_reports(client, admin, db_session):

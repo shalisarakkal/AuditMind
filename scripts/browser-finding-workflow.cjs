@@ -103,6 +103,106 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       return {page,request,context};
     }
     const admin=await session('admin'), p=admin.page, org=`/orgs/${seed.org}`, list=org+'/findings';
+    // Hold only the large summary response: the shell/security data must paint
+    // while it is pending, without fake scores or blocking navigation.
+    let releaseDashboard;
+    const heldDashboard=new Promise(resolve=>{releaseDashboard=resolve;});
+    const summaryRoute='**/api/v1/orgs/*/dashboard';
+    await p.route(summaryRoute,async route=>{await heldDashboard;await route.continue();});
+    await p.reload();
+    await expect(p.getByRole('heading',{name:'Resilience dashboard',exact:true})).toBeVisible();
+    await expect(p.getByText('Loading dashboard…',{exact:true})).toBeVisible();
+    await expect(p.getByRole('link',{name:/^Members added /})).toBeVisible();
+    await expect(p.getByTestId('overall-score')).toHaveCount(0);
+    for(const width of [320,1440]) {
+      await p.setViewportSize({width,height:1000});
+      assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await p.screenshot({path:path.join(output,`dashboard-loading-${width}.png`),fullPage:true});
+    }
+    const loadingAxe=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(loadingAxe.violations.map(v=>v.id),[]);
+    releaseDashboard();
+    await expect(p.getByTestId('overall-score')).toBeVisible();
+    await expect(p.getByText('Loading dashboard…',{exact:true})).toHaveCount(0);
+    await p.unroute(summaryRoute);
+    check('Delayed Dashboard paints accessible responsive skeleton, keeps security summary live, hides pending scores and replaces loading on completion');
+    for(const kind of ['assets','findings']) {
+      let releaseList;
+      let pendingList=new Promise(resolve=>{releaseList=resolve;});
+      const listPattern=new RegExp(`/api/v1/orgs/[^/]+/${kind}\\?`);
+      await p.route(listPattern,async route=>{await pendingList;await route.continue();});
+      await p.goto(base+'/'+kind);
+      await expect(p.getByText(`Loading ${kind}…`,{exact:true})).toBeVisible();
+      await expect(p.getByRole('searchbox',{name:`Search ${kind}`,exact:true})).toBeEnabled();
+      await expect(p.getByRole('table')).toHaveCount(0);
+      for(const width of [320,1440]) {
+        await p.setViewportSize({width,height:1000});
+        const listOverflow=await p.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,
+          elements:Array.from(document.querySelectorAll('main *')).filter(node=>node.getBoundingClientRect().right>innerWidth+1)
+            .slice(0,12).map(node=>({tag:node.tagName,text:node.textContent?.slice(0,50),classes:node.className,right:node.getBoundingClientRect().right}))}));
+        assert(listOverflow.width<=listOverflow.viewport,JSON.stringify(listOverflow));
+        await p.screenshot({path:path.join(output,`${kind}-loading-${width}.png`),fullPage:true});
+      }
+      const listLoadingAxe=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+      assert.deepEqual(listLoadingAxe.violations.map(v=>v.id),[]);
+      releaseList();
+      await expect(p.getByRole('table')).toBeVisible();
+      await expect(p.getByText(`Loading ${kind}…`,{exact:true})).toHaveCount(0);
+      pendingList=new Promise(resolve=>{releaseList=resolve;});
+      await p.getByRole('searchbox',{name:`Search ${kind}`,exact:true}).fill('delayed-list-refresh-fixture');
+      await expect(p.getByText(`Updating ${kind}…`,{exact:true})).toBeVisible();
+      await expect(p.getByRole('table')).toBeVisible();
+      await expect(p.getByRole('button',{name:'Clear filters',exact:true})).toBeEnabled();
+      releaseList();
+      await expect(p.getByText(`Updating ${kind}…`,{exact:true})).toHaveCount(0);
+      await p.unroute(listPattern);
+      check(`Delayed ${kind} paints responsive accessible loading rows; search stays enabled, refresh keeps previous table visible and loading clears on response`);
+    }
+    await p.goto(base+'/');
+    // Presentation fixture only: no large imports or tenant writes are needed
+    // to hold queue/heartbeat/count states long enough for a UI regression.
+    const importPresentation=/\/api\/v1\/orgs\/[^/]+\/scans\?(?:tracked|active)=true$/;
+    let importStep='active';
+    const oldProgress=new Date(Date.now()-15000).toISOString();
+    let advancedProgress=oldProgress;
+    const virtualImports=Array.from({length:3},(_,i)=>({id:require('node:crypto').randomUUID(),org_id:seed.org,
+      scan_type:'asset_import',scope:null,source:'upload',filename:`progress-display-${i}.csv`,profile:null,
+      started_by:null,started_at:new Date(Date.now()-120000).toISOString(),completed_at:null,dismissed_at:null,summary:null,progress:null}));
+    await p.route(importPresentation,route=>{
+      const completed=importStep==='complete';
+      const payload=virtualImports.map((scan,i)=>({...scan,status:completed?'completed':i===0?'running':'pending',
+        heartbeat_at:i===0?new Date().toISOString():null,
+        progress:completed||i>0?null:{phase:'writing',rows_done:importStep==='advanced'?400000:378000,rows_total:500000,updated_at:importStep==='advanced'?advancedProgress:oldProgress},
+        summary:completed?{created:0,updated:0,skipped:0,duplicates:0,failed:0,findings_created:0,errors:[],warnings:[]}:null}));
+      return route.fulfill({json:route.request().url().includes('active=true')&&completed?[]:payload});
+    });
+    await p.goto(base+'/assets'); await p.reload();
+    const progressSummary=p.getByText('1 processing · 2 queued',{exact:true});
+    await expect(progressSummary).toBeVisible();
+    await progressSummary.click();
+    const activeProgress=p.getByRole('region',{name:'Processing progress-display-0.csv',exact:true});
+    await expect(activeProgress).toContainText('Writing rows: 378,000 / 500,000 (75%)');
+    await expect(activeProgress.locator('[class*="animate-spin"]')).toHaveCount(1);
+    await expect(activeProgress).toContainText('The worker is still checking in.');
+    await expect(p.getByRole('region',{name:'Queued progress-display-1.csv',exact:true}).locator('[class*="animate-spin"]')).toHaveCount(0);
+    for(const width of [1440,390]) {
+      await p.setViewportSize({width,height:1000});
+      assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await p.screenshot({path:path.join(output,`import-states-${width}.png`),fullPage:true});
+    }
+    const importStatesAxe=await new AxeBuilder({page:p}).include('details').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(importStatesAxe.violations.map(v=>v.id),[]);
+    importStep='advanced'; advancedProgress=new Date().toISOString();
+    await expect(activeProgress).toContainText('400,000 / 500,000 (80%)');
+    await expect(activeProgress).not.toContainText('Waiting for a progress update.');
+    importStep='complete';
+    await expect(p.getByText('3 imports completed',{exact:true})).toBeVisible();
+    await expect(p.getByRole('region',{name:'Processing progress-display-0.csv',exact:true})).toHaveCount(0);
+    await p.getByText('3 imports completed',{exact:true}).click();
+    await expect(p.getByText('Show reports',{exact:true})).toBeVisible();
+    await p.unroute(importPresentation); await p.reload();
+    await p.setViewportSize({width:1440,height:1000}); await p.goto(base+'/');
+    check('Import presentation separates one processing/two queued, animates only active work, shows real update age/heartbeat, advances actual counts and labels completed reports; mobile/Axe pass');
     const productMarks=p.getByRole('img',{name:'AuditMind',exact:true});
     await expect(productMarks).toHaveCount(1);
     await expect(p.locator('main header').getByRole('img',{name:'AuditMind',exact:true})).toHaveCount(0);
@@ -378,6 +478,67 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(p.getByText('No organization logo set.',{exact:true})).toBeVisible();
     await expect(p.getByAltText('Phase3 Alpha logo',{exact:true})).toHaveCount(0);
     check('Logo removal requires confirmation, Cancel preserves it and successful removal clears header and settings');
+    const limitsResponse=await p.request.get(base+'/api/v1/upload-limits');
+    assert.equal(limitsResponse.status(),200);
+    assert.equal(limitsResponse.headers()['cache-control'],'no-store');
+    const uploadLimits=await limitsResponse.json();
+    assert.ok(Number.isSafeInteger(uploadLimits.import_max_bytes) && uploadLimits.import_max_bytes>0);
+    assert.equal(uploadLimits.document_max_bytes,10*1024**2);
+    assert.equal(uploadLimits.logo_max_bytes,2*1024**2);
+    check('Public upload metadata exposes only effective byte ceilings with no-store caching');
+    const invalidFilePosts=[];
+    // Navigation renews the access token. Count all other POSTs so the test
+    // still rejects any accidental file submission or document/version write.
+    const observeInvalidPost=request=>{
+      const pathname=new URL(request.url()).pathname;
+      if(request.method()==='POST' && pathname!=='/api/v1/auth/refresh')invalidFilePosts.push(pathname);
+    };
+    p.on('request',observeInvalidPost);
+    await p.goto(base+'/documents');
+    await p.getByRole('button',{name:'Upload document',exact:true}).click();
+    const documentUpload=p.getByRole('form',{name:'Upload document',exact:true});
+    // Metadata-only File fixtures reproduce the client check without allocating
+    // or transmitting hundreds of MiB. Server byte limits have separate tests.
+    await documentUpload.locator('input[type="file"]').evaluate(input=>{
+      const file=new File(['Synthetic policy'],'oversized-policy.md',{type:'text/markdown'});
+      Object.defineProperty(file,'size',{value:10*1024**2+1});
+      const transfer=new DataTransfer(); transfer.items.add(file); input.files=transfer.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    await expect(documentUpload.getByRole('alert')).toContainText('10 MiB file limit');
+    await expect(documentUpload.getByRole('button',{name:'Queue processing',exact:true})).toBeDisabled();
+    await documentUpload.locator('input[type="file"]').setInputFiles({name:'cloud_assets.json',mimeType:'application/json',buffer:Buffer.from('[]')});
+    await expect(documentUpload.getByRole('alert')).toContainText('Assets or Findings');
+    await documentUpload.locator('input[type="file"]').setInputFiles({name:'valid-policy.md',mimeType:'text/markdown',buffer:Buffer.from('Synthetic policy')});
+    await expect(documentUpload.getByRole('alert')).toHaveCount(0);
+    await expect(documentUpload.getByRole('button',{name:'Queue processing',exact:true})).toBeEnabled();
+    await documentUpload.getByRole('button',{name:'Cancel upload',exact:true}).click();
+    assert.deepEqual(invalidFilePosts,[]);
+    check('Document size/type errors appear immediately, block submission and clear on valid replacement; Cancel makes no request');
+    await p.goto(base+'/assets');
+    await expect(p.getByRole('heading',{name:'Assets',exact:true})).toBeVisible();
+    await p.locator('input[type="file"]').evaluate((input,max)=>{
+      const transfer=new DataTransfer();
+      const large=new File(['tiny fixture'],'oversized-assets.csv',{type:'text/csv'});
+      Object.defineProperty(large,'size',{value:max+1}); transfer.items.add(large);
+      transfer.items.add(new File(['unsupported'],'unsupported.exe'));
+      transfer.items.add(new File(['type,hostname\nserver,valid-metadata-only\n'],'valid-assets.csv',{type:'text/csv'}));
+      input.files=transfer.files; input.dispatchEvent(new Event('change',{bubbles:true}));
+    },uploadLimits.import_max_bytes);
+    const preflightQueue=p.getByRole('dialog',{name:'Upload files',exact:true});
+    await expect(preflightQueue.getByRole('alert')).toContainText('oversized-assets.csv exceeds');
+    await expect(preflightQueue.getByRole('alert')).toContainText('Unsupported file type');
+    await expect(preflightQueue.getByRole('button',{name:'Upload all ready files (1)',exact:true})).toBeEnabled();
+    await expect(p.getByLabel('Source for oversized-assets.csv',{exact:true})).toHaveCount(0);
+    await expect(p.getByLabel('Source for valid-assets.csv',{exact:true})).toBeVisible();
+    await p.setViewportSize({width:320,height:844});
+    assert(await preflightQueue.evaluate(node=>node.scrollWidth<=node.clientWidth));
+    await p.screenshot({path:path.join(output,'upload-preflight-mobile.png')});
+    await preflightQueue.getByRole('button',{name:'Cancel queued uploads',exact:true}).click();
+    assert.deepEqual(invalidFilePosts,[]);
+    p.off('request',observeInvalidPost);
+    await p.setViewportSize({width:1680,height:1000});
+    check('Mixed selection rejects oversized/unsupported imports before content upload, retains only valid ready files and fits narrow mobile');
     const dragSession=await p.context().newCDPSession(p);
     async function dropNativeFiles() {
       await p.evaluate(()=>{
@@ -401,10 +562,40 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(p.getByRole('dialog',{name:'Upload files',exact:true})).toBeVisible();
     await expect(p.getByLabel('Source for demo-assets.csv',{exact:true})).toBeVisible();
     await expect(p.getByLabel('Source for demo-findings.csv',{exact:true})).toBeVisible();
-    await p.getByRole('button',{name:'Close',exact:true}).click();
-    await p.getByRole('button',{name:'Close and remove queued files',exact:true}).click();
+    await p.getByRole('button',{name:'Cancel queued uploads',exact:true}).click();
     await dragSession.detach();
     check('Chrome native multi-file drag outside the upload button opens one queue; non-upload pages stay in the app without file navigation');
+    // Cancelling a long queue is one step; Escape has identical idle semantics.
+    await p.getByRole('button',{name:'Upload file',exact:true}).focus();
+    let closeQueuePosts=0;
+    const observeQueuePost=request=>{if(request.method()==='POST' && /\/(?:import|imports)$/.test(request.url()))closeQueuePosts++;};
+    p.on('request',observeQueuePost);
+    await p.locator('input[type="file"]').setInputFiles(Array.from({length:20},(_,i)=>({
+      name:`close-queue-${i}.csv`,mimeType:'text/csv',buffer:Buffer.from(`type,hostname\nserver,close-queue-${i}\n`),
+    })));
+    const longQueue=p.getByRole('dialog',{name:'Upload files',exact:true});
+    await expect(longQueue.getByRole('button',{name:'Upload all ready files (20)',exact:true})).toBeEnabled();
+    await p.getByLabel('Source for close-queue-0.csv',{exact:true}).selectOption('generic_findings');
+    await longQueue.evaluate(node=>{node.scrollTop=node.scrollHeight;});
+    const closeQueueAxe=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(closeQueueAxe.violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)})),[]);
+    await p.screenshot({path:path.join(output,'upload-cancel-desktop.png')});
+    await p.setViewportSize({width:390,height:844});
+    assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await expect(longQueue.getByRole('button',{name:'Cancel queued uploads',exact:true})).toBeVisible();
+    await p.screenshot({path:path.join(output,'upload-cancel-mobile.png')});
+    await longQueue.getByRole('button',{name:'Cancel queued uploads',exact:true}).click();
+    await expect(p.getByRole('dialog')).toHaveCount(0);
+    await expect(p.getByRole('button',{name:'Upload file',exact:true})).toBeFocused();
+    await p.locator('input[type="file"]').setInputFiles({name:'escape-cancel.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,escape-cancel\n')});
+    await expect(p.getByRole('button',{name:'Cancel queued uploads',exact:true})).toBeEnabled();
+    await p.keyboard.press('Escape');
+    await expect(p.getByRole('dialog')).toHaveCount(0);
+    await expect(p.getByRole('button',{name:'Upload file',exact:true})).toBeFocused();
+    assert.equal(closeQueuePosts,0);
+    p.off('request',observeQueuePost);
+    await p.setViewportSize({width:1680,height:1000});
+    check('Cancel queued uploads discards a scrolled 20-file queue in one click without a confirmation or POST; idle Escape also cancels and restores focus; desktop/mobile Axe pass');
     await p.goto(base+'/assets');
     await p.locator('input[type="file"]').setInputFiles([
       {name:'browser-batch-a.csv',mimeType:'text/csv',buffer:Buffer.from('type,hostname\nserver,browser-batch-a\n')},
@@ -416,7 +607,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     }
     const uploadDialog=p.getByRole('dialog',{name:'Upload files',exact:true});
     await expect(uploadDialog).toBeVisible();
-    await expect(uploadDialog.getByRole('button',{name:'Close',exact:true})).toBeFocused();
+    await expect(uploadDialog.getByRole('button',{name:'Cancel queued uploads',exact:true})).toBeFocused();
     const uploadAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     assert.deepEqual(uploadAxe.violations.map(v=>v.id),[]);
     await p.screenshot({path:path.join(output,'upload-dialog-desktop.png'),fullPage:true});
@@ -424,7 +615,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     assert.ok(await uploadDialog.evaluate(node=>node.scrollWidth<=node.clientWidth));
     await p.screenshot({path:path.join(output,'upload-dialog-mobile.png'),fullPage:true});
     await p.setViewportSize({width:1440,height:1000});
-    check('Upload dialog has initial Close focus, compact desktop/mobile layout and no scoped Axe violations');
+    check('Upload dialog has initial Cancel queued uploads focus, compact desktop/mobile layout and no scoped Axe violations');
     await p.getByRole('button',{name:'Upload all ready files (2)',exact:true}).click();
     await expect(p.getByText(/2 submitted; 0 failed/)).toBeVisible();
     await expect(p.getByLabel('Source for browser-batch-a.csv',{exact:true})).toHaveCount(0);

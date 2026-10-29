@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
 import Sidebar from "@/components/Sidebar";
-import { importPages, progressText } from "@/context/ImportsContext";
+import { importPages, importState, progressText } from "@/context/ImportsContext";
 import type { Scan } from "@/lib/types";
 import { useReloadOnImport } from "@/lib/useReloadOnImport";
 import { json, renderSignedIn, scan } from "@/test/helpers";
@@ -36,9 +36,51 @@ function requests(fetchMock: Awaited<ReturnType<typeof renderSignedIn>>["fetchMo
 beforeEach(() => window.sessionStorage.clear());
 
 describe("Import tracking", () => {
+  it("labels finished imports as completed reports", async () => {
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [scan({ id: "done-a" }), scan({ id: "done-b" })]));
+    expect(await screen.findByText("2 imports completed")).toBeVisible();
+    expect(screen.getByText("Show reports")).toBeVisible();
+  });
+
+  it("distinguishes one actively writing file from two queued files, including their icons", async () => {
+    const now = new Date().toISOString();
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [
+      scan({ id: "active", filename: "active.csv", status: "running", heartbeat_at: now, progress: { phase: "writing", rows_done: 378000, rows_total: 500000, updated_at: now } }),
+      scan({ id: "queued-a", filename: "queued-a.csv", status: "pending" }),
+      scan({ id: "queued-b", filename: "queued-b.csv", status: "pending" }),
+    ]));
+    const summary = await screen.findByText("1 processing · 2 queued");
+    fireEvent.click(summary.closest("summary")!);
+    const active = screen.getByRole("region", { name: "Processing active.csv" });
+    expect(active).toHaveTextContent("Writing rows: 378,000 / 500,000 (75%)");
+    expect(active.querySelector('[class*="animate-spin"]')).not.toBeNull();
+    const queued = screen.getByRole("region", { name: "Queued queued-a.csv" });
+    expect(queued).toHaveTextContent("Queued — waiting for an available worker.");
+    expect(queued.querySelector('[class*="animate-spin"]')).toBeNull();
+  });
+
+  it("shows time since real progress and a recent worker heartbeat without inventing row progress", async () => {
+    const now = Date.now();
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [scan({
+      id: "slow", filename: "slow.csv", status: "running", heartbeat_at: new Date(now).toISOString(),
+      progress: { phase: "writing", rows_done: 100, rows_total: 500, updated_at: new Date(now - 15000).toISOString() },
+    })]));
+    fireEvent.click((await screen.findByText("1 processing")).closest("summary")!);
+    expect(screen.getByRole("region", { name: "Processing slow.csv" })).toHaveTextContent("100 / 500 (20%)");
+    expect(screen.getByText(/Progress updated 15s ago/)).toBeVisible();
+    expect(screen.getByText(/The worker is still checking in/)).toBeVisible();
+  });
+
+  it("counts successful completions separately from failures and queued imports", async () => {
+    await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [
+      scan({ id: "done" }), scan({ id: "bad", status: "failed" }), scan({ id: "queue", status: "pending" }),
+    ]));
+    expect(await screen.findByText("1 queued · 1 failed · 1 completed")).toBeVisible();
+  });
+
   it("groups running imports in a compact collapsed progress disclosure", async () => {
     await renderSignedIn(<ImportStatus page="assets" />, "admin", server(() => [scan({ id: "one", status: "running" }), scan({ id: "two", status: "pending" })]));
-    const summary = await screen.findByText("2 imports processing");
+    const summary = await screen.findByText("1 processing · 1 queued");
     const details = summary.closest("details")!;
     expect(details.open).toBe(false);
     fireEvent.click(summary.closest("summary")!);
@@ -251,6 +293,13 @@ describe("Import tracking", () => {
     expect(list).not.toHaveTextContent("done.csv");
   });
 
+  it("shows a static queued sidebar link rather than processing", async () => {
+    await renderSignedIn(<Sidebar />, "viewer", server(() => [scan({ id: "q", filename: "queued.csv", status: "pending" })]));
+    const list = await screen.findByRole("list", { name: "Uploads in progress" });
+    expect(within(list).getByRole("link")).toHaveTextContent("Queued queued.csv…");
+    expect(list.querySelector('[class*="animate-pulse"]')).toBeNull();
+  });
+
   it("links a tool export's import back to the page it was started from", async () => {
     const running = scan({ id: "s1", filename: "scan.csv", scan_type: "network_scan_import", status: "running" });
     await renderSignedIn(
@@ -275,8 +324,14 @@ describe("Import tracking", () => {
 });
 
 describe("import helpers", () => {
+  it("classifies organization-lock waits and unavailable-worker jobs without counting them as processing", () => {
+    expect(importState(scan({ status: "running", progress: { phase: "waiting" } }))).toBe("waiting");
+    expect(importState(scan({ status: "pending" }), true)).toBe("interrupted");
+    expect(importState(scan({ status: "running", heartbeat_at: "2026-10-29T12:00:00Z" }), true)).toBe("interrupted");
+    expect(importState(scan())).toBe("completed");
+  });
   it("describes progress", () => {
-    expect(progressText(scan({ status: "pending" }))).toBe("Waiting for the background worker…");
+    expect(progressText(scan({ status: "pending" }))).toBe("Queued — waiting for an available worker.");
     // The worker was running it and stopped; one run during its request isn't the worker's.
     const byWorker = scan({ status: "running", heartbeat_at: "2026-09-30T21:08:13Z", progress: { phase: "writing", rows_done: 1, rows_total: 2 } });
     expect(progressText(byWorker, true)).toBe(
@@ -300,7 +355,8 @@ describe("import helpers", () => {
     expect(progressText(scan({ status: "running", progress: { phase: "findings", rows_done: 120000, rows_total: 426700 } }))).toBe(
       "Writing findings: 120,000 / 426,700 (28%)",
     );
-    expect(progressText(scan({ status: "running", progress: { phase: "saving", rows_done: 0, rows_total: 0 } }))).toBe("Saving…");
+    expect(progressText(scan({ status: "running", progress: { phase: "saving", rows_done: 0, rows_total: 0 } }))).toBe("Saving changes…");
+    expect(progressText(scan({ status: "running", progress: { phase: "preparing" } }))).toBe("Preparing inventory matches…");
   });
 
   it("maps imports to the pages they affect", () => {

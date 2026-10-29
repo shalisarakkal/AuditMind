@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import AccountMenu from "@/components/AccountMenu";
 import OrgPicker from "@/components/OrgPicker";
 import { useApp } from "@/context/AppContext";
-import { importHome, isInterrupted, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
+import { importHome, importState, isInterrupted, isRunning, jobTitle, useImports } from "@/context/ImportsContext";
 import { PLATFORM_PATH } from "@/lib/paths";
 import { useMe } from "@/lib/useMe";
 
@@ -60,18 +60,20 @@ export default function Sidebar() {
       )}
       {running.length > 0 && (
         <ul aria-label="Uploads in progress" className="mt-6 space-y-1">
-          {running.map((scan) => (
+          {running.map((scan) => {
+            const state = importState(scan, imports.workerDown);
+            return (
             <li key={scan.id}>
               <Link
                 href={`/${importHome(scan)}`}
                 title={scan.filename ?? undefined}
                 className={`block truncate rounded-md px-3 py-2 text-xs hover:bg-cyan/10 ${isInterrupted(scan, imports.workerDown) ? "text-violet-200" : "text-cyan"}`}
               >
-                <Indicator interrupted={isInterrupted(scan, imports.workerDown)} />
-                Processing {scan.filename ?? "a file"}…
+                <Indicator interrupted={state === "interrupted"} active={state === "processing"} />
+                {state[0].toUpperCase() + state.slice(1)} {scan.filename ?? "a file"}…
               </Link>
             </li>
-          ))}
+          ); })}
         </ul>
       )}
       {runningJobs.length > 0 && (
@@ -128,10 +130,10 @@ function NavList({ items, pathname, label }: { items: { href: string; label: str
 }
 
 /** A pulsing dot while it runs; a warning sign while the worker is down. */
-function Indicator({ interrupted }: { interrupted: boolean }) {
+function Indicator({ interrupted, active = true }: { interrupted: boolean; active?: boolean }) {
   return interrupted ? (
     <span aria-hidden className="mr-1">⚠</span>
   ) : (
-    <span aria-hidden className="mr-1 inline-block animate-pulse">●</span>
+    <span aria-hidden className={`mr-1 inline-block ${active ? "motion-safe:animate-pulse" : ""}`}>{active ? "●" : "◷"}</span>
   );
 }

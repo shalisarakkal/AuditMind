@@ -5,6 +5,7 @@ so it shows while the import's transaction is still open.
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 
@@ -44,7 +45,8 @@ def write_progress(scan_id: uuid.UUID, phase: str, rows_done: int, rows_total: i
             db.execute(
                 update(Scan)
                 .where(Scan.id == scan_id)
-                .values(progress={"phase": phase, "rows_done": rows_done, "rows_total": rows_total})
+                .values(progress={"phase": phase, "rows_done": rows_done, "rows_total": rows_total,
+                                  "updated_at": datetime.now(timezone.utc).isoformat()})
             )
             db.commit()
     except Exception:

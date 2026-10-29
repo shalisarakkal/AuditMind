@@ -452,13 +452,15 @@ export function runByWorker(item: Scan | ArchiveJob): boolean {
 export function progressText(scan: Scan, workerDown = false): string {
   const progress = scan.progress;
   if (workerDown && scan.status === "pending") return `${STOPPED} This upload starts when it's back.`;
-  if (scan.status === "pending") return WAITING;
+  if (scan.status === "pending") return "Queued — waiting for an available worker.";
   // The worker keeps what it has read and checked (Phase 2f): it carries on
   // from there; one cut off while writing writes again, nothing half-written.
   if (workerDown && runByWorker(scan)) {
     return `${STOPPED} This upload carries on from where it got to when it's back.`;
   }
   switch (progress?.phase) {
+    case "preparing":
+      return "Preparing inventory matches…";
     case "waiting":
       return "Waiting for another upload into this organization to finish processing…";
     case "writing":
@@ -466,10 +468,18 @@ export function progressText(scan: Scan, workerDown = false): string {
     case "findings":
       return counted("Writing findings", progress.rows_done, progress.rows_total) ?? "Writing findings…";
     case "saving":
-      return "Saving…";
+      return "Saving changes…";
     default:
       return counted("Reading file", progress?.rows_done, progress?.rows_total, " rows") ?? "Reading file…";
   }
+}
+
+/** Queued/waiting jobs must never be presented as active row processing. */
+export function importState(scan: Scan, workerDown = false) {
+  if (isInterrupted(scan, workerDown)) return "interrupted";
+  if (scan.status === "pending") return "queued";
+  if (scan.status === "running") return scan.progress?.phase === "waiting" ? "waiting" : "processing";
+  return scan.status;
 }
 
 function counted(label: string, done = 0, total = 0, unit = ""): string | null {

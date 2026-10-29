@@ -310,9 +310,11 @@ export type Scan = {
  * rows, waiting for another import into the org, writing its rows, writing a
  * tool export's findings, saving. Counts are 0 (or absent) where there are none. */
 export type ImportProgress = {
-  phase: "reading" | "waiting" | "writing" | "findings" | "saving";
+  phase: "reading" | "waiting" | "preparing" | "writing" | "findings" | "saving";
   rows_done?: number;
   rows_total?: number;
+  /** Server time of the last published progress, not the last browser poll. */
+  updated_at?: string;
 };
 
 export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier | null; assessment_status?: "not_assessed" | "findings_based" | "evidence_qualified"; justification: string;

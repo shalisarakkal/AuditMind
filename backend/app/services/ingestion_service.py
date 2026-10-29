@@ -45,6 +45,7 @@ from app.models.scan import Scan
 from app.models.user import User
 from app.schemas.ingestion import ImportReport, RowError, RowNote, RowWarning
 from app.services import import_staging
+from app.services.ingestion_progress import ProgressReporter
 from app.services.asset_types import BUILTIN_TYPE_ALIASES, resolve_asset_type
 from app.services.events import record_event
 from app.services.import_matching import TARGETED_LOAD_MAX, AssetIndex, FindingIndex, IndexedAsset, Origin, finding_key
@@ -74,8 +75,8 @@ _EXPECTED_COLUMNS = {
     "assets": "type, hostname and/or ip or cloud_id, and optionally subtype, environment, criticality, tags",
     "findings": "hostname and/or ip or cloud_id, domain, severity, and optionally category, description, source",
 }
-# New rows sent to the database per batch, file rows per staged chunk, and
-# file rows per progress report.
+# New rows sent to the database per batch and file rows per staged chunk.
+# Progress reporting has its own time limit; it does not change these sizes.
 WRITE_BATCH = 2000
 # Assets whose updates are gathered before they're sent (see _PendingWrites).
 UPDATE_BATCH = 20000
@@ -293,6 +294,7 @@ def process_import(
     worker: staged in the database, resumable). kind "profile" reads each
     row with `profile`; `progress` is told how it goes. Unexpected errors
     mark the scan failed and are re-raised."""
+    progress = ProgressReporter(progress) if progress is not None else None
     scan_id = scan.id
     org = db.get(Organization, scan.org_id)
     ingestion = resolve_ingestion_settings(org)
@@ -474,11 +476,15 @@ def _import(
     # All-or-nothing with a bad row: nothing is written.
     if not state.failed or ingestion.import_partial_success:
         lock_org(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
+        if progress is not None:
+            progress("preparing", 0, state.items_staged)
         found = state.identifiers
         index = AssetIndex.load(
             db, scan.org_id, found.hostnames, found.ips, found.cloud_ids, whole_org=found.whole_org
         )
         writes = _PendingWrites(db, scan.id, progress, state.items_staged)
+        if progress is not None:
+            progress("writing", 0, state.items_staged)
         # When a file creates assets too, `created` counts those, so its
         # findings are counted separately.
         count_findings_as = "findings_created" if profile is not None and profile.creates_assets else "created"
@@ -714,7 +720,7 @@ class _PendingWrites:
     New rows are sent (with COPY) every WRITE_BATCH of them. Updates are
     gathered per asset until UPDATE_BATCH assets have some, since a file
     often lists the same host many times. Progress, in file rows, is reported
-    every WRITE_BATCH rows.
+    at row boundaries (the import's reporter rate-limits database updates).
 
     It also records which assets the upload touched (asset_scans), so
     archiving another upload leaves them be."""
@@ -774,7 +780,7 @@ class _PendingWrites:
 
     def row_done(self) -> None:
         self.rows_done += 1
-        if self.progress is not None and (self.rows_done % WRITE_BATCH == 0 or self.rows_done == self.rows_total):
+        if self.progress is not None:
             self.progress("writing", self.rows_done, self.rows_total)
 
     def _created(self) -> None:
