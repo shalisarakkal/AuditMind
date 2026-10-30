@@ -1,5 +1,36 @@
 # Phase 4 remediation workflow validation
 
+## Assets search local trial — 30 October 2026
+
+- Prototype compares old/new results on the same disposable 100k-row copy,
+  including direct 5k write probes. Common-query regressions were identified
+  and guarded before normal API activation; all prototype schemas were cleaned.
+- Latest strict PostgreSQL run: **69 passed in 90.06 seconds**, covering Assets
+  search/paging, import/re-import, matching, workflow filters and migrations.
+  Final strategy/index checks after null-array frequency correction: **5 passed**;
+  multi-label/quoted/wildcard/Unicode binding was also checked separately.
+  Counts overlap; these are not a new full-backend run.
+- 0037 applied locally after idle checks; exact source counts and account/settings
+  digests unchanged. Full index: 301,383,680 bytes; metadata drift and readiness pass.
+  High-severity Bandit and signed-in Chrome pass. No-match UI: 487 ms including
+  debounce; hostname general search: 222 ms, 1,000 matches. Broad counts retained.
+- Only API restarted; frontend, worker, scoring flags and concurrency unchanged.
+  Implementation/benchmarks/documentation are reviewed as scoped commits. The
+  final strict combined PostgreSQL run passed **70 tests in 88.03 seconds**.
+  Hosted Linux conclusions are recorded by the Actions run on the pushed commit;
+  historical green runs below do not establish this increment's Linux result.
+  SaaS and pilot holds remain.
+  [Detailed measurements and rollback](ASSET_SEARCH_INDEX.md).
+
+## Hosted closeout — 30 October 2026
+
+All four Ubuntu CI jobs passed for pushed commit `1b2286f`:
+[run 40984969686](https://github.com/shalisarakkal/AuditMind/actions/runs/40984969686).
+Backend, frontend, browser acceptance and dependency/security audit are green.
+Earlier pending push/CI and normal-frontend launch entries are superseded.
+Pilot preparation and broader qualified-scoring adoption are explicitly deferred;
+no global enablement, SaaS rollout or production deployment is implied.
+
 ## Scoped commit closeout — 29 October 2026
 
 - Latest focused backend run: `pytest tests/integration/test_dashboard_snapshots.py

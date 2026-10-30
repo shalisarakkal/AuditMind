@@ -1,5 +1,11 @@
 # Single-organization Dashboard count optimization
 
+Historical 29 October measurement record. Its count-index changes are now
+committed/pushed and covered by hosted Linux run 40984969686; normal frontend
+startup and signed-in Chrome checks are complete. The launch/check-in blockers
+below describe that earlier checkpoint. See the separate
+[30 October large-list query increment](LARGE_LIST_PERFORMANCE.md) for current work.
+
 29 October 2026: implemented and applied locally at migration **0033**. This is
 a focused exact-count improvement, separate from the SaaS scaling proposal.
 Application changes remain uncommitted at this checkpoint; no new hosted CI or

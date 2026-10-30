@@ -7,8 +7,39 @@ are complete and recorded in scoped commits. All 516 frontend tests and 21
 snapshot/interval/migration tests pass; lint and production build pass. Signed-in
 Chrome verifies Reload saved settings and the five-second completion timeout.
 Historical launch-block notes below are superseded by the operator's normal
-frontend restart. Push/hosted CI remains pending; SaaS scale and broader scoring
-enablement remain held. See `docs/PHASE4_STATUS.md` for the current handoff.
+frontend restart. Pushed through `1b2286f`; all four hosted Linux CI jobs passed
+in [run 40984969686](https://github.com/shalisarakkal/AuditMind/actions/runs/40984969686).
+Pilot preparation and broader scoring enablement are explicitly deferred on
+30 October; SaaS scaling remains held. Large-list search/filter performance is
+the next active increment. See `docs/PHASE4_STATUS.md` for the current handoff.
+
+## Large-list search and filter performance — 30 October
+
+- [x] Subsequent Assets index prototype and local trial (0037): immutable
+  text-only candidate representation, original matching recheck and planner/tag
+  frequency guard. No-match query: 6.5 s → 50 ms. Chrome: 487 ms including debounce;
+  general hostname search: 222 ms for 1,000 exact matches. 69 PostgreSQL checks,
+  final binding regression, readiness, drift and Chrome checks pass.
+  Additional full-size index: about 287 MiB. Import write-cost measurements and
+  broad-query limits are recorded in [Assets search](docs/ASSET_SEARCH_INDEX.md).
+
+- [x] Measure Assets/Findings list bottlenecks on the large local organization.
+- [x] Migration 0036: compact active facet/filter indexes and ordered distinct
+  probes. Preserve blank options, exact filters and tenant/archive boundaries.
+- [x] Project Findings search grouping keys with candidate IDs and defer unused
+  raw import JSON on list reads; retain existing date-text search behavior.
+- [x] PostgreSQL regression/migration and signed-in Chrome verification; local
+  0036 activation/drift/readiness checks with data/settings digests unchanged.
+  Filter options: 5.3/4.5 s to 29/33 ms; common Findings search: 7.9 to 4.9 s.
+- [x] Add guarded indexed candidates for selective Assets tag/metadata searches.
+- [ ] Very broad exact counts, deep paging and arbitrary-sort follow-up. Common
+  tag/type queries still take seconds; no universal subsecond-search or 500k-row
+  write-throughput claim is made.
+- [x] Review and record list-query implementation in scoped commits; latest
+  strict PostgreSQL regression: 70 passed in 88.03 seconds. Benchmarks and
+  validation documentation are separate from application code.
+  Hosted Linux conclusions belong to the Actions run for the pushed commit.
+  [Measurements, limits and reproduction](docs/LARGE_LIST_PERFORMANCE.md).
 
 ## Dashboard refresh interval inheritance and load spreading
 
@@ -26,8 +57,8 @@ enablement remain held. See `docs/PHASE4_STATUS.md` for the current handoff.
   515 frontend tests; 85 Chrome scenarios; builds/lint/TypeScript pass. Counts
   overlap. Local demo at 0035, Platform interval 3,600 seconds/version 2, all five
   organizations inherit; source data/credentials retained, one worker slot.
-  Frontend production build is ready; its previously policy-blocked launch still
-  requires manual start. Changes remain uncommitted/unpushed.
+  Frontend is running; signed-in Chrome checks pass. Changes are committed,
+  pushed and covered by hosted run 40984969686.
 
 ## Stored Dashboard snapshots — approved implementation
 
@@ -49,8 +80,8 @@ enablement remain held. See `docs/PHASE4_STATUS.md` for the current handoff.
   Data/credentials and organization settings match; only the approved new
   Platform snapshot setting changed. No new hosted CI or commit yet.
   [Behavior and operator/Chrome steps](docs/DASHBOARD_SNAPSHOTS.md).
-- [ ] Normal frontend launch remains blocked by automatic approval review;
-  production build is ready, but manual start is required for localhost:3000.
+- [x] Normal frontend launched by the operator; signed-in Chrome verification
+  and hosted Linux CI passed. Earlier launch blocker is closed.
 
 ## Single-organization performance follow-up — 29 October 2026
 
@@ -60,10 +91,10 @@ enablement remain held. See `docs/PHASE4_STATUS.md` for the current handoff.
   local demo without API/worker restart; counts and account/settings digests match.
   Repeat count samples: findings 1,911 → 476 ms, assets 997 → 555 ms. Cache-sensitive
   local observations, not an endpoint/load guarantee. Scoring stays off; one slot.
-- [ ] Frontend launch again rejected by automatic approval review; manual start
-  remains required. No new normal-runtime Chrome verification.
-- [ ] Review/check in this increment; broad searches/facets and further count
-  optimization remain open. [Measurements and limits](docs/SINGLE_ORG_PERFORMANCE.md).
+- [x] Normal frontend launch and signed-in Chrome verification completed.
+- [x] Review/check in count-index increment (`4cce614`); hosted CI passed.
+- [ ] Optimize broad searches/facets based on measurements.
+  [Measurements and limits](docs/SINGLE_ORG_PERFORMANCE.md).
 
 ## SaaS job scaling — three-phase design review
 

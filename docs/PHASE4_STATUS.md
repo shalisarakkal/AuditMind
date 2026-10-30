@@ -1,5 +1,41 @@
 # Phase 4 status and next milestone
 
+## Guarded Assets search — 30 October
+
+The 100k-row prototype led to a local 0037 combined expression index, with
+original-predicate rechecks and ordinary-scan fallback for estimated common
+type/tag searches. 69 focused PostgreSQL checks, five final strategy/index checks,
+schema drift/readiness and signed-in Chrome pass. Source counts and account/
+Platform-setting digests match. Only the API was restarted. No-match query:
+6.5 s → 50 ms; Chrome including debounce: 487 ms. Broad tag/type result sets still
+take seconds, and extra write/disk cost is measured rather than assumed away.
+Implementation is reviewed and recorded in scoped commits; benchmark tools and
+documentation are separate. Current strict PostgreSQL regression: 70 passed in
+88.03 seconds. Hosted Linux conclusions must be checked on the pushed commit's
+Actions run; the earlier green run below belongs to the Dashboard increment.
+[Contract, timings, costs and remaining limits](ASSET_SEARCH_INDEX.md).
+
+## Large-list query increment — 30 October
+
+Facet probes/indexes and Findings candidate-count optimization are implemented
+locally at migration 0036. 60 PostgreSQL checks and the final focused search
+assertions pass; signed-in Chrome, readiness and metadata drift checks pass.
+Local data/account/settings comparisons match. Broad Assets tag/metadata search
+remains slow for very broad results. These changes are included in the scoped
+list-performance commits; the green 1b2286f result below belongs to the earlier
+Dashboard work. Use the pushed commit's Actions run for current Linux acceptance.
+[Measurements and costs](LARGE_LIST_PERFORMANCE.md).
+
+## Current handoff — 30 October
+
+Dashboard work is committed and pushed through `1b2286f`. All four hosted Linux
+jobs passed in [run 40984969686](https://github.com/shalisarakkal/AuditMind/actions/runs/40984969686).
+Normal frontend startup and signed-in Chrome acceptance are complete; earlier
+launch/commit/CI blockers below are historical and closed. Pilot preparation and
+broader evidence-qualified scoring adoption are explicitly deferred. Scoring
+remains default-off and SaaS scaling remains held. Active next work: measured
+Assets/Findings search and filter performance for large single organizations.
+
 ## Dashboard closeout — 29 October
 
 The Dashboard snapshot, inherited refresh interval and Settings UI changes are

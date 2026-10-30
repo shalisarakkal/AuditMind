@@ -1,5 +1,15 @@
 # Database performance: what to do as the data grows
 
+The subsequent [Assets search trial](ASSET_SEARCH_INDEX.md) adds migration 0037:
+guarded combined trigram candidates, direct/import write probes and full-inventory
+measurements. Selective queries improve substantially; common result sets still
+scan. Index maintenance and approximately 287 MiB extra demo storage are explicit.
+
+30 October measured follow-up: [large-list search/filter queries](LARGE_LIST_PERFORMANCE.md)
+documents migration 0036, millisecond filter-option retrieval, improved Findings
+search counting, new index storage/write costs, and the remaining broad Assets
+tag/metadata bottleneck. These local measurements are not SaaS load acceptance.
+
 Review synchronization (2026-10-22): Historical/design record: original dates, results and proposals are preserved. This is not fresh test evidence or current release sign-off.
 See [current code review and release gates](RELEASE_READINESS.md).
 

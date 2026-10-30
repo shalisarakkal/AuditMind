@@ -1,5 +1,27 @@
 # Release readiness and code review
 
+## Assets search local trial — 30 October 2026
+
+0037 and guarded combined search passed 69 focused PostgreSQL checks, a final
+binding regression, drift/readiness, high-severity static checks and signed-in
+Chrome. Source counts/account/settings comparisons match; the API is running
+the new query locally. Old/new search results match on the disposable 100k-row
+prototype. Full-inventory selective queries improve, while broad counts remain
+seconds and write/storage costs are recorded. Code, benchmarks and documentation
+are reviewed as scoped commits; final strict PostgreSQL run: 70 passed in 88.03 s.
+Check the pushed commit's Actions run for hosted Linux acceptance. No
+production/SaaS/pilot approval is implied.
+[Evidence and compatibility/rollback requirements](ASSET_SEARCH_INDEX.md).
+
+## Hosted Dashboard closeout — 30 October 2026
+
+All four hosted Linux jobs passed for `1b2286f` in
+[run 40984969686](https://github.com/shalisarakkal/AuditMind/actions/runs/40984969686):
+backend, frontend, browser acceptance and backend dependency/security audit.
+This closes the local Dashboard push/CI gate, not production deployment or
+capacity certification. Pilot preparation and broader scoring adoption are
+explicitly deferred; the organization scoring setting remains default-off.
+
 ## Current Dashboard handoff — 29 October 2026
 
 Scoped local commits cover active-count indexes (0033), persistent snapshots and
