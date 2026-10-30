@@ -3,12 +3,24 @@
 Review synchronization (2026-10-22): Runtime clarification: FastAPI/Python, PostgreSQL/pgvector and a separate worker are implemented; Node microservices, general automated discovery and standalone AI analysis routes below are design context, not current endpoints. Dashboard scoring is deterministic; AI runs through report jobs.
 See [current code review and release gates](docs/RELEASE_READINESS.md).
 
+Dashboard snapshot implementation: migration 0034 stores per-organization
+inventory/security summaries and durable refresh state. The fair worker performs
+scheduled/on-demand regeneration; current membership, scoring mode and evidence
+validity remain authoritative. Default-off platform control preserves live-read
+compatibility until enabled. See [snapshot contract](docs/DASHBOARD_SNAPSHOTS.md).
+
 29 October worker implementation: bounded threaded processing supports fair
 admission across organizations, with one queued job per scope. Normal/demo
 default remains **one slot**. SaaS scale work and parallel activation are on
 hold; platform-admin configuration is required before future rollout. This is
 not a distributed fleet or demonstrated SaaS capacity.
 See [worker design, limitations and verification](docs/WORKER_POOL.md).
+
+The [three-phase SaaS job scaling review](docs/SAAS_JOB_SCALING.md) proposes
+32 cross-organization jobs, distributed execution targeting 1,000 organizations,
+and staged same-organization parallelism with explicit publication conflict
+rules. It is a future architecture, not the current deployment or a capacity
+claim; normal processing remains one slot.
 
 28 October 2026 local pilot: Dashboard scoring can additionally require current
 reviewed evidence behind an organization-admin **default-off** setting. A durable

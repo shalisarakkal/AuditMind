@@ -403,6 +403,35 @@ and enabling a controlled rollout is a separate decision described in
 remains open.
 # Persistent synthetic demonstration reports
 
+## Settings display checks (October 29, 2026)
+
+In Chrome, open Settings as an organization administrator:
+
+1. Under Dashboard refresh, confirm **Reload saved settings** reloads saved
+   configuration without regenerating Dashboard data. Select **Inherit Platform
+   refresh interval**, then **Save refresh interval** to restore inheritance;
+   selecting the checkbox alone does not save. There is no separate Reset button.
+2. Under Organization-wide evaluation, run an evaluation or open a completed one.
+   **Evaluation completed.** and its progress bar disappear after five seconds.
+   Coverage results and **Last evaluated** remain visible.
+3. A stale-evidence warning must remain visible after the progress display hides.
+   Running, failed and cancelled states do not use the completion timeout.
+
+Component checks: six evidence-evaluation tests and three Dashboard-refresh tests
+passed; lint and the isolated production build passed. Chrome login smoke check returned HTTP 200, with no page
+JavaScript errors; an empty login payload reached backend validation (HTTP 422).
+These smoke checks do not establish a successful credentialed sign-in or replace
+the signed-in Settings checks above.
+
+An initial installed-Chrome attempt with outdated saved credentials was rejected.
+After the operator updated the local platform credentials, signed-in Chrome
+verification passed on October 29, 2026: Reload saved settings worked without
+page JavaScript errors. In SA01, the completed message and progress bar disappeared
+after five seconds while Last evaluated and coverage results remained visible.
+No new evaluation, password reset or saved organization-setting change was made.
+
+## Opening the synthetic reports
+
 Sign in at http://localhost:3000 using the existing demo organization-admin account.
 In **Organization**, select **Evidence examples - SYNTHETIC ONLY**, then open **Reports**.
 Four saved examples show sufficient, limited, insufficient and conflicting evidence.

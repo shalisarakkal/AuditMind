@@ -3,6 +3,11 @@
 Review synchronization (2026-10-22): Historical/design record: original dates, results and proposals are preserved. This is not fresh test evidence or current release sign-off.
 See [current code review and release gates](RELEASE_READINESS.md).
 
+29 October measured follow-up: [single-organization Dashboard count indexes](SINGLE_ORG_PERFORMANCE.md)
+adds migration 0033, preserves exact counts and records query plans, local timing,
+storage/maintenance costs and verification scope. Historical hardware/tuning
+recommendations below are not fresh measurements or automatic configuration changes.
+
 How fast AuditMind's bulk operations run (imports, archive/restore/purge,
 list pages, migrations) depends mostly on **how many rows the biggest tables
 hold** and **where Postgres keeps them** (disk type, memory). This page says

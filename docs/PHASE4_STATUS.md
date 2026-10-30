@@ -1,5 +1,55 @@
 # Phase 4 status and next milestone
 
+## Dashboard closeout — 29 October
+
+The Dashboard snapshot, inherited refresh interval and Settings UI changes are
+reviewed for scoped local commits. Current verification: 21 snapshot/interval/
+migration tests and all 516 frontend tests pass; production build passes.
+Signed-in installed Chrome confirms Reload saved settings and the five-second
+completed-evaluation progress timeout, with results and timestamps retained.
+The operator has rebuilt/restarted the normal frontend with backend port 8000;
+the earlier launch-block notes below are historical. Hosted CI for these local
+changes is still pending a push. SaaS load testing and broader evidence-qualified
+scoring enablement remain on hold. Credentials and local branding files are
+excluded from commits.
+
+## One-hour defaults and organization interval overrides — 29 October
+
+Migration 0035 adds inheritable organization intervals and optimistic edit
+versions. Platform built-in default is one hour; organizations can override or
+reset to inheritance. Stable scheduling spread is up to 10%, capped at five
+minutes. 64 focused backend checks, final 19 interval/snapshot and 2 migration
+checks, 515 frontend tests and 85 Chrome checks pass (overlapping scopes).
+Local demo migrated to 0035 and its previously configured five-minute Platform
+value explicitly changed to 3,600 seconds/version 2. All five organizations
+inherit; existing data/settings/credentials preserved aside from that intended
+Platform change and new nullable/version columns. One worker slot remains.
+Frontend build ready; prior policy-blocked normal launch still needs manual
+start. Uncommitted/unpushed. [Contract](DASHBOARD_SNAPSHOTS.md).
+
+## Stored Dashboard snapshots — implementation and verification
+
+Migration 0034, durable coalesced refresh jobs, platform settings, timestamped
+Dashboard/Refresh action, scheduled warming and live evidence-validity checks
+are implemented. Full backend: 1,435 passed; latest lifecycle/rollback follow-up:
+21 passed. Latest frontend: 512 passed. Chrome: 83 passed. Local demo upgraded to
+0034, stored mode enabled at five minutes, five snapshots complete, API/one-slot
+worker healthy. Counts/credentials/org settings match; only the approved new
+Platform setting changed. Saved-read samples: 1,054 ms first (ORM initialization),
+19/18 ms warm, excluding auth/network. Normal frontend build is ready but launch
+was rejected by automatic approval review; manual start remains necessary.
+Uncommitted/unpushed; no new hosted CI claim. [Contract](DASHBOARD_SNAPSHOTS.md).
+
+## Single-organization Dashboard performance — 29 October
+
+Migration 0033 adds compact active-row count indexes; 48 focused PostgreSQL tests
+pass and idle local upgrade/drift checks succeed. Repeat local SQL samples fell
+from 1,911 to 476 ms for finding counts and 997 to 555 ms for asset counts;
+cache-sensitive observations, not an API SLA. Data/account/settings snapshots
+match, API and serial worker retained. Frontend manual start is still required
+after automatic approval review rejected launch. Changes are not yet committed
+or hosted-CI verified. [Evidence and limitations](SINGLE_ORG_PERFORMANCE.md).
+
 ## Bounded worker pool — local verification, 29 October
 
 Latest user direction supersedes the rollout plan: hold SaaS scale work and

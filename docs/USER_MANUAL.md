@@ -442,7 +442,8 @@ appear only after the existing scoring-state checks pass. Large inventories can
 still take several seconds. A failed summary request shows **Retry dashboard**.
 Loading animation respects the browser's reduced-motion preference.
 
-Dashboard scores are deterministic, calculated live from currently active findings
+Dashboard scores are deterministic, calculated from active findings (live reads
+or the timestamped saved inventory when Platform snapshot mode is enabled)
 across identity/access, network configuration, vulnerability management, backup/
 recovery, monitoring/detection, incident response and compliance alignment.
 Higher resilience scores mean lower risk:
@@ -455,6 +456,24 @@ Higher resilience scores mean lower risk:
 | 0-39 | Critical |
 
 Severity deductions and domain weights are documented in [risk scoring](../RISK_SCORING.md).
+
+Platform administrators can enable **Platform → Dashboard settings → Use stored
+Dashboard snapshots** and set the default refresh interval (default one hour).
+Organizations inherit it. Organization administrators can choose an override
+under **Settings → Dashboard refresh**. To inherit again, check **Inherit Platform
+refresh interval**, then click **Save refresh interval**. Checking alone does not
+save. Later Platform changes apply to organizations without overrides.
+Short intervals increase database work. Scheduled refreshes include up to 10%
+additional spread (maximum five minutes), plus any worker/queue delay.
+The Dashboard then shows **Last updated** and **Refresh dashboard**. Refresh runs
+in the background; previous results stay visible until the replacement is ready.
+Multiple users share the same queued refresh. Before the first build, pending
+work is shown without fabricated counts. Busy workers may delay scheduled work.
+An open page notices new snapshots automatically; the security summary labels
+its saved seven-day window. Disable snapshot mode to return to live reads.
+Recent changes may be absent from saved counts/cards until refresh; evidence
+expiry, revocation and current inventory revision are still checked on reads.
+See [snapshot behavior and Chrome verification](DASHBOARD_SNAPSHOTS.md).
 No findings can yield a high score; that is not proof that a domain was examined
 or is secure. Coverage and evidence quality matter. AI report assessments are
 separate snapshots and do not replace the deterministic `/risk/score` service.
@@ -738,7 +757,7 @@ Shared-standard indexing and other organizations' jobs do not block your archive
 | No documents returned by search | Successful real indexing, a current published version, permitted scope and prepared model cache. |
 | AI report fails | In the demo this is expected: credentials are deliberately disabled. In staging check consent target, credentials, worker, provider/quota and evidence readiness. |
 | Buttons are missing or action forbidden | Selected organization, your role, archive state and job status. |
-| Score/report appears inconsistent | Dashboard is live; reports are snapshots. Check filters, archived items, assessment type and legacy labels. |
+| Score/report appears inconsistent | Check Dashboard Last updated and refresh if stored mode is enabled. Audit reports are separate immutable snapshots. Also check filters, archived items, assessment type and legacy labels. |
 
 Report a problem with the page, steps, approximate time and safe error/correlation
 identifier. Never share passwords, session tokens, API keys or confidential evidence.
@@ -835,7 +854,8 @@ missing/stale/expired/conflicting evidence stays unscored. The overall score nee
 all seven qualified domains with compatible scope, not just the selected domain.
 Material inventory/source/review changes invalidate cached eligibility; rebind and
 review affected qualifications where needed, then evaluate again. Dashboard does
-not trigger a full scan automatically. An open Dashboard checks current mode and
+not trigger a full evidence-evaluation scan automatically. Stored inventory refresh
+is a separate scheduled operation. An open Dashboard checks current mode and
 evidence state every ten seconds/on focus, so another user's change is not an
 instant server-pushed update. Failed verification hides scores.
 

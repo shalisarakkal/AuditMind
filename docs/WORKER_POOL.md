@@ -1,5 +1,22 @@
 # Background worker concurrency
 
+The proposed [three-phase SaaS scaling design](SAAS_JOB_SCALING.md) covers
+32 cross-organization jobs, a distributed fleet targeting 1,000 active jobs,
+and safe same-organization concurrency. These are implementation/verification
+targets, not measured capacity. Current runtime remains serial.
+
+## Phase 1 target
+
+Support **32 concurrent ready jobs across 32 organizations**, one active queued
+job per organization, controlled by a platform-admin setting. With 33
+organizations and five accepted files each, 32 jobs should be active and 133
+queued; the unserved organization receives the next free slot. Verify this
+using isolated organizations, representative large files, resource measurements,
+tenant isolation and recovery checks. Existing two-slot tests do not establish
+32-slot capacity. Normal operation remains at one pending this work; concurrency
+within one organization is outside this phase. This target supersedes the prior
+planning hold below, without enabling parallel processing in the running app.
+
 `WORKER_CONCURRENCY` controls simultaneous queued background jobs in one
 installation. It defaults to **1**, accepts **1–32**, and does not limit the
 number of organizations, users or registered assets. `start-demo.ps1` also
@@ -14,7 +31,7 @@ serial until that control is reviewed and verified.
 
 Different organizations can process concurrently. Each organization has at most
 one active queued job across imports, archive/restore/purge jobs, reports,
-document indexing and evidence evaluation. Its other jobs stay pending instead
+document indexing, evidence evaluation and Dashboard refresh. Its other jobs stay pending instead
 of consuming slots waiting for its inventory lock. Shared-standard indexing has
 its own shared scope. Small synchronous API operations retain their existing
 inventory locks; they are not worker-pool reservations. Uploading file bytes from

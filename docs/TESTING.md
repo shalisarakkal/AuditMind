@@ -1,5 +1,16 @@
 # Testing strategy and measured coverage
 
+## Stored Dashboard snapshots
+
+The snapshot increment adds PostgreSQL tests for cached reads without inventory
+scans, coalesced requests, atomic replacement, periodic refresh, failure retention,
+worker recovery, tenant/role/version checks and live evidence expiry/revocation/
+revision/policy validation. UI tests cover refresh and settings controls. Chrome
+now also exercises actual one-minute worker scheduling, two-user saved results,
+settings conflicts and mobile/Axe behavior, restoring the fixture setting off.
+Exact counts and the current full-regression/activation outcome belong to
+[Phase 4 validation](PHASE4_VALIDATION.md). [Contract and commands](DASHBOARD_SNAPSHOTS.md).
+
 ## Worker pool verification — 29 October 2026
 
 Full backend regression: **1,423 passed**. After final startup/clock safeguards

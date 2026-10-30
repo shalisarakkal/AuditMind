@@ -1,5 +1,127 @@
 # Phase 4 remediation workflow validation
 
+## Scoped commit closeout — 29 October 2026
+
+- Latest focused backend run: `pytest tests/integration/test_dashboard_snapshots.py
+  tests/integration/test_dashboard_refresh_intervals.py
+  tests/integration/test_migrations.py -q`: **21 passed in 45.07 seconds**.
+- Latest full frontend run: `npm test`: **516 tests across 51 files passed**
+  in 60.20 seconds. Lint and the isolated production build pass.
+- Additional Dashboard API, worker-pool, Platform API and worker-review
+  regression run: **52 passed in 82.34 seconds**. This is a separate focused
+  run, not a fresh full-backend run.
+- Signed-in installed Chrome on the normal demo passes Reload saved settings;
+  SA01 completed status/progress disappears after five seconds while coverage
+  and Last evaluated remain visible. No new expensive evaluation, account reset
+  or saved organization-setting write was needed for these checks.
+- Count-index, snapshot/settings, evaluation UI and upload-test timing changes
+  are committed separately. Local credentials, branding experiments and editor
+  configuration are excluded. No push or hosted CI result is claimed here.
+- Earlier launch-block and uncommitted status entries below are historical.
+  SaaS load testing and broader scoring enablement remain held.
+
+## Dashboard interval inheritance and staggered scheduling — 29 October
+
+- Migration 0035 adds nullable organization overrides (60–86,400 seconds), edit
+  versions and database constraints. Platform fallback is now 3,600 seconds;
+  explicitly configured values are preserved by migration. Organization APIs
+  use current admin/lifecycle authorization, version checks and settings audits.
+- Periodic scheduling uses the effective organization/Platform interval plus
+  `first_two_UUID_bytes % (min(300, interval // 10) + 1)` seconds. SQL and Python
+  agree, including non-round intervals. It never refreshes earlier than the
+  selected interval. Future due times react to setting changes; active work is
+  unchanged. Stale-age warnings use the same staggered deadline.
+- **64 focused backend tests passed in 114.58 seconds**. Final boundary follow-up:
+  **19 interval/snapshot tests passed in 26.90 seconds**; latest real migration
+  round-trip/drift checks: **2 passed in 5.61 seconds**. Tests overlap and are not
+  added together. No new full-suite or hosted result is claimed; previous 1,435
+  full tests predate this increment.
+- **515 frontend tests passed in 38.83 seconds**, lint/TypeScript and both
+  production builds pass. Installed Chrome **85 checks passed**, fixture
+  `phase3_browser_9b43961f55fc`, no page errors/AI usage and fixture removed.
+  Browser cases cover inherited hourly default, organization override, stale
+  edits/reload, override survival after a Platform change, Reset inheritance,
+  real staggered periodic refresh, second-user visibility and mobile/Axe.
+- Idle source and snapshot queues verified before process changes. API/worker
+  identities checked, logs and prior frontend build retained. Scoped demo
+  migration **0034 → 0035** and metadata check pass. Platform value changed
+  explicitly from 300/version 1 to 3,600/version 2 with operator audit; enabled
+  mode retained. All five organizations have NULL override/version 0.
+- Source counts match. Existing organization fields (excluding the two added
+  defaulted fields), other Platform settings, credentials, memberships, logos
+  and organization scoring settings match the pre-activation digests. No seed,
+  reset, data rewrite or scoring-mode enablement; worker remains one slot.
+  `/ready` passes. Normal build: `JkMsRO4i7JYSaYk6UTAbq`.
+- Frontend was already stopped due to automatic approval review rejecting its
+  launch as "blocked by policy". No bypass or repeated launch attempted in this
+  increment. New build is ready; manual npm start from `frontend` is required.
+  Normal-runtime Chrome verification remains outstanding for that reason.
+
+Plan/manual/contract updated; changes remain uncommitted/unpushed.
+
+## Stored Dashboard snapshots — 29 October 2026
+
+Implemented migration 0034, persistent inventory/security payloads, fair queued
+refresh, heartbeat/recovery, versioned audited platform settings and browser
+Refresh/Last updated/polling controls. Snapshot data never substitutes for live
+membership, scoring-mode or evidence eligibility checks. Current focused run:
+**91 backend checks** pass (143.49 s); **512 frontend tests** pass (30.53 s).
+Initial UI runs exposed duplicate save notices and two upload-test render races;
+not counted as green. Save-notice rendering and explicit async test waits were
+corrected. A subsequent affected frontend run passes **91 tests** (10.55 s).
+
+Fresh Chrome: **83 checks passed**, fixture
+`phase3_browser_ce252348c33b`, artifacts under `temp/testing/finding-workflow/`.
+It verifies real scheduled regeneration at a one-minute setting, automatic
+replacement on an open page, on-demand refresh, second-user visibility,
+platform stale-edit rejection, rollback to live mode, mobile overflow/Axe,
+zero AI usage and no page errors. The fixture was removed. Full backend
+regression and latest lifecycle/rollback delta checks remain in progress;
+normal demo activation and new hosted CI are not yet claimed.
+[Full design and verification contract](DASHBOARD_SNAPSHOTS.md).
+
+Final local closeout supersedes the in-progress checkpoint above:
+
+- Full regression: **1,435 passed in 922.59 seconds**, recorded in
+  `temp/testing/dashboard-snapshots-full.xml`. This preceded three additional
+  lifecycle/concurrency tests and final rollback hardening. Latest follow-up:
+  **21 passed in 25.33 seconds**, including those tests and migration drift/
+  downgrade behavior. The first follow-up had a JSON-literal binding error in
+  test setup; corrected to use a bound parameter before applying migration.
+- Latest full frontend: **512 passed in 31.12 seconds**; normal and isolated
+  production builds/TypeScript and lint pass. The async upload test waits are
+  test-only corrections, not changes to upload semantics.
+- After fresh idle/ownership checks, only API/worker restarted. Demo **0033 →
+  0034** migration and metadata check pass; no seed/reset. Stored mode enabled
+  at **300 seconds**, with a platform settings audit event identifying operator
+  activation. Five snapshots completed. Worker remains **one slot**; evidence
+  scoring settings remain off. `/ready` passes.
+- Before/after global source counts match: 5 organizations, 6 users,
+  5,324,472 assets, 7,338,410 findings, 48 scans, 9 reports, 5 documents/versions.
+  Credentials, organization settings, scoring settings, memberships and logos
+  digests match. Platform-settings digest changes only for the approved new
+  snapshot key. All original queues/staging and refresh jobs are idle.
+- Saved SA01 read plus serialization: **1,053.9 / 19.12 / 17.54 ms** across three
+  local samples, 2,798,320 active assets / 3,581,221 active findings. First read
+  includes ORM initialization; subsequent samples are warm. These are service
+  timings without auth/network, not a browser SLA. Artifact:
+  `temp/testing/dashboard-saved-read.json`.
+- Normal frontend build **PplnYIatDNhBjuefeJUnA** is ready, with prior complete
+  build/logs retained. Automatic approval review rejected `npm start` as
+  **blocked by policy**, without a more specific reason. Port 3000 remains
+  stopped; normal-runtime Chrome verification could not run. Manual start from
+  `frontend`: `npm.cmd run start -- --hostname 127.0.0.1 --port 3000`.
+
+This increment remains uncommitted/unpushed; earlier hosted runs do not verify it.
+
+## Single-organization count-index follow-up — 29 October
+
+See [complete performance evidence](SINGLE_ORG_PERFORMANCE.md): migration 0033,
+48 focused PostgreSQL tests, concurrent local upgrade, unchanged data/settings,
+real before/after plans/timings and remaining write/visibility costs. Normal
+frontend launch remains policy-blocked; no new Chrome, full-suite or hosted CI
+result is claimed for this uncommitted increment.
+
 ## Bounded worker pool — 29 October 2026
 
 Hosted run [40911280217](https://github.com/shalisarakkal/AuditMind/actions/runs/40911280217)

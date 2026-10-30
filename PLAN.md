@@ -2,6 +2,109 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+Current Dashboard closeout (29 October): local implementation and UI verification
+are complete and recorded in scoped commits. All 516 frontend tests and 21
+snapshot/interval/migration tests pass; lint and production build pass. Signed-in
+Chrome verifies Reload saved settings and the five-second completion timeout.
+Historical launch-block notes below are superseded by the operator's normal
+frontend restart. Push/hosted CI remains pending; SaaS scale and broader scoring
+enablement remain held. See `docs/PHASE4_STATUS.md` for the current handoff.
+
+## Dashboard refresh interval inheritance and load spreading
+
+- [x] Change the built-in Platform default to one hour, preserving existing
+  explicitly configured values outside the authorized local update.
+- [x] Organization-admin override (1–1,440 minutes), inherited by default;
+  checking Inherit and clicking Save clears the override, with version/audit
+  safeguards. The redundant immediate Reset button has been removed.
+- [x] Spread scheduled refreshes by a stable per-organization delay of up to
+  10% of its interval (maximum five minutes), never before the configured interval.
+  Apply interval changes to future scheduling; leave active jobs untouched.
+- [x] Verify inheritance, reset, tenant/role/version boundaries, SQL/Python
+  scheduling agreement, stagger timing and local activation.
+  64 focused backend checks; final 19 snapshot/interval and 2 migration checks;
+  515 frontend tests; 85 Chrome scenarios; builds/lint/TypeScript pass. Counts
+  overlap. Local demo at 0035, Platform interval 3,600 seconds/version 2, all five
+  organizations inherit; source data/credentials retained, one worker slot.
+  Frontend production build is ready; its previously policy-blocked launch still
+  requires manual start. Changes remain uncommitted/unpushed.
+
+## Stored Dashboard snapshots — approved implementation
+
+- [x] Persist per-organization inventory and security-summary snapshots, generated
+  by the existing fair background worker with atomic replacement and recovery.
+- [x] Platform-admin controls: enable stored snapshots and refresh interval
+  (default five minutes), version conflict protection and audit history.
+- [x] Refresh button, last-updated time, first-build/loading/failure states and
+  polling only while work is pending; concurrent requests share one refresh.
+- [x] Keep current membership checks, scoring mode, evidence revision, approval
+  expiry/revocation and policy validation live; stale evidence cannot authorize
+  scores. Preserve previous snapshot on failed regeneration.
+- [x] Verify scheduling, exact counts, tenant boundaries, safe invalidation,
+  recovery, frontend behavior and migration before local activation.
+  Full regression: 1,435 backend tests; final lifecycle/rollback follow-up:
+  21 tests. Latest frontend: 512 tests. Chrome: 83 checks, including real
+  scheduled refresh and second-user visibility. Local demo at 0034, five
+  snapshots generated, five-minute mode enabled, one worker slot retained.
+  Data/credentials and organization settings match; only the approved new
+  Platform snapshot setting changed. No new hosted CI or commit yet.
+  [Behavior and operator/Chrome steps](docs/DASHBOARD_SNAPSHOTS.md).
+- [ ] Normal frontend launch remains blocked by automatic approval review;
+  production build is ready, but manual start is required for localhost:3000.
+
+## Single-organization performance follow-up — 29 October 2026
+
+- [x] Measured Dashboard bottlenecks; added compact active findings/asset count
+  indexes in migration 0033. Exact scores, totals and snapshot semantics retained.
+- [x] 48 focused PostgreSQL/migration/scoring/evidence tests pass. Applied to idle
+  local demo without API/worker restart; counts and account/settings digests match.
+  Repeat count samples: findings 1,911 → 476 ms, assets 997 → 555 ms. Cache-sensitive
+  local observations, not an endpoint/load guarantee. Scoring stays off; one slot.
+- [ ] Frontend launch again rejected by automatic approval review; manual start
+  remains required. No new normal-runtime Chrome verification.
+- [ ] Review/check in this increment; broad searches/facets and further count
+  optimization remain open. [Measurements and limits](docs/SINGLE_ORG_PERFORMANCE.md).
+
+## SaaS job scaling — three-phase design review
+
+- Phase 1: 32 concurrent jobs across 32 organizations, one per organization.
+- Phase 2: distributed execution beyond 32 toward **1,000 active jobs across
+  1,000 organizations**, not merely 1,000 queued submissions.
+- Phase 3: concurrent same-organization preparation first, then concurrent
+  publication only after identity, conflict and lifecycle safety are defined.
+- [x] Reviewed current scheduler, worker, inventory locking and matching paths;
+  documented architecture, platform controls and acceptance gates in
+  [SaaS job scaling](docs/SAAS_JOB_SCALING.md).
+- [ ] Implement Phase 1 platform-admin control and representative-load harness.
+- [ ] Build distributed leases/fencing, shared storage and bounded database
+  access before Phase 2 capacity testing.
+- [ ] Design and verify same-organization preparation/publication stages and
+  overlapping-write behavior before raising per-organization limits.
+
+This approves planning scope, not a capacity claim or activation. Normal
+operation remains serial; no SaaS infrastructure or large test has been launched.
+
+## Worker concurrency Phase 1 — agreed target
+
+Target: **32 ready background jobs from 32 different organizations can process
+concurrently**, with at most one active queued job per organization. This
+supersedes the hold on planning cross-organization concurrency; normal operation
+stays at one until the setting and verification below are complete.
+
+- [ ] Expose the concurrency limit through platform-admin settings, bounded to
+  1–32, with safe application of changes and audit history.
+- [ ] Verify 33 isolated organizations with five accepted large files each:
+  32 distinct organizations active, 133 jobs queued, never two active jobs from
+  one organization. Give the unserved 33rd organization the next available slot.
+- [ ] Verify tenant isolation, failures/recovery, progress visibility and UI
+  responsiveness under representative load; record throughput and resource use.
+- [ ] Check PostgreSQL connection capacity and hardware headroom before the
+  controlled 32-slot run. Do not treat correctness tests as capacity evidence.
+
+The scheduling mechanism already accepts 1–32 slots; current verification covers
+two slots. Phase 1 remains open until the platform control and 32-slot exercise
+are complete. Parallel jobs within a single organization are outside Phase 1.
+
 ## Bounded worker pool — 29 October 2026
 
 Latest scope decision: **hold SaaS scale work and parallel rollout; focus on one

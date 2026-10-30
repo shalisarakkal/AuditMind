@@ -1,5 +1,33 @@
 # Release readiness and code review
 
+## Current Dashboard handoff — 29 October 2026
+
+Scoped local commits cover active-count indexes (0033), persistent snapshots and
+inheritable refresh intervals (0034–0035), completion-progress UI and upload-test
+timing. All 516 frontend tests and 21 snapshot/interval/migration tests pass;
+lint and production build pass. Signed-in normal-runtime Chrome verifies Reload
+saved settings and completed-progress dismissal with results retained. This
+supersedes the earlier frontend-launch blocker below. No push or new hosted CI
+result is claimed; broader scoring enablement and SaaS scaling remain held.
+
+## Stored Dashboard local verification — 29 October 2026
+
+Stored inventory/security snapshots, scheduled/on-demand worker refresh, Platform
+settings and live evidence-validity checks are implemented. Full backend run:
+1,435 passed; subsequent final lifecycle/rollback delta: 21 passed. Latest full
+frontend: 512 passed; isolated Chrome: 83 passed, including a real one-minute
+scheduled refresh and open-page/second-user visibility. Builds, lint and the
+high-severity static gate pass. Counts overlap; these are separate runs, not a
+summed coverage claim. [Exact record](PHASE4_VALIDATION.md).
+
+Local demo is migrated to 0034, stored mode enabled at five minutes, five
+snapshots generated and API/one-slot worker ready; source counts and credentials
+are retained. Organization evidence scoring remains off. Automatic approval
+review blocked the normal frontend launch, so manual start and normal-runtime
+Chrome verification remain outstanding. Changes remain uncommitted/unpushed;
+old hosted CI does not verify this increment. This is not production, SaaS load,
+concurrency rollout or live-AI approval. [Contract](DASHBOARD_SNAPSHOTS.md).
+
 ## Scoped hardening handoff closed — 28 October 2026
 
 Implementation `cd317934e5d7611735022fddc21865fe19660da9` is reviewed/pushed;

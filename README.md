@@ -1,5 +1,11 @@
 # AuditMind AI
 
+Optional [stored Dashboard snapshots](docs/DASHBOARD_SNAPSHOTS.md) provide
+scheduled background refresh and a per-organization Refresh dashboard action,
+with live evidence-validity checks, a one-hour Platform default and optional
+organization-admin interval overrides. Migrate to 0035
+before using the updated worker.
+
 Background processing: [worker configuration and current rollout hold](docs/WORKER_POOL.md).
 Keep normal/demo processing serial while validating single-organization use.
 Platform-admin concurrency controls and SaaS capacity verification remain pending.
