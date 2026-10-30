@@ -25,6 +25,7 @@ export default function EvidenceEvaluationPanel({ orgId, disabled, refreshSignal
   const [submitting, setSubmitting] = useState(false);
   const [clock, setClock] = useState(Date.now);
   const [reload, setReload] = useState(0);
+  const [dismissedCompletion, setDismissedCompletion] = useState("");
   const serial = useRef(0);
   const action = useRef(false);
   const mounted = useRef(true);
@@ -48,6 +49,12 @@ export default function EvidenceEvaluationPanel({ orgId, disabled, refreshSignal
     return () => { current = false; mounted.current = false; serial.current++; clearTimeout(timer); };
   }, [path, reload, refreshSignal]);
   const jobStatus = job?.status;
+  const completionKey = `${path}/${job?.id}`;
+  useEffect(() => {
+    if (jobStatus !== "completed") return;
+    const timer = setTimeout(() => setDismissedCompletion(completionKey), 5000);
+    return () => clearTimeout(timer);
+  }, [completionKey, jobStatus]);
   useEffect(() => {
     if (jobStatus !== "pending" && jobStatus !== "running") return;
     const timer = setInterval(() => setClock(Date.now()), 1000);
@@ -76,16 +83,16 @@ export default function EvidenceEvaluationPanel({ orgId, disabled, refreshSignal
     <button className={button} type="button" disabled={disabled || loading || submitting || running} onClick={() => void submit()}>Evaluate evidence across all domains</button>
     {loading && <p role="status">Loading evaluation status…</p>}
     {error && <p role="alert" className="text-red-300">{error}</p>}
-    {job && <div role="status" aria-label="Organization evaluation progress" className="space-y-2 text-sm">
-      <p>{job.cancel_requested_at && running ? "Cancellation requested" : job.status === "pending" ? "Queued — waiting for the background worker" : words(job.status)}{progress ? `: ${words(progress.phase)} · ${(progress.processed ?? 0).toLocaleString()} / ${progress.total == null ? "counting records" : progress.total.toLocaleString()} records` : ""}{running ? ` · ${elapsed}s elapsed` : ""}</p>
+    {job && (job.status !== "completed" || dismissedCompletion !== completionKey) && <div role="status" aria-label="Organization evaluation progress" className="space-y-2 text-sm">
+      <p>{job.status === "completed" ? "Evaluation completed." : <>{job.cancel_requested_at && running ? "Cancellation requested" : job.status === "pending" ? "Queued — waiting for the background worker" : words(job.status)}{progress ? `: ${words(progress.phase)} · ${(progress.processed ?? 0).toLocaleString()} / ${progress.total == null ? "counting records" : progress.total.toLocaleString()} records` : ""}{running ? ` · ${elapsed}s elapsed` : ""}</>}</p>
       {progress?.total != null && progress.total > 0 && <progress aria-label="Inventory records processed" className="w-full accent-cyan" max={progress.total} value={progress.processed ?? 0} />}
       {running && <p className="text-white/60">Counts advance after completed batches. Counting and preparing the next batch may take time. Cancellation waits for the current database fetch to finish.</p>}
       {job.can_cancel && running && <button type="button" className={button} disabled={submitting || !!job.cancel_requested_at} onClick={() => void submit(true)}>Cancel operation</button>}
       {job.status === "cancelled" && <p>Evaluation cancelled. No partial result was published.</p>}
       {job.status === "superseded" && <p>Inputs changed during evaluation. The result was not published; evaluate again.</p>}
       {job.status === "failed" && <p>{job.error_message ?? "Evaluation failed. Check the worker and retry."}</p>}
-      {job.status === "completed" && !job.is_current && <p>Evidence changed or a review expired. Evaluate again before relying on these results.</p>}
     </div>}
+    {job?.status === "completed" && !job.is_current && <p role="status">Evidence changed or a review expired. Evaluate again before relying on these results.</p>}
     {result ? <div className="space-y-2"><p>Coverage assessment: {words(result.assessment_status)} · {result.qualified_domain_count} of 7 domains qualified.</p>
       <p className="text-sm text-white/60">Last evaluated: {new Date(result.evaluated_at).toLocaleString()}. Only current results can authorize scores when evidence-qualified scoring is enabled.</p>
       <ul>{result.domains.map(domain => <li key={domain.domain}>{DOMAIN_LABELS[domain.domain]}: {words(domain.reason_code)}{domain.eligible ? " (eligible)" : " (not eligible)"}</li>)}</ul>

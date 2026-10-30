@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import EvidenceEvaluationPanel, { type EvidenceEvaluationJob } from "./EvidenceEvaluationPanel";
 import { mockApi } from "@/test/helpers";
 
@@ -7,6 +7,22 @@ const running: EvidenceEvaluationJob = { id: "job-1", status: "running", created
   can_cancel: true, is_current: false, error_message: null, progress: { phase: "assets", processed: 5000, total: 20000 }, result: null };
 
 describe("background evidence evaluation", () => {
+  it("hides completed progress after five seconds while retaining results", async () => {
+    mockApi({ "GET /orgs/org-1/scoring/evaluations/current": () => ({ ...running, status: "completed", can_cancel: false, is_current: true,
+      result: { evaluated_at: "2026-10-29T18:12:04Z", assessment_status: "not_assessed", qualified_domain_count: 0, domains: [] } }) });
+    vi.useFakeTimers();
+    const view = render(<EvidenceEvaluationPanel orgId="org-1" disabled={false} />);
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getByText("Evaluation completed.")).toBeVisible();
+      // Reloading the same job must not restart its completion timeout.
+      view.rerender(<EvidenceEvaluationPanel orgId="org-1" disabled={false} refreshSignal={1} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(screen.queryByRole("status", { name: "Organization evaluation progress" })).not.toBeInTheDocument();
+      expect(screen.getByText(/Coverage assessment:/)).toBeVisible();
+      expect(screen.getByText(/Last evaluated:/)).toBeVisible();
+    } finally { view.unmount(); vi.useRealTimers(); }
+  });
   it("reopens the durable running job without submitting another scan", async () => {
     const api = mockApi({ "GET /orgs/org-1/scoring/evaluations/current": () => running });
     const view = render(<EvidenceEvaluationPanel orgId="org-1" disabled={false} />);
