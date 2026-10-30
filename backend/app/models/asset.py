@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, String, text, literal_column
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+from app.db.asset_search import register as register_search
 
 # The partial indexes' condition: queries over active rows must say
 # `archived_at IS NULL` to use them.
@@ -24,6 +25,10 @@ class Asset(Base):
         Index("ix_assets_org_cloud_id", "org_id", "cloud_id", postgresql_where=ACTIVE),
         # Exact active-row counts without traversing hostname/IP payload keys.
         Index("ix_assets_active_org_count", "org_id", postgresql_where=ACTIVE),
+        *[Index(f"ix_assets_active_org_{column}", "org_id", column, postgresql_where=ACTIVE)
+          for column in ("type", "subtype", "environment", "criticality")],
+        Index("ix_assets_active_search_trgm", literal_column("am_asset_search_v1(hostname, ip, cloud_id, type, subtype, environment, criticality, tags)").label("search_text"),
+              postgresql_using="gin", postgresql_ops={"search_text": "gin_trgm_ops"}, postgresql_where=ACTIVE),
         # Restoring or purging an archive batch.
         Index("ix_assets_archive_batch", "archive_batch_id", postgresql_where=text("archive_batch_id IS NOT NULL")),
     )
@@ -62,3 +67,6 @@ class Asset(Base):
 
     organization: Mapped["Organization"] = relationship(back_populates="assets")
     findings: Mapped[list["Finding"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
+
+
+register_search(Asset.__table__)

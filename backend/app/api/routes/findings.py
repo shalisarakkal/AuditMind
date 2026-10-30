@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import DateTime, String, and_, case, cast, func, or_, select, union
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.api.deps import require_org_member, require_org_role
 from app.api.paging import (
@@ -15,6 +15,7 @@ from app.api.paging import (
     contains,
     date_range,
     distinct_values,
+    indexed_values,
     labelled,
     one_of,
     ordered,
@@ -156,6 +157,7 @@ def list_findings(
         contains(q, func.coalesce(User.name, User.email)),
     )
     search_condition = Finding.id == query_id if query_id else None
+    candidate_predicates = None
     label_conditions = [labelled(q, column, labels) for column, labels in (
         (Finding.severity, _SEVERITY_LABELS), (Finding.domain, _DOMAIN_LABELS),
         (Finding.workflow_status, _WORKFLOW_LABELS))]
@@ -169,15 +171,17 @@ def list_findings(
     elif q and not query_id:
         # Separate indexed branches: an OR containing asset/assignee subqueries
         # prevents PostgreSQL from using selective text indexes effectively.
-        # UNION removes duplicate IDs before counts, facets and pagination.
+        # Deduplicate candidates here. Keeping this bounded relation lets
+        # PostgreSQL avoid repeated heap probes for overlapping branches.
         active = (Finding.org_id == org_id, Finding.archived_at.is_(None))
-        branches = [select(Finding.id).where(*active, predicate) for predicate in (
+        candidate_predicates = [
             contains(q, Finding.description, Finding.category, Finding.source),
             Finding.asset_id.in_(search_asset_ids),
             Finding.assignee_id.in_(search_assignee_ids),
-        )]
+        ]
         for column in (Finding.due_date, Finding.risk_review_date):
-            branches.append(select(Finding.id).where(*active, column.is_not(None), contains(q, cast(column, String))))
+            candidate_predicates.append(and_(column.is_not(None), contains(q, cast(column, String))))
+        branches = [select(Finding.id).where(*active, predicate) for predicate in candidate_predicates]
         matches = union(*branches).subquery()
         search_condition = Finding.id.in_(select(matches.c.id))
     conditions = [
@@ -215,8 +219,17 @@ def list_findings(
         return query.outerjoin(Asset, asset_join) if needs_asset else query
 
     # Counts per domain and severity, under every filter but the domain one.
-    counts = matching(Finding.domain, Finding.severity, func.count()).filter(*filters)
-    counts = counts.group_by(Finding.domain, Finding.severity).all()
+    if candidate_predicates:
+        # Project grouping keys with each matching ID. Counting these distinct
+        # candidates avoids probing the finding heap again for every hit.
+        count_filters = [condition for condition in filters if condition is not search_condition]
+        candidates = union(*(matching(Finding.id, Finding.domain, Finding.severity)
+            .filter(*count_filters, predicate).statement for predicate in candidate_predicates)).subquery()
+        counts = db.query(candidates.c.domain, candidates.c.severity, func.count()).group_by(
+            candidates.c.domain, candidates.c.severity).all()
+    else:
+        counts = matching(Finding.domain, Finding.severity, func.count()).filter(*filters)
+        counts = counts.group_by(Finding.domain, Finding.severity).all()
     domain_counts: dict[Domain, int] = {}
     for d, _severity, n in counts:
         domain_counts[d] = domain_counts.get(d, 0) + n
@@ -231,6 +244,7 @@ def list_findings(
     ids = _page_ids(matching, filters, sort, order, page, severity_counts)
     rows = (
         db.query(Finding, Asset.hostname, Asset.ip, Asset.cloud_id, _ASSIGNEE_LABEL)
+        .options(defer(Finding.raw_data))
         .outerjoin(Asset, asset_join)
         .filter(Finding.id.in_(ids))
         .all()
@@ -300,14 +314,13 @@ def finding_facets(
     """The values the source pick-list can offer ("" first when some
     findings have none). Severity and domain are fixed lists."""
     findings = db.query(Finding).filter(Finding.org_id == org_id, Finding.archived_at.is_(None))
-    owners = db.scalars(select(Finding.assignee_id).where(
-        Finding.org_id == org_id, Finding.archived_at.is_(None)).distinct()).all()
+    owners = indexed_values(findings, Finding.assignee_id)
     labels = dict(db.execute(select(User.id, func.coalesce(User.name, User.email))
         .join(OrgMembership, OrgMembership.user_id == User.id).where(OrgMembership.org_id == org_id,
             User.is_active.is_(True), User.id.in_([identifier for identifier in owners if identifier]))).all())
     return FindingFacets(has_manual_findings=findings.with_entities(Finding.id).filter(Finding.scan_id.is_(None)).first() is not None,
-        source=distinct_values(findings, Finding.source),
-        workflow_status=distinct_values(findings, Finding.workflow_status),
+        source=distinct_values(findings, Finding.source, indexed=True),
+        workflow_status=distinct_values(findings, Finding.workflow_status, indexed=True),
         assignee=sorted([FindingAssigneeFacet(value=str(identifier) if identifier else "unassigned",
             label=labels.get(identifier) or ("Assignee unavailable" if identifier else "Unassigned")) for identifier in owners],
             key=lambda item: (item.label.casefold(), item.value)))

@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timezone
 from typing import Literal
 
 from fastapi import HTTPException, Query
-from sqlalchemy import ColumnElement, false, or_
+from sqlalchemy import ColumnElement, false, or_, select
 from sqlalchemy.orm import Query as OrmQuery
 from zoneinfo import ZoneInfo
 from app.services.workflow_deadlines import deadline_expiry, validate_deadline_zone
@@ -65,10 +65,30 @@ def ordered(column, order: SortOrder):
     return (column.desc() if order == "desc" else column.asc()).nulls_last()
 
 
-def distinct_values(query: OrmQuery, column, limit: int = 500) -> list[str]:
+def indexed_values(query: OrmQuery, column, limit: int | None = None) -> list:
+    """Distinct values via ordered index probes, for an (org_id, column) index.
+
+    Skip repeated entries rather than reading millions of identical facet keys.
+    Keep this opt-in: without the matching index each probe could scan the table.
+    NULL is checked separately because it cannot participate in a > comparison.
+    """
+    nonnull = query.with_entities(column.label("value")).filter(column.is_not(None)).order_by(None)
+    values = nonnull.order_by(column).limit(1).cte("facet_values", recursive=True)
+    next_value = nonnull.filter(column > values.c.value).order_by(column).limit(1).correlate(values).scalar_subquery()
+    values = values.union_all(select(next_value.label("value")).where(values.c.value.is_not(None)))
+    statement = select(values.c.value).where(values.c.value.is_not(None))
+    if limit is not None:
+        statement = statement.limit(limit)
+    found = list(query.session.scalars(statement))
+    if query.with_entities(column).filter(column.is_(None)).first() is not None:
+        found.insert(0, None)
+    return found
+
+
+def distinct_values(query: OrmQuery, column, limit: int = 500, *, indexed: bool = False) -> list[str]:
     """A pick-list's values: the column's distinct values in `query`, sorted,
     with BLANK first if some rows have none."""
-    values = {value for (value,) in query.with_entities(column).distinct().limit(limit + 1)}
+    values = set(indexed_values(query, column, limit + 1)) if indexed else {value for (value,) in query.with_entities(column).distinct().limit(limit + 1)}
     blank = None in values or "" in values
     listed = sorted(str(v.value if hasattr(v, "value") else v) for v in values if v not in (None, ""))
     return ([BLANK] if blank else []) + listed[:limit]

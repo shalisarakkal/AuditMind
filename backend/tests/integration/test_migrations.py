@@ -61,6 +61,31 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
                 assert index["column_names"] == columns
                 assert "archived_at IS NULL" in str(index["dialect_options"]["postgresql_where"])
             connection.commit()
+            for table, columns in (("assets", ("type", "subtype", "environment", "criticality")),
+                                   ("findings", ("source", "workflow_status", "assignee_id", "scan_id"))):
+                indexes = {i["name"]: i for i in inspect(connection).get_indexes(table, schema=schema)}
+                for column in columns:
+                    index = indexes[f"ix_{table}_active_org_{column}"]
+                    assert index["column_names"] == ["org_id", column]
+                    assert "archived_at IS NULL" in str(index["dialect_options"]["postgresql_where"])
+            connection.commit()
+            command.downgrade(config, "0035")
+            assert "ix_assets_active_org_subtype" not in {i["name"] for i in inspect(connection).get_indexes("assets", schema=schema)}
+            connection.commit()
+            command.upgrade(config, "head")
+            connection.commit()
+            search_index = next(i for i in inspect(connection).get_indexes("assets", schema=schema) if i["name"] == "ix_assets_active_search_trgm")
+            assert search_index["dialect_options"]["postgresql_using"] == "gin"
+            assert "archived_at IS NULL" in str(search_index["dialect_options"]["postgresql_where"])
+            assert connection.execute(text("""SELECT p.provolatile,p.proparallel FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                WHERE n.nspname=:schema AND p.proname='am_asset_search_v1'"""), {"schema": schema}).one() == ("i", "s")
+            connection.commit()
+            command.downgrade(config, "0036")
+            assert "ix_assets_active_search_trgm" not in {i["name"] for i in inspect(connection).get_indexes("assets", schema=schema)}
+            assert connection.scalar(text("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=:schema AND proname='am_asset_search_v1'"), {"schema": schema}) == 0
+            connection.commit()
+            command.upgrade(config, "head")
+            connection.commit()
             connection.execute(text("INSERT INTO platform_settings (key,value) VALUES ('dashboard_snapshots',CAST(:value AS jsonb))"),
                                {"value": '{"enabled":true,"version":5}'})
             connection.commit()

@@ -11,6 +11,7 @@ from app.api.paging import (
     SortOrder,
     any_of,
     contains,
+    contains_pattern,
     distinct_values,
     labelled,
     one_of,
@@ -19,6 +20,7 @@ from app.api.paging import (
 )
 from app.api.uploads import IMPORT_RESPONSES, confirm_form, start_import
 from app.db.session import get_db
+from app.db.asset_search import expression as search_expression, useful_trigrams, selective_candidates
 from app.models.asset import Asset
 from app.models.enums import UserRole
 from app.models.membership import OrgMembership
@@ -84,24 +86,20 @@ def list_assets(
     """The org's assets, a page at a time: by default in the order they were
     added. Filters combine (all must match); text filters match partially."""
     tag_text = func.array_to_string(Asset.tags, " ")
+    search = any_of(contains(q, Asset.hostname, Asset.ip, Asset.cloud_id, Asset.subtype,
+        Asset.environment, Asset.criticality, tag_text), labelled(q, Asset.type, _TYPE_LABELS))
+    tag_filter = contains(tags, tag_text)
+    candidates = [(contains(value, search_expression(Asset)), original, contains_pattern(value))
+                  for value, original in ((q, search), (tags, tag_filter)) if useful_trigrams(value)]
     conditions = [
-        any_of(
-            contains(
-                q,
-                Asset.hostname,
-                Asset.ip,
-                Asset.cloud_id,
-                Asset.subtype,
-                Asset.environment,
-                Asset.criticality,
-                tag_text,
-            ),
-            labelled(q, Asset.type, _TYPE_LABELS),
-        ),
+        # Indexed candidate superset; retain the original per-field predicate
+        # below to reject matches spanning field boundaries or type labels.
+        *selective_candidates(db, Asset, org_id, candidates),
+        search,
         contains(hostname, Asset.hostname),
         contains(ip, Asset.ip),
         contains(cloud_id, Asset.cloud_id),
-        contains(tags, tag_text),
+        tag_filter,
         one_of(Asset.type, type),
         one_of(Asset.subtype, subtype),
         one_of(Asset.environment, environment),
@@ -135,10 +133,10 @@ def asset_facets(
     have none)."""
     assets = db.query(Asset).filter(Asset.org_id == org_id, Asset.archived_at.is_(None))
     return AssetFacets(
-        type=distinct_values(assets, Asset.type),
-        subtype=distinct_values(assets, Asset.subtype),
-        environment=distinct_values(assets, Asset.environment),
-        criticality=distinct_values(assets, Asset.criticality),
+        type=distinct_values(assets, Asset.type, indexed=True),
+        subtype=distinct_values(assets, Asset.subtype, indexed=True),
+        environment=distinct_values(assets, Asset.environment, indexed=True),
+        criticality=distinct_values(assets, Asset.criticality, indexed=True),
     )
 
 

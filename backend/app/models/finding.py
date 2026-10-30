@@ -30,6 +30,8 @@ class Finding(Base):
         Index("ix_findings_asset", "asset_id"),
         Index("ix_findings_scan", "scan_id"),
         Index("ix_findings_active_assignee", "assignee_id", postgresql_where=ACTIVE),
+        *[Index(f"ix_findings_active_org_{column}", "org_id", column, postgresql_where=ACTIVE)
+          for column in ("source", "workflow_status", "assignee_id", "scan_id")],
         Index("ix_findings_active_due_search", "org_id", postgresql_where=text("archived_at IS NULL AND due_date IS NOT NULL")),
         Index("ix_findings_active_review_search", "org_id", postgresql_where=text("archived_at IS NULL AND risk_review_date IS NOT NULL")),
         *[Index(f"ix_findings_{column}_trgm", column, postgresql_using="gin",

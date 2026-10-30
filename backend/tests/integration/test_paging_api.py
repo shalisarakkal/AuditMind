@@ -214,6 +214,67 @@ def test_asset_facets_list_each_pick_lists_values(client, admin):
     }
 
 
+def test_facets_keep_blanks_and_unique_values_without_archived_or_foreign_rows(client, admin, db_session):
+    from datetime import datetime, timezone
+    from app.models.asset import Asset
+    from app.models.organization import Organization
+    _, org_id = admin
+    other = Organization(name="Other facet tenant")
+    db_session.add(other)
+    db_session.flush()
+    for subtype in [None, "", "Laptop", "Laptop", "router"]:
+        db_session.add(Asset(org_id=uuid.UUID(org_id), type="server", subtype=subtype))
+    db_session.add_all([
+        Asset(org_id=other.id, type="server", subtype="Foreign"),
+        Asset(org_id=uuid.UUID(org_id), type="server", subtype="Archived", archived_at=datetime.now(timezone.utc)),
+    ])
+    for source in [None, "", "scanner", "scanner"]:
+        db_session.add(Finding(org_id=uuid.UUID(org_id), domain=Domain.network_config,
+            severity=Severity.high, source=source, raw_data={"large_payload": "x" * 20000}))
+    db_session.add(Finding(org_id=other.id, domain=Domain.network_config, severity=Severity.high, source="Foreign"))
+    db_session.commit()
+    assert _get(client, admin, "assets/facets")["subtype"] == ["", "Laptop", "router"]
+    assert _get(client, admin, "findings/facets")["source"] == ["", "scanner"]
+    result = _get(client, admin, "findings", q="scanner")
+    assert result["total"] == 2
+    assert all("raw_data" not in item for item in result["items"])
+
+
+def test_indexed_facet_cap_is_bounded_with_blanks(client, admin, db_session):
+    from app.models.asset import Asset
+    _, org_id = admin
+    db_session.add_all(Asset(org_id=uuid.UUID(org_id), type="server", subtype=f"subtype-{i:04d}") for i in range(510))
+    db_session.add(Asset(org_id=uuid.UUID(org_id), type="server"))
+    db_session.commit()
+    values = _get(client, admin, "assets/facets")["subtype"]
+    assert values == [""] + [f"subtype-{i:04d}" for i in range(500)]
+
+
+def test_search_candidates_never_duplicate_rows_and_deadline_fragments_still_match(client, admin, db_session):
+    from datetime import date
+    from app.models.asset import Asset
+    _, org_id = admin
+    asset = Asset(org_id=uuid.UUID(org_id), type="server", hostname="sharedneedle")
+    db_session.add(asset)
+    db_session.flush()
+    db_session.add(Finding(org_id=uuid.UUID(org_id), asset_id=asset.id, domain=Domain.network_config,
+        severity=Severity.high, description="sharedneedle", category="sharedneedle", source="sharedneedle",
+        due_date=date(2026, 10, 30), risk_review_date=date(2026, 11, 30)))
+    db_session.commit()
+    result = _get(client, admin, "findings", q="sharedneedle", limit=1)
+    assert result["total"] == 1
+    assert result["domain_counts"] == {"network_config": 1}
+    assert len(result["items"]) == 1
+    assert _get(client, admin, "findings", q="sharedneedle", offset=1)["items"] == []
+    assert _get(client, admin, "findings", q="sharedneedle", source="missing")["total"] == 0
+    assert _get(client, admin, "findings", q="sharedneedle", severity="low")["domain_counts"] == {}
+    other_domain = _get(client, admin, "findings", q="sharedneedle", domain="identity_access")
+    assert other_domain["total"] == 0
+    assert other_domain["domain_counts"] == {"network_config": 1}
+    assert _get(client, admin, "findings", q="2026-10")["total"] == 1
+    assert _get(client, admin, "findings", q="11-30")["total"] == 1
+
+
 def test_findings_sort_and_filter_by_column(client, admin):
     _upload(client, admin, "findings", FINDINGS)
     categories = lambda body: [f["category"] for f in body["items"]]  # noqa: E731
