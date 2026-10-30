@@ -183,7 +183,7 @@ describe("ImportButton", () => {
     selectBatch();
     fireEvent.click(await screen.findByRole("button", { name: "Upload all ready files (2)" }));
     await screen.findByText(/0 submitted; 1 failed; 1 already uploaded/);
-    const duplicate = screen.getByLabelText("two.csv");
+    const duplicate = await screen.findByLabelText("two.csv");
     fireEvent.click(duplicate);
     fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -275,7 +275,7 @@ describe("ImportButton", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Upload all ready files (2)" }));
     await screen.findByText(/1 submitted; 0 failed; 1 already uploaded/);
     expect(submitted).toEqual([{ name: "one.csv", confirmed: false }, { name: "two.csv", confirmed: false }]);
-    const group = screen.getByRole("region", { name: "Already uploaded files" });
+    const group = await screen.findByRole("region", { name: "Already uploaded files" });
     fireEvent.click(within(group).getByLabelText("Select all already uploaded files"));
     const confirm = within(group).getByRole("button", { name: "Upload selected anyway (1)" });
     fireEvent.click(confirm); fireEvent.click(confirm);
