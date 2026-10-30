@@ -22,6 +22,8 @@ class Asset(Base):
         Index("ix_assets_org_hostname", "org_id", text("lower(hostname)"), postgresql_where=ACTIVE),
         Index("ix_assets_org_ip", "org_id", "ip", postgresql_where=ACTIVE),
         Index("ix_assets_org_cloud_id", "org_id", "cloud_id", postgresql_where=ACTIVE),
+        # Exact active-row counts without traversing hostname/IP payload keys.
+        Index("ix_assets_active_org_count", "org_id", postgresql_where=ACTIVE),
         # Restoring or purging an archive batch.
         Index("ix_assets_archive_batch", "archive_batch_id", postgresql_where=text("archive_batch_id IS NOT NULL")),
     )

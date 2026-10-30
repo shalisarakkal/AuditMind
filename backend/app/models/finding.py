@@ -20,6 +20,9 @@ class Finding(Base):
         # The findings list (newest first) and an import's duplicate check,
         # which loads the org's findings once. Active findings only.
         Index("ix_findings_org_created", "org_id", "created_at", postgresql_where=ACTIVE),
+        # Compact covering keys for exact per-domain/severity counts. Keeping
+        # all columns as keys permits B-tree deduplication for repeated groups.
+        Index("ix_findings_active_org_domain_severity", "org_id", "domain", "severity", postgresql_where=ACTIVE),
         # The dashboard's most severe findings, newest first; the findings list.
         Index("ix_findings_org_severity_created", "org_id", "severity", "created_at", postgresql_where=ACTIVE),
         # Deleting an asset or scan cascades to its findings; archiving one
