@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/apiClient";
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { enumLabel } from "@/lib/presentation";
 
 import ScoreCard from "@/components/ScoreCard";
@@ -18,7 +21,7 @@ import {
   formatDateTime,
   riskTierStyle,
 } from "@/lib/domain";
-import type { DashboardSummary } from "@/lib/types";
+import type { DashboardSummary, DashboardPending } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useDashboardState, type DashboardState } from "@/lib/useDashboardState";
 
@@ -28,8 +31,9 @@ export default function DashboardPage() {
 }
 
 function OrganizationDashboard({ orgId, orgName }: { orgId: string; orgName: string }) {
+  const [securityRefresh, setSecurityRefresh] = useState("");
   const { state, error } = useDashboardState(orgId);
-  const identity = state ? `${orgId}:${state.settings_version}:${state.scoring_mode}:${state.scoring_mode === "evidence_qualified" ? `${state.evidence_revision}:${state.evaluation_id}` : "baseline"}` : null;
+  const identity = state ? `${orgId}:${state.settings_version}:${state.scoring_mode}:${state.scoring_mode === "evidence_qualified" ? `${state.evidence_revision}:${state.evaluation_id}` : "baseline"}:${state.snapshot_enabled ?? false}:${state.snapshot_generated_at ?? ""}` : null;
 
   return (
     <div className="min-w-0 space-y-8 [overflow-wrap:anywhere]">
@@ -42,18 +46,46 @@ function OrganizationDashboard({ orgId, orgName }: { orgId: string; orgName: str
 
       <StatusMessage loading={false} error={error} />
       {!state && !error && <DashboardLoading checking />}
-      {state && identity && <CurrentDashboard key={identity} orgId={orgId} expected={state} />}
-      <DashboardSecuritySummary />
+      {state && identity && <CurrentDashboard key={identity} orgId={orgId} expected={state} onSnapshot={setSecurityRefresh} />}
+      <DashboardSecuritySummary key={securityRefresh} />
     </div>
   );
 }
 
-function CurrentDashboard({ orgId, expected }: { orgId: string; expected: DashboardState }) {
-  const { data, error, loading, reload } = useApi<DashboardSummary>(`/orgs/${orgId}/dashboard`);
+function CurrentDashboard({ orgId, expected, onSnapshot }: { orgId: string; expected: DashboardState; onSnapshot(value: string): void }) {
+  const { data: response, error, loading, reload } = useApi<DashboardSummary | DashboardPending>(`/orgs/${orgId}/dashboard`, { background: true, keepPreviousData: true });
+  const data = response && !("snapshot_state" in response) ? response : null;
+  const refreshing = response?.snapshot_refresh_status === "pending" || response?.snapshot_refresh_status === "running";
+  const [submitting, setSubmitting] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!refreshing || loading || error) return;
+    const timer = setTimeout(reload, 2000);
+    return () => clearTimeout(timer);
+  }, [refreshing, loading, error, response, reload]);
+  useEffect(() => {
+    if (data?.snapshot_generated_at) onSnapshot(data.snapshot_generated_at);
+  }, [data?.snapshot_generated_at, onSnapshot]);
   const matching = data && (data.scoring_mode ?? "findings_based") === expected.scoring_mode
     && (data.settings_version ?? 0) === expected.settings_version
     && (expected.scoring_mode !== "evidence_qualified" || (data.evidence_revision === expected.evidence_revision && (data.evaluation_id ?? null) === expected.evaluation_id));
-  return <><StatusMessage loading={false} error={error} />
+  return <><StatusMessage loading={false} error={error ?? refreshError} />
+    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+      <p className="text-white/60">{data?.snapshot_generated_at ? `Last updated: ${formatDateTime(data.snapshot_generated_at)}` : response && "snapshot_state" in response ? response.snapshot_refresh_status === "failed" ? "Dashboard snapshot unavailable." : "Preparing the first saved Dashboard." : "Live Dashboard data"}</p>
+      <button type="button" disabled={submitting || refreshing || loading} className="rounded-md border border-cyan px-3 py-2 text-cyan disabled:opacity-60"
+        onClick={async () => {
+          if (submitting || refreshing) return;
+          setSubmitting(true); setRefreshError(null);
+          try {
+            if (response?.snapshot_refresh_status) await api.post(`/orgs/${orgId}/dashboard/refresh`, {});
+            reload();
+          } catch (cause) { setRefreshError(cause instanceof Error ? cause.message : "Could not refresh Dashboard"); }
+          finally { setSubmitting(false); }
+        }}>{submitting || refreshing ? "Refreshing…" : "Refresh dashboard"}</button>
+    </div>
+    {refreshing && <LoadingIndicator label={response?.snapshot_refresh_status === "pending" ? "Dashboard refresh queued." : "Refreshing Dashboard in the background."} detail={data ? "Previous results remain available." : "The first snapshot will appear when processing finishes."} />}
+    {response?.snapshot_error && <p role="alert" className="text-sm text-red-300">{response.snapshot_error}</p>}
+    {data?.snapshot_stale && <p role="status" className="text-sm text-white/70">Saved data may be out of date. Refresh to include recent changes; evidence-qualified scores require a matching current inventory.</p>}
     {loading && !data && <DashboardLoading />}
     {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry dashboard</button>}
     {matching ? <Dashboard data={data} /> : data && <p role="status">Dashboard inputs changed. Waiting for the latest scoring state; no stale scores are shown.</p>}</>;

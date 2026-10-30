@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,12 +11,16 @@ from app.db.base_class import Base
 class Organization(Base):
     __tablename__ = "organizations"
     __table_args__ = (
+        CheckConstraint("dashboard_refresh_interval_seconds IS NULL OR dashboard_refresh_interval_seconds BETWEEN 60 AND 86400", name="organization_dashboard_refresh_interval"),
+        CheckConstraint("dashboard_refresh_settings_version >= 0", name="organization_dashboard_refresh_version"),
         CheckConstraint("header_logo_size IN ('small', 'medium', 'large')", name="organization_header_logo_size"),
         CheckConstraint("header_name_size IN ('small', 'medium', 'large')", name="organization_header_name_size"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    dashboard_refresh_interval_seconds: Mapped[int | None] = mapped_column(Integer)
+    dashboard_refresh_settings_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
     show_name_in_header: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     header_logo_size: Mapped[str] = mapped_column(String(6), nullable=False, default="medium", server_default=text("'medium'"))
     header_name_size: Mapped[str] = mapped_column(String(6), nullable=False, default="medium", server_default=text("'medium'"))

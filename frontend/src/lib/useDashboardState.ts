@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./apiClient";
 
-export type DashboardState = { scoring_mode: "findings_based" | "evidence_qualified"; settings_version: number; evidence_revision: number; evaluation_id: string | null };
+export type DashboardState = { scoring_mode: "findings_based" | "evidence_qualified"; settings_version: number; evidence_revision: number; evaluation_id: string | null; snapshot_enabled?: boolean; snapshot_generated_at?: string | null };
 
 /** Cheap revision/mode polling, not an inventory scan. Never keeps a login alive. */
 export function useDashboardState(orgId: string) {

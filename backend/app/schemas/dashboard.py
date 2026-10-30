@@ -29,11 +29,13 @@ class SecuritySummary(BaseModel):
     window_start: datetime
     window_end: datetime
     counts: dict[str, int]
+    snapshot_generated_at: datetime | None = None
 
 
 class DashboardSummary(BaseModel):
-    """Scores computed live; evidence eligibility may use a revision-bound job
-    result. POST /orgs/{org_id}/risk/score independently records baseline snapshots.
+    """Scores derived from live or explicitly timestamped saved inventory;
+    evidence eligibility always uses current revision-bound checks.
+    POST /orgs/{org_id}/risk/score independently records baseline snapshots.
     Empty active inventory
     AND findings returns not_assessed/null scores; findings_based is a baseline,
     not an assertion that domain evidence coverage has been qualified."""
@@ -57,3 +59,39 @@ class DashboardSummary(BaseModel):
     recent_scans: list[ScanRead]
     asset_count: int
     findings_by_severity: dict[Severity, int]
+    snapshot_generated_at: datetime | None = None
+    snapshot_stale: bool = False
+    snapshot_refresh_status: str | None = None
+    snapshot_error: str | None = None
+    security_summary: SecuritySummary | None = None
+
+
+class DashboardPending(BaseModel):
+    snapshot_state: Literal["pending"] = "pending"
+    snapshot_refresh_status: str
+    snapshot_error: str | None = None
+
+
+class DashboardSettings(BaseModel):
+    enabled: bool = False
+    refresh_interval_seconds: int = Field(3600, ge=60, le=86400)
+    version: int = 0
+
+
+class DashboardSettingsUpdate(BaseModel):
+    enabled: bool
+    refresh_interval_seconds: int = Field(3600, ge=60, le=86400)
+    expected_version: int = Field(ge=0)
+
+
+class OrganizationDashboardSettings(BaseModel):
+    enabled: bool
+    platform_refresh_interval_seconds: int
+    refresh_interval_seconds: int
+    refresh_interval_override_seconds: int | None
+    version: int
+
+
+class OrganizationDashboardSettingsUpdate(BaseModel):
+    refresh_interval_override_seconds: int | None = Field(..., ge=60, le=86400)
+    expected_version: int = Field(ge=0)

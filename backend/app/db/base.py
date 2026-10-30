@@ -1,4 +1,5 @@
 from app.db.base_class import Base
+from app.models.dashboard_snapshot import DashboardSnapshot  # noqa: F401
 from app.models.organization import Organization
 from app.models.organization_logo import OrganizationLogo
 from app.models.scoring_qualification import OrganizationScoringSettings, DomainEvidenceQualification

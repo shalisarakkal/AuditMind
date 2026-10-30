@@ -322,6 +322,11 @@ export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier
   qualification_scope?: string | null; reviewed_at?: string | null; expires_at?: string | null };
 
 export type DashboardSummary = {
+  snapshot_generated_at?: string | null;
+  snapshot_stale?: boolean;
+  snapshot_refresh_status?: string | null;
+  snapshot_error?: string | null;
+  security_summary?: { window_start: string; window_end: string; counts: Record<string, number> } | null;
   overall_score: number | null;
   overall_tier: RiskTier | null;
   assessment_status?: "not_assessed" | "findings_based" | "partial" | "complete";
@@ -342,6 +347,8 @@ export type DashboardSummary = {
   asset_count: number;
   findings_by_severity: Record<Severity, number>;
 };
+
+export type DashboardPending = { snapshot_state: "pending"; snapshot_refresh_status: string; snapshot_error: string | null };
 
 export type AssetExistingStrategy = "update" | "skip" | "duplicate";
 export type NessusInfoSeverity = "skip" | "low";

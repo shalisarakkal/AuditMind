@@ -49,10 +49,12 @@ from app.models.knowledge import KnowledgeIndex
 from app.services import knowledge_service
 from app.models.scan import Scan
 from app.models.organization import Organization
+from app.models.dashboard_snapshot import DashboardSnapshot
+from app.services import dashboard_snapshots
 from app.services import archive_service, import_staging, ingestion_background, platform, report_service
 from app.services.events import purge_expired_events, record_event
 from app.services.import_profiles import resolve_profile
-from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, REPORT_JOB, DOCUMENT_JOB, EVIDENCE_JOB, job_is_running, job_running
+from app.services.org_lock import ARCHIVE_JOB, IMPORT_JOB, REPORT_JOB, DOCUMENT_JOB, EVIDENCE_JOB, DASHBOARD_JOB, job_is_running, job_running
 from app.services.ingestion_service import IngestionError, detect_format, fail_import, process_import
 from app.services.sessions import purge_old_sessions
 
@@ -117,6 +119,8 @@ def _worker_lease():
             from app.models.worker_dispatch import WorkerDispatch
             try:
                 conn.execute(select(WorkerDispatch.scope_id).limit(0))
+                conn.execute(select(DashboardSnapshot.id).limit(0))
+                conn.execute(select(Organization.dashboard_refresh_interval_seconds).limit(0))
                 conn.commit()
             except Exception as exc:
                 raise RuntimeError("Worker schema is not ready; run alembic upgrade head before starting the pool") from exc
@@ -175,7 +179,7 @@ def run_once(db: Session, *, allow_org_purge: bool = True) -> bool:
                 return False
             # Also cover jobs run by a synchronous API request or a draining
             # predecessor pool. A queued tenant purge waits rather than racing.
-            for model in (Scan, ArchiveJob, Report, KnowledgeIndex, EvidenceEvaluation):
+            for model in (Scan, ArchiveJob, Report, KnowledgeIndex, EvidenceEvaluation, DashboardSnapshot):
                 if db.scalar(select(model.id).where(model.status == "running").limit(1)) is not None:
                     db.rollback()
                     return False
@@ -200,11 +204,14 @@ def run_once(db: Session, *, allow_org_purge: bool = True) -> bool:
         elif kind == "evidence":
             with job_running(db, EVIDENCE_JOB, job_id):
                 evidence_jobs.process_job(db, job_id)
+        elif kind == "dashboard":
+            with job_running(db, DASHBOARD_JOB, job_id):
+                dashboard_snapshots.process(db, job_id)
         else:
             archive_service.run_job(db, job_id)
     except Exception:
         # Each runner has recorded its failure (and its event) already.
-        if kind in {"report", "document", "evidence"}:
+        if kind in {"report", "document", "evidence", "dashboard"}:
             logger.error("%s job %s failed; see its recorded status", kind, job_id)
         else:
             logger.exception("%s job %s failed", kind, job_id)
@@ -374,6 +381,17 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
         else:
             evaluation.status, evaluation.completed_at = "failed", now
             evaluation.error_message = "Evidence evaluation interrupted too many times; retry after checking the worker."
+    for dashboard in db.scalars(select(DashboardSnapshot).where(DashboardSnapshot.status == "running",
+            func.coalesce(DashboardSnapshot.heartbeat_at, DashboardSnapshot.run_started_at) < stale)
+            .with_for_update(skip_locked=True)).all():
+        if job_is_running(db, DASHBOARD_JOB, dashboard.id):
+            continue
+        if dashboard.retry_count < MAX_RESUMES:
+            dashboard.status, dashboard.retry_count = "pending", dashboard.retry_count + 1
+            dashboard.heartbeat_at = dashboard.run_started_at = None
+        else:
+            dashboard.status = "failed"
+            dashboard.error_message = "Dashboard refresh interrupted too many times; retry after checking the worker."
     db.commit()
 
 
@@ -460,6 +478,8 @@ def _check_in(stop: threading.Event, started_at: datetime, lease=None, stop_work
                         model = KnowledgeIndex
                     elif job[0] == "evidence":
                         model = EvidenceEvaluation
+                    elif job[0] == "dashboard":
+                        model = DashboardSnapshot
                     else:
                         model = ArchiveJob
                     db.execute(update(model).where(model.id == job[1]).values(heartbeat_at=now))
@@ -490,6 +510,7 @@ def _update_queue_metrics() -> None:
 def _run_loop(stop: threading.Event, *, maintenance: bool = True) -> None:
     next_reap = _now()
     next_housekeeping = _now() + FIRST_HOUSEKEEPING_AFTER
+    next_dashboard_refresh = _now()
     last_queue_check = _now()
     failures = 0
     try:
@@ -504,6 +525,9 @@ def _run_loop(stop: threading.Event, *, maintenance: bool = True) -> None:
                             if acquired and _now() >= next_housekeeping:
                                 next_housekeeping = _now() + HOUSEKEEPING_EVERY
                                 housekeeping(db)
+                            if acquired and _now() >= next_dashboard_refresh:
+                                next_dashboard_refresh = _now() + timedelta(seconds=30)
+                                dashboard_snapshots.enqueue_due(db)
                     ran = run_once(db) if maintenance else run_once(db, allow_org_purge=False)
                 failures = 0
             except Exception:

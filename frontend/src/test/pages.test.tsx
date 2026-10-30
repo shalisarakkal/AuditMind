@@ -419,6 +419,48 @@ describe("Findings page", () => {
 });
 
 describe("Dashboard page", () => {
+  it("queues one refresh, retains the saved Dashboard and polls until replacement", async () => {
+    let phase = "completed";
+    let reads = 0;
+    const { fetchMock } = await renderSignedIn(<DashboardPage />, "viewer", {
+      "GET /orgs/org-1/dashboard": () => {
+        if (phase === "running" && ++reads > 1) phase = "completed-new";
+        return { ...summary, asset_count: phase === "completed-new" ? 13 : 12,
+          snapshot_generated_at: phase === "completed-new" ? "2026-10-29T12:05:00Z" : "2026-10-29T12:00:00Z",
+          snapshot_refresh_status: phase === "running" ? "running" : "completed" };
+      },
+      "POST /orgs/org-1/dashboard/refresh": () => { phase = "running"; return json({}, 202); },
+    });
+    expect(await screen.findByText(/Last updated:/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh dashboard" }));
+    expect(await screen.findByText("Refreshing Dashboard in the background.")).toBeVisible();
+    expect(screen.getByText(/12 assets/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Refreshing…" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByText(/13 assets/)).toBeVisible(), { timeout: 4000 });
+    expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/dashboard/refresh") && init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("shows a pending first snapshot without fabricating zero or perfect scores", async () => {
+    await renderSignedIn(<DashboardPage />, "viewer", {
+      "GET /orgs/org-1/dashboard": () => json({ snapshot_state: "pending", snapshot_refresh_status: "pending", snapshot_error: null }, 202),
+    });
+    expect(await screen.findByText("Preparing the first saved Dashboard.")).toBeVisible();
+    expect(screen.queryByTestId("overall-score")).not.toBeInTheDocument();
+    expect(screen.getByText("Dashboard refresh queued.")).toBeVisible();
+  });
+
+  it("keeps saved results visible when on-demand refresh fails", async () => {
+    await renderSignedIn(<DashboardPage />, "viewer", {
+      "GET /orgs/org-1/dashboard": () => ({ ...summary, snapshot_generated_at: "2026-10-29T12:00:00Z", snapshot_refresh_status: "completed" }),
+      "POST /orgs/org-1/dashboard/refresh": () => json({ detail: "Worker unavailable" }, 503),
+    });
+    await screen.findByText(/Last updated:/);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh dashboard" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh dashboard" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Worker unavailable");
+    expect(screen.getByTestId("overall-score")).toHaveTextContent("87");
+    expect(screen.getByText(/12 assets/)).toBeVisible();
+  });
   it("paints the dashboard shell and independent security summary while scores are delayed", async () => {
     let finish!: (value: DashboardSummary) => void;
     const pending = new Promise<DashboardSummary>(resolve => { finish = resolve; });

@@ -6,6 +6,7 @@ import RegisterPage from "@/app/(auth)/register/page";
 import AccountsPage from "@/app/(app)/platform/accounts/page";
 import OrganizationsPage from "@/app/(app)/platform/organizations/page";
 import SharedDocumentsPage from "@/app/(app)/platform/documents/page";
+import DashboardSettingsPage from "@/app/(app)/platform/dashboard/page";
 import OrgGate from "@/components/OrgGate";
 import SecuritySettingsForm from "@/components/SecuritySettingsForm";
 import Sidebar from "@/components/Sidebar";
@@ -38,6 +39,34 @@ const ROOT: Me = {
 
 const bodyOf = (fetchMock: ReturnType<typeof mockApi>, key: string, index = 0) =>
   JSON.parse(String(callsTo(fetchMock, key)[index][1].body));
+
+describe("Dashboard snapshot platform settings", () => {
+  it("lets platform admins save the interval with a version check", async () => {
+    let saved = { enabled: false, refresh_interval_seconds: 300, version: 0 };
+    const { fetchMock } = await renderSignedIn(<DashboardSettingsPage />, "viewer", {
+      "GET /auth/me": () => ROOT,
+      "GET /platform/dashboard-settings": () => saved,
+      "PATCH /platform/dashboard-settings": init => { saved = { ...JSON.parse(String(init.body)), version: 1 }; return saved; },
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Use stored Dashboard snapshots" }));
+    fireEvent.change(screen.getByLabelText("Refresh interval (minutes)"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Dashboard settings" }));
+    expect(await screen.findByText("Dashboard settings saved.")).toBeVisible();
+    expect(bodyOf(fetchMock, "PATCH /platform/dashboard-settings")).toEqual({ enabled: true, refresh_interval_seconds: 600, expected_version: 0 });
+  });
+
+  it("requires explicit reload after conflicting settings edits", async () => {
+    await renderSignedIn(<DashboardSettingsPage />, "viewer", {
+      "GET /auth/me": () => ROOT,
+      "GET /platform/dashboard-settings": () => ({ enabled: false, refresh_interval_seconds: 300, version: 0 }),
+      "PATCH /platform/dashboard-settings": () => json({ detail: "Dashboard settings changed; reload before retrying" }, 409),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Save Dashboard settings" }));
+    expect(await screen.findByText("Reload settings before retrying. Your changes were not saved.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save Dashboard settings" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reload settings" })).toBeEnabled();
+  });
+});
 
 describe("sign-up", () => {
   it("offers Create an account only while sign-up is open", async () => {

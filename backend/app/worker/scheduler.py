@@ -15,6 +15,7 @@ from app.models.organization import Organization
 from app.models.report import Report
 from app.models.scan import Scan
 from app.models.worker_dispatch import WorkerDispatch
+from app.models.dashboard_snapshot import DashboardSnapshot
 
 
 def _scope(org):
@@ -31,12 +32,12 @@ def claim(db, clock):
         KnowledgeDocument, KnowledgeDocument.id == KnowledgeVersion.document_id).where(KnowledgeIndex.status == "running")
     busy = union_all(
         *[select(_scope(model.org_id)).where(model.status == "running")
-          for model in (Scan, ArchiveJob, Report, EvidenceEvaluation)], documents).subquery()
+          for model in (Scan, ArchiveJob, Report, EvidenceEvaluation, DashboardSnapshot)], documents).subquery()
     busy_scopes = select(busy.c[0])
     # Also bound claims across processes during restarts/failover. Inline HTTP
     # jobs have no worker heartbeat and are not worker-pool reservations.
     reservations = union_all(*[select(model.id).where(model.status == "running", model.heartbeat_at.is_not(None))
-        for model in (Scan, ArchiveJob, Report, KnowledgeIndex, EvidenceEvaluation)]).subquery()
+        for model in (Scan, ArchiveJob, Report, KnowledgeIndex, EvidenceEvaluation, DashboardSnapshot)]).subquery()
     if db.scalar(select(func.count()).select_from(reservations)) >= settings.WORKER_CONCURRENCY:
         db.rollback()
         return None
@@ -46,7 +47,8 @@ def claim(db, clock):
               ("archive", ArchiveJob, ArchiveJob.started_at, ArchiveJob.org_id),
               ("report", Report, Report.created_at, Report.org_id),
               ("document", KnowledgeIndex, KnowledgeIndex.created_at, KnowledgeDocument.org_id),
-              ("evidence", EvidenceEvaluation, EvidenceEvaluation.created_at, EvidenceEvaluation.org_id)]
+              ("evidence", EvidenceEvaluation, EvidenceEvaluation.created_at, EvidenceEvaluation.org_id),
+              ("dashboard", DashboardSnapshot, DashboardSnapshot.requested_at, DashboardSnapshot.org_id)]
     for kind, model, queued, org in models:
         scope = _scope(org)
         priority = literal(0)
@@ -73,7 +75,7 @@ def claim(db, clock):
         item[2].last or datetime.min.replace(tzinfo=timezone.utc), item[2].queued or now, str(item[2].id)))
     now = clock()  # Fresh heartbeat after selection/lock waits, not before them.
     values = dict(status="running", heartbeat_at=now)
-    if kind in {"report", "document", "evidence"}:
+    if kind in {"report", "document", "evidence", "dashboard"}:
         values["run_started_at"] = now
     db.execute(update(model).where(model.id == row.id).values(**values))
     db.execute(insert(WorkerDispatch).values(scope_id=row.scope, org_id=row.org_id, last_started_at=now)

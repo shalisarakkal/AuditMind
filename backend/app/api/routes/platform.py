@@ -35,6 +35,8 @@ from app.schemas.platform import (
 )
 from app.schemas.security import SecuritySettingsRead, SecuritySettingsUpdate
 from app.schemas.product_branding import ProductBrandingRead, ProductBrandingUpdate
+from app.schemas.dashboard import DashboardSettings, DashboardSettingsUpdate
+from app.services import dashboard_snapshots
 from app.services import people, platform
 from app.services.events import record_event
 from app.services.people import PeopleError
@@ -43,6 +45,39 @@ from app.services.security_policy import PLATFORM_KEY, SecuritySettings, change_
 router = APIRouter(prefix="/platform", tags=["platform"])
 
 PRODUCT_BRANDING_KEY = "product_branding"
+
+
+@router.get("/dashboard-settings", response_model=DashboardSettings)
+def read_dashboard_settings(response: Response, db: Session = Depends(get_db),
+                            _: User = Depends(require_sysadmin)):
+    _no_store(response)
+    return dashboard_snapshots.configuration(db)
+
+
+@router.patch("/dashboard-settings", response_model=DashboardSettings)
+def update_dashboard_settings(payload: DashboardSettingsUpdate, response: Response,
+                              db: Session = Depends(get_db), sysadmin: User = Depends(require_sysadmin)):
+    db.execute(select(func.pg_advisory_xact_lock(13, 0)))
+    actor = db.scalar(select(User).where(User.id == sysadmin.id).with_for_update(read=True).execution_options(populate_existing=True))
+    if actor is None or not actor.is_active or not actor.is_sysadmin:
+        raise HTTPException(403, "Platform permissions changed; reload before retrying")
+    before = dashboard_snapshots.configuration(db)
+    if payload.expected_version != before.version:
+        raise HTTPException(409, "Dashboard settings changed; reload before retrying")
+    changed = before.enabled != payload.enabled or before.refresh_interval_seconds != payload.refresh_interval_seconds
+    after = DashboardSettings(enabled=payload.enabled, refresh_interval_seconds=payload.refresh_interval_seconds,
+                              version=before.version + int(changed))
+    if changed:
+        row = db.get(PlatformSetting, dashboard_snapshots.SETTINGS_KEY)
+        if row is None:
+            db.add(PlatformSetting(key=dashboard_snapshots.SETTINGS_KEY, value=after.model_dump()))
+        else:
+            row.value = after.model_dump()
+        record_event(db, "settings_changed", org_id=None, actor=sysadmin, item="Dashboard refresh settings",
+                     details={"from": before.model_dump(), "to": after.model_dump()})
+    db.commit()
+    _no_store(response)
+    return after
 
 
 @router.get("/branding", response_model=ProductBrandingRead)

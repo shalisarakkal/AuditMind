@@ -3,8 +3,9 @@
 import Link from "next/link";
 import StatusMessage from "./StatusMessage";
 import { useApi } from "@/lib/useApi";
+import { formatDateTime } from "@/lib/domain";
 
-type Summary = { window_start: string; window_end: string; counts: Record<string, number> };
+type Summary = { window_start: string; window_end: string; counts: Record<string, number>; snapshot_generated_at?: string | null };
 const cards = [{ type: "member_added", label: "Members added" },
   { type: "role_changed", label: "Role changes" }, { type: "purge", label: "Completed purges" }];
 
@@ -16,6 +17,7 @@ export default function SecuritySummary({ orgId }: { orgId: string }) {
       <Link href="/activity" className="text-sm text-cyan hover:underline">All activity</Link>
     </div>
     <p className="text-xs text-white/60">Completed organization actions started in the rolling seven-day period. Purges count operations, not deleted records.</p>
+    {data?.snapshot_generated_at && <p className="text-xs text-white/60">Saved seven-day window ending {formatDateTime(data.window_end)}.</p>}
     <StatusMessage loading={loading && !data} error={error} />
     {error && <button type="button" onClick={reload} className="text-sm text-cyan underline">Retry security summary</button>}
     {data && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{cards.map(card => {

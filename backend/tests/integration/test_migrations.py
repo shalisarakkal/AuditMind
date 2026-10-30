@@ -53,6 +53,23 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
                 "ix_findings_description_trgm", "ix_findings_category_trgm", "ix_findings_source_trgm",
                 "ix_findings_active_assignee", "ix_findings_active_due_search", "ix_findings_active_review_search",
             }
+            for table, name, columns in (
+                ("findings", "ix_findings_active_org_domain_severity", ["org_id", "domain", "severity"]),
+                ("assets", "ix_assets_active_org_count", ["org_id"]),
+            ):
+                index = next(i for i in inspect(connection).get_indexes(table, schema=schema) if i["name"] == name)
+                assert index["column_names"] == columns
+                assert "archived_at IS NULL" in str(index["dialect_options"]["postgresql_where"])
+            connection.commit()
+            connection.execute(text("INSERT INTO platform_settings (key,value) VALUES ('dashboard_snapshots',CAST(:value AS jsonb))"),
+                               {"value": '{"enabled":true,"version":5}'})
+            connection.commit()
+            command.downgrade(config, "0032")
+            assert connection.scalar(text("SELECT value FROM platform_settings WHERE key='dashboard_snapshots'")) == {"enabled": False, "version": 6}
+            assert "ix_assets_active_org_count" not in {i["name"] for i in inspect(connection).get_indexes("assets", schema=schema)}
+            assert "ix_findings_active_org_domain_severity" not in {i["name"] for i in inspect(connection).get_indexes("findings", schema=schema)}
+            connection.commit()
+            command.upgrade(config, "head")
             assert connection.scalar(text("""SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
                 JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=:schema AND NOT i.indisvalid"""),
                 {"schema": schema}) == 0
@@ -74,6 +91,14 @@ def test_migrations_upgrade_rollback_and_preserve_legacy_reports():
             assert connection.scalar(text("SELECT show_name_in_header FROM organizations WHERE id=:id"), {"id": org}) is True
             assert connection.scalar(text("SELECT header_logo_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
             assert connection.scalar(text("SELECT header_name_size FROM organizations WHERE id=:id"), {"id": org}) == "medium"
+            assert connection.execute(text("SELECT dashboard_refresh_interval_seconds,dashboard_refresh_settings_version FROM organizations WHERE id=:id"), {"id": org}).one() == (None, 0)
+            connection.execute(text("UPDATE organizations SET dashboard_refresh_interval_seconds=120,dashboard_refresh_settings_version=1 WHERE id=:id"), {"id": org})
+            connection.commit()
+            command.downgrade(config, "0034")
+            assert "dashboard_refresh_interval_seconds" not in {c["name"] for c in inspect(connection).get_columns("organizations", schema=schema)}
+            connection.commit()
+            command.upgrade(config, "head")
+            assert connection.scalar(text("SELECT dashboard_refresh_interval_seconds FROM organizations WHERE id=:id"), {"id": org}) is None
             assert {"evidence_evaluations", "organization_evidence_revisions"} <= set(inspect(connection).get_table_names(schema=schema))
             connection.execute(text("INSERT INTO organization_scoring_settings (org_id,evidence_qualified_enabled,version) VALUES (:id,true,5)"), {"id": org})
             connection.execute(text("INSERT INTO assets (id,org_id,type,hostname,created_at) VALUES (:id,:org,'server','migration-evidence',now())"), {"id": uuid4(), "org": org})

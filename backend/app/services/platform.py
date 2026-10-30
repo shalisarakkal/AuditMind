@@ -107,6 +107,7 @@ def create_org(
 
 def running_jobs(db: Session, org_id: uuid.UUID) -> int:
     from app.models.evidence_evaluation import EvidenceEvaluation
+    from app.models.dashboard_snapshot import DashboardSnapshot
     active = (ScanStatus.pending, ScanStatus.running)
     scans = db.scalar(select(func.count()).select_from(Scan).where(Scan.org_id == org_id, Scan.status.in_(active)))
     jobs = db.scalar(select(func.count()).select_from(ArchiveJob).where(ArchiveJob.org_id == org_id, ArchiveJob.status.in_(active)))
@@ -118,7 +119,9 @@ def running_jobs(db: Session, org_id: uuid.UUID) -> int:
         .where(KnowledgeDocument.org_id == org_id, KnowledgeIndex.status.in_(("pending", "running"))))
     evaluations = db.scalar(select(func.count()).select_from(EvidenceEvaluation).where(
         EvidenceEvaluation.org_id == org_id, EvidenceEvaluation.status.in_(("pending", "running"))))
-    return scans + jobs + reports + indexes + evaluations
+    dashboards = db.scalar(select(func.count()).select_from(DashboardSnapshot).where(
+        DashboardSnapshot.org_id == org_id, DashboardSnapshot.status.in_(("pending", "running"))))
+    return scans + jobs + reports + indexes + evaluations + dashboards
 
 
 def _lock(db: Session, org: Organization) -> None:
@@ -138,7 +141,7 @@ def archive_org(db: Session, org: Organization, actor: User) -> None:
             409,
             "jobs_running",
             f"{org.name} has {busy} background job{'s' if busy != 1 else ''} waiting or running "
-            "(uploads, archive jobs, reports, document indexing or evidence evaluation). Archive it when they've finished.",
+            "(uploads, archive jobs, reports, document indexing, evidence evaluation or Dashboard refresh). Archive it when they've finished.",
         )
     org.archived_at, org.archived_by = _now(), actor.id
     _org_event(db, "org_archived", org, actor)

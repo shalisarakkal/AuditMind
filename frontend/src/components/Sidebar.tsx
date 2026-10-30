@@ -30,6 +30,7 @@ const PLATFORM_ITEMS = [
   { href: `${PLATFORM_PATH}/accounts`, label: "Accounts" },
   { href: `${PLATFORM_PATH}/activity`, label: "Platform activity" },
   { href: `${PLATFORM_PATH}/security`, label: "Security defaults" },
+  { href: `${PLATFORM_PATH}/dashboard`, label: "Dashboard settings" },
   { href: `${PLATFORM_PATH}/branding`, label: "Product branding" },
   { href: `${PLATFORM_PATH}/documents`, label: "Shared standards" },
 ];

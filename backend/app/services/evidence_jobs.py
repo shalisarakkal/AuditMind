@@ -105,8 +105,14 @@ def dashboard_state(db, org_id):
     enabled = mode.evidence_qualified_enabled if mode else False
     current_revision = revision(db, org_id)
     job = current_result(db, org_id) if enabled else None
+    from app.services import dashboard_snapshots
+    from app.models.dashboard_snapshot import DashboardSnapshot
+    snapshots_enabled = dashboard_snapshots.configuration(db).enabled
+    generated = db.scalar(select(DashboardSnapshot.generated_at).where(DashboardSnapshot.org_id == org_id)) if snapshots_enabled else None
     return {"scoring_mode": "evidence_qualified" if enabled else "findings_based",
         "settings_version": mode.version if mode else 0,
+        "snapshot_enabled": snapshots_enabled,
+        "snapshot_generated_at": generated,
         "evidence_revision": current_revision, "evaluation_id": str(job.id) if job else None}
 
 
