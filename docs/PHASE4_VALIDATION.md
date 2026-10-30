@@ -1,5 +1,20 @@
 # Phase 4 remediation workflow validation
 
+## Hosted index-test portability follow-up — 30 October 2026
+
+Run [41066594402](https://github.com/shalisarakkal/AuditMind/actions/runs/41066594402)
+for `c82d79d` passed frontend, browser and dependency/security checks. Backend
+reported 1,451 passed and one failed assertion: the tiny index-maintenance fixture
+required the planner to prefer the combined GIN index. Linux legitimately chose
+an organization-index bitmap scan instead.
+
+The maintenance test now removes competing indexes only inside its disposable
+test database and directly verifies GIN results before/after update, archive,
+restore and delete. It preserves separate API-result assertions and leaves
+production planning unrestricted. No application or migration change is involved.
+All seven focused search-index/migration checks pass in 24.13 seconds. Hosted
+acceptance must use the subsequent fix commit's run, not the failed run above.
+
 ## Assets search local trial — 30 October 2026
 
 - Prototype compares old/new results on the same disposable 100k-row copy,

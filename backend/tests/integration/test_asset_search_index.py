@@ -91,22 +91,38 @@ def test_null_tag_arrays_do_not_misclassify_a_selective_tag(client, inventory, d
 
 def test_database_maintains_index_on_direct_update_archive_restore_and_delete(client, inventory, db_session):
     _, org, target = inventory
-    db_session.execute(text("SET LOCAL enable_seqscan = off"))
-    stmt = select(Asset.id).where(Asset.org_id == org, Asset.archived_at.is_(None),
-        expression(Asset).ilike(contains_pattern("tagneedle"), escape="\\"))
-    compiled = stmt.compile(dialect=db_session.connection().dialect, compile_kwargs={"render_postcompile": True})
-    plan = db_session.connection().exec_driver_sql("EXPLAIN (FORMAT JSON) " + str(compiled), compiled.params).scalar_one()
-    assert INDEX in str(plan)
+    # Isolate index maintenance from cost-based choices on this tiny fixture.
+    # A valid organization-index bitmap scan is often cheaper on Linux. Remove
+    # competing indexes only in the disposable test DB, retaining the PK/GIN.
+    for index in Asset.__table__.indexes:
+        if index.name != INDEX:
+            index.drop(db_session.connection())
+
+    def indexed_ids(value):
+        db_session.execute(text("SET LOCAL enable_seqscan = off"))
+        stmt = select(Asset.id).where(Asset.org_id == org, Asset.archived_at.is_(None),
+            expression(Asset).ilike(contains_pattern(value), escape="\\"))
+        compiled = stmt.compile(dialect=db_session.connection().dialect, compile_kwargs={"render_postcompile": True})
+        plan = db_session.connection().exec_driver_sql("EXPLAIN (FORMAT JSON) " + str(compiled), compiled.params).scalar_one()
+        assert INDEX in str(plan)
+        return list(db_session.scalars(stmt))
+
+    assert indexed_ids("tagneedle") == [target]
     db_session.execute(text("UPDATE assets SET tags=ARRAY['newtagneedle']::varchar[],hostname='renamed' WHERE id=:id"), {"id": target})
     db_session.commit()
     assert get(client, inventory, tags="newtagneedle")["total"] == 1
     assert get(client, inventory, q="webneedle")["total"] == 0
+    assert indexed_ids("newtagneedle") == [target]
+    assert indexed_ids("webneedle") == []
     db_session.execute(text("UPDATE assets SET archived_at=now() WHERE id=:id"), {"id": target}); db_session.commit()
     assert get(client, inventory, tags="newtagneedle")["total"] == 0
+    assert indexed_ids("newtagneedle") == []
     db_session.execute(text("UPDATE assets SET archived_at=NULL WHERE id=:id"), {"id": target}); db_session.commit()
     assert get(client, inventory, tags="newtagneedle")["total"] == 1
+    assert indexed_ids("newtagneedle") == [target]
     db_session.execute(text("DELETE FROM assets WHERE id=:id"), {"id": target}); db_session.commit()
     assert get(client, inventory, tags="newtagneedle")["total"] == 0
+    assert indexed_ids("newtagneedle") == []
 
 
 def test_import_pipeline_preserves_indexed_tags_and_records_paired_timings(client, db_session):
