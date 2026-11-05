@@ -7,6 +7,7 @@ import { browserTimezone, formatDeadline, changedWorkflowFields, historyValue, W
 import { formatDateTime } from "@/lib/domain";
 import { useDebounced } from "@/lib/useDebounced";
 import FindingReference from "./FindingReference";
+import FindingObservations from "./FindingObservations";
 
 type Props = { orgId: string; orgName: string; role: string; ids: string[]; names?: string[]; onClose(): void; onSaved(): void };
 type Member = { id: string; name: string | null; email: string; status: string };
@@ -180,5 +181,6 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
       </li>)}</ol> : <p className="text-sm text-white/70">No workflow history yet.</p>}
       <div className="mt-3 flex gap-4 text-sm"><button type="button" disabled={busy || history.loading || historyOffset === 0} onClick={() => setHistoryOffset(v => v - 20)}>Newer history</button><button type="button" disabled={busy || history.loading || (history.data?.length ?? 0) < 20} onClick={() => setHistoryOffset(v => v + 20)}>Older history</button></div>
     </section>}
+    {ids.length === 1 && <FindingObservations key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} />}
   </dialog>;
 }

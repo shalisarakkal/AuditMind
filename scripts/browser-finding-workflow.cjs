@@ -692,6 +692,31 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     async function open(name) {await row(name).getByRole('button',{name:'Workflow',exact:true}).click(); await expect(dialog().getByRole('status').filter({hasText:'Loading workflow'})).toHaveCount(0); await expect(dialog().getByText('Current status',{exact:true})).toBeVisible();}
     async function save() {await dialog().getByRole('button',{name:'Save workflow',exact:true}).click(); await expect(dialog()).toHaveCount(0);}
     await p.reload(); await expect(row('Imported workflow')).toBeVisible();
+    await open('Imported workflow');
+    await dialog().getByRole('button',{name:'Show source observations',exact:true}).click();
+    await expect(dialog().getByText('workflow.csv · Row 2',{exact:true})).toBeVisible();
+    await expect(dialog().getByText('Source observed time: Not provided',{exact:true})).toBeVisible();
+    await expect(dialog().getByText('Not eligible for reconciliation',{exact:true})).toBeVisible();
+    await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
+    const repeatedObservation=await p.request.post(base+'/api/v1'+list+'/import',{headers:{Authorization:authorization},multipart:{confirm:'true',file:{name:'workflow-repeat.csv',mimeType:'text/csv',buffer:Buffer.from('hostname,domain,severity,category,description,source\nworkflow-host,network_config,critical,WF-1,Changed source observation,synthetic-workflow\n')}}});
+    assert.equal(repeatedObservation.status(),201);
+    assert.equal((await repeatedObservation.json()).report.duplicates,1);
+    const observed=(await admin.request(list+'/'+c+'/observations')).body;
+    assert.equal(observed.length,2); assert.equal(observed[0].payload.description,'Changed source observation');
+    assert.equal((await admin.request(list+'/'+c+'/workflow')).body.version,0);
+    await p.reload(); await open('Imported workflow');
+    await dialog().getByRole('button',{name:'Show source observations',exact:true}).click();
+    await expect(dialog().getByText('workflow-repeat.csv · Row 2',{exact:true})).toBeVisible();
+    await expect(dialog().getByText('WF-1: Changed source observation',{exact:true})).toBeVisible();
+    const observationAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(observationAxe.violations.map(v=>v.id),[]);
+    await p.setViewportSize({width:320,height:844});
+    assert.ok(await dialog().evaluate(node=>node.scrollWidth<=node.clientWidth));
+    await p.screenshot({path:path.join(output,'source-observations-mobile.png'),fullPage:true});
+    await dialog().getByRole('button',{name:'Hide source observations',exact:true}).click();
+    await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
+    await p.setViewportSize({width:1440,height:1000});
+    check('Source observations retain repeated changed imports separately from canonical payload/workflow; lazy UI fits mobile and passes Axe');
     await p.getByRole('button',{name:'Add finding',exact:true}).click();
     const add = p.getByRole('dialog',{name:'Add finding',exact:true});
     const addAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze(); assert.deepEqual(addAxe.violations.map(v=>v.id),[]);
@@ -764,7 +789,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(row('Bulk archive one')).toHaveCount(0,{timeout:20000}); await expect(row('Bulk archive two')).toHaveCount(0,{timeout:20000});
     await expect(p.getByRole('group',{name:'Selected',exact:true})).toHaveCount(0);
     check('Multi-row manual archive confirms names, submits exact IDs and clears selection');
-    const scroller=p.locator('table').locator('..');
+    const scroller=p.locator('table').filter({has:p.getByRole('columnheader',{name:/^Finding/})}).locator('..');
     await scroller.evaluate(el=>{el.scrollLeft=el.scrollWidth;});
     const edge=await scroller.boundingBox(), addedArrow=await p.getByRole('columnheader',{name:/^Added/}).locator('span[aria-hidden]').boundingBox();
     assert.ok(edge && addedArrow && addedArrow.x>=edge.x && addedArrow.x+addedArrow.width<=edge.x+edge.width);
@@ -942,9 +967,9 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     check('Unchanged date-only controls transmit browser-local full-day filter semantics');
     await p.goto(base+`/findings/lookup?org=${seed.org}&finding_id=${a}`);
     await expect(p).toHaveURL(base+`/findings?org=${seed.org}&finding_id=${a}`);
-    await expect(p.locator('tbody tr')).toHaveCount(1);
+    await expect(scroller.locator('tbody tr')).toHaveCount(1);
     await expect(row('Manual workflow A')).toBeVisible();
-    await p.reload(); await expect(p.locator('tbody tr')).toHaveCount(1);
+    await p.reload(); await expect(scroller.locator('tbody tr')).toHaveCount(1);
     await row('Manual workflow A').getByText('Finding ID',{exact:true}).click();
     await admin.context.grantPermissions(['clipboard-read','clipboard-write']);
     await row('Manual workflow A').getByRole('button',{name:`Copy finding ID ${a}`,exact:true}).click();
@@ -953,7 +978,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     check('Scoped finding reference switches organization, returns one exact finding, survives refresh and copies its UUID');
     await p.getByRole('button',{name:'Clear filters',exact:true}).click();
     await p.getByLabel('Search findings',{exact:true}).fill(a.toUpperCase());
-    await expect(p.locator('tbody tr')).toHaveCount(1); await expect(row('Manual workflow A')).toBeVisible();
+    await expect(scroller.locator('tbody tr')).toHaveCount(1); await expect(row('Manual workflow A')).toBeVisible();
     check('Findings search locates an exact UUID case-insensitively');
     const workflowEvents=await admin.request(org+`/events?item=${a}`);
     assert.ok(workflowEvents.body.items.some(event=>event.type==='finding_workflow_changed' && event.details?.finding_id===a));

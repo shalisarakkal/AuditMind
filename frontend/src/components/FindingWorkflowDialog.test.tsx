@@ -175,10 +175,10 @@ describe("Finding workflow", () => {
     const view = render(<FindingWorkflowDialog {...base} />); await ready();
     const first = screen.getByRole("button", { name: "Close finding workflow" });
     const last = screen.getByRole("button", { name: "Older history" });
-    // Last history button is disabled without a full page; select the last enabled control.
+    // History pagination is disabled; the source-observation toggle follows it.
     expect(last).toBeDisabled();
-    const save = screen.getByRole("button", { name: "Save workflow" }); save.focus();
-    fireEvent.keyDown(save, { key: "Tab" }); expect(first).toHaveFocus();
+    const observations = screen.getByRole("button", { name: "Show source observations" }); observations.focus();
+    fireEvent.keyDown(observations, { key: "Tab" }); expect(first).toHaveFocus();
     view.unmount(); expect(trigger).toHaveFocus(); trigger.remove();
   });
   it("fails closed when workflow loading fails and supports retry", async () => {

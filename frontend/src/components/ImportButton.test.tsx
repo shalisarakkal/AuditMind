@@ -553,6 +553,8 @@ describe("ImportButton with import profiles", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Upload" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("first.csv: Unsupported file type");
 
+    // The error can paint before the request's finally block releases actions.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel queued uploads" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Cancel queued uploads" }));
     pick("assets", "type,hostname\nserver,a\n", "second.csv");
     await screen.findByRole("group", { name: "Upload options" });
