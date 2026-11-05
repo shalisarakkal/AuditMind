@@ -2,6 +2,27 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## PB-1.1 - Per-finding source observations, 5 November
+
+- [x] Migration 0040 and bounded, atomic import observation recording, including
+  duplicates and all finding-producing import paths. Existing matching and
+  workflow decisions remain unchanged; no inferred historical backfill.
+- [x] Organization-scoped, seek-paged read API and on-demand source history in
+  the single-finding Workflow dialog. Explicit reconciliation ineligibility;
+  unknown observation timestamps remain unknown.
+- [x] Regression checks cover repeated/changed rows, all three asset strategies,
+  tenant/read permissions, archive/purge, source timestamps, rollback/retry and
+  a 5,000-row background import plus repeat. Migration upgrade/downgrade/drift,
+  focused UI tests and TypeScript checks pass.
+- [x] Chrome: 87 checks passed; final full frontend suite: 522 passed. Local demo
+  migrated to 0040 and restarted idle, with DB/uploads/worker readiness green.
+- [x] Final pre-commit review: fix UTC conversion overflow without rejecting
+  imports; full backend suite 1,528 passed with PostgreSQL required/warnings as
+  errors, full frontend 522 passed and history retry/empty-state verified.
+  Final helper fix activated idle; runtime readiness remains green.
+- [ ] Commit/push this increment, then verify its exact-commit hosted Linux CI.
+- PB-1.2/PB-1.3 remain separate increments. [Contract](docs/FINDING_OBSERVATIONS.md).
+
 ## Short-character search design - 5 November
 
 - [x] Step 1: benchmark candidate indexes in disposable 100,000/500,000-row

@@ -61,6 +61,15 @@ Focus:
 
 ## P1 — Establish evidence and control context
 
+**Progress, 5 November:** PB-1.1's additive source observations are complete
+locally and activated at migration 0040, with verification tracked in
+[Phase 4 validation](PHASE4_VALIDATION.md). Pre-commit review and local verification
+are complete (1,528 backend / 522 frontend tests and 87 Chrome checks).
+Check-in/push and exact-commit hosted CI are pending.
+Existing matching and archive ownership remain unchanged. Comparable scans
+(PB-1.2) and reconciliation (PB-1.3) are still pending; this does not enable
+automatic source updates, suppression or absence conclusions.
+
 **Outcome:** Users can tell where evidence came from, whether it is current, and
 what security obligation a finding relates to.
 

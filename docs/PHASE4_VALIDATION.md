@@ -1,5 +1,73 @@
 # Phase 4 remediation workflow validation
 
+## PB-1.1 pre-commit review follow-up - 5 November 2026
+
+Final review found that an ISO timestamp near year 1/9999 can parse but overflow
+when converted to UTC. The observation writer now treats this as an invalid
+source time, retains the original raw value and does not fail an otherwise
+valid import. Two PostgreSQL regression cases cover both ends of the range.
+The history UI also has an explicit failed-request/retry/empty-history test.
+Final full frontend suite: **522 tests passed across 54 files**. New scoped-file
+secret checks, high-severity Bandit, documentation links and whitespace checks
+pass. The full backend suite passed **1,528 tests in 1,064.14 seconds**, with
+`--require-postgres -W error` and no skips. Both timestamp-boundary regressions
+pass in that run. The final helper fix was activated after all local queues
+were verified idle; the API, frontend and one-slot worker restarted with the
+existing production frontend build. `/ready` returns 200 with database, uploads
+and worker all true. Accounts, passwords and data were retained. The PB-1.1
+pre-commit review and local verification gate is complete. Scoped commit/push
+and exact-commit hosted Linux CI remain the next delivery steps; PB-1.2/PB-1.3
+and production/pilot approvals remain outside this increment.
+
+## PB-1.1 source observations - 5 November 2026
+
+Migration 0040 adds per-import occurrence snapshots without historical inference.
+All finding-producing imports use the existing transactional publisher, including
+duplicate-only runs. The single-finding Workflow dialog loads source history on
+demand through an organization-scoped seek API. Current duplicate matching,
+workflow, scoring and archive ownership remain unchanged. All current records
+are explicitly ineligible for automated reconciliation; PB-1.2/PB-1.3 remain
+pending. [Contract and Chrome verification](FINDING_OBSERVATIONS.md).
+
+Local checks: 72 import/staging/migration/matching regressions passed, followed
+by 81 observation/archive/event/matching checks after review additions. Final
+observation plus migration verification passed 15 checks, including real
+upgrade/downgrade and metadata drift. These runs overlap; counts are not additive.
+The 5,000-row queued import plus repeat recorded 10,000 occurrences against
+5,000 canonical findings in 3.05 seconds in the synthetic test fixture. This is
+not a representative capacity benchmark. Atomic publication-failure/retry,
+same-file duplicates, changed source payloads, native/missing identities,
+timestamp offsets, tenant/viewer/cursor checks, archive/reimport/purge and
+duplicate-only scan deletion are covered.
+
+Focused UI checks: 17 passed; TypeScript and production acceptance build passed;
+high-severity Bandit and targeted ESLint passed. Initial test fixture date/email
+assumptions were corrected. A browser selector was scoped to the Findings table
+after a duplicate-report table made its prior selector ambiguous. Broader Chrome
+and local activation closeout follows below; no new hosted-CI result is claimed.
+
+Final UI suite: **521 tests passed across 54 files**. An existing upload test
+clicked Cancel before the error request's `finally` block re-enabled actions;
+it now waits for enabled state, matching an actual user click. No upload product
+behavior changed. Installed Chrome passed **87 checks** in isolated schema
+`phase3_browser_9e5777f821b6`, including the new repeated-import source history,
+mobile dialog fit and Axe checks, all existing workflow/archive/tenant checks
+and timed Dashboard refresh. No page errors or AI usage. Results/screenshots:
+`temp/testing/finding-workflow/phase3_browser_9e5777f821b6/` (ignored). Failed
+browser attempts retain their selector findings; all fixture schemas/processes
+were cleaned up. Documentation links and whitespace checks pass.
+
+Activation: all ordinary demo queues (imports, archive, evidence evaluation,
+Dashboard snapshots and reports) were idle before restart. The scoped demo
+launcher migrated only `auditmind_demo` to 0040 and rebuilt/restarted the API,
+frontend and one-slot worker. `/ready` returns 200 with database/uploads/worker
+all true; the login page returns 200. The new table contains zero observations
+before new imports, confirming no historical backfill. Existing accounts/data
+were retained and passwords were not reset. This increment remains uncommitted
+and unpushed, with no hosted-CI claim. Earlier hosted CI for `868c53b` passed all
+four jobs, including browser after an Ubuntu package-mirror timeout rerun:
+[baseline run](https://github.com/shalisarakkal/AuditMind/actions/runs/42080840192).
+
 ## Local recovery rehearsal - 5 November 2026
 
 PB-0.3 completed in a separate loopback-only temporary PostgreSQL 18 cluster,

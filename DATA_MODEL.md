@@ -65,6 +65,15 @@ This document defines the core data entities and relationships for the cyber res
 - **Purpose:** Logical scan/ingestion events (vuln scan, config import, IAM review). Every file import is recorded as a scan: `scan_type` `asset_import` / `findings_csv` / `findings_json` / `nessus`, or `<family>_import` for a profile import (e.g. `endpoint_agent_import`), `source` `upload`, `filename` the uploaded file, `profile` the import profile used (built-in key or the org's profile id), and `summary` (JSONB) the import report (created/updated/skipped/duplicates/failed/findings_created + row errors and warnings; for profile imports the first three count assets). `status` goes `pending` → `running` → `completed`/`failed`; large imports run in the background and are polled through it.
 
 ### 2.5 findings
+
+Migration `0040` adds **finding_observations**, an append-only application history
+of accepted finding occurrences, including duplicates. Each row links org/finding,
+retains an immutable import UUID plus nullable live scan link, records parser,
+source row/occurrence, filename, recording/source time, asset/source identifiers
+and imported payload. No historical backfill or stable identity is inferred;
+current reconciliation eligibility is false with reasons. Purging the finding
+cascades to observations; deleting a duplicate-only scan nulls its live link and
+retains the import UUID. [Full contract](docs/FINDING_OBSERVATIONS.md).
 - **Fields:** `id`, `scan_id`, `org_id`, `asset_id`, `category`, `domain`, `severity`, `description`, `raw_data`, `source`, `created_at`
 - **Relations:** `scan_id → scans.id`, `asset_id → assets.id`
 - **Purpose:** Individual issues (vulns, misconfigs, IAM risks, backup gaps).

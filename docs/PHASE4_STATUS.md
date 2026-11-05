@@ -1,5 +1,16 @@
 # Phase 4 status and next milestone
 
+PB-1.1 source observations are complete locally and activated at migration 0040:
+87 Chrome checks, 522 frontend tests and the full 1,528-test PostgreSQL backend
+suite pass. Final pre-commit review is complete, including a source timestamp
+overflow fix and activation. Check-in/push and exact-commit hosted CI remain pending.
+Imports append provenance
+without changing matching, workflow, scores or saved reports. A single-finding
+Workflow dialog exposes the read-only history on demand. Migration 0040 has no
+historical backfill. [Contract and verification](FINDING_OBSERVATIONS.md);
+[current validation](PHASE4_VALIDATION.md). Comparable scans/reconciliation and
+broader pilot/production rollout remain pending.
+
 Current release decisions and open evidence requirements are consolidated in the
 [5 November release-gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
 The project owner/user confirmed execution and approval ownership; release-gate

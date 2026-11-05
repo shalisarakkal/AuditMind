@@ -1,5 +1,13 @@
 # Verify the evidence-aware reporting changes
 
+PB-1.1 source history: after installation, import a small findings file, open
+the finding's **Workflow**, then **Show source observations**. Reimport the file
+with a changed severity/description and the same matching key. Two occurrences
+should be visible, while canonical finding/workflow values remain unchanged.
+These observations are explicitly ineligible for reconciliation; history is not
+backfilled for earlier/manual findings. See the
+[Chrome steps and retention contract](FINDING_OBSERVATIONS.md#inspection-and-chrome-verification).
+
 UI text/time follow-up (27 October): application headings, report filters and
 shared table/section labels use sentence case instead of forced all caps. Names,
 acronyms, authored report titles and evidence text retain their original case.

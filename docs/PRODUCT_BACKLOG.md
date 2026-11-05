@@ -93,6 +93,17 @@ observations; do not infer targets that have not been approved.
 
 ### PB-1.1 — Add per-finding source observation history
 
+**Status, 5 November:** Complete locally and activated at migration 0040;
+validation/activation closeout is
+recorded in [Phase 4 validation](PHASE4_VALIDATION.md). Append-only import
+occurrences and a read-only, paged source-history view preserve current matching
+and workflow behavior. No historical backfill or reconciliation eligibility is
+inferred. Chrome passed 87 checks and the final full frontend suite passed 522 tests.
+Final pre-commit review is complete, including 1,528 passing backend tests with
+PostgreSQL required and warnings as errors. Check-in/push and exact-commit
+hosted CI remain pending.
+[Contract and verification](FINDING_OBSERVATIONS.md).
+
 **Priority:** P1 · **Depends on:** PB-0.1
 
 Add an append-only observation record for supported imports, separate from the

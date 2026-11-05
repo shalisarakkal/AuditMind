@@ -86,6 +86,16 @@ schema is not migrated automatically. Scoring and existing report snapshots rema
 
 ### Manage a finding's workflow
 
+For imported findings, open the row's **Workflow** action and select **Show
+source observations** at the bottom. This shows each accepted import occurrence,
+including repeats, separately from workflow history. It loads only when expanded
+and supports Newer/Older pages. Recording times use your browser timezone;
+unknown source-observed times say Not provided. Existing/manual findings have no
+invented history. Reimporting a changed source payload records an observation
+without replacing workflow decisions or the canonical payload. All current
+observations remain ineligible for automated reconciliation. See
+[source observations](FINDING_OBSERVATIONS.md) for retention and matching limits.
+
 #### Upload protection
 
 Upload protection: imports, documents and logos share a per-address/process

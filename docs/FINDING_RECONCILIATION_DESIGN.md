@@ -1,5 +1,11 @@
 # Individual imported-finding archive and scan reconciliation
 
+PB-1.1 now implements the additive [source observation foundation](FINDING_OBSERVATIONS.md).
+The existing-behavior analysis below describes the baseline before that increment.
+Observations now record repeated occurrences; comparable scans, refreshed canonical
+payloads, suppression and reconciliation remain pending. Existing matching and
+archive ownership are unchanged.
+
 Status: functional rules approved on 23 October 2026; implementation remains pending
 as a separate increment after browser-timezone correction. User approved minimal
 suppression retained until explicit organization-admin clearance, independent of
