@@ -2,6 +2,37 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Archive lifecycle performance follow-up - 4 November
+
+November 5 Findings follow-up: workflow save measured 47 ms, but the following
+list reload took 10.7 s. Ordered broad-search paging and bounded rare short-filter
+metadata reuse are implemented and active in the restarted review API. On the
+current inventory: common search 1.25 s first / 27 ms repeat / 60 ms Next;
+literal backtick column filter 5.83 s first / 11 ms repeat. Cold short-filter
+scans and refresh after invalidation remain slower. All 58 focused list/filter
+tests pass, with five final punctuation/filter checks repeated successfully.
+See [search follow-up and limits](docs/LIST_NAVIGATION_PERFORMANCE.md).
+
+- [x] Measure archive, restore and permanent purge in a disposable test schema:
+  100,000 assets / 100,000 uploaded findings plus 100 manual findings.
+  Upload archive 21.6 s, corrected restore 85.9 s, purge 9.2 s locally.
+- [x] Replace restore's NULL-safe duplicate query with indexed equality branches;
+  preserve tenant/source identity, NULL/empty distinctions and workflow history.
+  All 57 archive API tests pass. No extra index or migration.
+- [x] Activate the tested service change with a coordinated API/worker restart
+  on 5 November; readiness, login and authentication proxy checks pass.
+- [x] Chrome lifecycle acceptance: literal backtick column filter, workflow save,
+  exact totals 1 -> 0 -> 1 across archive/restore, and saved rationale retained.
+  Final combined backend review: 129 focused checks pass; four process-stop
+  regressions pass. Restart fix is committed separately as `db37a31`.
+  Full isolated Chrome run: 86 checks pass, no browser errors or AI usage.
+- [x] Scoped application commits: restart `db37a31`, archive `5b3f48c`, and
+  Findings search/filter `2094cc1`. Cold short-query and larger lifecycle limits
+  remain documented rather than treated as closed performance guarantees.
+- [ ] Larger/concurrent lifecycle loads remain unvalidated; progress may pause
+  during index writes and statistics work. See
+  [archive measurements and limits](docs/ARCHIVE_PERFORMANCE.md).
+
 Current Dashboard closeout (29 October): local implementation and UI verification
 are complete and recorded in scoped commits. All 516 frontend tests and 21
 snapshot/interval/migration tests pass; lint and production build pass. Signed-in

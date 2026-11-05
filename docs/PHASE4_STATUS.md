@@ -1,5 +1,26 @@
 # Phase 4 status and next milestone
 
+## November 5 archive and Findings follow-up
+
+The local review closes the measured restore duplicate-query bottleneck,
+repeated broad-search candidate rebuilding and redundant scans for rare short
+Finding-column filters. Totals, tenant boundaries, NULL identity and saved
+workflow history remain covered by 129 focused PostgreSQL/unit checks. The
+restart launcher now handles rounded/typed process timestamps and Python child
+interpreters; four pure process-identity regressions pass on Windows.
+
+Scoped commits: `db37a31` (restart), `5b3f48c` (archive) and `2094cc1` (Findings).
+Chrome verifies exact displayed totals through backtick filtering, workflow save,
+archive and restore, preserving the saved rationale. The full isolated Chrome
+run passes 86 checks, with no browser errors or AI usage. The review API is active;
+hosted Linux acceptance must be verified for the pushed revision. No migration
+or additional index is introduced. Cold one-character searches and refresh
+after invalidation can still take seconds. Larger/concurrent lifecycle loads,
+SaaS scaling and broader scoring enablement remain held.
+
+[Archive measurements](ARCHIVE_PERFORMANCE.md) and
+[Finding-search measurements](LIST_NAVIGATION_PERFORMANCE.md).
+
 ## November 4 performance review
 
 Exact-count reuse, stable seek navigation and the 0039 sort/group indexes have
