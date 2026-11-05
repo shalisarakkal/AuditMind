@@ -1,6 +1,7 @@
 """Exact count reuse and signed, revision-bound seek navigation.
 
-Only small count metadata is cached, never rows or authorization decisions.
+Only small count and bounded candidate-ID metadata is cached, never finding
+payloads or authorization decisions.
 Invalid/stale cursors fall back to the existing offset contract.
 """
 import base64

@@ -75,6 +75,76 @@ def test_every_sort_seeks_forward_and_back_with_nulls_and_ties(client, inventory
                 assert [row["id"] for row in previous["items"]] == [row["id"] for row in pages[index-1][1]["items"]], (kind,sort,order)
 
 
+@pytest.mark.parametrize("sort,order", [("severity","asc"),("severity","desc"),("created","asc"),("created","desc")])
+def test_broad_finding_search_keeps_exact_counts_and_cursor_order(client, inventory, db_session, monkeypatch, sort, order):
+    from app.api.routes import findings as route
+    # Make one result match both finding text and its asset, exercising UNION
+    # deduplication versus the ordered predicate path on the same rows.
+    asset = inventory[2][1]
+    asset.hostname = "Finding-host"
+    db_session.commit()
+    for query in ("Finding", "host", "Zulu", "2026-10-03"):
+        params = {"q":query,"sort":sort,"order":order}
+        monkeypatch.setattr(route,"_BROAD_SEARCH_ROWS",10000)
+        expected = get(client,inventory,"findings",limit=500,**params)
+        assert expected["total"] > 7
+        monkeypatch.setattr(route,"_BROAD_SEARCH_ROWS",1)
+        first = get(client,inventory,"findings",limit=7,**params)
+        second = get(client,inventory,"findings",limit=7,offset=7,cursor=first["next_cursor"],**params)
+        assert first["total"] == second["total"] == expected["total"]
+        assert first["domain_counts"] == expected["domain_counts"]
+        assert [row["id"] for row in first["items"]+second["items"]] == [row["id"] for row in expected["items"][:14]]
+        previous = get(client,inventory,"findings",limit=7,cursor=second["previous_cursor"],**params)
+        assert previous["items"] == first["items"]
+    before = get(client,inventory,"findings",q="Finding",workflow_status="open",**{"sort":sort,"order":order})
+    changed = before["items"][0]["id"]
+    db_session.execute(text("UPDATE findings SET workflow_status='resolved' WHERE id=:id"),{"id":uuid.UUID(changed)})
+    db_session.commit()
+    after = get(client,inventory,"findings",q="Finding",workflow_status="open",**{"sort":sort,"order":order})
+    assert after["total"] == before["total"]-1
+    assert changed not in {row["id"] for row in after["items"]}
+
+
+@pytest.mark.parametrize("needle", ["`","%","_","ab"])
+def test_short_finding_filter_reuses_bounded_matches_and_invalidates(client, inventory, db_session, monkeypatch, needle):
+    from app.api.routes import findings as route
+    first, second = inventory[3][:2]
+    for finding in (first,second):
+        finding.description = f"literal {needle} example"
+        finding.category = None
+        finding.workflow_status = "open"
+    db_session.commit()
+    statements = []
+    def record(conn,cursor,statement,parameters,context,many):
+        if "like" in statement.lower(): statements.append(statement)
+    engine = db_session.get_bind()
+    event.listen(engine,"before_cursor_execute",record)
+    try:
+        expected = get(client,inventory,"findings",finding=needle,workflow_status="open",limit=1)
+        assert expected["total"] == 2 and len(statements) == 1
+        statements.clear()
+        page = get(client,inventory,"findings",finding=needle,workflow_status="open",limit=1,offset=1,cursor=expected["next_cursor"])
+        assert page["total"] == 2 and not statements
+        assert page["items"][0]["id"] != expected["items"][0]["id"]
+        db_session.execute(text("UPDATE findings SET workflow_status='resolved' WHERE id=:id"),{"id":first.id})
+        db_session.commit()
+        updated = get(client,inventory,"findings",finding=needle,workflow_status="open")
+        assert updated["total"] == 1 and statements
+        db_session.execute(text("UPDATE findings SET archived_at=now() WHERE id=:id"),{"id":second.id})
+        db_session.commit()
+        assert get(client,inventory,"findings",finding=needle,workflow_status="open")["total"] == 0
+    finally:
+        event.remove(engine,"before_cursor_execute",record)
+
+
+def test_short_finding_filter_over_sample_limit_stays_exact(client, inventory, monkeypatch):
+    from app.api.routes import findings as route
+    monkeypatch.setattr(route,"_SHORT_SEARCH_SAMPLE",1)
+    result = get(client,inventory,"findings",finding="Fi",limit=500)
+    assert result["total"] == sum(1 for row in inventory[3] if row.description and "fi" in row.description.lower())
+    assert len(result["items"]) == result["total"]
+
+
 def test_counts_reuse_across_sort_and_page_and_invalidate_on_raw_writes(client, inventory, db_session):
     statements = []
     def record(conn, cursor, statement, parameters, context, executemany):

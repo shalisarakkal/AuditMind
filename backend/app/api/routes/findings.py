@@ -13,6 +13,7 @@ from app.api.paging import (
     SortOrder,
     any_of,
     contains,
+    contains_pattern,
     date_range,
     distinct_values,
     indexed_values,
@@ -76,6 +77,8 @@ def bulk_finding_workflow(org_id: uuid.UUID, payload: WorkflowBulk,
 _SEVERITY_RANK = severity_rank(Finding.severity)
 _DOMAIN_RANK = case(*((Finding.domain == domain, rank) for rank, domain in enumerate(Domain)))
 _MAX_SORT_GROUPS = 1024
+_BROAD_SEARCH_ROWS = 10000
+_SHORT_SEARCH_SAMPLE = 1000
 
 # The domains' labels as the app shows them (frontend/src/lib/domain.ts), so
 # the search box finds "Vulnerability Mgmt" by what's on screen.
@@ -187,10 +190,18 @@ def list_findings(
         branches = [select(Finding.id).where(*active, predicate) for predicate in candidate_predicates]
         matches = union(*branches).subquery()
         search_condition = Finding.id.in_(select(matches.c.id))
+    finding_condition = contains(finding, Finding.description, Finding.category)
+    finding_needle = (finding or "").strip()
+    if finding_needle and finding_needle.isascii() and not any(c.isalpha() for c in finding_needle):
+        # ASCII punctuation/digits have no case variants. Avoid ILIKE's
+        # per-character case folding without changing literal matching.
+        pattern = contains_pattern(finding_needle)
+        finding_condition = or_(Finding.description.like(pattern, escape="\\"),
+                                Finding.category.like(pattern, escape="\\"))
     conditions = [
         search_condition,
         Finding.id == finding_id if finding_id else None,
-        contains(finding, Finding.description, Finding.category),
+        finding_condition,
         contains(asset, Asset.hostname, Asset.ip, Asset.cloud_id),
         one_of(Finding.severity, severity),
         one_of(Finding.source, source),
@@ -255,7 +266,23 @@ def list_findings(
         "status": list_pages.choices(workflow_status), "assignee": list_pages.choices(assignee),
         "overdue": overdue, "since": dates.since, "until": dates.until, "timezone": dates.timezone_name}
     stamp = list_pages.revision_stamp(db, org_id, "findings")
-    counted = list_pages.exact_counts(db, stamp, "findings", key, build_counts,
+    count_builder = build_counts
+    short_ids = None
+    if finding_condition is not None and len(finding.strip()) < 3 and not q:
+        # One/two-character patterns cannot use trigrams. For rare matches,
+        # scan once and reuse a bounded set of ID/count metadata for paging;
+        # do not repeat the full scan for counts, page IDs and positions.
+        sample = list_pages.exact_counts(db, stamp, "findings", {"short_candidates":key},
+            lambda: matching(Finding.id, Finding.domain, Finding.severity, for_counts=True)
+                .filter(*filters).limit(_SHORT_SEARCH_SAMPLE+1).all(),
+            asof=now if overdue else None, boundary=next_deadline if overdue else None).value
+        if len(sample) <= _SHORT_SEARCH_SAMPLE:
+            grouped_counts = {}
+            for identifier, d, s in sample:
+                grouped_counts[(d,s)] = grouped_counts.get((d,s),0)+1
+            short_ids = [row[0] for row in sample]
+            count_builder = lambda: [(d,s,n) for (d,s),n in grouped_counts.items()]
+    counted = list_pages.exact_counts(db, stamp, "findings", key, count_builder,
         asof=now if overdue else None, boundary=next_deadline if overdue else None)
     counts = counted.value
     domain_counts: dict[Domain, int] = {}
@@ -268,6 +295,17 @@ def list_findings(
         if not domain or d in domain:
             severity_counts[s] = severity_counts.get(s, 0) + n
     total = sum(severity_counts.values())
+
+    if short_ids is not None:
+        filters = [Finding.id.in_(short_ids) if condition is finding_condition else condition
+                   for condition in filters]
+
+    # Broad matches should walk the ordered page index and stop at LIMIT,
+    # rather than rebuild/deduplicate every candidate ID for each page probe.
+    # Keep the indexed UNION for exact counts and selective/unknown matches.
+    if candidate_predicates and total >= _BROAD_SEARCH_ROWS and sort in {"severity", "created"}:
+        filters = [or_(*candidate_predicates) if condition is search_condition else condition
+                   for condition in filters]
 
     # A bounded partial index accelerates ordinary finding text without
     # imposing B-tree entry-size limits on imported long descriptions.

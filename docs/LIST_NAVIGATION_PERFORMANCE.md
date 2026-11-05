@@ -1,5 +1,43 @@
 # Exact counts and large-list navigation
 
+## November 5 Findings search and workflow-refresh follow-up
+
+Live API logs separated a 47 ms workflow PATCH from a 10.7 s subsequent list
+reload; other observed finding-list reads took 9–20 s. Search/filter work after
+save was the measured delay, rather than the workflow write itself.
+
+For broad common searches under severity/created ordering, paging now uses an
+ordered predicate scan once exact counts establish at least 10,000 matches.
+Counts still use indexed UNION branches; selective searches retain that path.
+The local `Deprecated` case (184,836 matches) improved from 3.31 s first /
+2.55 s repeat / 3.17 s Next to 1.25 s / 27 ms / 60 ms in the final sample.
+
+The Finding-column literal backtick case found one match in 10.85 s before
+the change. Rare one/two-character column filters now reuse at most 1,000
+candidate IDs and their domain/severity count metadata, under the existing
+tenant/schema/epoch/revision/TTL cache key. If a 1,001st result is found, exact
+normal counting/paging remains in use; results are never truncated. Workflow,
+archive, membership and data changes invalidate this metadata. ASCII-only
+punctuation/digit patterns use equivalent escaped LIKE rather than ILIKE;
+alphabetic filters keep case-insensitive matching. Final local sample: 5.83 s
+first and 11 ms repeat. Cold short filters and refresh after invalidation can
+still take seconds because they cannot use trigram selectivity.
+
+No new index, schema migration, search restriction or frontend change. The
+58 focused PostgreSQL list/navigation/workflow-filter tests pass; the final
+punctuation comparison also passed all five dedicated short-filter checks.
+These tests cover exact counts, literal wildcard escaping, sample overflow,
+cursor ordering and invalidation after workflow/archive changes.
+Real Chrome also verifies the backtick column filter and displayed totals through
+workflow save, archive and restore, including preservation of the saved rationale.
+Measurements are read-only, single observations on the current local inventory,
+not production latency guarantees. Reproduce with:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts/benchmark_large_lists.py --case findings_literal_short --case findings_common_search
+```
+
 ## November 4 query-plan review
 
 The wider review measures all eight Assets sorts and eleven Findings sorts in

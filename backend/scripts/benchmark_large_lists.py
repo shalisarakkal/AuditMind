@@ -65,6 +65,7 @@ def main():
             ("assets_hostname_filter", asset_list, {"hostname": "NET-499979"}),
             ("assets_hostname_search", asset_list, {"q": "NET-499"}),
             ("findings_text_filter", finding_list, {"finding": "Deprecated"}),
+            ("findings_literal_short", finding_list, {"finding": "`"}),
             ("findings_common_search", finding_list, {"q": "Deprecated"}),
             ("assets_tag_search", asset_list, {"q": tag or "no-such-tag-93c7"}),
             ("assets_tag_filter", asset_list, {"tags": tag or "no-such-tag-93c7"}),
