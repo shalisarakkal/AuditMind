@@ -555,7 +555,7 @@ class _Runner:
 
 def purge_at(org: Organization, archived_at: datetime) -> datetime:
     """When an item archived at `archived_at` is purged automatically."""
-    return archived_at + timedelta(days=resolve_ingestion_settings(org).archive_retention_days)
+    return archived_at.astimezone(timezone.utc) + timedelta(days=resolve_ingestion_settings(org).archive_retention_days)
 
 
 def purge_expired(db: Session, now: datetime | None = None, queue: bool = False) -> int:
@@ -565,7 +565,7 @@ def purge_expired(db: Session, now: datetime | None = None, queue: bool = False)
     run), as low-priority jobs it takes when nothing else waits; returns how
     many were queued. An archived org is left as it is (read-only, kept
     whole until the Sysadmin restores or purges it)."""
-    now = now or _now()
+    now = (now or _now()).astimezone(timezone.utc)
     purged = 0
     for org in db.scalars(
         select(Organization).where(Organization.archived_at.is_(None), Organization.purge_requested_at.is_(None))
