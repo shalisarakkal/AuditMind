@@ -10,8 +10,33 @@ function Stop-Demo {
     foreach ($record in (Get-Content -LiteralPath $demoPidFile -Raw | ConvertFrom-Json)) {
         $process = Get-Process -Id $record.Id -ErrorAction SilentlyContinue
         # PID reuse must not stop a different application.
-        if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $record.Started) {
-            Stop-Process -Id $record.Id
+        # JSON writers may round sub-microsecond digits. Compare instants with
+        # a one-millisecond tolerance, retaining protection against PID reuse.
+        $recordedStart = if ($record.Started -is [DateTimeOffset]) {
+            $record.Started.UtcDateTime
+        } elseif ($record.Started -is [DateTime]) {
+            $record.Started.ToUniversalTime()
+        } else {
+            [DateTimeOffset]::Parse([string]$record.Started).UtcDateTime
+        }
+        $sameStart = $process -and [Math]::Abs(($process.StartTime.ToUniversalTime() - $recordedStart).TotalMilliseconds) -lt 1
+        if ($sameStart) {
+            # Python's Windows venv launcher creates a child interpreter.
+            # Capture descendants before stopping their parent.
+            $descendants = @()
+            $parents = @($process.Id)
+            while ($parents.Count -gt 0) {
+                $children = @(Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -in $parents })
+                $descendants += $children
+                $parents = @($children | ForEach-Object { $_.ProcessId })
+            }
+            foreach ($child in $descendants) {
+                $liveChild = Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
+                if ($liveChild -and [Math]::Abs(($liveChild.StartTime - $child.CreationDate).TotalMilliseconds) -lt 1) {
+                    Stop-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
+                }
+            }
+            Stop-Process -Id $record.Id -ErrorAction SilentlyContinue
         }
     }
     Remove-Item -LiteralPath $demoPidFile

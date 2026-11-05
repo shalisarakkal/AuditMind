@@ -364,6 +364,13 @@ Restart without rebuilding only if frontend code has not changed:
 powershell -ExecutionPolicy Bypass -File .\start-demo.ps1 -SkipBuild
 ```
 
+Wait for active jobs to finish, stop the demo, then start it again. Stop handles
+the Python worker/API child processes as well as their launchers. It checks
+recorded start times to avoid stopping a different application that reused a PID.
+If `-SkipBuild` reports that the build was not prepared for this demo, run
+`powershell -ExecutionPolicy Bypass -File .\start-demo.ps1` without `-SkipBuild`;
+this rebuilds the frontend with the demo's backend address.
+
 The demo uses the separate `auditmind_demo` schema inside the configured local
 PostgreSQL database. The regular application's `public` tables, accounts and
 migration revision are not changed. It is **not** the disposable `auditmind_test`
