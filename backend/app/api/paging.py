@@ -21,13 +21,15 @@ BLANK = ""
 class PageParams:
     limit: int
     offset: int
+    cursor: str | None = None
 
 
 def page_params(
     limit: int = Query(100, ge=1, le=500, description="Items per page"),
     offset: int = Query(0, ge=0, description="Items to skip"),
+    cursor: str | None = Query(None, max_length=4096, description="Opaque seek hint from the previous response"),
 ) -> PageParams:
-    return PageParams(limit=limit, offset=offset)
+    return PageParams(limit=limit, offset=offset, cursor=cursor)
 
 
 def contains_pattern(q: str | None) -> str | None:

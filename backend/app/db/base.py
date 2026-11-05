@@ -1,5 +1,6 @@
 from app.db.base_class import Base
 from app.models.dashboard_snapshot import DashboardSnapshot  # noqa: F401
+from app.models.list_revision import OrganizationListRevision  # noqa: F401
 from app.models.organization import Organization
 from app.models.organization_logo import OrganizationLogo
 from app.models.scoring_qualification import OrganizationScoringSettings, DomainEvidenceQualification
@@ -27,6 +28,8 @@ from app.models.worker_dispatch import WorkerDispatch
 from app.db.evidence_revision import register
 
 register(Base.metadata)
+from app.db.list_revision import register as register_lists
+register_lists(Base.metadata)
 
 __all__ = [
     "WorkerDispatch",

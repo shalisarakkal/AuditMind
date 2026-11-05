@@ -1,20 +1,50 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from datetime import date
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+from app.db.list_sort import severity_rank_index, SHORT_FINDING_TEXT, LONG_FINDING_TEXT
 from app.db.types import str_enum
 from app.models.asset import ACTIVE
 from app.models.enums import Domain, Severity
 
-
 class Finding(Base):
     __tablename__ = "findings"
     __table_args__ = (
+        Index("ix_findings_active_domain_page", "org_id", "domain", severity_rank_index(),
+              text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE),
+        *[Index(f"ix_findings_active_{field}_group_page", "org_id", field, "severity",
+                text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE)
+          for field in ("workflow_status", "assignee_id")],
+        Index("ix_findings_active_due_presence", "org_id", postgresql_where=text("archived_at IS NULL AND (due_date IS NOT NULL OR due_expires_at IS NOT NULL)")),
+        Index("ix_findings_active_review_presence", "org_id", postgresql_where=text("archived_at IS NULL AND (risk_review_date IS NOT NULL OR risk_review_expires_at IS NOT NULL)")),
+        *[Index(f"ix_findings_active_{field}_{direction}_page", "org_id",
+                text(f"lower({field}) {direction.upper()} NULLS LAST"), severity_rank_index(),
+                text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE)
+          for field in ("category", "source") for direction in ("asc", "desc")],
+        *[Index(f"ix_findings_active_text_{direction}_page", "org_id",
+                text(f"lower(COALESCE(description, category::text)) {direction.upper()} NULLS LAST"),
+                severity_rank_index(), text("created_at DESC NULLS LAST"), "id",
+                postgresql_where=SHORT_FINDING_TEXT) for direction in ("asc", "desc")],
+        Index("ix_findings_active_long_text", "org_id", postgresql_where=LONG_FINDING_TEXT),
+        Index("ix_findings_active_severity_page", "org_id", severity_rank_index(),
+              text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE),
+        Index("ix_findings_active_created_page", "org_id", "created_at", "id", postgresql_where=ACTIVE),
         CheckConstraint("workflow_status IN ('open','accepted_risk','mitigated','resolved','false_positive')", name="ck_finding_workflow_status"),
         CheckConstraint("workflow_version >= 0", name="ck_finding_workflow_version"),
         # The findings list (newest first) and an import's duplicate check,

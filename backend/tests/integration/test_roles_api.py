@@ -68,7 +68,10 @@ def test_viewers_can_read_everything(client, org, path):
 def test_viewer_write_attempt_changes_nothing(client, org):
     org_id, headers = org
 
-    client.post(f"/api/v1/orgs/{org_id}/assets/import", headers=headers["viewer"], files=CSV_FILE)
+    denied = client.post(f"/api/v1/orgs/{org_id}/assets/import", headers=headers["viewer"], files=CSV_FILE)
+    assert denied.status_code == 403
 
-    assert client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers["admin"]).json() == {"items": [], "total": 0}
+    assets = client.get(f"/api/v1/orgs/{org_id}/assets", headers=headers["admin"]).json()
+    assert assets["items"] == [] and assets["total"] == 0
+    assert assets["next_cursor"] is None and assets["previous_cursor"] is None
     assert client.get(f"/api/v1/orgs/{org_id}/uploads", headers=headers["admin"]).json()["total"] == 0

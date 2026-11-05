@@ -6,8 +6,9 @@ import FindingsPage from "@/app/(app)/findings/page";
 import DashboardPage from "@/app/(app)/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import type { Asset, DashboardSummary, Finding, FindingListItem } from "@/lib/types";
-import { json, renderSignedIn, requestInit, scan } from "@/test/helpers";
+import { json, org, renderSignedIn, requestInit, scan } from "@/test/helpers";
 import { BUILTIN_PROFILES } from "@/test/profiles";
+import { useApp } from "@/context/AppContext";
 
 // The page address: tests set `search` before rendering; lists write theirs
 // back through router.replace.
@@ -21,6 +22,36 @@ vi.mock("next/navigation", () => ({
 beforeEach(() => {
   navigation.search = "";
   navigation.replace.mockClear();
+});
+
+it("resets Findings filters, sorting and seek state when switching organizations", async () => {
+  navigation.search = "org=org-1&q=server&sort=source&order=desc&offset=100&cursor=old-anchor";
+  function SwitchOrganization() {
+    const { selectOrg } = useApp();
+    return <button onClick={() => selectOrg("org-2")}>Switch test organization</button>;
+  }
+  const { fetchMock } = await renderSignedIn(<><SwitchOrganization /><FindingsPage /></>, "viewer", {
+    "GET /orgs": () => [org({ role: "viewer" }), org({ id: "org-2", name: "Second", role: "viewer" })],
+    "GET /orgs/org-1/findings": () => ({ items: [], total: 300, domain_counts: {} }),
+    "GET /orgs/org-2/findings": () => ({ items: [], total: 0, domain_counts: {} }),
+    "GET /orgs/org-2/findings/facets": () => ({ source: [] }),
+    "GET /orgs/org-2/scans?tracked=true": () => [],
+    "GET /orgs/org-2/scans?active=true": () => [],
+    "GET /orgs/org-2/archive-jobs?tracked=true": () => [],
+  });
+  expect(await screen.findByPlaceholderText("Search all columns")).toHaveValue("server");
+  fireEvent.click(screen.getByText("Switch test organization"));
+  await waitFor(() => {
+    const requests = fetchMock.mock.calls.map(([url]) => String(url))
+      .filter(url => url.includes("/orgs/org-2/findings?"));
+    expect(requests.length).toBeGreaterThan(0);
+    for (const url of requests) {
+      const params = new URL(url, "http://localhost").searchParams;
+      expect(params.get("offset")).toBe("0");
+      for (const key of ["q", "sort", "order", "cursor"]) expect(params.has(key)).toBe(false);
+    }
+  });
+  expect(screen.getByPlaceholderText("Search all columns")).toHaveValue("");
 });
 
 const ASSETS: Asset[] = [

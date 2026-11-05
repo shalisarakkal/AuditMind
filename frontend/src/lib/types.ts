@@ -234,7 +234,7 @@ export type FindingListItem = Finding & {
 };
 
 /** One page of a list, and how many items match across all pages. */
-export type Page<T> = { items: T[]; total: number };
+export type Page<T> = { items: T[]; total: number; next_cursor?: string | null; previous_cursor?: string | null };
 
 /** The values each pick-list filter can offer; "" stands for "no value". */
 export type AssetFacets = { type: string[]; subtype: string[]; environment: string[]; criticality: string[] };

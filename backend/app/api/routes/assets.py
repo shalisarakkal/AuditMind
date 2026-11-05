@@ -15,7 +15,6 @@ from app.api.paging import (
     distinct_values,
     labelled,
     one_of,
-    ordered,
     page_params,
 )
 from app.api.uploads import IMPORT_RESPONSES, confirm_form, start_import
@@ -27,7 +26,8 @@ from app.models.membership import OrgMembership
 from app.models.organization import Organization
 from app.schemas.asset import AssetCreate, AssetFacets, AssetListItem, AssetRead
 from app.schemas.ingestion import ImportResponse
-from app.schemas.paging import Page
+from app.schemas.paging import SeekPage
+from app.services import list_pages
 from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.asset_types import resolve_asset_type
 from app.services.events import record_event
@@ -61,7 +61,7 @@ _TYPE_LABELS = {
 }
 
 
-@router.get("", response_model=Page[AssetListItem])
+@router.get("", response_model=SeekPage[AssetListItem])
 def list_assets(
     org_id: uuid.UUID,
     q: str | None = Query(
@@ -82,7 +82,7 @@ def list_assets(
     page: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     _: OrgMembership = Depends(require_org_member),
-) -> Page[AssetListItem]:
+) -> SeekPage[AssetListItem]:
     """The org's assets, a page at a time: by default in the order they were
     added. Filters combine (all must match); text filters match partially."""
     tag_text = func.array_to_string(Asset.tags, " ")
@@ -108,20 +108,32 @@ def list_assets(
     query = db.query(Asset).filter(
         Asset.org_id == org_id, Asset.archived_at.is_(None), *(c for c in conditions if c is not None)
     )
-    total = query.count()
-    items = (
-        query.order_by(ordered(_SORT_COLUMNS[sort], order), Asset.created_at, Asset.id)
-        .offset(page.offset)
-        .limit(page.limit)
-        .all()
-    )
+    key = {"q": (q or "").strip(), "hostname": (hostname or "").strip(), "ip": (ip or "").strip(),
+        "cloud_id": (cloud_id or "").strip(), "tags": (tags or "").strip(),
+        **{name: list_pages.choices(value) for name, value in (
+            ("type", type), ("subtype", subtype), ("environment", environment), ("criticality", criticality))}}
+    stamp = list_pages.revision_stamp(db, org_id, "assets")
+    total = list_pages.exact_counts(db, stamp, "assets", key, query.count).value
+    terms = [list_pages.Term(_SORT_COLUMNS[sort], order == "asc")]
+    if sort != "created": terms.append(list_pages.Term(Asset.created_at))
+    terms.append(list_pages.Term(Asset.id))
+    scope = list_pages.fingerprint({"kind": "assets-v1", "org": org_id, "filters": key, "sort": sort, "order": order})
+    positions = list_pages.page_rows(query.with_entities(Asset.id, *(term.column for term in terms)),
+        terms, page, stamp, scope, indexed=sort in {"created", "hostname", "ip"}) if page.offset < total else []
+    ids = [row[0] for row in positions]
+    # Sorting/offset operates on narrow IDs/keys. Fetch payload only for this page.
+    items = db.query(Asset).filter(Asset.org_id == org_id, Asset.archived_at.is_(None), Asset.id.in_(ids)).all() if ids else []
+    position = {id_: index for index, id_ in enumerate(ids)}
+    items.sort(key=lambda item: position[item.id])
+    navigation = list_pages.navigation(positions, stamp, scope, page, total) if list_pages.revision_stamp(db, org_id, "assets") == stamp else {}
     unfinished = unfinished_archives(db, org_id, [a.id for a in items])
-    return Page(
+    return SeekPage(
         items=[
             AssetListItem(**AssetRead.model_validate(a).model_dump(), **archiving_fields(unfinished, a.id))
             for a in items
         ],
         total=total,
+        **navigation,
     )
 
 

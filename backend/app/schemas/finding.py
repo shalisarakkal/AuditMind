@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import ArchiveProgress, Domain, Severity
-from app.schemas.paging import Page
+from app.schemas.paging import SeekPage
 from app.schemas.finding_workflow import WorkflowStatus
 
 
@@ -62,7 +62,7 @@ class FindingListItem(FindingRead):
     archiving_batch_id: uuid.UUID | None = None
 
 
-class FindingPage(Page[FindingListItem]):
+class FindingPage(SeekPage[FindingListItem]):
     # Findings per domain for the same search (whatever the domain filter),
     # for the list's domain filter.
     domain_counts: dict[Domain, int]

@@ -11,3 +11,8 @@ class Page(BaseModel, Generic[T]):
 
     items: list[T]
     total: int
+
+
+class SeekPage(Page[T], Generic[T]):
+    next_cursor: str | None = None
+    previous_cursor: str | None = None

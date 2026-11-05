@@ -25,6 +25,18 @@ class Asset(Base):
         Index("ix_assets_org_cloud_id", "org_id", "cloud_id", postgresql_where=ACTIVE),
         # Exact active-row counts without traversing hostname/IP payload keys.
         Index("ix_assets_active_org_count", "org_id", postgresql_where=ACTIVE),
+        Index("ix_assets_active_created_page", "org_id", "created_at", "id", postgresql_where=ACTIVE),
+        Index("ix_assets_active_created_desc_page", "org_id", text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE),
+        *[Index(f"ix_assets_active_ip_{direction}_page", "org_id", text(f"ip {direction.upper()} NULLS LAST"),
+                "created_at", "id", postgresql_where=ACTIVE) for direction in ("asc", "desc")],
+        # Active findings can reference an archived asset in legacy data;
+        # the finding-list label join intentionally retains those labels.
+        *[Index(f"ix_assets_org_label_{direction}_page", "org_id",
+                text(f"lower(COALESCE(hostname, ip, cloud_id)) {direction.upper()} NULLS LAST"), "id")
+          for direction in ("asc", "desc")],
+        *[Index(f"ix_assets_active_hostname_{direction}_page", "org_id",
+                text(f"lower(hostname) {direction.upper()} NULLS LAST"), "created_at", "id",
+                postgresql_where=ACTIVE) for direction in ("asc", "desc")],
         *[Index(f"ix_assets_active_org_{column}", "org_id", column, postgresql_where=ACTIVE)
           for column in ("type", "subtype", "environment", "criticality")],
         Index("ix_assets_active_search_trgm", literal_column("am_asset_search_v1(hostname, ip, cloud_id, type, subtype, environment, criticality, tags)").label("search_text"),

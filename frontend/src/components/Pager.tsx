@@ -9,11 +9,15 @@ export default function Pager({
   limit,
   total,
   onChange,
+  nextCursor,
+  previousCursor,
 }: {
   offset: number;
   limit: number;
   total: number;
-  onChange(offset: number): void;
+  onChange(offset: number, cursor?: string | null): void;
+  nextCursor?: string | null;
+  previousCursor?: string | null;
 }) {
   const pastTheEnd = offset > 0 && offset >= total;
   useEffect(() => {
@@ -32,10 +36,10 @@ export default function Pager({
         {total.toLocaleString("en-US")}
       </span>
       <span className="flex gap-2">
-        <button type="button" className={button} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>
+        <button type="button" className={button} disabled={offset === 0} onClick={() => previousCursor ? onChange(Math.max(0, offset - limit), previousCursor) : onChange(Math.max(0, offset - limit))}>
           Previous
         </button>
-        <button type="button" className={button} disabled={last >= total} onClick={() => onChange(offset + limit)}>
+        <button type="button" className={button} disabled={last >= total} onClick={() => nextCursor ? onChange(offset + limit, nextCursor) : onChange(offset + limit)}>
           Next
         </button>
       </span>

@@ -262,7 +262,7 @@ function Assets() {
             </tbody>
         </ListTable>
       )}
-      {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
+      {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} nextCursor={page.next_cursor} previousCursor={page.previous_cursor} />}
     </div>
   );
 }

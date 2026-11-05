@@ -58,7 +58,7 @@ export function useListState(pageSize: number, orgId: string) {
       const next = new URLSearchParams(latest.current);
       next.delete(ORG_KEY);
       change(next);
-      if (!keepOffset) next.delete("offset");
+      if (!keepOffset) { next.delete("offset"); next.delete("cursor"); }
       write(next);
     },
     [write],
@@ -77,7 +77,7 @@ export function useListState(pageSize: number, orgId: string) {
     if (own.get("sort") && !own.get("order")) apiQuery.set("order", "asc");
     apiQuery.set("limit", String(pageSize));
     apiQuery.set("offset", String(offset));
-    const filterKeys = [...new Set(own.keys())].filter((k) => !["sort", "order", "offset"].includes(k));
+    const filterKeys = [...new Set(own.keys())].filter((k) => !["sort", "order", "offset", "cursor"].includes(k));
     return {
       apiQuery: apiQuery.toString(),
       offset,
@@ -115,8 +115,11 @@ export function useListState(pageSize: number, orgId: string) {
             next.set("order", order);
           }
         }),
-      setOffset: (value: number) =>
-        update((next) => (value > 0 ? next.set("offset", String(value)) : next.delete("offset")), true),
+      setOffset: (value: number, cursor?: string | null) =>
+        update((next) => {
+          if (value > 0) next.set("offset", String(value)); else next.delete("offset");
+          if (cursor) next.set("cursor", cursor); else next.delete("cursor");
+        }, true),
       clearFilters: () => {
         setClearCount((count) => count + 1);
         update((next) => {
