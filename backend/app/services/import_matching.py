@@ -208,7 +208,9 @@ class FindingIndex:
     duplicates)."""
 
     def __init__(self, keys: Iterable[tuple] | dict[tuple, Origin] = ()):
-        self._origins: dict[tuple, Origin] = keys if isinstance(keys, dict) else dict.fromkeys(keys)
+        origins = keys if isinstance(keys, dict) else dict.fromkeys(keys)
+        self._entries: dict[tuple, tuple[Origin, uuid.UUID | None]] = {
+            key: (origin, None) for key, origin in origins.items()}
 
     @classmethod
     def load(cls, db: Session, org_id: uuid.UUID, asset_ids: Iterable[uuid.UUID]) -> "FindingIndex":
@@ -216,32 +218,43 @@ class FindingIndex:
         its own asset, and a new asset has none yet."""
         # Descriptions only matter for uncategorised findings.
         description = case((Finding.category.is_(None), Finding.description))
-        query = select(Finding.asset_id, Finding.source, Finding.category, description, Finding.scan_id).where(
+        query = select(Finding.asset_id, Finding.source, Finding.category, description, Finding.scan_id, Finding.id).where(
             Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.source.is_not(None)
         )
         # One object per upload, not one per row: millions of findings share
         # a few uploads.
         uploads: dict[uuid.UUID, uuid.UUID] = {}
-
-        def entry(row) -> tuple[tuple, Origin]:
+        def entry(row):
             scan_id = row[4]
-            return finding_key(*row[:4]), scan_id and uploads.setdefault(scan_id, scan_id)
+            key = finding_key(*row[:4])
+            return key, (scan_id and uploads.setdefault(scan_id, scan_id), row[5])
+
+        def result(origins):
+            index = cls()
+            index._entries = origins
+            return index
 
         asset_ids = list(asset_ids)
         # Findings on no asset (an event log's, about a whole tenant): few.
-        origins: dict[tuple, Origin] = dict(entry(row) for row in db.execute(query.where(Finding.asset_id.is_(None))))
+        origins = dict(entry(row) for row in db.execute(query.where(Finding.asset_id.is_(None))))
         if len(asset_ids) > TARGETED_LOAD_MAX:  # the whole org: one pass
             origins.update(entry(row) for row in db.execute(query.where(Finding.asset_id.is_not(None))))
-            return cls(origins)
+            return result(origins)
         for chunk in _chunks(asset_ids):
             origins.update(entry(row) for row in db.execute(query.where(Finding.asset_id.in_(chunk))))
-        return cls(origins)
+        return result(origins)
 
     def __contains__(self, key: tuple) -> bool:
-        return key in self._origins
+        return key in self._entries
 
     def origin(self, key: tuple) -> Origin:
-        return self._origins.get(key)
+        return self._entries.get(key, (None, None))[0]
 
-    def add(self, key: tuple, origin: Origin = None) -> None:
-        self._origins[key] = origin
+    def finding_id(self, key: tuple) -> uuid.UUID:
+        identifier = self._entries[key][1]
+        if identifier is None:
+            raise ValueError("Finding index entry has no canonical finding ID")
+        return identifier
+
+    def add(self, key: tuple, origin: Origin = None, finding_id: uuid.UUID | None = None) -> None:
+        self._entries[key] = (origin, finding_id)

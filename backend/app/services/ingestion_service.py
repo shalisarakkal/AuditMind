@@ -40,6 +40,8 @@ from app.models.archive import AssetScan
 from app.models.asset import Asset
 from app.models.enums import Criticality, Domain, ScanStatus, Severity
 from app.models.finding import Finding
+from app.models.finding_observation import FindingObservation
+from app.services.finding_observations import observation_values
 from app.models.organization import Organization
 from app.models.scan import Scan
 from app.models.user import User
@@ -737,6 +739,7 @@ class _PendingWrites:
         self.asset_updates: dict[uuid.UUID, dict] = {}
         self.details: dict[uuid.UUID, dict] = {}
         self.findings: list[dict] = []
+        self.observations: list[dict] = []
         self._last_created: datetime | None = None
 
     def created_at(self) -> datetime:
@@ -778,6 +781,11 @@ class _PendingWrites:
         self.findings.append(values)
         self._created()
 
+    def observe(self, values: dict) -> None:
+        self.observations.append(values)
+        if len(self.observations) >= WRITE_BATCH:
+            self.flush()
+
     def row_done(self) -> None:
         self.rows_done += 1
         if self.progress is not None:
@@ -805,6 +813,9 @@ class _PendingWrites:
             _copy_rows(self.db, AssetScan.__tablename__, self.links)
         if self.findings:
             _copy_rows(self.db, Finding.__tablename__, self.findings)
+        if self.observations:
+            _copy_rows(self.db, FindingObservation.__tablename__, self.observations)
+        self.observations = []
         self.new_assets, self.asset_updates, self.details, self.findings, self.links = {}, {}, {}, [], []
 
 
@@ -848,6 +859,8 @@ class _Publisher:
         self.report, self.index, self.writes = report, index, writes
         self.count_findings_as = count_findings_as
         self.findings = FindingIndex.load(db, org_id, index.existing_ids)
+        self.scan = db.get(Scan, scan_id)
+        self.occurrence = 0
         self.warnings: Capped = Capped()
         self.duplicates: list[tuple[FindingRow, Origin]] = []  # the first, to list
         self.repeated = _RepeatedAssets() if self.strategy != "duplicate" else None
@@ -985,15 +998,19 @@ class _Publisher:
         """Unless the same finding is already recorded (on its asset, or for
         no asset): then it's counted as a duplicate."""
         key = finding_key(asset.id if asset else None, row.source, row.category, row.description)
+        self.occurrence += 1
         if key in self.findings:
+            self.writes.observe(observation_values(row, asset, self.scan,
+                self.findings.finding_id(key), self.occurrence))
             self.report.duplicates += 1
             if len(self.duplicates) < MAX_REPORTED_ERRORS:
                 self.duplicates.append((row, self.findings.origin(key)))
             return
-        self.findings.add(key, row.row)  # later rows in the same file dedup against it
+        finding_id = uuid.uuid4()
+        self.findings.add(key, row.row, finding_id)  # later rows in the same file dedup against it
         self.writes.create_finding(
             {
-                "id": uuid.uuid4(),
+                "id": finding_id,
                 "org_id": self.org_id,
                 "scan_id": self.scan_id,
                 "asset_id": asset.id if asset else None,
@@ -1010,6 +1027,7 @@ class _Publisher:
                 "created_at": self.writes.created_at(),
             }
         )
+        self.writes.observe(observation_values(row, asset, self.scan, finding_id, self.occurrence))
         setattr(self.report, self.count_findings_as, getattr(self.report, self.count_findings_as) + 1)
 
 

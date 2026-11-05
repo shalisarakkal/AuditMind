@@ -11,6 +11,7 @@ from app.models.asset import Asset
 from app.models.scan import Scan
 from app.models.finding import Finding
 from app.models.finding_history import FindingHistory
+from app.models.finding_observation import FindingObservation
 from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.ai_usage import AIUsage
@@ -47,6 +48,7 @@ __all__ = [
     "Scan",
     "Finding",
     "FindingHistory",
+    "FindingObservation",
     "RiskScore",
     "Report",
     "Document",

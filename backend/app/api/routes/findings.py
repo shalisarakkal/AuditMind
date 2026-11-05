@@ -36,12 +36,31 @@ from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.events import record_event
 from app.schemas.finding_workflow import HistoryRead, WorkflowBulk, WorkflowRead, WorkflowStatus, WorkflowTarget, WorkflowUpdate
 from app.models.finding_history import FindingHistory
+from app.models.finding_observation import FindingObservation
+from app.schemas.finding_observation import FindingObservationRead
 from app.services.finding_workflow import get_finding, read_history, read_workflow, update_workflows
 from app.services.workflow_deadlines import deadline_now
 from app.services import list_pages
 from app.db.list_sort import severity_rank, finding_text_size, TEXT_SORT_BYTES
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
+
+
+@router.get("/findings/{finding_id}/observations", response_model=list[FindingObservationRead])
+def finding_observations(org_id: uuid.UUID, finding_id: uuid.UUID,
+        before: uuid.UUID | None = None, limit: int = Query(20, ge=1, le=100),
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    get_finding(db, org_id, finding_id)
+    query = select(FindingObservation).where(FindingObservation.org_id == org_id,
+        FindingObservation.finding_id == finding_id)
+    if before is not None:
+        cursor = db.scalar(query.where(FindingObservation.id == before))
+        if cursor is None:
+            raise HTTPException(404, "Observation cursor not found")
+        query = query.where(or_(FindingObservation.recorded_at < cursor.recorded_at,
+            and_(FindingObservation.recorded_at == cursor.recorded_at, FindingObservation.id < cursor.id)))
+    return db.scalars(query.order_by(FindingObservation.recorded_at.desc(),
+        FindingObservation.id.desc()).limit(limit)).all()
 
 
 @router.get("/findings/{finding_id}/workflow", response_model=WorkflowRead)
