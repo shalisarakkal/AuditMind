@@ -1,5 +1,31 @@
 # Phase 4 remediation workflow validation
 
+## Local recovery rehearsal - 5 November 2026
+
+PB-0.3 completed in a separate loopback-only temporary PostgreSQL 18 cluster,
+with source/restore databases independent of the installed application/test DBs.
+Final run `recovery_44cc46a38cc9418a835e6c9a6b65a239`: ten operational checks pass;
+five checksum/schema-canonicalization unit checks pass. The prior complete run
+also passed. All temporary clusters, including failed-run clusters, are removed.
+
+Backup 0.477 s; restore plus full verification 0.987 s; worker restart to completed
+5,000-row import 5.255 s after eligibility; actual interruption to completion
+34.756 s, including the real 30-second fixture stale window. The normal app's
+120-second stale default is unchanged. Every table's full row hash/count and
+companion file hash matches at the backup point; raw DDL and the narrow PostgreSQL
+enum-array cast canonicalization are retained/tested. Missing-file and corrupt-
+archive checks, preserved workflow/report/document data, tenant denial, no-op
+migration, checkpoint resume and duplicate-free second restart pass.
+
+Evidence is under ignored `temp/testing/recovery/<run>/`: `results.json`, manifest,
+custom dump, file ZIP, worker logs and raw schema snapshots. Earlier failed runs
+retain the Windows pipe and cast-normalization findings. No ordinary data,
+password, setting, application process or external provider was changed/called.
+The full native rehearsal is local and opt-in; hosted CI checks helper unit tests
+and application suites rather than executing the full drill. Exact-commit hosted
+CI is a separate verification gate. Prior `b4230f9` CI is the application baseline.
+[Recovery contract and remaining gates](RECOVERY_REHEARSAL.md).
+
 ## Hosted index-test portability follow-up — 30 October 2026
 
 Run [41066594402](https://github.com/shalisarakkal/AuditMind/actions/runs/41066594402)
