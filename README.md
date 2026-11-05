@@ -182,3 +182,7 @@ migration `0021`, quotas, idempotency, retention and embedding deployment instru
 validation are user-deferred to [Future phase](PLAN.md#future-phase--deferred-delivery),
 not core Phase 3 blockers. Reporting-period browser fields are also deferred. `PLAN.md` tracks every
 phase, decision and test run; `Blueprint.md` / `Architecture.md` section 9 hold the original roadmap.
+
+Product direction beyond the current build is captured in the
+[prioritized product roadmap](docs/PRODUCT_ROADMAP.md); proposed capabilities
+there are not claims of current implementation or release approval.

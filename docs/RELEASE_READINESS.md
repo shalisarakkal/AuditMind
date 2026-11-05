@@ -1,5 +1,88 @@
 # Release readiness and code review
 
+## Current release-gate checklist - 5 November 2026
+
+This is the current PB-0.1 reconciliation. Checkpoints below retain their original
+dates; old statements such as "not pushed", "frontend stopped" or "CI pending"
+do not override this section. Implementation, hosted CI, customer acceptance and
+production approval are separate decisions.
+
+**Current code baseline:** `b4230f98515c3ef480a4d2cfb4d0f25ca05ce838` on `main`.
+All four hosted Ubuntu jobs passed in
+[run 42064135975](https://github.com/shalisarakkal/AuditMind/actions/runs/42064135975):
+backend, frontend, browser and backend dependency/security audit. Local review
+passed 129 focused backend checks, 86 Chrome checks and four Windows process-stop
+regressions. These overlapping scopes must not be added as equivalent coverage.
+The later short-search index work is research only. The user chose to retain
+current search behavior and defer implementation on 5 November.
+[Measured tradeoffs and disposition](SHORT_FINDING_SEARCH_DESIGN.md).
+
+### Accountability
+
+**Confirmed accountable person: the project owner (the requesting user).** On
+5 November the user answered "Me" for release approver and engineering,
+operations and security ownership. That person holds the functional roles in
+the tables below until explicitly reassigned. No full name or separate contact
+identity is invented here.
+
+PB-0.1 checklist reconciliation and owner assignment are complete. The target
+environment, acceptance dates and individual gate approval records still need
+release decisions. Assigning authority does not approve pilot/production/live-AI
+use or waive any open gate.
+
+**Verified** means the cited bounded scope passed. **Open** means evidence or a
+release decision is missing. **Deferred** means the user held the work; it is
+not a failed test or automatically part of the next release.
+
+### Baseline and operational gates
+
+| Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
+| --- | --- | --- | --- |
+| G-01: reviewed code and correctness CI | Verified for `b4230f9` | Engineering / project release owner | Exact-SHA run above and scoped archive/search/restart review. Verify again for later implementation changes. CI is not production sign-off. |
+| G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
+| G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
+| G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |
+| G-05: production security configuration | Open | Security and operations / designated security reviewer and release owner | Verify service-account storage ACLs, TLS/secure cookies, proxies/CORS, DB least privilege, secrets/rotation, upload quarantine/malware policy and appropriate request limits against the existing security contract. |
+| G-06: monitoring and response | Open | Operations / project release owner | Verify external telemetry/alert delivery, access, worker/queue alerts and recovery/runbook ownership on the target. Process-local metrics/readiness do not establish production monitoring acceptance. |
+| G-07: workload and performance disposition | Open acceptance decision | Engineering / product acceptance owner | Agree inventory, concurrency, import workflows and latency/write budgets. Review measured limits; retained one-character search behavior is not a universal performance SLA. |
+
+G-05 details: [security deployment gates](SECURITY_HARDENING.md#remaining-deployment-gates).
+Reconcile historical security dispositions, including the 23 October development-
+tool waiver with a 22 November review/expiry, against later dependency remediation
+before relying on them. A passing high-severity audit does not establish whether
+an older waiver remains applicable or has been closed.
+
+### Scope-dependent approvals and held features
+
+These do not automatically block continued local testing. They become release
+gates when the capability enters the agreed release scope.
+
+| Item | Current disposition | Owner / approval authority (roles held by project owner) | Evidence or next action |
+| --- | --- | --- | --- |
+| Customer pilot contract (PB-0.2) | User-deferred | Product acceptance owner and operations / project release owner | When resumed, define users, data sources, workflows, support/data-handling procedures and limitations. Synthetic pilot tests are not customer approval. |
+| Broader evidence-qualified scoring | Deferred; default-off retained | Product acceptance owner and evidence reviewer / authorized org admin plus release owner for broader rollout | Representative real-evidence review, workload acceptance and explicit rollout decision. Software tests do not establish evidence quality or default-on approval. |
+| Live AI/provider/model acceptance | Not approved | Engineering and security / release owner and authorized org approver | Separate account/model, pricing/budget, context/output-quality, data-processing and consent acceptance. No inference/provider change is authorized here. See PHASE3_CLOSURE.md and PHASE3_OPERATIONS.md. |
+| SaaS/parallel-worker rollout | Held; normal local operation is one slot | Engineering and operations / project release owner | Validate platform controls, representative cross-tenant load, resource bounds and recovery. Two-slot tests do not prove 32/1,000-job capacity. See WORKER_POOL.md and SAAS_JOB_SCALING.md. |
+| Imported-finding reconciliation | Design only | Engineering and product acceptance owner / project release owner | Stable identity, comparable scans and suppression/retention/reappearance contracts before implementation. Keep current upload/archive behavior. See FINDING_RECONCILIATION_DESIGN.md. |
+| Short-character index implementation | User-deferred, 5 November | Engineering / product acceptance owner | Retain current search behavior. Reconsider only with an accepted write-cost budget and measured design gates. |
+| Docker/container staging and persistent model cache | User-deferred Future scope | Operations and engineering / project release owner | Resume if that deployment scope is selected. Local tests do not close container acceptance. |
+
+### Next work and completion rule
+
+The **isolated backup/restore and worker-recovery rehearsal (PB-0.3)** is complete
+for its local synthetic scope; [results and unresolved deployment gates](RECOVERY_REHEARSAL.md)
+are recorded. Customer pilot, live AI, scoring rollout and SaaS work remain held.
+
+PB-0.1 is closed as a checklist/ownership reconciliation: open gates have an
+accountable person, evidence requirements, authority, status and next action.
+Production or pilot release still requires the separate gate dispositions above.
+This checklist records gaps; it does not waive them or claim whole-phase completion.
+
+## Historical delivery record
+
+The following checkpoints are retained for traceability. Test counts, running-
+state descriptions and approval boundaries belong to their original dates.
+
 ## Assets search local trial — 30 October 2026
 
 0037 and guarded combined search passed 69 focused PostgreSQL checks, a final

@@ -2,6 +2,39 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Short-character search design - 5 November
+
+- [x] Step 1: benchmark candidate indexes in disposable 100,000/500,000-row
+  clones with all 31 existing indexes. Punctuation lookup: about 1.0–1.3 s to
+  1.9 ms at 500,000 rows; initial extra index 2.2 MiB. Insert overhead 28–86%
+  in the larger prototype. Broader unigram/bigram indexing costs roughly 4–5x
+  inserts and has unsafe unbounded long-text extraction cost.
+- [x] Validate literal escaping, candidate rechecks, tenant/archive boundaries,
+  long-text supersets and prepared-plan behavior. A bounded punctuation extractor
+  handles 100 long descriptions in about 12 ms, with full text rechecked.
+- [ ] Step 2 deferred by the user on 5 November: retain current search behavior.
+  Benchmark findings remain available for later reprioritization. No application query, source index,
+  migration, setting or running process changed in this design exercise.
+  [Design, measurements and tradeoffs](docs/SHORT_FINDING_SEARCH_DESIGN.md).
+
+## Next roadmap item - release-gate reconciliation (PB-0.1)
+
+- [x] Consolidate current technical evidence, open operational gates, approval
+  boundaries and user-deferred features in the existing authoritative
+  [release-readiness checklist](docs/RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+  Preserve historical delivery records under an explicit historical heading.
+- [x] PB-0.1 owner assignment confirmed on 5 November: the project owner/user
+  self-assigned release approval and engineering, operations and security roles.
+  Checklist reconciliation is complete; actual release decisions remain open.
+  This does not grant pilot, production, live-AI, broad scoring or SaaS approval.
+- [x] PB-0.3 local synthetic rehearsal: ten operational checks and five unit
+  checks pass on a separate disposable PostgreSQL cluster. Restore/full
+  verification 0.987 s; 5,000-row worker resume 5.255 s after real stale
+  eligibility, 34.756 s from interruption. Exact DB/file fingerprints match;
+  no duplicate work on restart, no remaining private clusters or AI usage.
+  [Procedure, artifacts and deployment limits](docs/RECOVERY_REHEARSAL.md).
+  Intended-deployment recovery acceptance and pilot preparation remain open/deferred.
+
 ## Archive lifecycle performance follow-up - 4 November
 
 November 5 Findings follow-up: workflow save measured 47 ms, but the following

@@ -1,5 +1,18 @@
 # Phase 4 status and next milestone
 
+Current release decisions and open evidence requirements are consolidated in the
+[5 November release-gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+The project owner/user confirmed execution and approval ownership; release-gate
+sign-offs remain open. Dated entries below retain their
+checkpoint context; older pending/launch statements do not supersede that list.
+Short-character index implementation is user-deferred; current search remains.
+
+PB-0.3 local recovery rehearsal is complete: ten operational and five unit
+checks pass in an independent disposable PostgreSQL cluster, including exact
+database/files recovery, interrupted 5,000-row import resume and no duplicate
+work after restart. [Procedure, results and deployment limits](RECOVERY_REHEARSAL.md).
+PB-0.1 ownership is confirmed to the project owner; PB-0.2 remains deferred.
+
 ## November 5 archive and Findings follow-up
 
 The local review closes the measured restore duplicate-query bottleneck,
@@ -13,7 +26,8 @@ Scoped commits: `db37a31` (restart), `5b3f48c` (archive) and `2094cc1` (Findings
 Chrome verifies exact displayed totals through backtick filtering, workflow save,
 archive and restore, preserving the saved rationale. The full isolated Chrome
 run passes 86 checks, with no browser errors or AI usage. The review API is active;
-hosted Linux acceptance must be verified for the pushed revision. No migration
+all four hosted Linux jobs passed for `b4230f9` in
+[run 42064135975](https://github.com/shalisarakkal/AuditMind/actions/runs/42064135975). No migration
 or additional index is introduced. Cold one-character searches and refresh
 after invalidation can still take seconds. Larger/concurrent lifecycle loads,
 SaaS scaling and broader scoring enablement remain held.
