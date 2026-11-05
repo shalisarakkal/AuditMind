@@ -15,6 +15,14 @@ the next active increment. See `docs/PHASE4_STATUS.md` for the current handoff.
 
 ## Large-list search and filter performance — 30 October
 
+- [x] November 4 wider review: 38 sort/direction cases and next pages retain
+  exact totals. Findings next pages: about 20–105 ms; final Assets IP pages:
+  48–53 ms. Added 0039 covering/group indexes, sparse deadline plans and
+  sort-only-join removal from counts. All 519 frontend and 60 focused backend
+  checks pass; the initial full run's three failures were fixed and retested.
+  Storage/write tradeoffs and remaining cold/fallback limits are recorded in
+  [the performance review](docs/LIST_NAVIGATION_PERFORMANCE.md).
+
 - [x] Subsequent Assets index prototype and local trial (0037): immutable
   text-only candidate representation, original matching recheck and planner/tag
   frequency guard. No-match query: 6.5 s → 50 ms. Chrome: 487 ms including debounce;
@@ -32,9 +40,16 @@ the next active increment. See `docs/PHASE4_STATUS.md` for the current handoff.
   0036 activation/drift/readiness checks with data/settings digests unchanged.
   Filter options: 5.3/4.5 s to 29/33 ms; common Findings search: 7.9 to 4.9 s.
 - [x] Add guarded indexed candidates for selective Assets tag/metadata searches.
-- [ ] Very broad exact counts, deep paging and arbitrary-sort follow-up. Common
-  tag/type queries still take seconds; no universal subsecond-search or 500k-row
-  write-throughput claim is made.
+- [x] Exact-count reuse, seek navigation and narrow sort/page hydration (0038).
+  Transactional revisions invalidate counts/cursors after source changes;
+  overdue counts expire at deadline crossings. Default deep-page continuation:
+  Assets 27 ms and Findings 71 ms. Broad tag repeat: 56 ms with exact totals.
+  [Contract, costs and verification](docs/LIST_NAVIGATION_PERFORMANCE.md).
+- [x] November 4 review: reset Findings list/action state on organization
+  switch. Regression confirms the first new-organization request carries no
+  old filters, sort or cursor. Navigation/paging/migrations: 33 PostgreSQL tests;
+  frontend pages/navigation: 36 tests; TypeScript, lint and isolated production
+  build pass.
 - [x] Review and record list-query implementation in scoped commits; latest
   strict PostgreSQL regression: 70 passed in 88.03 seconds. Benchmarks and
   validation documentation are separate from application code.

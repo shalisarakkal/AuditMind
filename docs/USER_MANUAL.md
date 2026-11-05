@@ -69,6 +69,13 @@ three specific characters; one/two-character terms and broad matches can still
 take several seconds. Full Finding IDs use exact lookup. See
 [measured results and limitations](FINDING_SEARCH_PERFORMANCE.md).
 
+The November 4 list-performance release requires database migrations 0038 and
+0039. Assets and Findings keep exact totals and use the existing Previous/Next
+buttons. Changing a filter or sort returns to page one; switching organizations
+clears the old list state and selections. Very broad searches and some metadata
+sorts can still take several seconds on large inventories. See the
+[current measurements and operating costs](LIST_NAVIGATION_PERFORMANCE.md).
+
 Phase 4 remediation tracking now includes the Findings workflow UI and filters.
 See [the workflow contract](PHASE4_REMEDIATION_DESIGN.md) and
 [validation/delivery limits](PHASE4_VALIDATION.md). Running the updated backend

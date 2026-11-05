@@ -447,3 +447,12 @@ across restarts; seeding does not overwrite existing reports or user edits.
 To deliberately create missing examples, run from `backend`:
 `.\.venv\Scripts\python.exe scripts/demo.py seed-evidence-examples`.
 This command refuses ordinary application schemas and remote demo targets.
+
+## Assets and Findings navigation checks
+
+For the list-performance changes, see [the measurements and browser steps](LIST_NAVIGATION_PERFORMANCE.md).
+On Findings, apply a search, change sorting and move to another page. Switch
+organizations using the sidebar. The new organization should start on page
+one with a blank search and default sorting. Previously selected rows and open
+actions must also be cleared. Use Next and Previous to check that the exact
+total and row ordering remain consistent while no findings are being edited.

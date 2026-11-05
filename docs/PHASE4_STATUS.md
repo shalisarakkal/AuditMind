@@ -1,5 +1,37 @@
 # Phase 4 status and next milestone
 
+## November 4 performance review
+
+Exact-count reuse, stable seek navigation and the 0039 sort/group indexes have
+been reviewed across every Assets/Findings sort in both directions. Final
+Findings next-page requests measured about 20–105 ms on 3,581,221 active rows;
+Assets IP paging measured 48–53 ms after the final covering-index correction.
+All 519 frontend tests and 60 focused backend checks pass; the full backend
+run's three failures were corrected and retested. Builds, lint, TypeScript,
+high-severity static checks and dependency consistency pass. A separate DST
+archive-retention correction is included with fixed-date regressions.
+Scoped commits: `fe53274` (application/tests), `cf53f05` (retention correction)
+and `a660014` (benchmark tools).
+
+Remaining measured limits include cold broad searches, some Assets metadata
+sorts, arbitrary deep offset links and long/high-cardinality fallback sorts.
+Write batches cost about 1.5–2.6 times the prior index set in the local clone
+exercise; additional indexes use about 7.9 GiB on this inventory. SaaS scaling
+and broader evidence-qualified scoring remain held. Current hosted Linux
+acceptance must be read from the pushed commit's Actions run.
+[Detailed results, costs and reproduction](LIST_NAVIGATION_PERFORMANCE.md).
+
+## Exact counts and navigation — 30 October
+
+Local 0038 adds revision-invalidated exact-count reuse, signed seek navigation
+and page-only payload hydration. All 518 frontend tests pass; 47 focused
+PostgreSQL checks plus the added deadline-crossing case pass. Production builds,
+lint and TypeScript pass. Local default deep-page continuation measures 27 ms
+for Assets and 71 ms for Findings, with exact totals preserved. This historical
+local checkpoint is superseded by the November 4 review above. The baseline
+`4aa1467` passed all four Linux jobs in run 41069210537.
+[Implementation, measurements and verification](LIST_NAVIGATION_PERFORMANCE.md).
+
 ## Guarded Assets search — 30 October
 
 The 100k-row prototype led to a local 0037 combined expression index, with
