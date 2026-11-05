@@ -485,18 +485,30 @@ class _Runner:
             if gone:
                 params["ids"] = list(set(params["ids"]) - set(gone))
             # One that duplicates an active finding is purged instead.
-            duplicates += self.db.execute(
-                text(
-                    "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
-                    "AND f.workflow_version = 0 "
-                    "AND f.source IS NOT NULL AND EXISTS (SELECT 1 FROM findings g "
-                    "WHERE g.org_id = f.org_id AND g.asset_id IS NOT DISTINCT FROM f.asset_id "
-                    "AND g.archived_at IS NULL AND g.source = f.source "
-                    "AND g.category IS NOT DISTINCT FROM f.category "
-                    "AND (f.category IS NOT NULL OR g.description IS NOT DISTINCT FROM f.description))"
-                ),
-                params,
-            ).rowcount
+            # Preserve NULL-safe identity while exposing equality to the
+            # asset/category/description indexes. IS NOT DISTINCT FROM on
+            # every key made later chunks repeatedly scan restored rows.
+            asset_keys = (("f.asset_id IS NOT NULL", "g.asset_id = f.asset_id"),
+                          ("f.asset_id IS NULL", "g.asset_id IS NULL"))
+            finding_keys = (
+                ("f.category IS NOT NULL", "g.category = f.category"),
+                ("f.category IS NULL AND f.description IS NOT NULL",
+                 "g.category IS NULL AND g.description = f.description"),
+                ("f.category IS NULL AND f.description IS NULL",
+                 "g.category IS NULL AND g.description IS NULL"),
+            )
+            duplicate_keys = [(asset_target + " AND " + finding_target, asset_match + " AND " + finding_match)
+                for asset_target, asset_match in asset_keys for finding_target, finding_match in finding_keys]
+            for target, identity in duplicate_keys:
+                duplicates += self.db.execute(
+                    text(
+                        "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
+                        "AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
+                        " AND EXISTS (SELECT 1 FROM findings g WHERE g.org_id = f.org_id "
+                        "AND g.archived_at IS NULL AND g.source = f.source AND " + identity + ")"
+                    ),
+                    params,
+                ).rowcount
             restored += self.db.execute(
                 text("UPDATE findings SET archived_at = NULL WHERE id = ANY(:ids) AND archived_at IS NOT NULL"), params
             ).rowcount

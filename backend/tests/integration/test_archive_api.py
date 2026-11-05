@@ -216,6 +216,53 @@ def test_restore_preserves_duplicate_with_remediation_history(client, admin, db_
     assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 0
 
 
+@pytest.mark.parametrize("with_asset", [False,True])
+@pytest.mark.parametrize("original,active,protected,foreign,purged", [
+    ({"category":"policy","description":"old"},{"category":"policy","description":"new"},False,False,1),
+    ({"description":"same"},{"description":"same"},False,False,1),
+    ({"description":None},{"description":None},False,False,1),
+    ({"description":""},{"description":""},False,False,1),
+    ({"description":None},{"description":""},False,False,0),
+    ({"description":"same"},{"description":"different"},False,False,0),
+    ({"category":None},{"category":""},False,False,0),
+    ({"source":None},{"source":None},False,False,0),
+    ({},{"source":"other-tool"},False,False,0),
+    ({},{},True,False,0),
+    ({},{},False,True,0),
+])
+def test_restore_duplicate_null_identity_and_guards(client, admin, db_session, original, active, protected, foreign, purged, with_asset):
+    payload = {"domain":"network_config","severity":"high","source":"tool","category":None,"description":"same"}
+    if with_asset:
+        asset = Asset(org_id=uuid.UUID(admin[1]),type="server",hostname="restore-identity")
+        db_session.add(asset);db_session.commit()
+        payload["asset_id"] = str(asset.id)
+    created = client.post(_url(admin,"/findings"),headers=admin[0],json={**payload,**original})
+    assert created.status_code == 201,created.text
+    identifier = created.json()["id"]
+    if protected:
+        edited = client.patch(_url(admin,f"/findings/{identifier}/workflow"),headers=admin[0],
+            json={"expected_version":0,"status":"mitigated","rationale":"Preserve saved note","verification":"Synthetic retest"})
+        assert edited.status_code == 200,edited.text
+    archived = _post(client,admin,f"/findings/{identifier}/archive")
+    assert archived.status_code == 200,archived.text
+    batch = archived.json()["batch_id"]
+    if foreign:
+        from app.models.organization import Organization
+        other = Organization(name="Foreign duplicate test")
+        db_session.add(other);db_session.flush()
+        db_session.add(Finding(org_id=other.id,**{**payload,**active}));db_session.commit()
+    else:
+        duplicate = client.post(_url(admin,"/findings"),headers=admin[0],json={**payload,**active})
+        assert duplicate.status_code == 201,duplicate.text
+    restored = _post(client,admin,f"/archive/{batch}/restore")
+    assert restored.status_code == 200,restored.text
+    assert restored.json()["summary"]["duplicates_purged"] == purged
+    assert restored.json()["summary"]["findings"] == 1-purged
+    if protected:
+        history = client.get(_url(admin,f"/findings/{identifier}/workflow/history"),headers=admin[0])
+        assert history.status_code == 200 and len(history.json()) == 1
+
+
 def test_archiving_an_asset_takes_all_its_findings(client, admin):
     _setup(client, admin)
     own_02 = next(a for a in _get(client, admin, "/assets")["items"] if a["hostname"] == "own-02")
