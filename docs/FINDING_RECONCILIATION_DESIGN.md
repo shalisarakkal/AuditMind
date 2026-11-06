@@ -1,9 +1,12 @@
 # Individual imported-finding archive and scan reconciliation
 
 PB-1.1 now implements the additive [source observation foundation](FINDING_OBSERVATIONS.md).
+PB-1.2 adds [source-scan declarations and metadata comparison](SCAN_SNAPSHOTS.md),
+with absence eligibility still false. It does not validate finding identity or
+enable suppression/reconciliation.
 The existing-behavior analysis below describes the baseline before that increment.
-Observations now record repeated occurrences; comparable scans, refreshed canonical
-payloads, suppression and reconciliation remain pending. Existing matching and
+Observations now record repeated occurrences; stable-identity authorization,
+refreshed canonical payloads, suppression and reconciliation remain pending. Existing matching and
 archive ownership are unchanged.
 
 Status: functional rules approved on 23 October 2026; implementation remains pending

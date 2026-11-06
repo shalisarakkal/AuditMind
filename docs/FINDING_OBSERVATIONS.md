@@ -70,6 +70,12 @@ the same dictionary rather than issuing a query for every occurrence. History
 has a dedicated page index and foreign-key indexes for purge. It is not joined
 into the normal Findings list, count or sort queries.
 
+History COPY batches are bounded separately from pending existing-asset updates.
+Repeated source rows retain one coalesced update per asset until the update
+buffer limit or final flush; recording history does not force asset rewrites
+for every history batch. Parents are inserted before dependent history, and the
+whole publication still rolls back together on failure.
+
 ## Inspection and Chrome verification
 
 1. Import a small findings file. On Findings, open its row's **Workflow** action.

@@ -7,6 +7,19 @@ starting an item.
 
 ## Baseline: capabilities already present
 
+Local follow-up (5 November): concurrent import/workflow saves and independent
+workflow list invalidation are implemented and validated (migration 0042).
+Activated locally with migration 0043 after the user-approved stalled import
+abort on 6 November; uploader/admin Abort import is also available. See
+[delivery plan](../PLAN.md) and [validation](PHASE4_VALIDATION.md).
+
+Local cloud reimport performance correction (6 November): bounded bulk asset
+updates, unchanged-payload write suppression and Abort foreign-key-lock handling
+are active. The exact retained file reimported 500,000 existing assets in
+213.084 seconds in an isolated test schema, with unchanged full payload checksum.
+This is not a hosted scale result or a production-duration guarantee; see the
+same validation record for limits and outstanding commit/CI review.
+
 Avoid rebuilding these as new features. Extend them only where an item below
 identifies a specific gap:
 
@@ -99,9 +112,10 @@ recorded in [Phase 4 validation](PHASE4_VALIDATION.md). Append-only import
 occurrences and a read-only, paged source-history view preserve current matching
 and workflow behavior. No historical backfill or reconciliation eligibility is
 inferred. Chrome passed 87 checks and the final full frontend suite passed 522 tests.
-Final pre-commit review is complete, including 1,528 passing backend tests with
-PostgreSQL required and warnings as errors. Check-in/push and exact-commit
-hosted CI remain pending.
+Final pre-commit review included 1,528 passing backend tests with PostgreSQL
+required and warnings as errors. Delivered in `ec5f7b2`, `56bce49`, `376342c`;
+all four hosted Linux jobs passed for `376342c` in
+[run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
 [Contract and verification](FINDING_OBSERVATIONS.md).
 
 **Priority:** P1 · **Depends on:** PB-0.1
@@ -122,6 +136,14 @@ decisions on repeated imports.
   findings, null identifiers, and archive interactions.
 
 ### PB-1.2 — Declare comparable scan snapshots
+
+**Status, 5 November:** Complete locally and activated at migration 0041. Chrome
+passed 90 checks, the final snapshot backend suite passed 40 checks and the full
+frontend suite passed 529 tests. Captured configuration, versioned source-scan declarations and
+metadata-only comparison expose scope/completeness/configuration blockers.
+Absence eligibility remains false; no findings are marked Not observed.
+Review/check-in/push and exact-commit hosted CI for this increment remain pending.
+[Contract and verification](SCAN_SNAPSHOTS.md).
 
 **Priority:** P1 · **Depends on:** PB-1.1
 

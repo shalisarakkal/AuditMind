@@ -64,7 +64,28 @@ This document defines the core data entities and relationships for the cyber res
 - **Fields:** `id`, `org_id`, `scan_type`, `scope`, `status`, `started_at`, `completed_at`, `source`, `filename`, `summary`
 - **Purpose:** Logical scan/ingestion events (vuln scan, config import, IAM review). Every file import is recorded as a scan: `scan_type` `asset_import` / `findings_csv` / `findings_json` / `nessus`, or `<family>_import` for a profile import (e.g. `endpoint_agent_import`), `source` `upload`, `filename` the uploaded file, `profile` the import profile used (built-in key or the org's profile id), and `summary` (JSONB) the import report (created/updated/skipped/duplicates/failed/findings_created + row errors and warnings; for profile imports the first three count assets). `status` goes `pending` → `running` → `completed`/`failed`; large imports run in the background and are polled through it.
 
+Migration `0041` adds a nullable importer-owned configuration fingerprint on
+**scans** and **scan_snapshot_declarations**, an append-only versioned record of
+operator-declared source scope/completeness, tool instance/configuration, server
+scan context, attribution and rationale. The latest version can be revoked or
+superseded. Scan purge removes its declarations. Metadata comparisons return no
+absence facts and do not affect finding observations/workflow/scores.
+[Contract](docs/SCAN_SNAPSHOTS.md).
+
+Migrations `0043`/`0044` add durable abort intent and internal publication
+connection/transaction identity on **scans**. Cancellation matches PID, backend
+start, transaction start and transaction ID before interrupting SQL; terminal
+publication clears these fields. Aborted imports use failed status plus an
+explicit aborted summary, retain the uploaded file under the failed-file policy,
+and never resume automatically. Abort attribution is recorded in Activity.
+
 ### 2.5 findings
+
+Migration `0042` adds **organization_workflow_revisions**. Findings list cache
+and cursor stamps combine source/inventory and workflow revisions, allowing
+workflow-only edits to invalidate lists without waiting for an import's counter
+row. Selected findings use non-key row locks compatible with observation foreign
+keys; archive admission, permissions and optimistic versions remain fenced.
 
 Migration `0040` adds **finding_observations**, an append-only application history
 of accepted finding occurrences, including duplicates. Each row links org/finding,

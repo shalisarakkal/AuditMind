@@ -1,0 +1,2 @@
+hostname,domain,severity,category,description,source,observed_at
+snapshot-demo-host,network_config,high,SNAPSHOT-DEMO,Synthetic baseline finding,snapshot-demo,2026-11-05T12:00:00Z

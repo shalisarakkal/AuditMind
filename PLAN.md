@@ -2,6 +2,96 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Reviewed closeout - 6 November 2026
+
+- [x] Final review: fix import foreign-key blocking in workflow/snapshot paths
+  and fence abort against pooled backend transaction reuse (migration 0044).
+- [x] Reviewed PostgreSQL suites: 177 passed; frontend: 532 passed; Chrome:
+  90 checks passed. ESLint, production build, high-severity Bandit and tracked
+  secret guard pass. Full backend execution remains a hosted Linux CI gate.
+- [x] Backend `dcf387a` and frontend/browser `b3e5095` committed separately.
+- Post-push release gate: verify the final pushed commit in
+  [hosted Linux CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml).
+  This checkpoint records local pre-push evidence; the exact run is authoritative.
+
+## Existing cloud inventory update performance - 6 November 2026
+
+- [x] Trace the retained cloud file's previous run: same SHA-256, completed
+  in 666 seconds, creating 500,000 assets. The stalled attempt updated existing
+  assets via per-row SQL with statement-level invalidation triggers.
+- [x] Replace per-asset attribute/JSON writes with one COPY-staged bulk UPDATE
+  per bounded buffer. Preserve omitted fields, explicit nulls and JSON merge
+  semantics; skip physically rewriting unchanged assets.
+- [x] Initial import/abort/batching suites: 37 passed. Additional import and
+  null/JSON/no-op semantics suites: 43 passed. High-severity Bandit passed.
+- [x] Exact retained-file benchmark: 500,000 existing assets reimported in
+  213.084 seconds using 25 bulk UPDATE statements; complete asset checksum
+  unchanged. Owned test schema removed; ordinary application data untouched.
+- [x] Final import/cache/workflow/abort suites: 109 passed; final abort recheck:
+  4 passed, including the real endpoint with import-held foreign-key locks.
+- [x] Restarted the idle local application; DB/uploads/worker readiness is green.
+  Retained cloud upload remains failed and retryable. No production reimport
+  submitted; hosted CI and scoped commit review remain separate.
+
+## User-controlled import abort - 6 November 2026
+
+- [x] Stop the stalled cloud import and waiting workflow request with explicit
+  user approval. Retain the uploaded file; do not automatically retry.
+- [x] Durable abort requests, uploader/admin authorization, atomic rollback
+  acknowledgement and publication PID/backend-start fencing (migration 0043).
+- [x] Abort action in progress panels and Uploads, in-app confirmation,
+  Stopping acknowledgement state and five-minute progress warning.
+- [x] Initial backend import/migration/workflow validation: 61 passed; full
+  frontend: 532 passed. Targeted high-severity Bandit passed.
+- [x] Final cancellation/batching suite: 8 passed, including owned long-SQL
+  interruption and full rollback. Lint/build passed; local demo migrated to
+  0043 and restarted. No imports automatically retried.
+
+## Concurrent imports and workflow edits - 5 November 2026
+
+- [x] Replace workflow's import-wide advisory lock with selected finding row
+  locks, retaining archive-admission fencing, organization/member checks and
+  optimistic versions.
+- [x] Migration 0042 separates workflow list invalidation from import/source
+  invalidation. Findings count/cursor stamps include both revision lanes;
+  upgrade/downgrade rotate epochs to prevent cached-stamp reuse.
+- [x] Workflow/list/archive/migration suites: 69 passed. Final concurrency,
+  import/filter/batching suites: 17 passed, including a 100-finding save while
+  import advisory/revision locks remain held. High-severity Bandit passed.
+- [x] Activated with migration 0043 after the user-approved abort and restart.
+
+## Import observation batching regression - 5 November 2026
+
+- [x] Aborted the slow `active_directory500K.csv` import at operator request;
+  its unfinished publication rolled back. Kept its uploaded file and archived
+  staging chunks locally. No automatic retry.
+- [x] Separate bounded history/insertion COPY from existing-asset update flushing,
+  retaining per-asset coalescing, last-row-wins values and atomic rollback.
+- [x] Four regression tests plus observation/staging suites: 31 passed. Isolated
+  500,000-row repetitive directory benchmark: 191.137 seconds, 1,000,000
+  observations, 21,600 asset update executions for 10,800 existing assets.
+  This synthetic timing is not a production duration guarantee.
+- [x] Broader import/snapshot suites: 124 passed. Restarted local API/frontend
+  and one-slot worker; readiness is green and the aborted upload is retryable.
+
+## PB-1.2 - Scan snapshot declarations and comparison
+
+- [x] Migration 0041: captured import configuration and versioned declarations,
+  with no historical backfill. Parser/settings changes invalidate staged reads.
+- [x] Organization-scoped declaration/revocation and metadata-only comparison;
+  source scope/exclusions, completeness, configuration and stale versions checked.
+  No absence facts or finding/score/workflow mutations.
+- [x] Uploads snapshot dialog, visible baseline pin and deliberate review action;
+  read-only roles, rationale, stale-draft fencing and explicit revocation.
+- [x] Focused backend/import/migration/concurrency and UI checks; final snapshot
+  policy suite 40 passed; full frontend 529 passed; production build, lint and
+  high-severity Bandit pass. Source chronology uses source time, not upload order.
+- [x] Chrome 90 checks passed; migrated the idle local demo to 0041 and restarted
+  API/frontend/one-slot worker. DB/uploads/worker readiness is green; no backfill.
+- [x] Reviewed and committed with the backend/frontend closeout above; hosted
+  Linux CI is the final post-push gate recorded there.
+- [Contract and Chrome steps](docs/SCAN_SNAPSHOTS.md). PB-1.3 remains separate.
+
 ## PB-1.1 - Per-finding source observations, 5 November
 
 - [x] Migration 0040 and bounded, atomic import observation recording, including
@@ -20,7 +110,9 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   imports; full backend suite 1,528 passed with PostgreSQL required/warnings as
   errors, full frontend 522 passed and history retry/empty-state verified.
   Final helper fix activated idle; runtime readiness remains green.
-- [ ] Commit/push this increment, then verify its exact-commit hosted Linux CI.
+- [x] PB-1.1 delivered in `ec5f7b2`, `56bce49` and `376342c`; all four hosted
+  Linux jobs passed for `376342c` in
+  [run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
 - PB-1.2/PB-1.3 remain separate increments. [Contract](docs/FINDING_OBSERVATIONS.md).
 
 ## Short-character search design - 5 November

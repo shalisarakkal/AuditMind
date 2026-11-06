@@ -1,14 +1,24 @@
 # Phase 4 status and next milestone
 
+PB-1.2 source-scan declarations and metadata-only comparison are complete locally.
+The reviewed closeout also includes bulk existing-asset publication, safe import
+abort and concurrent workflow edits (migrations 0041 through 0044). Reviewed
+PostgreSQL suites: 177 passed; full frontend: 532 passed; Chrome: 90 checks passed.
+Backend and frontend are committed separately; exact-commit hosted Linux CI is
+the post-push gate. No absence
+conclusions, stable-identity authorization or workflow/score changes are enabled.
+[Contract and verification](SCAN_SNAPSHOTS.md).
+
 PB-1.1 source observations are complete locally and activated at migration 0040:
 87 Chrome checks, 522 frontend tests and the full 1,528-test PostgreSQL backend
 suite pass. Final pre-commit review is complete, including a source timestamp
-overflow fix and activation. Check-in/push and exact-commit hosted CI remain pending.
+overflow fix and activation. PB-1.1 was pushed through `376342c`; all four Linux
+jobs passed in [run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
 Imports append provenance
 without changing matching, workflow, scores or saved reports. A single-finding
 Workflow dialog exposes the read-only history on demand. Migration 0040 has no
 historical backfill. [Contract and verification](FINDING_OBSERVATIONS.md);
-[current validation](PHASE4_VALIDATION.md). Comparable scans/reconciliation and
+[current validation](PHASE4_VALIDATION.md). Finding reconciliation and
 broader pilot/production rollout remain pending.
 
 Current release decisions and open evidence requirements are consolidated in the

@@ -86,6 +86,21 @@ schema is not migrated automatically. Scoring and existing report snapshots rema
 
 ### Manage a finding's workflow
 
+After migration 0042 and the matching service restart, workflow saves can run
+while an import is writing in the same organization. They still check the
+selected findings' versions and reject affected items being archived. Other
+edits of the same findings or organization/member lifecycle changes can still
+require a short database wait. Imports do not overwrite existing workflow
+status, assignee, deadlines or history. Local activation status is tracked in
+[Phase 4 validation](PHASE4_VALIDATION.md).
+
+On **Uploads**, use a row's **Snapshot** action to declare source-scan scope and
+completeness (admin/auditor), or review it read-only. **Use as baseline** pins an
+upload across paging/filtering; open another Snapshot and choose **Review against
+baseline**, then **Review compatibility**. Matching declared metadata never
+authorizes absence conclusions or changes findings. Old uploads require a new
+import to capture configuration. See [scan snapshot steps](SCAN_SNAPSHOTS.md).
+
 For imported findings, open the row's **Workflow** action and select **Show
 source observations** at the bottom. This shows each accepted import occurrence,
 including repeats, separately from workflow history. It loads only when expanded
@@ -504,6 +519,27 @@ separate snapshots and do not replace the deterministic `/risk/score` service.
 Legacy saved reports preserve their original scoring labels.
 
 ## 5. Assets, findings and imports
+
+### Abort a queued or running import
+
+The uploader or an organization admin can choose **Abort import** in the
+Assets/Findings progress panel or the Uploads row. Review the in-app confirmation
+and choose **Abort import**, or **Keep processing** (Cancel in the Uploads
+confirmation). A queued import stops without processing. A running import shows
+**Stopping…** until the worker confirms rollback; requesting abort does not mean
+it has already stopped. The worker checks periodically, so stopping can take
+time. Closing the page does not undo an abort request.
+
+Unfinished publication writes roll back together. The uploaded file is retained
+under the existing failed-upload retention policy for an explicit **Retry**;
+aborted jobs are not automatically resumed. Activity records the requesting
+user and the import's final outcome. Other imports are unaffected. If the import
+committed before the abort request, the application reports that it already
+finished; abort cannot undo a completed import.
+
+After five minutes without a progress update, the progress panel warns that
+progress has not advanced. A recent heartbeat confirms a live worker, not useful
+progress. Review or abort the import rather than submitting duplicate uploads.
 
 Assets and Findings show a loading spinner and placeholder rows while their first
 list request runs. Search and page controls remain available. Later requests show

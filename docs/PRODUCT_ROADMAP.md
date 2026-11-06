@@ -15,6 +15,11 @@ candidate work items with acceptance criteria.
 
 ## Prioritization at a glance
 
+Local baseline maintenance on 6 November addressed stalled existing-asset cloud
+reimports with bounded bulk updates and safe Abort handling. Exact-file local
+verification and rollout limits are recorded in [Phase 4 validation](PHASE4_VALIDATION.md).
+This does not close the separate SaaS scaling or release-acceptance gates.
+
 | Priority | Milestone | Why it comes here |
 |---|---|---|
 | P0 | Close current acceptance and operational gates | Establish a dependable baseline before expanding scope. |
@@ -65,9 +70,14 @@ Focus:
 locally and activated at migration 0040, with verification tracked in
 [Phase 4 validation](PHASE4_VALIDATION.md). Pre-commit review and local verification
 are complete (1,528 backend / 522 frontend tests and 87 Chrome checks).
-Check-in/push and exact-commit hosted CI are pending.
-Existing matching and archive ownership remain unchanged. Comparable scans
-(PB-1.2) and reconciliation (PB-1.3) are still pending; this does not enable
+PB-1.1 was pushed through `376342c` and passed all four hosted Linux jobs in
+[run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
+PB-1.2 scan declarations and metadata comparison are complete locally and active
+at migration 0041 (90 Chrome checks, 40 final snapshot backend checks and 529
+frontend tests pass). Review/check-in/push and hosted CI remain pending;
+[contract](SCAN_SNAPSHOTS.md).
+Existing matching and archive ownership remain unchanged. Stable-identity
+authorization and reconciliation (PB-1.3) remain pending; this does not enable
 automatic source updates, suppression or absence conclusions.
 
 **Outcome:** Users can tell where evidence came from, whether it is current, and

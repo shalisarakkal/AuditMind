@@ -1,0 +1,2 @@
+hostname,domain,severity,category,description,source,observed_at
+snapshot-demo-host,network_config,critical,SNAPSHOT-DEMO,Synthetic later observation,snapshot-demo,2026-11-05T13:00:00Z

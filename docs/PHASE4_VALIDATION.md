@@ -1,5 +1,266 @@
 # Phase 4 remediation workflow validation
 
+## Final review and pre-push validation - 6 November 2026
+
+Review fixed foreign-key lock interactions for workflow edits and snapshot
+declarations: both use non-key locks compatible with import-held references.
+The 100-finding concurrency test now retains real source-observation foreign
+keys until after workflow commit. A running-scan declaration test verifies a
+prompt rejection while an asset/upload link is held.
+
+Review also fenced cancellation after rollback and pooled backend reuse.
+Migration 0044 adds publication transaction start/XID alongside PID/backend
+start; interruption requires all identities to match. The real-backend test
+rolls back a publication, reuses that exact backend for unrelated SQL, and
+verifies that abort cannot interrupt the unrelated transaction. Publication
+registration always uses a separate engine connection, even when its caller
+is bound to an explicit Connection.
+
+Reviewed backend suites: **177 passed** with PostgreSQL and warnings-as-errors.
+Full frontend: **532 passed**; ESLint, production build and high-severity Bandit
+passed. The superseded full local backend run was stopped after review fixes;
+it is not claimed as passing. The full suite is a hosted Linux CI gate.
+Installed Chrome **90 checks passed** with no page errors or AI usage; evidence:
+`temp/testing/finding-workflow/phase3_browser_f166914cb6e5/results.json` (ignored
+local artifact). The initial browser failure was a stale-tab test race: a
+disabled default Medium value was mistaken for a loaded version. The test now
+waits for the control to be enabled before the competing write. No branding
+product behavior was changed. Hosted Linux CI remains a post-push gate.
+Backend `dcf387a` and frontend/browser `b3e5095` are scoped commits. The idle
+local demo has been migrated to **0044** and restarted; database/uploads/worker
+readiness is green. Dated records below retain their earlier checkpoint context;
+this review supersedes their local uncommitted/pending-review wording. The
+exact pushed commit's [CI run](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml)
+is the authoritative hosted result.
+
+## Existing-asset cloud reimport performance - 6 November 2026
+
+The retained cloud file's hash matches an earlier successful upload which took
+666 seconds and created 500,000 assets (zero updates). The aborted attempt was
+updating existing inventory. These are different write paths despite identical
+file bytes: new assets use COPY, while existing assets used two per-row UPDATE
+paths. Each statement also invokes evidence/list invalidation triggers. The
+list counter is repeatedly updated in the same long transaction. This is not
+the observation-batch regression: cloud inventory creates no findings/history.
+
+The correction COPY-stages each bounded update buffer into a transaction-local
+temporary table, then applies one UPDATE for both scalar fields and top-level
+JSON patches. Omitted fields remain unchanged, explicit nulls clear fields,
+later staged values retain precedence, and unchanged assets are not rewritten.
+Triggers remain enabled. Matching, summaries, asset/upload links, publication
+atomicity and cancellation retain their existing contracts.
+
+Initial import/abort/batching suites: **37 passed**. Additional asset/findings
+import and omission/null/JSON/no-op semantics suites: **43 passed**. High-severity
+Bandit passed. The opt-in `backend/scripts/benchmark_asset_updates.py` seeds and
+reimports the exact retained file in an owned local PostgreSQL `*_test` schema,
+checks complete asset payload checksums, compares small old/new update controls,
+and removes the private schema. Its trigger-disabled diagnostic control is
+isolated and rolled back; disabling invalidation is not a production remedy.
+Exact-file evidence:
+`temp/testing/asset-updates/asset_update_bench_80b2923d2f6b4bdf889e953ee2185725/results.json`
+(ignored local artifact). Creating the isolated 500,000-asset baseline took
+254.673 seconds. Reimporting all 500,000 existing assets took **213.084 seconds**
+with **25 bulk UPDATE statements**, zero created assets, and an unchanged
+complete stored-asset checksum. The private schema was removed. This measures
+the unchanged-payload reimport workload in a smaller isolated database, not a
+guaranteed duration on the multi-million-row demo database.
+
+For 500 changed assets, old per-row writes took 2.033 seconds and updated the
+list revision counter 1,000 times. The isolated trigger-disabled diagnostic took
+0.776 seconds; bulk writes with triggers enabled took 0.182 seconds and updated
+that counter once. All three controls produced identical complete asset
+payloads. The small control demonstrates write/invalidation amplification, not
+a timing ratio for a full 500,000-row changed-payload upload. A plan-only check
+against the demo's 20,000-ID batch uses primary-key index lookups, not repeated
+whole-inventory scans; no real assets were updated by that check.
+
+Review also found that Abort's scan-row lock must be `FOR NO KEY UPDATE`:
+imports hold foreign-key KEY SHARE locks on their scan through asset links and
+observations. Abort intent, SQL interruption and final publication use the same
+non-key lock, remaining mutually exclusive while allowing those foreign keys.
+Final regression checks include a real import link held during a long SQL call.
+Final import/batching/staging/list-cache/workflow/abort suites: **109 passed**.
+After ensuring aborted calls return no successful-write counts, the focused
+abort suite passed again (**4 tests**), including the real abort endpoint while
+an import link retains its foreign-key lock. Targeted high-severity Bandit passed.
+Activated by an idle local restart on 6 November; database/uploads/worker
+readiness is green. The retained cloud upload remains failed and retryable.
+No production reimport has been submitted; hosted CI is not verified for this
+increment.
+
+## Import abort and stalled-progress UI - 6 November 2026
+
+Migration 0043 stores durable abort intent and the owned publication backend's
+PID/start time. Abort requests are scoped to the organization and restricted to
+the uploader or an organization admin, with membership rechecked under lock.
+Queued cancellation is terminal in the request transaction. Running cancellation
+remains Stopping until the publisher rolls back. The worker heartbeat interrupts
+only that scan's registered SQL backend, fenced by database, PID, backend start
+and a scan row lock shared with final publication. Progress boundaries also
+check intent. Final commit rechecks the abort flag under that same row lock;
+completed imports cannot be retroactively aborted. Stale aborted jobs are not
+automatically resumed. Uploaded files retain the normal failed-file policy.
+
+The user explicitly authorized stopping the legacy stalled cloud import and
+waiting workflow request for activation. Both were stopped; the cloud scan was
+marked failed/aborted with an Activity record and its uploaded file retained.
+No automatic retry was submitted.
+
+The Assets/Findings progress panel and Uploads rows offer an in-app confirmation.
+Stopping remains visible until server acknowledgement. Five minutes without a
+progress update shows a warning instead of implying that heartbeats mean useful
+progress. Progress panels also distinguish processing time from queued time when
+the start timestamp is available.
+
+Initial backend import/background/staging/migration/workflow suites: **61
+passed**. Full frontend: **532 passed**. Targeted high-severity Bandit passed.
+Final cancellation/batching suite: **8 passed**, including interrupting an owned
+long SQL call and proving complete asset rollback. Lint and production build
+passed. Local demo migrated to **0043** and restarted with one worker slot;
+database/uploads/worker readiness is green and no import was automatically
+retried. Hosted CI is not yet verified for this uncommitted increment.
+
+## Workflow/import concurrency - 5 November 2026
+
+Workflow saves no longer take the import-wide advisory lock. They retain the
+archive-admission lock, shared organization lifecycle lock, current membership
+checks, deterministic selected-finding row locks, assignee validation and
+optimistic versions. Imports still serialize matching/publication and never
+overwrite existing workflow fields. An affected item already being archived
+remains unavailable for workflow updates.
+
+Removing the advisory lock alone was insufficient: the list invalidation trigger
+would still wait on the import's organization revision row. Migration 0042 adds
+a workflow-only revision lane and routes workflow field updates to it; source
+and lifecycle updates retain the original lane. Findings stamps sum both lanes
+in one read. Migration upgrade/downgrade rotates stamp epochs; counts/cursors
+cannot reuse a pre-migration stamp. No stored findings or workflow history are
+rewritten by the migration.
+
+Workflow, list-navigation, archive-boundary and migration suites: **69 passed**.
+Final concurrency/import/filter/batching suites: **17 passed**, including a
+100-finding save committed while another transaction retains both the real
+import advisory lock and revision-row locks. Import rollback preserves that
+workflow save; pending archive admission still rejects edits. Targeted
+high-severity Bandit passed.
+
+Activated locally with migration 0043 on 6 November after the user-approved abort
+of the stalled import and pending workflow request. Subsequent workflow saves
+use the narrower locks. Hosted CI has not yet verified this uncommitted increment.
+
+## Activity settings-event rendering correction - 5 November 2026
+
+Activity assumed every settings event detail was a nested `{from,to}` object.
+Direct changes such as `{from:1,to:null}` (inherit a platform default) crashed
+the page, despite successful events API responses. Rendering now supports direct
+changes, nested changes and scalar/null metadata without altering stored events.
+Focused Activity/EventLog suites: **17 passed**, including rendering a default
+reset on the Activity page. Targeted ESLint and an isolated production build
+passed. Once all local job queues were idle, the standard launcher rebuilt and
+restarted the application; no active imports were interrupted.
+
+## Observation batching performance correction - 5 November 2026
+
+The operator aborted the slow directory import. Its unfinished publication rolled
+back; the uploaded file remains retryable. Staging was archived under ignored
+`temp/testing/import-batching/` before worker housekeeping. It is not automatically
+retried. Changed parser source invalidates old staging on an explicit retry.
+
+Observation COPY previously flushed pending existing-asset updates every 2,000
+observations. Repetitive source rows consequently rewrote the same assets many
+times. Observation-only flushes now insert buffered parents before dependent
+links/findings/history, leaving asset updates coalesced until their own bounded
+threshold or final flush. All writes remain in the import transaction.
+
+Regression coverage checks bounded history, update execution counts, foreign-key
+ordering, last-row-wins values, update buffer bounds and rollback after a history
+COPY. Observation/staging/regression suites: **31 passed**. Broader snapshot,
+profile, findings, asset and background-import suites: **124 passed** in 143.81
+seconds. High-severity Bandit passed for the ingestion service and synthetic
+benchmark helper. Local API/frontend/one-slot worker were restarted; `/ready`
+reports database, uploads and worker healthy. The aborted upload remains failed
+and retryable, with no automatic resubmission. Hosted CI is not yet verified for
+these uncommitted changes.
+
+The opt-in `backend/scripts/benchmark_observation_batching.py` uses a private
+schema in local PostgreSQL `*_test` only. A fixed-path 500,000-row directory import
+over 10,800 existing synthetic assets completed in **191.137 seconds**, retained
+**1,000,000 observations**, and performed **21,600 asset updates** (scalar and JSON
+update per asset). Canonical counts and final owner payloads were verified; the
+private schema was removed. Evidence: ignored
+`temp/testing/import-batching/observation_bench_9252b947037f4d828ec57fb389917e18/results.json`.
+An old-behavior control reproduced the slowdown and was cancelled in its isolated
+schema; no completed old/new timing ratio is claimed. Synthetic wall time does
+not predict the duration on the larger demo database.
+
+## PB-1.2 scan snapshot declarations and metadata review - 5 November 2026
+
+Migration 0041 adds importer-owned configuration capture and versioned source
+declarations, with no historical backfill. Configuration includes effective
+ingestion settings/profile, core parser source revision, Python and parser-library
+versions. Changed parser revisions invalidate staged reads. Declarations retain
+source type, tool instance/configuration, explicit target/exclusion/unreachable
+scope, source snapshot time, coverage assertion, actor and rationale. Writes and
+revocations append expected-version records, recheck role under lock and preserve
+the existing job/organization/member/scan lock ordering.
+
+The Uploads Snapshot dialog exposes declaration/revocation, a visible cross-page
+baseline pin and deliberate metadata review. Source snapshot time uses browser
+local entry/display and explicit UTC storage; it is never defaulted from upload
+time. Source chronology, not upload order, controls the newer-source check.
+Complete requires a known source time, confirmed coverage, no unreachable
+targets and a clean successful import. Unknown source time stays null on a
+non-complete declaration. Unchanged source instants preserve subsecond precision
+and avoid reinterpreting repeated local DST hours. An incomplete-import rejection
+retains an editable draft; a version conflict requires explicit reload.
+
+Comparisons name both scans/versions, display scopes/exclusions and return
+compatibility blockers. Every result keeps `absence_eligible=false` and
+`not_observed_finding_ids=null`; matching declared metadata is not authorization
+for absence, verified identity, control effectiveness or scoring changes. Existing
+finding payload/workflow, archive semantics, qualifications and saved reports are
+unchanged. [Contract, limits and synthetic Chrome samples](SCAN_SNAPSHOTS.md).
+
+Local verification (overlapping runs, not additive counts):
+
+- 86 import/staging/migration/profile/observation checks passed; 39 concurrency
+  and matching checks passed; 49 final migration/staging/event/snapshot checks
+  passed after configuration-capture review; 209 asset/findings/background/profile
+  and reader checks passed.
+- Final snapshot policy suite: **40 passed**, with PostgreSQL required and warnings
+  as errors. Includes stale role rejection, simultaneous first writes (one winner),
+  stopped archive blockers, tenant/viewer permissions, revision/revocation,
+  incomplete/failed/cancelled/incremental cases, forged fields, scope differences,
+  normalization, source-time offsets/range/future bounds, reverse upload order,
+  equal source time on reimport and unknown partial-source time.
+- Full frontend: **529 tests passed across 55 files**. Production build, TypeScript,
+  targeted ESLint and high-severity Bandit checks pass.
+- Installed Chrome: **90 checks passed**, with no page errors or AI usage, in
+  isolated schema `phase3_browser_d42104396e2a`. The new cases cover declarations,
+  pinned comparison, source-time browser/UTC round trip, unchanged finding state,
+  stale draft preservation/reload, scope mismatch, revocation, mobile width and
+  Axe. All existing workflow/tenant/archive and timed Dashboard checks also pass.
+  Artifacts are under ignored `temp/testing/finding-workflow/<schema>/`. Initial
+  runs exposed the source-type accessible label and Playwright's normalization of
+  zero-second datetime inputs; both are corrected. Fixture schemas/processes are
+  cleaned up; failed-run evidence is retained.
+
+PB-1.1's separate delivered baseline `376342c` passed all four hosted Linux jobs
+in [run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
+PB-1.2 remains local until its own review/commit/push and exact-commit hosted CI.
+PB-1.3, broader pilot/scoring rollout and production acceptance remain separate.
+
+Activation: imports, archive jobs, evidence evaluations, Dashboard refreshes and
+reports were all idle before restart. The scoped launcher migrated only
+`auditmind_demo` to 0041, rebuilt the production frontend and restarted API,
+frontend and the one-slot worker. The new declaration table contains zero
+inferred records. `/ready` returns 200 with database/uploads/worker all true;
+the login page returns 200. Existing accounts/passwords/data were retained.
+The two supplied synthetic CSV examples pass the finding parser. Documentation
+links, whitespace and scoped-file secret checks pass. No commit/push or hosted
+CI for PB-1.2 is claimed here.
+
 ## PB-1.1 pre-commit review follow-up - 5 November 2026
 
 Final review found that an ISO timestamp near year 1/9999 can parse but overflow
