@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 
 import ImportReportPanel from "@/components/ImportReportPanel";
+import { useApp } from "@/context/AppContext";
+import { useApi } from "@/lib/useApi";
+import type { Me } from "@/lib/types";
 import { importPages, importState, isInterrupted, isRunning, progressText, scanResult, useImports } from "@/context/ImportsContext";
 
 function age(iso: string | null | undefined, now: number) {
@@ -16,7 +19,11 @@ function duration(seconds: number) {
 /** A page's imports: progress while they run, then the report (for the
  * uploader) until it's dismissed. */
 export default function ImportStatus({ page }: { page: "assets" | "findings" }) {
-  const { scans, dismiss, retry, workerDown } = useImports();
+  const { scans, dismiss, retry, abort, workerDown } = useImports();
+  const { selectedOrg } = useApp();
+  const me = useApi<Me>("/auth/me");
+  const [confirmAbort, setConfirmAbort] = useState<string | null>(null);
+  const [aborting, setAborting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -32,7 +39,7 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
   const counts = new Map<string, number>();
   for (const scan of mine) { const state = importState(scan, workerDown); counts.set(state, (counts.get(state) ?? 0) + 1); }
   const summary = counts.size === 1 && counts.has("completed") ? `${mine.length} import${mine.length === 1 ? "" : "s"} completed`
-    : ["processing", "queued", "waiting", "interrupted", "failed", "completed"].filter(state => counts.has(state)).map(state => `${counts.get(state)} ${state}`).join(" · ");
+    : ["stopping", "processing", "queued", "waiting", "interrupted", "failed", "completed"].filter(state => counts.has(state)).map(state => `${counts.get(state)} ${state}`).join(" · ");
   const needsAttention = mine.some(scan => isInterrupted(scan, workerDown) || scan.status === "failed" || (scanResult(scan).report?.failed ?? 0) > 0);
 
   return (
@@ -51,7 +58,9 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
         const sinceUpdate = age(scan.progress?.updated_at, now);
         const sinceHeartbeat = age(scan.heartbeat_at, now);
         const elapsed = age(scan.started_at, now);
-        const label = active ? "Processing" : state === "queued" ? "Queued" : state === "waiting" ? "Waiting" : "Interrupted";
+        const processing = age(scan.run_started_at, now);
+        const stopping = state === "stopping";
+        const label = stopping ? "Stopping" : active ? "Processing" : state === "queued" ? "Queued" : state === "waiting" ? "Waiting" : "Interrupted";
         return (
           <section
             key={scan.id}
@@ -65,15 +74,28 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
             <p className={`mt-1 ${interrupted ? "text-violet-200" : "text-cyan"}`}>
               {active ? <span aria-hidden="true" className="mr-2 inline-block h-4 w-4 align-middle rounded-full border-2 border-cyan/30 border-t-cyan motion-safe:animate-spin" />
                 : <span aria-hidden="true" className="mr-2">{interrupted ? "⚠" : "◷"}</span>}
-              {progressText(scan, workerDown)}
+              {stopping ? "Abort requested. Waiting for the worker to confirm rollback; the import has not stopped yet." : progressText(scan, workerDown)}
             </p>
             <p className="mt-2 text-xs text-white/60">
-              {elapsed !== null && <span>Since submitted: {duration(elapsed)}</span>}
+              {processing !== null ? <span>Processing: {duration(processing)}{elapsed !== null && ` · Queued: ${duration(Math.max(0, elapsed - processing))}`}</span>
+                : elapsed !== null && <span>Since submitted: {duration(elapsed)}</span>}
               {active && sinceUpdate !== null && <span> · Progress updated {duration(sinceUpdate)} ago</span>}
             </p>
-            {active && sinceUpdate !== null && sinceUpdate >= 10 && <p className="mt-1 text-xs text-white/60">
-              Waiting for a progress update. {sinceHeartbeat !== null && sinceHeartbeat <= 30 ? "The worker is still checking in." : "Checking worker availability…"}
+            {active && sinceUpdate !== null && sinceUpdate >= 10 && <p className={`mt-1 text-xs ${sinceUpdate >= 300 ? "text-amber-200" : "text-white/60"}`}>
+              {sinceUpdate >= 300 ? "Progress has not advanced for over five minutes. A worker heartbeat does not confirm useful progress. Review this import or abort it." : <>Waiting for a progress update. {sinceHeartbeat !== null && sinceHeartbeat <= 30 ? "The worker is still checking in." : "Checking worker availability…"}</>}
             </p>}
+            {!stopping && (selectedOrg?.role === "admin" || scan.started_by === me.data?.id) && <div className="mt-3">
+              {confirmAbort === scan.id ? <div role="group" aria-label="Confirm abort import" className="rounded border border-amber-300/40 p-3">
+                <p>Abort {scan.filename ?? "this import"}? Unfinished import writes will roll back. The uploaded file is kept for retry. Other jobs are not cancelled.</p>
+                <div className="mt-2 flex gap-4"><button type="button" disabled={aborting === scan.id} className="text-red-300" onClick={async () => {
+                  setAborting(scan.id); setError(null);
+                  try { await abort(scan); setConfirmAbort(null); }
+                  catch (err) { setError(err instanceof Error ? err.message : "Could not request abort"); }
+                  finally { setAborting(null); }
+                }}>{aborting === scan.id ? "Requesting abort…" : "Abort import"}</button>
+                <button type="button" disabled={aborting === scan.id} className="text-cyan" onClick={() => setConfirmAbort(null)}>Keep processing</button></div>
+              </div> : <button type="button" className="text-red-300 hover:underline" onClick={() => setConfirmAbort(scan.id)}>Abort import</button>}
+            </div>}
           </section>
         );
       })}

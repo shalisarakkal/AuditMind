@@ -3,6 +3,7 @@ import type { ActivityEvent, Criticality } from "@/lib/types";
 /** Event types as Activity names them (backend app/services/events.py). */
 export const EVENT_LABELS: Record<string, string> = {
   import: "Upload",
+  import_abort_requested: "Import abort requested",
   repeat_upload: "Same file uploaded again",
   upload_skipped: "Exact duplicate file skipped",
   archive: "Archive",
@@ -11,6 +12,8 @@ export const EVENT_LABELS: Record<string, string> = {
   asset_added: "Asset added",
   finding_added: "Finding added",
   finding_workflow_changed: "Finding remediation changed",
+  scan_snapshot_declared: "Scan snapshot declared",
+  scan_snapshot_revoked: "Scan snapshot declaration revoked",
   settings_changed: "Settings changed",
   profile_created: "File format created",
   profile_updated: "File format changed",
@@ -116,9 +119,18 @@ export function eventSummary(event: ActivityEvent): string {
   if (typeof details.error === "string") parts.push(details.error);
   if (typeof details.retried === "string") parts.push(details.retried);
   if (event.type === "settings_changed") {
+    const directChange = Object.hasOwn(details, "from") && Object.hasOwn(details, "to");
+    if (directChange) parts.push(`${show(details.from)} → ${show(details.to)}`);
     for (const [key, change] of Object.entries(details)) {
-      const { from, to } = change as { from: unknown; to: unknown };
-      parts.push(`${key.replace(/_/g, " ")}: ${show(from)} → ${show(to)}`);
+      if (directChange && (key === "from" || key === "to")) continue;
+      const label = key.replace(/_/g, " ");
+      if (change !== null && typeof change === "object" && !Array.isArray(change)
+        && (Object.hasOwn(change, "from") || Object.hasOwn(change, "to"))) {
+        const { from, to } = change as { from?: unknown; to?: unknown };
+        parts.push(`${label}: ${show(from)} → ${show(to)}`);
+      } else {
+        parts.push(`${label}: ${show(change)}`);
+      }
     }
   }
   if (event.type === "member_added" && details.role) {

@@ -36,6 +36,7 @@ type ImportsContextValue = {
    * new upload, followed like one just made; the failed one's report goes.
    * Throws if the server refuses. */
   retry(scan: Scan): Promise<void>;
+  abort(scan: Scan): Promise<void>;
   /** Archive, restore and purge jobs, tracked the same way: the org's running
    * ones, and the user's finished ones not yet dismissed. */
   jobs: ArchiveJob[];
@@ -186,6 +187,12 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
     [orgId, apply, track],
   );
 
+  const abort = useCallback(async (scan: Scan) => {
+    if (!orgId) return;
+    const updated = await api.post<Scan>(`/orgs/${orgId}/scans/${scan.id}/abort`);
+    apply(orgId, begin(), current.current.scans.map(item => item.id === updated.id ? updated : item));
+  }, [orgId, apply]);
+
   // An archive, restore or purge finished: pages reload, and so does this
   // list (an upload archived or purged no longer has a report to show).
   const onJobsFinished = useCallback(
@@ -204,8 +211,8 @@ export function ImportsProvider({ children, pollIntervalMs = POLL_MS }: { childr
   const workerDown = useWorkerDown(waiting, WORKER_CHECK_MS);
 
   const value = useMemo(
-    () => ({ scans, finishedCount, track, dismiss, retry, jobs, startJob, startBulk, dismissJob, requested, workerDown }),
-    [scans, finishedCount, track, dismiss, retry, jobs, startJob, startBulk, dismissJob, requested, workerDown],
+    () => ({ scans, finishedCount, track, dismiss, retry, abort, jobs, startJob, startBulk, dismissJob, requested, workerDown }),
+    [scans, finishedCount, track, dismiss, retry, abort, jobs, startJob, startBulk, dismissJob, requested, workerDown],
   );
   return <ImportsContext.Provider value={value}>{children}</ImportsContext.Provider>;
 }
@@ -476,6 +483,7 @@ export function progressText(scan: Scan, workerDown = false): string {
 
 /** Queued/waiting jobs must never be presented as active row processing. */
 export function importState(scan: Scan, workerDown = false) {
+  if (isRunning(scan) && scan.abort_requested_at) return "stopping";
   if (isInterrupted(scan, workerDown)) return "interrupted";
   if (scan.status === "pending") return "queued";
   if (scan.status === "running") return scan.progress?.phase === "waiting" ? "waiting" : "processing";

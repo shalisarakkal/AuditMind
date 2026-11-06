@@ -436,6 +436,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     check('Admin uploads normalized organization logo; header/settings persist it on refresh and viewer remains read-only');
     const otherLogoTab=await admin.context.newPage(); await otherLogoTab.goto(base+'/settings');
     await expect(otherLogoTab.getByAltText('Phase3 Alpha logo',{exact:true})).toHaveCount(2);
+    await expect(otherLogoTab.getByLabel('Header company name size',{exact:true})).toBeEnabled();
     await p.getByLabel('Header company name size',{exact:true}).selectOption('large');
     await expect(p.locator('main header').getByText('Phase3 Alpha',{exact:true})).toHaveCSS('font-size','24px');
     await otherLogoTab.getByLabel('Header company name size',{exact:true}).selectOption('small');
@@ -446,6 +447,9 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.getByLabel('Header company name size',{exact:true}).selectOption('medium');
     await expect(p.locator('main header').getByText('Phase3 Alpha',{exact:true})).toHaveCSS('font-size','20px');
     await otherLogoTab.reload();
+    // Medium is also the disabled loading fallback. Wait for the stale tab
+    // to capture a real version before the other tab writes the next change.
+    await expect(otherLogoTab.getByLabel('Header logo size',{exact:true})).toBeEnabled();
     await expect(otherLogoTab.getByLabel('Header company name size',{exact:true})).toHaveValue('medium');
     check('Two-admin company-name size conflict requires reload and preserves the newer choice');
     await p.getByLabel('Header logo size',{exact:true}).selectOption('large');
@@ -686,6 +690,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect.poll(()=>authorization).toBeTruthy();
     const importedResponse=await p.request.post(base+'/api/v1'+list+'/import',{headers:{Authorization:authorization},multipart:{confirm:'true',file:{name:'workflow.csv',mimeType:'text/csv',buffer:Buffer.from('hostname,domain,severity,category,description,source\nworkflow-host,network_config,high,WF-1,Imported workflow,synthetic-workflow\n')}}});
     assert.ok([201,202].includes(importedResponse.status()));
+    const snapshotBaselineImport=await importedResponse.json();
     const c=(await admin.request(list)).body.items.find(f=>f.description==='Imported workflow').id;
     const row=name=>p.getByRole('row').filter({has:p.getByText(name,{exact:true})});
     const dialog=()=>p.getByRole('dialog',{name:'Finding workflow',exact:true});
@@ -700,7 +705,8 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
     const repeatedObservation=await p.request.post(base+'/api/v1'+list+'/import',{headers:{Authorization:authorization},multipart:{confirm:'true',file:{name:'workflow-repeat.csv',mimeType:'text/csv',buffer:Buffer.from('hostname,domain,severity,category,description,source\nworkflow-host,network_config,critical,WF-1,Changed source observation,synthetic-workflow\n')}}});
     assert.equal(repeatedObservation.status(),201);
-    assert.equal((await repeatedObservation.json()).report.duplicates,1);
+    const snapshotCurrentImport=await repeatedObservation.json();
+    assert.equal(snapshotCurrentImport.report.duplicates,1);
     const observed=(await admin.request(list+'/'+c+'/observations')).body;
     assert.equal(observed.length,2); assert.equal(observed[0].payload.description,'Changed source observation');
     assert.equal((await admin.request(list+'/'+c+'/workflow')).body.version,0);
@@ -717,6 +723,78 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
     await p.setViewportSize({width:1440,height:1000});
     check('Source observations retain repeated changed imports separately from canonical payload/workflow; lazy UI fits mobile and passes Axe');
+    await p.goto(base+'/uploads');
+    const snapshotDialog=()=>p.getByRole('dialog',{name:'Scan snapshot',exact:true});
+    const sourceSnapshotTimes={'workflow.csv':new Date(Date.now()-7200000).toISOString(),'workflow-repeat.csv':new Date(Date.now()-3600000).toISOString()};
+    async function declareSnapshot(filename) {
+      await p.getByRole('button',{name:`Scan snapshot for ${filename}`,exact:true}).click();
+      await snapshotDialog().getByRole('button',{name:'Declare snapshot',exact:true}).click();
+      await snapshotDialog().getByLabel('Source snapshot type',{exact:true}).selectOption('complete');
+      const localSourceTime=await p.evaluate(value=>{const d=new Date(value),pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}${d.getSeconds()?':'+pad(d.getSeconds()):''}`;},sourceSnapshotTimes[filename]);
+      await snapshotDialog().getByLabel('Source snapshot time',{exact:true}).fill(localSourceTime);
+      await snapshotDialog().getByLabel('Tool name',{exact:true}).fill('Synthetic scanner');
+      await snapshotDialog().getByLabel('Tool instance ID',{exact:true}).fill('scanner-1');
+      await snapshotDialog().getByLabel('Tool configuration ID',{exact:true}).fill('policy-v1');
+      await snapshotDialog().getByLabel('Target scope',{exact:true}).fill('workflow-host');
+      await snapshotDialog().getByLabel(/I confirm the source scan assessed/).check();
+      await snapshotDialog().getByLabel('Declaration rationale',{exact:true}).fill('Browser coverage review');
+      await snapshotDialog().getByRole('button',{name:'Save declaration',exact:true}).click();
+      await expect(snapshotDialog().getByText('Version 1 · Declared',{exact:true})).toBeVisible();
+      const scanId=filename==='workflow.csv'?snapshotBaselineImport.scan_id:snapshotCurrentImport.scan_id;
+      const savedSnapshot=(await admin.request(org+`/scans/${scanId}/snapshot`)).body;
+      assert.equal(Date.parse(savedSnapshot.declaration.declaration.source_snapshot_at),Math.floor(Date.parse(sourceSnapshotTimes[filename])/1000)*1000);
+    }
+    await declareSnapshot('workflow.csv');
+    await snapshotDialog().getByRole('button',{name:'Use as baseline',exact:true}).click();
+    await expect(p.getByRole('region',{name:'Scan comparison baseline',exact:true})).toContainText('workflow.csv');
+    await declareSnapshot('workflow-repeat.csv');
+    await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
+    const comparisonDialog=()=>p.getByRole('dialog',{name:'Review scan snapshots',exact:true});
+    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
+    await expect(comparisonDialog().getByText('Declared metadata matches',{exact:true})).toBeVisible();
+    await expect(comparisonDialog().getByText('Not approved for absence conclusions',{exact:true})).toBeVisible();
+    await expect(comparisonDialog().getByRole('region',{name:'Baseline',exact:true})).toContainText('workflow.csv');
+    await expect(comparisonDialog().getByRole('region',{name:'Current',exact:true})).toContainText('workflow-repeat.csv');
+    const snapshotReviewAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(snapshotReviewAxe.violations.map(v=>v.id),[]);
+    await p.setViewportSize({width:320,height:844});
+    assert.ok(await comparisonDialog().evaluate(node=>node.scrollWidth<=node.clientWidth));
+    await p.screenshot({path:path.join(output,'scan-snapshot-review-mobile.png'),fullPage:true});
+    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    await p.setViewportSize({width:1440,height:1000});
+    check('Versioned source-scan declarations and pinned baseline review show matching metadata without absence authority; mobile/Axe pass');
+    await p.getByRole('button',{name:'Scan snapshot for workflow-repeat.csv',exact:true}).click();
+    await snapshotDialog().getByRole('button',{name:'Revise declaration',exact:true}).click();
+    const revisedSnapshot=await admin.request(org+`/scans/${snapshotCurrentImport.scan_id}/snapshot`,'PUT',{
+      expected_version:1,snapshot_kind:'complete',tool_name:'Synthetic scanner',tool_instance_id:'scanner-1',tool_configuration_id:'policy-v1',
+      targets:['other-host'],exclusions:[],unreachable_targets:[],coverage_confirmed:true,rationale:'Concurrent scope correction',source_snapshot_at:sourceSnapshotTimes['workflow-repeat.csv']});
+    assert.equal(revisedSnapshot.status,200);
+    await snapshotDialog().getByLabel('Declaration rationale',{exact:true}).fill('Stale draft');
+    await snapshotDialog().getByRole('button',{name:'Save declaration',exact:true}).click();
+    await expect(snapshotDialog().getByRole('alert')).toContainText('changed');
+    await expect(snapshotDialog().getByRole('button',{name:'Save declaration',exact:true})).toBeDisabled();
+    await expect(snapshotDialog().getByLabel('Declaration rationale',{exact:true})).toHaveValue('Stale draft');
+    await snapshotDialog().getByRole('button',{name:'Reload saved declaration',exact:true}).click();
+    await expect(snapshotDialog().getByText('Version 2 · Declared',{exact:true})).toBeVisible();
+    await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
+    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
+    await expect(comparisonDialog().getByText('Target scopes differ',{exact:true})).toBeVisible();
+    await expect(comparisonDialog().getByText('Baseline only targets: workflow-host',{exact:true})).toBeVisible();
+    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    check('Concurrent declaration revision preserves the stale draft, requires explicit reload and explains changed target scope');
+    await p.getByRole('button',{name:'Scan snapshot for workflow-repeat.csv',exact:true}).click();
+    await snapshotDialog().getByRole('button',{name:'Revoke declaration',exact:true}).click();
+    await snapshotDialog().getByLabel('Revocation rationale',{exact:true}).fill('Revoke until source scope is verified');
+    await snapshotDialog().getByRole('group',{name:'Revoke scan declaration',exact:true}).getByRole('button',{name:'Revoke declaration',exact:true}).click();
+    await expect(snapshotDialog().getByText('Version 3 · Revoked',{exact:true})).toBeVisible();
+    await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
+    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
+    await expect(comparisonDialog().getByText('Current: Declaration was revoked',{exact:true})).toBeVisible();
+    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    assert.equal((await admin.request(list+'/'+c+'/workflow')).body.version,0);
+    assert.equal((await admin.request(org+`/scans/${snapshotBaselineImport.scan_id}/snapshot`)).body.declaration.version,1);
+    check('Explicit revocation appends a version and blocks compatibility without modifying baseline or finding workflow');
+    await p.goto(base+'/findings'); await expect(row('Imported workflow')).toBeVisible();
     await p.getByRole('button',{name:'Add finding',exact:true}).click();
     const add = p.getByRole('dialog',{name:'Add finding',exact:true});
     const addAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze(); assert.deepEqual(addAxe.violations.map(v=>v.id),[]);

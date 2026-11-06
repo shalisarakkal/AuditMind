@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useState } from "react";
 
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
+import ConfirmPanel from "@/components/ConfirmPanel";
 import FindingActionDialog from "@/components/FindingActionDialog";
 import ImportReportPanel from "@/components/ImportReportPanel";
 import { ArchiveButtons } from "@/components/JobButton";
@@ -32,11 +33,12 @@ import {
 } from "@/components/ListPage";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
+import ScanSnapshotDialog, { ScanSnapshotComparisonDialog } from "@/components/ScanSnapshotDialog";
 import { useApp } from "@/context/AppContext";
 import { isRunning, scanResult, useImports } from "@/context/ImportsContext";
 import { canWrite, formatDateTime, scanTypeLabel } from "@/lib/domain";
 import { importCountsText } from "@/lib/importCounts";
-import type { Page, Scan, Upload } from "@/lib/types";
+import type { Me, Page, Scan, Upload } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { useListState } from "@/lib/useListState";
 import { useSelection } from "@/lib/useSelection";
@@ -47,6 +49,7 @@ const COLUMNS = 7; // plus the checkboxes, for writers
 
 /** What an import did, in a few words. */
 function outcome(upload: Upload): string {
+  if (isRunning(upload) && upload.abort_requested_at) return "Stopping… Waiting for rollback confirmation.";
   if (isRunning(upload)) return upload.status === "pending" ? "Waiting…" : "Processing…";
   const s = upload.summary;
   if (!s) return "—";
@@ -75,9 +78,15 @@ function Uploads() {
   const selection = useSelection(list, org.id);
   const [opened, setOpened] = useState<string | null>(null);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
-  const { retry } = useImports();
+  const { retry, abort } = useImports();
+  const me = useApi<Me>("/auth/me");
+  const [abortTarget, setAbortTarget] = useState<Upload | null>(null);
+  const [aborting, setAborting] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<Upload | null>(null);
+  const [baseline, setBaseline] = useState<{ id: string; name: string } | null>(null);
+  const [comparison, setComparison] = useState<{ baselineId: string; currentId: string } | null>(null);
   useReloadOnImport(() => { selection.clear(); reload(); });
   useReloadOnImport(facets.reload);
 
@@ -128,6 +137,15 @@ function Uploads() {
     <div className="space-y-6">
       <PageHeader title="Uploads" total={page?.total} noun="uploads" orgName={org.name} filtered={list.hasFilters} />
       <JobStatus />
+      {baseline && <div role="region" aria-label="Scan comparison baseline" className="flex flex-wrap items-center gap-3 rounded-lg border border-cyan/30 p-3 text-sm">
+        <span className="min-w-0 break-words">Baseline: {baseline.name}. Open another upload&apos;s Snapshot to review against it.</span>
+        <button type="button" className="text-cyan underline" onClick={() => setBaseline(null)}>Clear baseline</button>
+      </div>}
+      {snapshot && <ScanSnapshotDialog key={snapshot.id} orgId={org.id} orgName={org.name} scanId={snapshot.id} writer={writer}
+        onClose={() => setSnapshot(null)} baselineId={baseline?.id}
+        onBaseline={name => { setBaseline({ id: snapshot.id, name }); setSnapshot(null); }}
+        onCompare={() => { if (baseline) { setComparison({ baselineId: baseline.id, currentId: snapshot.id }); setSnapshot(null); } }} />}
+      {comparison && <ScanSnapshotComparisonDialog orgId={org.id} orgName={org.name} {...comparison} onClose={() => setComparison(null)} />}
       {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
       <ListToolbar list={list} label="uploads">
         <DateRangeFilter list={list} label="Uploaded" />
@@ -205,6 +223,10 @@ function Uploads() {
                   </td>
                   <td className={`${TD} text-xs text-white/60`}>{outcome(u)}</td>
                   <td className={ACTIONS_CELL}>
+                    <button type="button" className={ROW_ACTION_VIEW} aria-label={`Scan snapshot for ${u.filename ?? "upload"}`}
+                      disabled={isRunning(u) || selection.count > 0 || loading || u.archiving === "running"}
+                      title={selection.count ? "Clear selection to use individual row actions." : "Review or declare the source scan scope"}
+                      onClick={() => setSnapshot(u)}>Snapshot</button>
                     {!isRunning(u) && (
                       <button
                         type="button"
@@ -227,6 +249,12 @@ function Uploads() {
                         {retrying === u.id ? "Retrying…" : "Retry"}
                       </button>
                     )}
+                    {isRunning(u) && (org.role === "admin" || u.started_by === me.data?.id) && <button
+                      type="button" className="text-xs text-red-300 hover:underline"
+                      disabled={!!u.abort_requested_at || selection.count > 0 || loading}
+                      onClick={() => { setRetryError(null); setAbortTarget(u); }}>
+                      {u.abort_requested_at ? "Stopping…" : "Abort import"}
+                    </button>}
                     {writer && (
                       <ArchiveButtons
                         itemId={u.id}
@@ -254,6 +282,17 @@ function Uploads() {
         </ListTable>
       )}
       {page && <Pager offset={list.offset} limit={PAGE_SIZE} total={page.total} onChange={list.setOffset} />}
+      {abortTarget && <FindingActionDialog title="Abort import" orgName={org.name} onClose={() => { if (!aborting) setAbortTarget(null); }}>
+        <ConfirmPanel label="Confirm abort import" confirmLabel="Abort import" danger busy={aborting}
+          message={<>Abort <strong>{abortTarget.filename}</strong>? Unfinished writes will roll back. The uploaded file is kept for retry. Other jobs are not cancelled.</>}
+          onCancel={() => setAbortTarget(null)} onConfirm={async () => {
+            setAborting(true);
+            try { await abort(abortTarget); setAbortTarget(null); reload(); }
+            catch (err) { setRetryError(err instanceof Error ? err.message : "Could not request abort"); }
+            finally { setAborting(false); }
+          }} />
+        {retryError && <p role="alert" className="mt-3 text-red-300">{retryError}</p>}
+      </FindingActionDialog>}
     </div>
   );
 }

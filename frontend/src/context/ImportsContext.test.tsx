@@ -15,6 +15,20 @@ const REPORT = {
   created: 3, updated: 0, skipped: 0, duplicates: 0, failed: 0, findings_created: 0, errors: [], warnings: [],
 };
 
+it("confirms an abort in the application and keeps showing Stopping until acknowledged", async () => {
+  let current = scan({ status: "running", filename: "slow.csv" });
+  const { fetchMock } = await renderSignedIn(<ImportStatus page="assets" />, "admin", {
+    ...server(() => [current]),
+    "POST /orgs/org-1/scans/s1/abort": () => (current = { ...current, abort_requested_at: new Date().toISOString() }),
+  });
+  fireEvent.click(await screen.findByText("Show progress and reports"));
+  fireEvent.click(await screen.findByRole("button", { name: "Abort import" }));
+  expect(requests(fetchMock, "/abort")).toBe(0);
+  fireEvent.click(within(screen.getByRole("group", { name: "Confirm abort import" })).getByRole("button", { name: "Abort import" }));
+  expect(await screen.findByText(/Waiting for the worker to confirm rollback/)).toBeVisible();
+  expect(screen.getByText("1 stopping")).toBeVisible();
+});
+
 function ListReloads({ onReload }: { onReload: () => void }) {
   useReloadOnImport(onReload);
   return null;

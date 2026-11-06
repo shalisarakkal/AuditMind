@@ -302,6 +302,8 @@ export type Scan = {
   progress: ImportProgress | null;
   /** Set while the background worker runs it (it checks in every ~15 s). */
   heartbeat_at?: string | null;
+  abort_requested_at?: string | null;
+  run_started_at?: string | null;
   /** Failed, but can run again from its kept file (Retry). */
   retryable?: boolean;
 };

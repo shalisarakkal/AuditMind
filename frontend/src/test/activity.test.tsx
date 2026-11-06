@@ -229,4 +229,25 @@ describe("helpers", () => {
       "Invalid JSON, Cut off",
     );
   });
+
+  it("keeps the Activity page usable when a setting is reset to its default", async () => {
+    await renderSignedIn(<ActivityPage />, "viewer", {
+      "GET /orgs/org-1/events": () => page([
+        event({ type: "settings_changed", counts: null, item: "Dashboard refresh settings",
+          details: { from: 1, to: null } }),
+      ]),
+    });
+    expect(await screen.findByText("1 → default")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard refresh settings")).toBeInTheDocument();
+  });
+
+  it("renders direct setting changes and scalar metadata without crashing", () => {
+    expect(eventSummary(event({ type: "settings_changed", counts: null,
+      details: { from: null, to: 60 } }))).toBe("default → 60");
+    expect(eventSummary(event({ type: "settings_changed", counts: null,
+      details: { from: 1, to: null } }))).toBe("1 → default");
+    expect(eventSummary(event({ type: "settings_changed", counts: null,
+      details: { from: false, enabled: true, version: 2, note: null } })))
+      .toBe("from: false, enabled: true, version: 2, note: default");
+  });
 });
