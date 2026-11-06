@@ -76,6 +76,7 @@ def _in_org(org: Organization):
 # so the search box finds "Signed in" by what's on screen.
 _TYPE_LABELS = {
     "import": "Import",
+    "import_abort_requested": "Import abort requested",
     "repeat_upload": "Same file imported again",
     "upload_skipped": "Exact duplicate file skipped",
     "archive": "Archive",

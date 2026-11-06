@@ -1,6 +1,6 @@
 from app.db.base_class import Base
 from app.models.dashboard_snapshot import DashboardSnapshot  # noqa: F401
-from app.models.list_revision import OrganizationListRevision  # noqa: F401
+from app.models.list_revision import OrganizationListRevision, OrganizationWorkflowRevision  # noqa: F401
 from app.models.organization import Organization
 from app.models.organization_logo import OrganizationLogo
 from app.models.scoring_qualification import OrganizationScoringSettings, DomainEvidenceQualification
@@ -12,6 +12,7 @@ from app.models.scan import Scan
 from app.models.finding import Finding
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
+from app.models.scan_snapshot import ScanSnapshotDeclaration
 from app.models.risk_score import RiskScore
 from app.models.report import Report
 from app.models.ai_usage import AIUsage
@@ -31,6 +32,8 @@ from app.db.evidence_revision import register
 register(Base.metadata)
 from app.db.list_revision import register as register_lists
 register_lists(Base.metadata)
+from app.db.workflow_revision import register as register_workflows
+register_workflows(Base.metadata)
 
 __all__ = [
     "WorkerDispatch",
@@ -49,6 +52,7 @@ __all__ = [
     "Finding",
     "FindingHistory",
     "FindingObservation",
+    "ScanSnapshotDeclaration",
     "RiskScore",
     "Report",
     "Document",

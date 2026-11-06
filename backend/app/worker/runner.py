@@ -302,6 +302,9 @@ def reap_stale(db: Session, now: datetime | None = None) -> None:
         if running_here == ("import", scan.id) or job_is_running(db, IMPORT_JOB, scan.id):
             continue
         by_worker = scan.heartbeat_at is not None
+        if scan.abort_requested_at is not None:
+            fail_import(db, scan, "Import aborted at user request")
+            continue
         saved = upload_path(scan.id).exists()
         if by_worker and scan.retry_count < MAX_RESUMES and saved:
             logger.warning("Import %s (%s) was cut off: carrying on", scan.id, scan.filename)
@@ -483,6 +486,9 @@ def _check_in(stop: threading.Event, started_at: datetime, lease=None, stop_work
                     else:
                         model = ArchiveJob
                     db.execute(update(model).where(model.id == job[1]).values(heartbeat_at=now))
+                    if job[0] == "import":
+                        from app.services.import_abort import interrupt_publication
+                        interrupt_publication(db, job[1])
                 db.commit()
 
                 # ADD THIS: Increment worker heartbeat metric

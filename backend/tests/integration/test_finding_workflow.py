@@ -282,6 +282,68 @@ def test_concurrent_edits_one_wins(db_session, client, setup):
     assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 1
 
 
+def test_workflow_commits_while_import_holds_org_and_revision_locks(db_session, setup):
+    """Hold actual import-side locks until after workflow commits, not just sleep."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+    from uuid import UUID
+    from app.models.membership import OrgMembership
+    from app.schemas.finding_workflow import WorkflowPatch, WorkflowTarget
+    from app.services.finding_workflow import update_workflows
+    from app.services.org_lock import lock_org
+    from app.services.list_pages import revision_stamp
+    from app.models.asset import Asset
+    _, org, _, f, _ = setup
+    org_id = UUID(org)
+    actor = db_session.scalar(select(User).where(User.email == "workflow@example.com")).id
+    sample = db_session.get(Finding, UUID(f))
+    extra = [Finding(org_id=org_id, domain=sample.domain, severity=sample.severity,
+        description="Concurrent bulk workflow fixture") for _ in range(99)]
+    db_session.add_all(extra)
+    db_session.commit()
+    identifiers = [UUID(f), *(finding.id for finding in extra)]
+    before = revision_stamp(db_session, org_id, "findings")
+    db_session.rollback()
+    engine = db_session.get_bind()
+    with Session(engine) as importing, Session(engine) as editing:
+        lock_org(importing, org_id)
+        importing.add(Asset(org_id=org_id, type="server", hostname="concurrent-import.example"))
+        importing.flush()  # Includes real list/evidence revision triggers.
+        from app.models.finding_observation import FindingObservation
+        import_id = uuid4()
+        importing.add_all([FindingObservation(id=uuid4(),org_id=org_id,finding_id=identifier,
+            import_id=import_id,scan_id=None,occurrence=index,source_row=index,source="review-test",
+            scan_type="generic_findings_import",recorded_at=datetime.now(timezone.utc),
+            asset_identity={},source_identity={},reconciliation_eligible=False,
+            ineligibility_reasons=["unstable_identity"],payload={})
+            for index,identifier in enumerate(identifiers,1)])
+        importing.flush()  # KEY SHARE on every finding, retained until rollback.
+        editing.execute(text("SET LOCAL lock_timeout='2s'"))
+        membership = editing.get(OrgMembership, (actor, org_id))
+        result = update_workflows(editing, org_id, membership,
+            [WorkflowTarget(finding_id=identifier, expected_version=0) for identifier in identifiers],
+            WorkflowPatch(status="mitigated", rationale="Concurrent review", verification="Verified"))
+        assert len(result) == 100 and all(item.version == 1 for item in result)
+        assert revision_stamp(editing, org_id, "findings") != before
+        importing.rollback()  # Workflow's committed history must survive.
+    db_session.expire_all()
+    assert db_session.get(Finding, UUID(f)).workflow_status == "mitigated"
+    assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 100
+
+
+def test_pending_archive_still_fences_workflow(client, db_session, setup):
+    from uuid import UUID
+    from app.models.enums import ArchiveItemType
+    from app.services.archive_service import start_archive
+    h, org, base, finding, _ = setup
+    actor = db_session.scalar(select(User).where(User.email == "workflow@example.com")).id
+    start_archive(db_session, UUID(org), ArchiveItemType.finding, UUID(finding), actor)
+    response = change(client, base, finding, h, status="mitigated", verification="Verified")
+    assert response.status_code == 409
+    assert db_session.get(Finding, UUID(finding)).workflow_version == 0
+    assert db_session.scalar(select(func.count()).select_from(FindingHistory)) == 0
+
+
 def test_assignment_deactivated_or_membership_removed(client, db_session, setup):
     from uuid import UUID
     from app.models.membership import OrgMembership

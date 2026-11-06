@@ -32,8 +32,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from psycopg.types.json import Jsonb
-from sqlalchemy import bindparam, select, update
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.archive import AssetScan
@@ -42,6 +41,7 @@ from app.models.enums import Criticality, Domain, ScanStatus, Severity
 from app.models.finding import Finding
 from app.models.finding_observation import FindingObservation
 from app.services.finding_observations import observation_values
+from app.services.import_configuration import PARSER_REVISION, configuration_identity
 from app.models.organization import Organization
 from app.models.scan import Scan
 from app.models.user import User
@@ -322,9 +322,13 @@ def process_import(
         except Exception:
             db.rollback()
             _finish(db, db.get(Scan, scan_id), ScanStatus.failed, {"error": "Unexpected error during import"})
+            if db.get(Scan, scan_id).summary.get("aborted"):
+                return ImportReport()
             raise
 
         _finish(db, db.get(Scan, scan_id), status, report.model_dump(mode="json"))
+        if db.get(Scan, scan_id).summary.get("aborted"):
+            return ImportReport()
         return report
 
 
@@ -370,20 +374,45 @@ def event_counts(scan_type: str, summary: dict) -> dict:
     return {names[key]: n for key, n in summary.items() if key in names and isinstance(n, int) and n}
 
 
-def fail_import(db: Session, scan: Scan, message: str) -> None:
+def fail_import(db: Session, scan: Scan, message: str, *, aborted: bool = False) -> None:
     """Mark an import that can't run (or be run again) failed, with its
     Activity event."""
-    _finish(db, scan, ScanStatus.failed, {"error": message})
+    _finish(db, scan, ScanStatus.failed, {"error": message, **({"aborted": True} if aborted else {})})
 
 
 def _finish(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
+    from sqlalchemy.exc import DBAPIError
+    identifier = scan.id
+    for attempt in range(3):
+        try:
+            return _finish_locked(db, scan, status, summary)
+        except DBAPIError:
+            db.rollback()
+            scan = db.get(Scan, identifier)
+            if scan.abort_requested_at is None or attempt == 2:
+                raise
+            status, summary = ScanStatus.failed, {"error": "Import aborted at user request; unfinished writes rolled back", "aborted": True}
+
+
+def _finish_locked(db: Session, scan: Scan, status: ScanStatus, summary: dict) -> None:
     """Record the outcome on the scan and its Activity event, together."""
+    with db.no_autoflush:
+        requested = db.scalar(select(Scan.abort_requested_at).where(Scan.id == scan.id).with_for_update(key_share=True))
+    if requested is not None and not summary.get("aborted"):
+        identifier = scan.id
+        db.rollback()
+        scan = db.get(Scan, identifier)
+        status, summary = ScanStatus.failed, {"error": "Import aborted at user request; unfinished writes rolled back", "aborted": True}
+    scan.publication_pid = scan.publication_backend_start = None
+    scan.publication_xact_start = scan.publication_xid = None
     scan.status = status
     scan.summary = summary
     scan.completed_at = datetime.now(timezone.utc)
     scan.progress = None
     counts = event_counts(scan.scan_type, summary)
     details = {}
+    if summary.get("aborted"):
+        details["aborted"] = True
     if error := summary.get("error") or next((e["message"] for e in summary.get("errors", []) if e["row"] == 0), None):
         details["error"] = error
     if scan.retry_count:
@@ -477,6 +506,9 @@ def _import(
             warnings.append(Capped([RowWarning(row=0, message=hint)], 1))
     # All-or-nothing with a bad row: nothing is written.
     if not state.failed or ingestion.import_partial_success:
+        if isinstance(source, Path):
+            from app.services.import_abort import register_publication
+            register_publication(db, scan.id)
         lock_org(db, scan.org_id, on_wait=lambda: progress and progress("waiting", 0, 0))
         if progress is not None:
             progress("preparing", 0, state.items_staged)
@@ -500,6 +532,7 @@ def _import(
     merged = sorted((w for capped in warnings for w in capped.items), key=lambda w: w.row)
     report.warnings = merged[:MAX_REPORTED_ERRORS]
     report.warnings_total = sum(capped.total for capped in warnings)
+    scan.ingestion_config_fingerprint = configuration_identity(state.fingerprint)
     return report
 
 
@@ -511,6 +544,7 @@ def _fingerprint(kind: ImportKind, fmt: str, ingestion: IngestionSettings, profi
     restarted worker would never carry on."""
     basis = {
         "version": import_staging.STAGING_VERSION,
+        "parser_revision": PARSER_REVISION,
         "kind": kind,
         "format": fmt,
         "settings": dataclasses.asdict(ingestion),
@@ -784,7 +818,11 @@ class _PendingWrites:
     def observe(self, values: dict) -> None:
         self.observations.append(values)
         if len(self.observations) >= WRITE_BATCH:
-            self.flush()
+            # History must stay bounded even for duplicate-only imports, but
+            # flushing it must not break per-asset update coalescing. Repeated
+            # profile rows can otherwise rewrite the same asset hundreds of
+            # times solely because observations reached their COPY batch size.
+            self._flush_inserts()
 
     def row_done(self) -> None:
         self.rows_done += 1
@@ -799,24 +837,60 @@ class _PendingWrites:
         """Write everything pending. Assets first: findings may refer to them."""
         if self.new_assets:
             _copy_rows(self.db, Asset.__tablename__, list(self.new_assets.values()))
-        if self.asset_updates:
-            self.db.execute(update(Asset), [{"id": id_, **values} for id_, values in self.asset_updates.items()])
-        if self.details:
-            table = Asset.__table__
-            self.db.execute(
-                update(table)
-                .where(table.c.id == bindparam("asset_id"))
-                .values(details=table.c.details.op("||")(bindparam("new_details", type_=JSONB))),
-                [{"asset_id": id_, "new_details": details} for id_, details in self.details.items()],
-            )
+        if self.asset_updates or self.details:
+            _bulk_update_assets(self.db, self.asset_updates, self.details)
+        self._flush_dependent_inserts()
+        self.new_assets, self.asset_updates, self.details = {}, {}, {}
+
+    def _flush_inserts(self) -> None:
+        """Publish buffered parents/links/history inside the same transaction;
+        leave existing-asset updates coalesced until UPDATE_BATCH or finish."""
+        if self.new_assets:
+            _copy_rows(self.db, Asset.__tablename__, list(self.new_assets.values()))
+        self._flush_dependent_inserts()
+        self.new_assets = {}
+
+    def _flush_dependent_inserts(self) -> None:
         if self.links:
             _copy_rows(self.db, AssetScan.__tablename__, self.links)
         if self.findings:
             _copy_rows(self.db, Finding.__tablename__, self.findings)
         if self.observations:
             _copy_rows(self.db, FindingObservation.__tablename__, self.observations)
-        self.observations = []
-        self.new_assets, self.asset_updates, self.details, self.findings, self.links = {}, {}, {}, [], []
+        self.findings, self.links, self.observations = [], [], []
+
+
+def _bulk_update_assets(db: Session, updates: dict, details: dict) -> None:
+    """One UPDATE per bounded buffer, not one statement per asset/JSON merge.
+
+    Statement invalidation triggers must fire once per batch. Missing columns
+    retain their stored value; explicit nulls clear it. JSON patches retain
+    PostgreSQL's existing top-level || semantics and last-row-wins coalescing.
+    The temporary staging table and update share the publication transaction.
+    """
+    name = "am_asset_patch_" + uuid.uuid4().hex
+    columns = sorted({key for patch in updates.values() for key in patch})
+    if not set(columns) <= set(Asset.__table__.columns.keys()) - {"id"}:
+        raise ValueError("Invalid asset update columns")
+    quote = db.get_bind().dialect.identifier_preparer.quote
+    expressions = {}
+    for column in columns:
+        if column == "details":
+            continue
+        field = quote(column)
+        expressions[field] = f"CASE WHEN patch.patch_data ? '{column}' THEN incoming.{field} ELSE target.{field} END"
+    base_details = "CASE WHEN patch.patch_data ? 'details' THEN incoming.details ELSE target.details END"
+    expressions["details"] = f"CASE WHEN patch.details_patch IS NULL THEN {base_details} ELSE ({base_details}) || patch.details_patch END"
+    assignments = [f"{field}={value}" for field, value in expressions.items()]
+    changed = " OR ".join(f"target.{field} IS DISTINCT FROM ({value})" for field, value in expressions.items())
+    db.execute(text(f"CREATE TEMP TABLE {name} (id uuid PRIMARY KEY, patch_data jsonb NOT NULL, details_patch jsonb) ON COMMIT DROP"))
+    _copy_rows(db, name, [{"id":identifier, "patch_data":updates.get(identifier, {}),
+        "details_patch":details.get(identifier)} for identifier in updates.keys() | details.keys()])
+    db.execute(text(f"""UPDATE assets AS target SET {', '.join(assignments)}
+        FROM {name} AS patch
+        CROSS JOIN LATERAL jsonb_populate_record(NULL::assets, patch.patch_data) AS incoming
+        WHERE target.id=patch.id AND ({changed})"""))
+    db.execute(text(f"DROP TABLE {name}"))
 
 
 def _copy_rows(db: Session, table: str, rows: list[dict]) -> None:

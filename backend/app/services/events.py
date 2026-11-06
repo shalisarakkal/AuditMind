@@ -32,6 +32,7 @@ UNKNOWN = "Unknown"
 # about the event changes it (a failure, failed rows, duplicates purged).
 TYPES: dict[str, Criticality] = {
     "import": Criticality.info,
+    "import_abort_requested": Criticality.warning,
     "repeat_upload": Criticality.warning,
     "upload_skipped": Criticality.info,
     "archive": Criticality.info,
@@ -40,6 +41,8 @@ TYPES: dict[str, Criticality] = {
     "asset_added": Criticality.info,
     "finding_added": Criticality.info,
     "finding_workflow_changed": Criticality.info,
+    "scan_snapshot_declared": Criticality.info,
+    "scan_snapshot_revoked": Criticality.warning,
     "settings_changed": Criticality.info,
     "profile_created": Criticality.info,
     "profile_updated": Criticality.info,

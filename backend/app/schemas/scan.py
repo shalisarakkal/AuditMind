@@ -32,6 +32,8 @@ class ScanRead(BaseModel):
     # Set only while the background worker runs the import (it checks in
     # every ~15 s); None for one run during its request.
     heartbeat_at: datetime | None
+    abort_requested_at: datetime | None = None
+    run_started_at: datetime | None = None
     # Failed, but can be run again from its kept file (POST .../retry).
     retryable: bool = False
 

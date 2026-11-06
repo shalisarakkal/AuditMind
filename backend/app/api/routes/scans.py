@@ -2,8 +2,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
@@ -14,11 +14,39 @@ from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.schemas.ingestion import ImportResponse
 from app.schemas.scan import ScanCreate, ScanRead
+from app.schemas.scan_snapshot import SnapshotView, SnapshotWrite, SnapshotRevoke, SnapshotComparisonRequest, SnapshotComparison
+from app.services.scan_snapshots import read_snapshot, write_snapshot, compare_snapshots
 
 router = APIRouter(prefix="/orgs/{org_id}/scans", tags=["scans"])
 
 
 _ACTIVE = (ScanStatus.pending, ScanStatus.running)
+
+
+@router.post("/snapshot-comparison", response_model=SnapshotComparison)
+def review_scan_snapshots(org_id: uuid.UUID, payload: SnapshotComparisonRequest, response: Response,
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    return compare_snapshots(db, org_id, payload)
+
+
+@router.get("/{scan_id}/snapshot", response_model=SnapshotView)
+def get_scan_snapshot(org_id: uuid.UUID, scan_id: uuid.UUID, response: Response,
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    return read_snapshot(db, org_id, scan_id)
+
+
+@router.put("/{scan_id}/snapshot", response_model=SnapshotView)
+def put_scan_snapshot(org_id: uuid.UUID, scan_id: uuid.UUID, payload: SnapshotWrite,
+        db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    return write_snapshot(db, org_id, scan_id, membership, payload)
+
+
+@router.post("/{scan_id}/snapshot/revoke", response_model=SnapshotView)
+def revoke_scan_snapshot(org_id: uuid.UUID, scan_id: uuid.UUID, payload: SnapshotRevoke,
+        db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    return write_snapshot(db, org_id, scan_id, membership, payload, revoke=True)
 
 
 def _admit_scan(db: Session, org_id: uuid.UUID) -> None:
@@ -98,6 +126,37 @@ def get_scan(
     completed/failed, and summary then holds the import report. An archived
     upload isn't found here (the Archived page lists it)."""
     return _active_scan(db, org_id, scan_id)
+
+
+@router.post("/{scan_id}/abort", response_model=ScanRead)
+def abort_scan(org_id: uuid.UUID, scan_id: uuid.UUID, db: Session = Depends(get_db),
+        membership: OrgMembership = Depends(require_org_member)):
+    from app.models.user import User
+    from app.services.events import record_event
+    from app.services.ingestion_service import fail_import
+    _admit_scan(db, org_id)
+    current = db.scalar(select(OrgMembership).where(OrgMembership.org_id == org_id,
+        OrgMembership.user_id == membership.user_id).with_for_update().execution_options(populate_existing=True))
+    scan = db.scalar(select(Scan).where(Scan.id == scan_id, Scan.org_id == org_id,
+        Scan.archived_at.is_(None)).with_for_update(key_share=True).execution_options(populate_existing=True))
+    if scan is None or scan.source != "upload":
+        raise HTTPException(404, "Upload not found")
+    if current is None or (scan.started_by != current.user_id and current.role != UserRole.admin):
+        raise HTTPException(403, "Only the uploader or an organization admin can abort this import")
+    if scan.abort_requested_at is not None:
+        return scan
+    if scan.status not in _ACTIVE:
+        raise HTTPException(409, "This import has already finished; it cannot be aborted")
+    scan.abort_requested_at = datetime.now(timezone.utc)
+    record_event(db, "import_abort_requested", org_id=org_id,
+        actor=db.get(User, current.user_id), item=scan.filename or "Upload",
+        details={"scan_id": str(scan.id)})
+    if scan.status == ScanStatus.pending:
+        fail_import(db, scan, "Import aborted before processing", aborted=True)
+    else:
+        db.commit()
+    db.refresh(scan)
+    return scan
 
 
 @router.post("/{scan_id}/dismiss", response_model=ScanRead)

@@ -40,8 +40,10 @@ open_progress_session: Callable[[], AbstractContextManager[Session]] = _new_sess
 def write_progress(scan_id: uuid.UUID, phase: str, rows_done: int, rows_total: int) -> None:
     """Record a running import's progress on its scan. Progress is only for
     display: if it can't be saved, the import carries on regardless."""
+    from app.services.import_abort import check_abort, ImportAborted
     try:
         with open_progress_session() as db:
+            check_abort(db, scan_id)
             db.execute(
                 update(Scan)
                 .where(Scan.id == scan_id)
@@ -49,5 +51,7 @@ def write_progress(scan_id: uuid.UUID, phase: str, rows_done: int, rows_total: i
                                   "updated_at": datetime.now(timezone.utc).isoformat()})
             )
             db.commit()
+    except ImportAborted:
+        raise
     except Exception:
         logger.warning("Couldn't record progress for scan %s", scan_id, exc_info=True)

@@ -18,7 +18,7 @@ from datetime import date, datetime, timezone
 from functools import cmp_to_key
 from sqlalchemy import and_, false, func, or_, select, union_all
 from app.core.config import settings
-from app.models.list_revision import OrganizationListRevision
+from app.models.list_revision import OrganizationListRevision, OrganizationWorkflowRevision
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,10 @@ class Stamp:
 
 def revision_stamp(db, org_id, kind):
     row = db.execute(select(OrganizationListRevision.epoch,
-        OrganizationListRevision.asset_revision if kind == "assets" else OrganizationListRevision.finding_revision,
+        OrganizationListRevision.asset_revision if kind == "assets" else
+        OrganizationListRevision.finding_revision + func.coalesce(OrganizationWorkflowRevision.revision, 0),
         func.current_database(), func.current_schema(), func.pg_current_xact_id_if_assigned())
+        .outerjoin(OrganizationWorkflowRevision, OrganizationWorkflowRevision.org_id == OrganizationListRevision.org_id)
         .where(OrganizationListRevision.org_id == org_id)).first()
     # Never publish counts from a writer's uncommitted transaction: rollback
     # could reuse its revision number for different future data.

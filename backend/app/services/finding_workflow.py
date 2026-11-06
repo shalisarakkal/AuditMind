@@ -12,7 +12,7 @@ from app.models.user import User
 from app.schemas.finding_workflow import HistoryRead, SavedWorkflowNote, WorkflowRead
 from app.services.events import actor_label, record_event
 from app.services.knowledge_service import KnowledgeError, require_active_org
-from app.services.org_lock import lock_org, lock_org_jobs
+from app.services.org_lock import lock_org_jobs
 from app.services.workflow_deadlines import DEADLINE_TIMEZONE, deadline_expiry, deadline_now
 
 
@@ -76,13 +76,13 @@ def _state(finding):
 
 
 def update_workflows(db, org_id, membership, targets, patch):
-    # Same ordering as archive job creation. Also serialize with archive/import chunks.
+    # Fence archive admission, then lock only the selected finding rows. Imports
+    # insert findings/observations but never update existing workflow fields.
     lock_org_jobs(db, org_id)
     try:
         require_active_org(db, org_id, lock=True)
     except KnowledgeError as exc:
         raise HTTPException(409, "Organization is read-only or unavailable") from exc
-    lock_org(db, org_id)
     # Re-read role under lock; never trust a role cached before a concurrent removal.
     current = db.scalar(select(OrgMembership).where(OrgMembership.org_id == org_id,
         OrgMembership.user_id == membership.user_id).with_for_update().execution_options(populate_existing=True))
@@ -90,7 +90,7 @@ def update_workflows(db, org_id, membership, targets, patch):
         raise HTTPException(403, "Insufficient permissions")
     ids = sorted((t.finding_id for t in targets), key=str)
     rows = db.scalars(select(Finding).where(Finding.org_id == org_id, Finding.id.in_(ids))
-        .order_by(Finding.id).with_for_update().execution_options(populate_existing=True)).all()
+        .order_by(Finding.id).with_for_update(key_share=True).execution_options(populate_existing=True)).all()
     if len(rows) != len(ids) or any(f.archived_at for f in rows):
         raise HTTPException(404, "Finding not found or unavailable")
     affected = {identifier for f in rows for identifier in (f.id, f.asset_id, f.scan_id) if identifier}
