@@ -28,7 +28,7 @@ from app.core.assessment_contract import active_prompt_version
 from app.services import evidence_policy
 from app.services.claude_service import ask_claude_structured
 from app.services.rag_service import retrieve_standards_for_findings
-from app.services import knowledge_service, scoring_service
+from app.services import knowledge_service, scoring_service, status_scoring
 from app.services.report_context import bounded_text, budget_context
 from app.services.claude_service import structured_input_bytes
 from app.models.knowledge import KnowledgeVersion, ReportEvidenceUse
@@ -148,6 +148,15 @@ def _read_org_audit_context(
     }
     total_findings = sum(findings_by_severity.values())
 
+    counts = {}
+    for domain, severity, count in db.execute(select(Finding.domain, Finding.severity, func.count())
+            .where(*finding_filters).group_by(Finding.domain, Finding.severity)):
+        counts.setdefault(domain, {})[severity] = count
+    risk_counts, status_policy = status_scoring.apply_policy(db, org_id, counts, filters=finding_filters, capture_basis=True)
+    if status_policy['not_assessed']:
+        raise ValueError("Not assessed: verified exclusions leave no current-risk findings; no numeric report can be generated")
+    sample_filters = finding_filters + ([status_scoring.eligible_exclusion().is_not(True)] if status_policy['enabled'] else [])
+
     # 3. High/Critical sample findings for RAG
     sample_findings_rows = db.execute(
         select(
@@ -162,7 +171,7 @@ def _read_org_audit_context(
             Finding.severity,
         )
         .where(
-            *finding_filters,
+            *sample_filters,
             Finding.severity.in_([Severity.critical, Severity.high, Severity.medium]),
         )
         .order_by(case({severity: rank for rank, severity in enumerate(Severity)}, value=Finding.severity),
@@ -196,14 +205,11 @@ def _read_org_audit_context(
         db, sample_findings, org_id=org_id, frameworks=frameworks, max_total=8
     )
 
-    counts = {}
-    for domain, severity, count in db.execute(select(Finding.domain, Finding.severity, func.count())
-            .where(*finding_filters).group_by(Finding.domain, Finding.severity)):
-        counts.setdefault(domain, {})[severity] = count
-    rule_domains = scoring_service.score_all_from_counts(counts)
+    rule_domains = scoring_service.score_all_from_counts(risk_counts)
     rule_score, rule_tier = scoring_service.overall_score(rule_domains)
 
     return {
+        "status_scoring": status_policy,
         "rule_based": {"version": "rule-v1", "overall_score": rule_score, "overall_tier": rule_tier.value,
                        "domains": {domain.value: {"score": score, "tier": tier.value, "justification": why}
                                    for domain, (score, tier, why) in rule_domains.items()}},
@@ -225,6 +231,10 @@ def _build_audit_prompt(
     frameworks: list[str],
 ) -> str:
     """Constructs the prompt for Claude with findings evidence and RAG standards."""
+    # Decision references are retained in server-side provenance. They are not
+    # additional model evidence and must not inflate the external input budget.
+    policy_summary = {key: value for key, value in (context.get('status_scoring') or {}).items()
+        if key != 'verification_basis'}
     prompt = f"""You are performing a comprehensive cyber resilience audit for organization: {org_title}.
 
 FRAMEWORKS EVALUATED: {', '.join(frameworks)}
@@ -235,6 +245,7 @@ ORGANIZATION INVENTORY & EXPOSURE:
 - Total Managed Assets: {context['total_assets']}
 - Asset Distribution: {json.dumps(context['assets_by_category'])}
 - Total Active Findings: {context['total_findings']}
+- Current-risk scoring policy and counts: {json.dumps(policy_summary)}
 - Findings by Severity: {json.dumps(context['findings_by_severity'])}
 
 KEY ACTIVE VULNERABILITIES & RISKS:
@@ -367,7 +378,7 @@ def generate_ai_audit_snapshot(
                            else 'No indexed supporting documents were retrieved')
     if limits.get('omitted_finding_ids') or limits.get('omitted_citation_ids'):
         limitations.append(f"Input budget omitted {len(limits['omitted_finding_ids'])} sampled findings and "
-                           f"{len(limits['omitted_citation_ids'])} retrieved citations; counts and baseline retain all active findings")
+                            f"{len(limits['omitted_citation_ids'])} retrieved citations; inventory counts retain all active findings and the baseline follows the captured current-risk policy")
     if any(finding.get('text_limits') for finding in context['sample_findings']):
         limitations.append('Some finding text is a marked UTF-8 prefix, not the complete source')
     snapshot.provenance = {
@@ -387,6 +398,7 @@ def generate_ai_audit_snapshot(
             'finding_description_max_bytes': settings.REPORT_AI_FINDING_TEXT_BYTES,
             'label_max_bytes': 256, 'max_output_tokens': 4096},
         "rule_based": context["rule_based"],
+        "status_scoring": context.get("status_scoring"),
         "evidence_limitation": '; '.join(limitations) or None,
     }
     snapshot.provenance.update(evidence_provenance)

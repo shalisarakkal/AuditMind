@@ -10,6 +10,7 @@ from app.models.membership import OrgMembership
 from app.models.asset import Asset
 from app.models.scan import Scan
 from app.models.finding import Finding
+from app.models.finding_verification import OrganizationRiskPolicy, FindingVerification
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.models.scan_snapshot import ScanSnapshotDeclaration
@@ -34,6 +35,8 @@ from app.db.list_revision import register as register_lists
 register_lists(Base.metadata)
 from app.db.workflow_revision import register as register_workflows
 register_workflows(Base.metadata)
+from app.db.status_scoring_revision import register as register_status_scoring
+register_status_scoring(Base.metadata)
 
 __all__ = [
     "WorkerDispatch",

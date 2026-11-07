@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Float, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -24,6 +24,7 @@ class RiskScore(Base):
     score: Mapped[float] = mapped_column(Float, nullable=False)
     tier: Mapped[RiskTier] = mapped_column(str_enum(RiskTier, length=50), nullable=False)
     justification: Mapped[str | None] = mapped_column(Text)
+    scoring_context: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

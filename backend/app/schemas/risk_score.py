@@ -17,6 +17,7 @@ class RiskScoreRead(BaseModel):
     tier: RiskTier
     justification: str | None
     created_at: datetime
+    scoring_context: dict | None = None
 
 
 class RiskAssessmentResult(BaseModel):

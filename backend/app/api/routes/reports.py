@@ -273,14 +273,13 @@ def generate_rule_based_test_report(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report workflow not found")
     if not payload.title.strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Report title cannot be blank.")
-    return report_service.create_rule_based_test_report(
-        db=db,
-        org_id=org_id,
-        title=payload.title.strip(),
-        user_id=membership.user_id,
-        period_start=payload.period_start,
-        period_end=payload.period_end,
-    )
+    try:
+        return report_service.create_rule_based_test_report(
+            db=db, org_id=org_id, title=payload.title.strip(), user_id=membership.user_id,
+            period_start=payload.period_start, period_end=payload.period_end,
+        )
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @router.get("/{report_id}", response_model=ReportDetail)

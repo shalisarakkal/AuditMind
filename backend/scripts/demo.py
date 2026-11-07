@@ -63,7 +63,7 @@ def seed_demo(db: Session) -> dict[str, str]:
     from app.models.organization import Organization
     from app.models.user import User
     from app.services.knowledge_service import digest
-    from app.services.report_service import create_rule_based_test_report
+    from app.services.report_service import _create_rule_based_test_report
 
     if db.scalar(select(User.id).where(User.email == DEMO_EMAIL)):
         # Never overwrite passwords or re-create content the user has edited.
@@ -101,9 +101,11 @@ def seed_demo(db: Session) -> dict[str, str]:
                             content_kind="full_text", rights="Project-created synthetic training text",
                             content=policy, content_hash=digest(policy)))
     db.flush()
-    # This service commits the entire seed atomically. No AI call or embedding
-    # index is queued; local semantic indexing needs a separately prepared cache.
-    create_rule_based_test_report(db, org.id, "DEMO - Rule-based preview (not AI)", admin.id)
+    # The unpublished synthetic seed must stay in this transaction. The public
+    # report entry point captures committed inventory on a separate connection,
+    # which cannot see these rows or satisfy their uncommitted foreign keys.
+    # Commit the seed and preview together; no inference/indexing is queued.
+    _create_rule_based_test_report(db, org.id, "DEMO - Rule-based preview (not AI)", admin.id)
     return passwords
 
 

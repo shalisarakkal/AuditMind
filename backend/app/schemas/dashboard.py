@@ -32,6 +32,13 @@ class SecuritySummary(BaseModel):
     snapshot_generated_at: datetime | None = None
 
 
+class FindingsBaseline(BaseModel):
+    overall_score: float | None
+    overall_tier: RiskTier | None
+    domains: list[DomainScore]
+    method: str = "rule-v1"
+
+
 class DashboardSummary(BaseModel):
     """Scores derived from live or explicitly timestamped saved inventory;
     evidence eligibility always uses current revision-bound checks.
@@ -41,6 +48,7 @@ class DashboardSummary(BaseModel):
     not an assertion that domain evidence coverage has been qualified."""
 
     overall_score: float | None
+    findings_baseline: FindingsBaseline | None = None
     overall_tier: RiskTier | None
     assessment_status: Literal["not_assessed", "findings_based", "partial", "complete"] = "findings_based"
     scoring_mode: Literal["findings_based", "evidence_qualified"] = "findings_based"
@@ -59,6 +67,9 @@ class DashboardSummary(BaseModel):
     recent_scans: list[ScanRead]
     asset_count: int
     findings_by_severity: dict[Severity, int]
+    risk_findings_by_severity: dict[Severity, int] = Field(default_factory=dict)
+    status_scoring: dict = Field(default_factory=dict)
+    risk_top_stale: bool = False
     snapshot_generated_at: datetime | None = None
     snapshot_stale: bool = False
     snapshot_refresh_status: str | None = None

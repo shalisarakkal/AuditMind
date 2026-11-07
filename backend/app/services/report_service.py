@@ -30,7 +30,7 @@ from app.schemas.report_ai import AuditReportSnapshot, DomainScoreAI, Remediatio
 from app.services.events import record_event
 from app.services.report_ai_service import generate_ai_audit_snapshot
 from app.services.knowledge_service import require_report_consent
-from app.services import scoring_service
+from app.services import scoring_service, status_scoring
 
 logger = logging.getLogger("app.reports")
 
@@ -60,11 +60,15 @@ def _remediation_evidence_lines(action: dict) -> list[str]:
 def _assessment_display_lines(data: dict) -> list[str]:
     """Presentation only: never infer evidence sufficiency or rewrite saved scores."""
     provenance = data.get("provenance") or {}
+    policy = provenance.get("status_scoring")
+    policy_lines = ([f"Status-aware scoring: {'On' if policy.get('enabled') else 'Off'}; policy {policy.get('policy_version')}. "
+        f"Recorded findings: {policy.get('recorded_findings')}; current-risk findings: {policy.get('current_risk_findings')}; "
+        f"verified exclusions: {policy.get('excluded_findings')}."] if isinstance(policy, dict) else [])
     if provenance.get("assessment_type") == "synthetic_mock":
         return ["SYNTHETIC MOCK - no AI calls. Fixed example evidence and scores; not a real audit or operational evidence qualification."]
     if provenance.get("assessment_type") == "rule_based_test":
         return ["Deterministic test score; no AI or framework control assessment.",
-                "Higher scores mean greater resilience; this is not proof of compliance."]
+                "Higher scores mean greater resilience; this is not proof of compliance."] + policy_lines
     baseline = provenance.get("rule_based") or {}
     score = baseline.get("overall_score")
     lines = ["AI resilience score (advisory). Higher scores mean greater resilience.",
@@ -87,7 +91,7 @@ def _assessment_display_lines(data: dict) -> list[str]:
         lines.append("Sampling coverage is not recorded.")
     if provenance.get("evidence_limitation"):
         lines.append(str(provenance["evidence_limitation"]))
-    return lines
+    return lines + policy_lines
 
 
 def _report_error_message(exc: Exception) -> str:
@@ -182,6 +186,20 @@ def purge_expired_reports(db: Session) -> int:
 
 
 def create_rule_based_test_report(
+    db: Session, org_id: uuid.UUID, title: str, user_id: uuid.UUID | None = None,
+    period_start: date | None = None, period_end: date | None = None,
+) -> Report:
+    """Capture counts, current policy and evidence in one committed MVCC view."""
+    if db.new or db.dirty or db.deleted:
+        raise ValueError("Commit pending changes before creating a report")
+    bind = db.get_bind()
+    engine = getattr(bind, "engine", bind)
+    with engine.connect().execution_options(isolation_level="REPEATABLE READ") as connection:
+        with Session(bind=connection) as capture:
+            return _create_rule_based_test_report(capture, org_id, title, user_id, period_start, period_end)
+
+
+def _create_rule_based_test_report(
     db: Session,
     org_id: uuid.UUID,
     title: str,
@@ -207,6 +225,9 @@ def create_rule_based_test_report(
         counts.setdefault(domain, {})[severity] = count
         severity_totals[severity.value] += count
 
+    counts, status_policy = status_scoring.apply_policy(db, org_id, counts, filters=finding_filters, capture_basis=True)
+    if status_policy['not_assessed']:
+        raise ValueError("Not assessed: verified exclusions leave no current-risk findings; no numeric report was created")
     domain_scores = scoring_service.score_all_from_counts(counts)
     overall, _overall_scoring_tier = scoring_service.overall_score(domain_scores)
     overall_score = round(overall)
@@ -275,6 +296,7 @@ def create_rule_based_test_report(
         frameworks_evaluated=[],
         provenance={
             "assessment_type": "rule_based_test",
+            "status_scoring": status_policy,
             "method": "AuditMind deterministic finding severity scoring",
             "version": "rule-v1",
             "captured_at": generated_at.isoformat(),

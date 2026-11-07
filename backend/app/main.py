@@ -23,6 +23,7 @@ from app.api.routes import (
     risk,
     scans,
     scoring_qualifications,
+    status_scoring,
 )
 from app.core.config import check_secret_key, settings
 from app.core.middleware import DOCUMENT_MAX_BYTES, SecurityHeadersMiddleware, UploadSizeLimitMiddleware
@@ -77,6 +78,7 @@ app.include_router(archive.router, prefix=api_router_prefix)
 app.include_router(events.router, prefix=api_router_prefix)
 app.include_router(documents.router, prefix=api_router_prefix)
 app.include_router(scoring_qualifications.router, prefix=api_router_prefix)
+app.include_router(status_scoring.router, prefix=api_router_prefix)
 
 
 @app.get(f"{api_router_prefix}/upload-limits", tags=["uploads"])

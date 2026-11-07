@@ -85,6 +85,7 @@ _TYPE_LABELS = {
     "asset_added": "Asset added",
     "finding_added": "Finding added",
     "finding_workflow_changed": "Finding remediation changed",
+    "finding_verification_changed": "Scoring verification changed",
     "settings_changed": "Settings changed",
     "profile_created": "Import profile created",
     "profile_updated": "Import profile changed",

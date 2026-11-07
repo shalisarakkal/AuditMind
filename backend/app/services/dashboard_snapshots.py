@@ -77,7 +77,7 @@ def read(db, org_id):
             row = snapshot.scalar(select(DashboardSnapshot).where(DashboardSnapshot.org_id == org_id))
             if not row.payload:
                 return DashboardPending(snapshot_refresh_status=row.status, snapshot_error=row.error_message)
-            from app.api.routes.dashboard import build_dashboard
+            from app.api.routes.dashboard import build_dashboard, risk_policy_stamp
             result = build_dashboard(org_id, snapshot, row.payload["inventory"], row.captured_revision)
             result.snapshot_generated_at = row.generated_at
             result.snapshot_refresh_status = row.status
@@ -85,6 +85,7 @@ def read(db, org_id):
             config = configuration(snapshot)
             org = snapshot.get(Organization, org_id)
             result.snapshot_stale = (row.captured_revision != result.evidence_revision
+                or row.payload['inventory'].get('risk_policy_stamp')!=risk_policy_stamp(snapshot,org_id)
                 or refresh_due_at(org_id, row.generated_at, effective_interval(org, config)) <= now())
             result.security_summary = SecuritySummary.model_validate(row.payload["security"]).model_copy(update={"snapshot_generated_at": row.generated_at})
             return result

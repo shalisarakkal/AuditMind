@@ -48,6 +48,25 @@ def test_empty_org_is_not_assessed(client, admin):
     assert body["recent_scans"] == []
     assert body["asset_count"] == 0
     assert body["findings_by_severity"] == {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    assert body["findings_baseline"]["overall_score"] is None
+
+
+def test_known_risk_baseline_remains_visible_without_evidence_qualification(client, admin, db_session):
+    from uuid import UUID
+    from app.models.scoring_qualification import OrganizationScoringSettings
+    headers, org_id = admin
+    _seed(db_session, org_id, Severity.critical, 1)
+    db_session.add(OrganizationScoringSettings(org_id=UUID(org_id), evidence_qualified_enabled=True, version=1))
+    db_session.commit()
+    body = _dashboard(client, admin).json()
+    assert body["scoring_mode"] == "evidence_qualified"
+    assert body["overall_score"] is None
+    assert all(domain["score"] is None for domain in body["domains"])
+    baseline = body["findings_baseline"]
+    assert 0 <= baseline["overall_score"] < 100
+    vulnerable = next(domain for domain in baseline["domains"] if domain["domain"] == "vulnerability_management")
+    assert vulnerable["score"] < 100 and vulnerable["assessment_status"] == "findings_based"
+    assert body["qualified_domain_count"] == 0
 
 
 def test_scores_match_the_scoring_service_after_an_upload(client, admin, db_session):

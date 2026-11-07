@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Response, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, defer
 
 from app.api.deps import require_org_member, require_org_role
@@ -14,12 +14,13 @@ from app.models.finding import Finding
 from app.models.event import Event
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
-from app.schemas.dashboard import (DashboardSummary, DashboardPending, DomainScore, SecuritySummary,
+from app.schemas.dashboard import (DashboardSummary, DashboardPending, DomainScore, SecuritySummary, FindingsBaseline,
     OrganizationDashboardSettings, OrganizationDashboardSettingsUpdate)
 from app.services.events import record_event
 from app.schemas.finding import FindingRead
 from app.schemas.scan import brief_scan
-from app.services import evidence_jobs, dashboard_snapshots
+from app.services import evidence_jobs, dashboard_snapshots, status_scoring
+from app.models.list_revision import OrganizationWorkflowRevision
 from app.models.scoring_qualification import OrganizationScoringSettings
 from app.services.evidence_policy import POLICY_VERSION
 from app.services.scoring_service import count_org_findings, overall_score, score_all_from_counts
@@ -130,16 +131,24 @@ def build_dashboard(org_id: uuid.UUID, db: Session, inventory: dict | None = Non
     """
     inventory = inventory if inventory is not None else capture_inventory(org_id, db)
     counts = {Domain(d): {Severity(s): n for s, n in values.items()} for d, values in inventory["counts"].items()}
-    domain_scores = score_all_from_counts(counts)
+    current_revision = evidence_jobs.revision(db, org_id)
+    risk_counts, risk_policy = status_scoring.apply_policy(db,org_id,counts,
+        source_current=captured_revision is None or captured_revision==current_revision)
+    domain_scores = score_all_from_counts(risk_counts)
     overall, overall_tier = overall_score(domain_scores)
     top, recent_scans, asset_count = inventory["top_findings"], inventory["recent_scans"], inventory["asset_count"]
     by_severity = {severity: sum(values.get(severity, 0) for values in counts.values()) for severity in Severity}
     empty = asset_count == 0 and not any(by_severity.values())
-    status = "not_assessed" if empty else "findings_based"
+    no_risk_without_coverage=risk_policy['not_assessed']
+    status = "not_assessed" if empty or no_risk_without_coverage else "findings_based"
+    top_stale=False
+    if risk_policy['enabled'] and risk_policy['excluded_findings']:
+        top_stale=(inventory.get('risk_policy_stamp')!=risk_policy_stamp(db,org_id)
+            or inventory.get('risk_excluded_count')!=risk_policy['excluded_findings'])
+        top=[] if top_stale else inventory.get('risk_top_findings',[])
 
     settings_row = db.get(OrganizationScoringSettings, org_id)
     enabled = settings_row.evidence_qualified_enabled if settings_row else False
-    current_revision = evidence_jobs.revision(db, org_id)
     live_evaluation = evidence_jobs.current_result(db, org_id) if enabled else None
     evaluated = live_evaluation if captured_revision is None or captured_revision == current_revision else None
     qualified = {d["domain"]: d for d in evaluated.result["domains"]} if evaluated else {}
@@ -148,8 +157,10 @@ def build_dashboard(org_id: uuid.UUID, db: Session, inventory: dict | None = Non
     domains = []
     for domain, (score, tier, justification) in domain_scores.items():
         if not enabled:
-            domains.append(DomainScore(domain=domain, score=None if empty else score, tier=None if empty else tier,
-                assessment_status=status, justification="No active assets or findings recorded. Not assessed." if empty else justification))
+            no_score=empty or no_risk_without_coverage
+            domains.append(DomainScore(domain=domain, score=None if no_score else score, tier=None if no_score else tier,
+                assessment_status=status, justification=("Verified exclusions leave no current-risk findings; this does not establish evidence coverage. Not assessed." if no_risk_without_coverage
+                    else "No active assets or findings recorded. Not assessed.") if no_score else justification))
             continue
         coverage = qualified.get(domain.value)
         eligible = bool(coverage and coverage["eligible"])
@@ -166,8 +177,17 @@ def build_dashboard(org_id: uuid.UUID, db: Session, inventory: dict | None = Non
             source_references=coverage.get("source_references", []) if coverage else []))
 
     return DashboardSummary(
-        overall_score=overall if (qualified_status == "complete" if enabled else not empty) else None,
-        overall_tier=overall_tier if (qualified_status == "complete" if enabled else not empty) else None,
+        findings_baseline=FindingsBaseline(
+            overall_score=overall if not empty and not no_risk_without_coverage else None,
+            overall_tier=overall_tier if not empty and not no_risk_without_coverage else None,
+            domains=[DomainScore(domain=domain,
+                score=score if not empty and not no_risk_without_coverage else None,
+                tier=tier if not empty and not no_risk_without_coverage else None,
+                assessment_status="findings_based" if not empty and not no_risk_without_coverage else "not_assessed",
+                justification=why if not empty and not no_risk_without_coverage else "No current-risk baseline can be assigned; evidence coverage is separate.")
+                for domain,(score,tier,why) in domain_scores.items()]),
+        overall_score=overall if (qualified_status == "complete" if enabled else not empty and not no_risk_without_coverage) else None,
+        overall_tier=overall_tier if (qualified_status == "complete" if enabled else not empty and not no_risk_without_coverage) else None,
         assessment_status=qualified_status if enabled else status,
         scoring_mode="evidence_qualified" if enabled else "findings_based",
         settings_version=settings_row.version if settings_row else 0,
@@ -182,7 +202,14 @@ def build_dashboard(org_id: uuid.UUID, db: Session, inventory: dict | None = Non
         recent_scans=recent_scans,
         asset_count=asset_count,
         findings_by_severity=by_severity,
+        risk_findings_by_severity={severity:sum(values.get(severity,0) for values in risk_counts.values()) for severity in Severity},
+        status_scoring=risk_policy,risk_top_stale=top_stale,
     )
+
+
+def risk_policy_stamp(db,org_id):
+    revision=db.scalar(select(OrganizationWorkflowRevision.revision).where(OrganizationWorkflowRevision.org_id==org_id)) or 0
+    return {**status_scoring.configuration(db,org_id).model_dump(),'workflow_revision':revision}
 
 
 def capture_inventory(org_id: uuid.UUID, db: Session) -> dict:
@@ -214,7 +241,18 @@ def capture_inventory(org_id: uuid.UUID, db: Session) -> dict:
     # indexes can serve an index-only count. IDs are non-null, so semantics match.
     asset_count = db.query(func.count()).select_from(Asset).filter(Asset.org_id == org_id, Asset.archived_at.is_(None)).scalar()
 
+    _,risk_policy=status_scoring.apply_policy(db,org_id,counts)
+    risk_top=top
+    if risk_policy['enabled'] and risk_policy['excluded_findings']:
+        risk_top=[]
+        for severity in Severity:
+            if len(risk_top)==TOP_FINDINGS:break
+            risk_top+=(db.query(Finding).options(defer(Finding.raw_data)).filter(Finding.org_id==org_id,
+                Finding.archived_at.is_(None),Finding.severity==severity,status_scoring.eligible_exclusion().is_not(True))
+                .order_by(Finding.created_at.desc(),Finding.id).limit(TOP_FINDINGS-len(risk_top)).all())
     return {"counts": {d.value: {s.value: n for s, n in values.items()} for d, values in counts.items()},
+            "risk_policy_stamp":risk_policy_stamp(db,org_id),"risk_excluded_count":risk_policy['excluded_findings'],
+            "risk_top_findings":[FindingRead.model_validate(f).model_dump(mode='json') for f in risk_top],
             "asset_count": asset_count, "top_findings": [FindingRead.model_validate(f).model_dump(mode="json") for f in top],
             "recent_scans": [brief_scan(s).model_dump(mode="json") for s in recent_scans]}
 

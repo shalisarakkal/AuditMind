@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
@@ -26,6 +27,8 @@ from app.models.enums import Domain, Severity
 class Finding(Base):
     __tablename__ = "findings"
     __table_args__ = (
+        Index("ix_findings_risk_verified", "org_id", "domain", "severity", "risk_verification_expires_at",
+            postgresql_where=text("archived_at IS NULL AND risk_verification_state='approved'")),
         Index("ix_findings_active_domain_page", "org_id", "domain", severity_rank_index(),
               text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE),
         *[Index(f"ix_findings_active_{field}_group_page", "org_id", field, "severity",
@@ -97,6 +100,15 @@ class Finding(Base):
     risk_review_timezone: Mapped[str | None] = mapped_column(String(100))
     risk_review_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     workflow_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    risk_verification_state: Mapped[str] = mapped_column(String(20), nullable=False, default="unverified", server_default="unverified")
+    risk_verification_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    risk_verified_workflow_version: Mapped[int | None] = mapped_column(Integer)
+    risk_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    risk_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    risk_verified_observation_count: Mapped[int | None] = mapped_column(BigInteger)
+    risk_verification_source_kind: Mapped[str | None] = mapped_column(String(20))
+    risk_verification_document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    risk_verification_source_hash: Mapped[str | None] = mapped_column(String(64))
     # A finding that sums an event log's events up (Phase 2f part 2): how
     # many, first and last seen, and details (top actors and scopes,
     # examples). Empty for other findings.
