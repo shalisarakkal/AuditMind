@@ -90,6 +90,12 @@ def test_nessus_records_native_identity_without_guessing_tool_instance(client, o
     assert entry.source_identity == {"plugin_id": "187095", "port": "443", "protocol": "tcp"}
     assert "source_instance_not_configured" in entry.ineligibility_reasons
     assert not entry.reconciliation_eligible
+    page = observations(client, owner, entry.finding_id).json()
+    assessment = next(item for item in page if item["id"] == str(entry.id))["identity_assessment"]
+    assert assessment["mapping"] == "nessus-plugin-service-v1"
+    assert assessment["source_material"] == {"plugin_id": "187095", "port": 443, "protocol": "tcp"}
+    assert assessment["candidate_key"] is None
+    assert "stable_asset_mapping_not_verified" in assessment["blocking_reasons"]
 
 
 def test_tenant_permissions_seek_and_empty_legacy_history(client, owner, db_session):
@@ -210,3 +216,16 @@ def test_manual_and_preexisting_findings_have_no_invented_history(client, owner)
     assert observations(client, owner, finding_id).json() == []
     response = client.post(f"/api/v1/orgs/{owner[1]}/findings/{finding_id}/observations", headers=owner[0], json={})
     assert response.status_code == 405
+
+
+def test_generic_uploaded_identity_claims_are_diagnostics_not_authority(client, owner):
+    send(client, owner, [row(source="nessus", plugin_id="187095", port=443,
+        protocol="tcp", source_instance_id=str(uuid.uuid4()),
+        source_finding_id="187095", instance_discriminator="443/tcp")])
+    items = client.get(f"/api/v1/orgs/{owner[1]}/findings", headers=owner[0]).json()["items"]
+    entry = observations(client, owner, items[0]["id"]).json()[0]
+    assessment = entry["identity_assessment"]
+    assert assessment["candidate_key"] is None
+    assert assessment["mapping"] is None
+    assert "source_identity_mapping_unavailable" in assessment["blocking_reasons"]
+    assert entry["reconciliation_eligible"] is False

@@ -36,3 +36,11 @@ class FindingObservation(Base):
     reconciliation_eligible: Mapped[bool] = mapped_column(Boolean, nullable=False)
     ineligibility_reasons: Mapped[list] = mapped_column(JSONB, nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    @property
+    def identity_assessment(self) -> dict:
+        """Read-time diagnostics; never retrofit identity authority onto history."""
+        from app.services.finding_identity import assess_identity
+        return assess_identity(org_id=self.org_id, scan_type=self.scan_type,
+            source=self.source, profile=self.profile,
+            raw=self.source_identity or {}).snapshot()

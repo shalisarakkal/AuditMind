@@ -21,4 +21,7 @@ class FindingObservationRead(BaseModel):
     source_identity: dict
     reconciliation_eligible: bool
     ineligibility_reasons: list[str]
+    # Derived on the bounded observation page, never a verified binding.
+    identity_assessment: dict
+    identity_binding: dict | None = None
     payload: dict

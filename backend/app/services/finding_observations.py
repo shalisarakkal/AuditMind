@@ -16,7 +16,7 @@ def observation_values(row, asset, scan, finding_id, occurrence):
     reasons = ["source_instance_not_configured", "stable_asset_mapping_not_verified"]
     if not (identity.get("plugin_id") or identity.get("source_finding_id")):
         reasons.append("stable_source_identifier_unavailable")
-    if identity.get("plugin_id") and (not identity.get("port") or not identity.get("protocol")):
+    if identity.get("plugin_id") and (identity.get("port") in (None, "") or not identity.get("protocol")):
         reasons.append("source_instance_discriminator_missing")
     observed_at = row.last_seen
     if observed_at is None and raw.get("observed_at") is not None:

@@ -59,8 +59,10 @@ def finding_observations(org_id: uuid.UUID, finding_id: uuid.UUID,
             raise HTTPException(404, "Observation cursor not found")
         query = query.where(or_(FindingObservation.recorded_at < cursor.recorded_at,
             and_(FindingObservation.recorded_at == cursor.recorded_at, FindingObservation.id < cursor.id)))
-    return db.scalars(query.order_by(FindingObservation.recorded_at.desc(),
+    from app.services.identity_bindings import read_observations
+    rows = db.scalars(query.order_by(FindingObservation.recorded_at.desc(),
         FindingObservation.id.desc()).limit(limit)).all()
+    return read_observations(db, org_id, rows)
 
 
 @router.get("/findings/{finding_id}/workflow", response_model=WorkflowRead)
