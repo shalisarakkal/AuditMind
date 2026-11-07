@@ -8,7 +8,11 @@ import FindingActionDialog from "./FindingActionDialog";
 import ConfirmPanel from "./ConfirmPanel";
 
 const control = "mt-1 w-full rounded-md border border-white/20 bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50";
-const button = "rounded-md border border-cyan px-3 py-2 text-sm text-cyan disabled:opacity-50";
+const buttonBase = "min-h-10 rounded-md px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:cursor-not-allowed disabled:opacity-50";
+const button = `${buttonBase} border border-cyan text-cyan hover:bg-cyan/10`;
+const primaryButton = `${buttonBase} border border-cyan bg-cyan font-medium text-navy hover:opacity-90`;
+const neutralButton = `${buttonBase} border border-white/20 text-white/80 hover:bg-white/10`;
+const actionLayout = "grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center";
 
 function Reasons({ values }: { values: string[] }) {
   return values.length ? <ul className="list-inside list-disc text-sm text-yellow-100">{values.map(value => <li key={value}>{snapshotReason(value)}</li>)}</ul> : null;
@@ -67,12 +71,6 @@ export default function ScanSnapshotDialog({ orgId, orgName, scanId, writer, onC
       <p className="text-sm text-white/70">Declare what the source scan covered. Declarations are user assertions; they do not verify controls or change findings, workflow, scores or reports.</p>
       {view.loading ? <p role="status">Loading scan snapshot…</p> : view.error ? <p role="alert">{view.error} <button className={button} onClick={reload}>Retry snapshot</button></p> : data && <>
         <SnapshotDetails view={data} label="Upload" />
-        {!editing && !revoking && <div className="flex flex-wrap gap-3">
-          {writer && <button type="button" className={button} disabled={busy || data.declaration_blockers.length > 0} onClick={() => setEditing(true)}>{data.declaration ? "Revise declaration" : "Declare snapshot"}</button>}
-          {writer && data.declaration?.state === "declared" && <button type="button" className={button} onClick={() => setRevoking(true)}>Revoke declaration</button>}
-          <button type="button" className={button} onClick={() => onBaseline(data.scan.filename || scanId)}>Use as baseline</button>
-          {baselineId && baselineId !== scanId && <button type="button" className={button} onClick={onCompare}>Review against baseline</button>}
-        </div>}
         {editing && <form key={data.declaration?.version || 0} onSubmit={event => {
           event.preventDefault(); const values = new FormData(event.currentTarget);
           const lines = (name: string) => String(values.get(name) || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
@@ -101,7 +99,7 @@ export default function ScanSnapshotDialog({ orgId, orgName, scanId, writer, onC
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="coverage_confirmed" defaultChecked={data.declaration?.declaration.coverage_confirmed || false} />I confirm the source scan assessed every target in the declared scope, apart from listed exclusions.</label>
           <p className="text-xs text-white/70">Complete requires confirmed coverage, no unreachable targets and an import with no errors, skips or warnings. Use Partial, Incremental, Failed or Cancelled when appropriate.</p>
           <label className="block text-sm">Declaration rationale<textarea name="rationale" className={control} required maxLength={12000} rows={2} /></label>
-          <div className="flex flex-wrap gap-3"><button type="submit" className={button}>{busy ? "Saving…" : "Save declaration"}</button><button type="button" onClick={() => { setEditing(false); setError(null); }}>Cancel editing</button></div>
+          <div className="flex flex-wrap gap-3"><button type="submit" className={primaryButton}>{busy ? "Saving…" : "Save declaration"}</button><button type="button" className={neutralButton} onClick={() => { setEditing(false); setError(null); }}>Cancel editing</button></div>
         </fieldset></form>}
         {revoking && <div className="space-y-3"><label className="block text-sm">Revocation rationale<textarea className={control} value={reason} onChange={e => setReason(e.target.value)} maxLength={12000} disabled={busy || stale} /></label>
           <ConfirmPanel label="Revoke scan declaration" message="Append a revocation? Existing declaration history is retained." confirmLabel="Revoke declaration" busy={busy || stale}
@@ -112,7 +110,17 @@ export default function ScanSnapshotDialog({ orgId, orgName, scanId, writer, onC
       </>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       {stale && <p className="text-sm">Reload before retrying. Reloading discards your draft. <button type="button" className={button} onClick={reload}>Reload saved declaration</button></p>}
-      <button type="button" data-confirm-cancel disabled={busy} className={button} onClick={onClose}>Close snapshot</button>
+      <footer aria-label="Snapshot actions" className="space-y-3 border-t border-white/15 pt-4">
+        {data && !view.loading && !view.error && !editing && !revoking && <div className={actionLayout}>
+          {writer && <button type="button" className={data.declaration ? button : primaryButton} disabled={busy || data.declaration_blockers.length > 0} onClick={() => setEditing(true)}>{data.declaration ? "Revise declaration" : "Declare snapshot"}</button>}
+          {writer && data.declaration?.state === "declared" && <button type="button" className={button} onClick={() => setRevoking(true)}>Revoke declaration</button>}
+          <button type="button" className={button} onClick={() => onBaseline(data.scan.filename || scanId)}>Use as baseline</button>
+          {baselineId && baselineId !== scanId && <button type="button" className={button} onClick={onCompare}>Review against baseline</button>}
+        </div>}
+        <div className="flex justify-end">
+          <button type="button" data-confirm-cancel disabled={busy} className={`${neutralButton} w-full sm:w-auto`} onClick={onClose}>Close</button>
+        </div>
+      </footer>
     </div>
   </FindingActionDialog>;
 }
@@ -152,11 +160,13 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
         {Object.entries(result.scope_differences).map(([key, values]) => <p key={key} className="break-words">{key.replaceAll("_", " ").replace(/^./, c => c.toUpperCase())}: {values.join(", ") || "None"}</p>)}
       </section>}
       {!loading && (!baseline.data?.declaration || !current.data?.declaration) && <p className="text-sm">Both uploads need a saved declaration before review.</p>}
-      <div className="flex flex-wrap gap-3">
-        <button type="button" className={button} disabled={loading || busy || stale || !!baseline.error || !!current.error || !baseline.data?.declaration || !current.data?.declaration} onClick={compare}>{busy ? "Reviewing…" : "Review compatibility"}</button>
+      <footer aria-label="Comparison actions" className="space-y-3 border-t border-white/15 pt-4">
+      <div className={actionLayout}>
+        <button type="button" className={primaryButton} disabled={loading || busy || stale || !!baseline.error || !!current.error || !baseline.data?.declaration || !current.data?.declaration} onClick={compare}>{busy ? "Reviewing…" : "Review compatibility"}</button>
         <button type="button" className={button} disabled={busy} onClick={() => { setResult(null); setError(null); setStale(false); baseline.reload(); current.reload(); }}>Reload snapshots</button>
-        <button type="button" className={button} data-confirm-cancel disabled={busy} onClick={onClose}>Close comparison</button>
       </div>
+      <div className="flex justify-end"><button type="button" className={`${neutralButton} w-full sm:w-auto`} data-confirm-cancel disabled={busy} onClick={onClose}>Close</button></div>
+      </footer>
     </div>
   </FindingActionDialog>;
 }

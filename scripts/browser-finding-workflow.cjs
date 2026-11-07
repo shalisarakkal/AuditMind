@@ -728,6 +728,19 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     const sourceSnapshotTimes={'workflow.csv':new Date(Date.now()-7200000).toISOString(),'workflow-repeat.csv':new Date(Date.now()-3600000).toISOString()};
     async function declareSnapshot(filename) {
       await p.getByRole('button',{name:`Scan snapshot for ${filename}`,exact:true}).click();
+      const actions=snapshotDialog().locator('footer[aria-label="Snapshot actions"]');
+      await expect(actions.getByRole('button',{name:'Close',exact:true})).toBeVisible();
+      assert.ok(await actions.getByRole('button',{name:'Declare snapshot',exact:true}).evaluate(node=>node.classList.contains('bg-cyan')));
+      await p.setViewportSize({width:320,height:844});
+      assert.ok(await snapshotDialog().evaluate(node=>node.scrollWidth<=node.clientWidth));
+      const stacked=await actions.getByRole('button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};}));
+      assert.ok(stacked.length>=3);
+      for(let index=1;index<stacked.length;index++) {
+        assert.ok(stacked[index].top>=stacked[index-1].bottom);
+        assert.ok(Math.abs(stacked[index].left-stacked[0].left)<2 && Math.abs(stacked[index].right-stacked[0].right)<2);
+      }
+      await p.screenshot({path:path.join(output,`snapshot-actions-${filename}.png`),fullPage:true});
+      await p.setViewportSize({width:1440,height:1000});
       await snapshotDialog().getByRole('button',{name:'Declare snapshot',exact:true}).click();
       await snapshotDialog().getByLabel('Source snapshot type',{exact:true}).selectOption('complete');
       const localSourceTime=await p.evaluate(value=>{const d=new Date(value),pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}${d.getSeconds()?':'+pad(d.getSeconds()):''}`;},sourceSnapshotTimes[filename]);
@@ -760,7 +773,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.setViewportSize({width:320,height:844});
     assert.ok(await comparisonDialog().evaluate(node=>node.scrollWidth<=node.clientWidth));
     await p.screenshot({path:path.join(output,'scan-snapshot-review-mobile.png'),fullPage:true});
-    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    await comparisonDialog().getByRole('button',{name:'Close',exact:true}).click();
     await p.setViewportSize({width:1440,height:1000});
     check('Versioned source-scan declarations and pinned baseline review show matching metadata without absence authority; mobile/Axe pass');
     await p.getByRole('button',{name:'Scan snapshot for workflow-repeat.csv',exact:true}).click();
@@ -780,7 +793,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
     await expect(comparisonDialog().getByText('Target scopes differ',{exact:true})).toBeVisible();
     await expect(comparisonDialog().getByText('Baseline only targets: workflow-host',{exact:true})).toBeVisible();
-    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    await comparisonDialog().getByRole('button',{name:'Close',exact:true}).click();
     check('Concurrent declaration revision preserves the stale draft, requires explicit reload and explains changed target scope');
     await p.getByRole('button',{name:'Scan snapshot for workflow-repeat.csv',exact:true}).click();
     await snapshotDialog().getByRole('button',{name:'Revoke declaration',exact:true}).click();
@@ -790,7 +803,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
     await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
     await expect(comparisonDialog().getByText('Current: Declaration was revoked',{exact:true})).toBeVisible();
-    await comparisonDialog().getByRole('button',{name:'Close comparison',exact:true}).click();
+    await comparisonDialog().getByRole('button',{name:'Close',exact:true}).click();
     assert.equal((await admin.request(list+'/'+c+'/workflow')).body.version,0);
     assert.equal((await admin.request(org+`/scans/${snapshotBaselineImport.scan_id}/snapshot`)).body.declaration.version,1);
     check('Explicit revocation appends a version and blocks compatibility without modifying baseline or finding workflow');

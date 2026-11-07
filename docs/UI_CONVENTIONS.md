@@ -1,5 +1,28 @@
 # UI conventions: list pages
 
+## Button hierarchy and modal actions
+
+Agreed 6 November 2026. Use filled cyan with navy text for a clear primary
+action, outlined cyan for secondary actions, and neutral styling for Close or
+Cancel. Do not manufacture a primary action when several operations have equal
+priority. Keep destructive actions explicitly labelled and use the established
+danger treatment. Row-action text buttons retain the list conventions below.
+
+Place modal actions in a separated footer. Keep Close/Cancel in a consistent
+right-aligned dismissal area, apart from the operational actions. On narrow
+screens, deliberately stack full-width actions with consistent gaps; do not let
+Close appear to be an accidentally wrapped fourth action. Wider layouts may wrap
+the operational group while preserving the separate dismissal area. Use sentence
+case, visible keyboard focus and at least 40px-high modal buttons. Keep existing
+focus restoration, initial safe-action focus and busy-state dismissal guards.
+Use Close for an inspection dialog and Cancel for abandoning an operation.
+
+Scan snapshot uses primary Declare snapshot only before a declaration exists;
+Revise declaration, baseline selection and baseline review remain secondary.
+Save declaration and Review compatibility are primary within their respective
+tasks. Both snapshot dialogs use a neutral Close footer button. This is a visual
+convention, not a claim that wrapping alone constitutes an accessibility failure.
+
 File drag/drop must not navigate to a local file. Signed-in layout installs a
 capture-phase file-only navigation guard (preserve native file inputs and text
 drags). Assets/Findings accept page-content drops, not only the compact header
