@@ -1,5 +1,27 @@
 # Phase 4 remediation workflow validation
 
+## PB-1.3 identity and reviewed bindings - 7 November 2026
+
+Migration 0046 adds organization tool namespaces and append-only observation
+binding decisions, with bounded read-time candidate checks. No auto-matching,
+absence reconciliation, suppression or scoring authority is added. Seven
+review defects were reproduced before fixes: stale confirmations after target
+edits, retained cancelled confirmation, unfrozen retirement targets and a newly
+registered tool missing beyond the first list page, and a retirement panel that
+did not block other workflow forms, plus insufficient contrast in the active
+retirement modal. A backend versioning reproduction also showed old reviews
+being reused for a new identity contract; contract/mapping/material pins now
+require explicit re-review. Regression tests pass; the destructive fill is solid red.
+See [review findings and release results](IDENTITY_RELEASE_REVIEW.md) and
+[contract/verification steps](FINDING_IDENTITY.md).
+
+The initial full local backend suite passed 1,651 tests before the final version
+fix. Both new regression cases pass, and a fresh full run is in progress.
+Frontend passes 548 tests; Chrome passes 94 checks. Evidence pilot, worker
+recovery, contrast probe, lint/build and security checks pass. Exact-commit Linux
+CI is being completed; earlier runs remain historical checkpoints.
+
+
 ## Status-scoring and Dashboard release closeout - 6 November 2026
 
 PB-4.4 adds versioned Platform default-On status-aware scoring and optional

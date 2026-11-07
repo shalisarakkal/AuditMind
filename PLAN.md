@@ -2,6 +2,49 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Identity release review and complete tests - 7 November 2026
+
+- Reproduced/fixed seven issues: stale mapping confirmation, retained cancelled
+  draft confirmation, unfrozen retirement target, new namespace pagination and
+  nonblocking retirement confirmation, and destructive-button contrast below AA.
+  Added regression coverage and top-modal
+  Escape isolation. Identity/mapping-version changes now require explicit re-review. See docs/IDENTITY_RELEASE_REVIEW.md.
+- Initial full local backend: 1,651 passed before the final contract-version fix.
+  Both new backend regressions pass; a fresh full run is in progress.
+  Full frontend: 548 passed; Chrome: 94 checks passed. Lint, production build,
+  Bandit, pip/secret guards, evidence pilot and worker recovery pass.
+  Review findings and authoritative final CI gates: docs/IDENTITY_RELEASE_REVIEW.md.
+- User authorized reviewed scoped commits/push and exact-commit hosted Linux CI.
+  Reconciliation, suppression, SaaS-scale and production acceptance remain open.
+
+## PB-1.3 reviewed binding increment - 7 November 2026
+
+- Add migration 0046 for organization tool namespaces and append-only reviewed
+  observation-to-canonical-asset bindings. Admin-only explicit confirmation,
+  rationale, optimistic versions, retirement/revocation and Activity records.
+- Candidate reads validate retained source/canonical context using bounded queries.
+  Imports do not resolve/inherit bindings; reconciliation/suppression stays off.
+  Native Nessus review UI is lazy and blocks parent dismissal while submitting.
+- Activated locally at migration 0046 with idle queues. Validation: 78 backend
+  tests (including migrations, concurrency and batching), a cross-tenant asset
+  recheck, 542 frontend tests and 94 Chrome checks pass. Production build/lint
+  pass. Registration draft retention was corrected and regression-tested.
+  Foundation and binding changes remain uncommitted; hosted CI has not run.
+
+## PB-1.3 stable identity foundation - 7 November 2026
+
+- Implemented versioned candidate-key kernel and bounded read-time observation
+  diagnostics, with a reviewed native Nessus mapping and fail-closed namespace
+  requirements. Uploaded tool/asset claims never establish trusted bindings.
+- No import matching, canonical merge, absence flags, suppression or scoring
+  changes. Observations stay ineligible for reconciliation; explicit reviewed
+  tool/asset bindings are delivered in the increment above. Canonical conflicts,
+  review queue and suppression remain pending. See docs/FINDING_IDENTITY.md.
+- Local validation: 62 backend identity/matching/observation/batching tests,
+  4 observation UI tests and 93 Chrome workflow checks pass. Lint and production
+  build pass; local app restarted with all queues idle. Uncommitted; hosted CI
+  has not run for this identity increment.
+
 ## Shared dialog action conventions - 6 November 2026
 
 - Standardized neutral Cancel/Close and primary action styles through shared
@@ -11,8 +54,8 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   and the distinction between dismissing a dialog and aborting a submitted job.
 - Local verification: 537 frontend tests, lint, production build and 93 Chrome
   workflow checks pass. Local application restarted while all queues were idle.
-  Reviewed for scoped commit/push; exact-commit hosted Linux CI is the final
-  release gate for this follow-up.
+  Delivered through `4e071af`; all four hosted Linux jobs passed in
+  [run 42338891007](https://github.com/shalisarakkal/AuditMind/actions/runs/42338891007).
 
 ## Approved status-aware scoring policy - 6 November 2026
 

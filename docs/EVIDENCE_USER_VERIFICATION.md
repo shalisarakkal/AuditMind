@@ -493,3 +493,35 @@ organizations using the sidebar. The new organization should start on page
 one with a blank search and default sorting. Previously selected rows and open
 actions must also be cleared. Use Next and Previous to check that the exact
 total and row ordering remain consistent while no findings are being edited.
+
+
+## Reviewed finding identity (PB-1.3 local increment, 7 November 2026)
+
+Use an organization-admin account and a retained completed native Nessus upload.
+Generic CSV/JSON and generated profile rules do not offer identity review yet.
+
+1. Findings -> row Workflow -> Show source observations -> Review identity binding.
+2. Inspect the captured source asset. Select its registered Nessus tool instance,
+   or expand Register a tool instance, enter a unique instance name and review
+   reason, then register it. Registration saves immediately; cancelling the later
+   binding review does not delete that namespace or undo a submitted write.
+3. Verify the canonical asset UUID (defaults to the captured source asset), enter
+   the binding reason, explicitly confirm scanner/asset verification, then save.
+4. Expand Identity assessment: a current candidate key appears. Reconciliation
+   remains ineligible; workflow status, severity, archive state and scores do not
+   change. Eligibility reasons labelled at import retain their historical meaning.
+5. Reopen the review and provide a reason to Revoke identity binding: the version
+   advances and the key becomes unavailable. Review/create another decision only
+   after explicitly checking current context.
+6. To retire a scanner, select it and use Retire selected tool instance, then the
+   application confirmation. Every binding for that namespace becomes unavailable;
+   it cannot be reactivated/reused. A replacement needs a new namespace.
+7. Two stale browser edits: the second save is refused; its draft stays. Reload
+   identity context and reconfirm before retrying. Close/Escape remain blocked
+   during submission. Read-only users have no review controls; API writes also
+   enforce organization-admin permissions.
+
+New uploads never inherit reviewed bindings automatically. Retained source scan,
+asset identity and namespace lifecycle are checked when the history is read.
+No not-observed queue, automatic merge, source-driven resolution or imported-row
+suppression is enabled by this increment.

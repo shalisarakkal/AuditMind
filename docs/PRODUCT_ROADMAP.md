@@ -13,6 +13,12 @@ acceptance/sign-off; see the [README status](../README.md#status) and
 The [product backlog](PRODUCT_BACKLOG.md) breaks the phases into ordered
 candidate work items with acceptance criteria.
 
+PB-1.3 starts with a local [stable identity foundation](FINDING_IDENTITY.md):
+versioned candidate contract and read-only source diagnostics. Explicit admin-reviewed
+namespace/asset bindings are implemented and activated locally at migration 0046;
+local tests/browser checks pass, with commit/hosted CI remaining. Reviewed reconciliation and suppression remain
+unfinished.
+
 ## Prioritization at a glance
 
 Local baseline maintenance on 6 November addressed stalled existing-asset cloud

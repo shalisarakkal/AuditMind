@@ -1,5 +1,13 @@
 # Phase 4 status and next milestone
 
+7 November: PB-1.3 identity candidate foundation and explicit admin-reviewed
+bindings are implemented and activated locally at migration 0046. This adds no
+absence, suppression or automatic matching authority. Complete release review,
+regression fixes and final per-commit gates are documented in
+[identity release review](IDENTITY_RELEASE_REVIEW.md). Remaining PB-1.3 canonical
+conflicts, review queue and suppression lifecycle are tracked in PRODUCT_BACKLOG.md.
+
+
 Status-aware current-risk scoring is approved and implemented locally as Product Phase 4 item
 [PB-4.4](PRODUCT_BACKLOG.md#pb-44--introduce-verified-status-aware-current-risk-scoring),
 dependent on PB-2.1/PB-2.2 verification and transition controls. Its approved
@@ -694,7 +702,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Browser-local deadlines and date filters | Implemented | Author timezone/fixed expiry, today through inclusive local end of day, creation boundary; global dark native date inputs. Legacy Eastern metadata retained. |
 | Selection, archive confirmations, IDs and shared UI | Implemented for documented scope | Findings, Archived, Assets, Uploads; manual finding entry; inline Documents preview; full-width Settings; timed routine notices. |
 | Workflow preservation on import/restore | Partial, bounded | Existing matching skips exact duplicates; archive restore protects edited workflow (`workflow_version = 0` duplicate purge guard). This is not stable cross-scan identity or absence reconciliation. |
-| Imported individual suppression and comparable-scan absence review | Design only | `FINDING_RECONCILIATION_DESIGN.md`; implementation and identity contract still require approval. |
+| Imported individual suppression and comparable-scan absence review | Pending implementation | Functional rules approved; native identity candidates and explicit reviewed bindings are implemented locally at 0046. Canonical conflicts, absence queue and suppression lifecycle remain pending; see FINDING_IDENTITY.md and FINDING_RECONCILIATION_DESIGN.md. |
 | Status-aware scoring / report changes | Approved PB-4.4 increment | See STATUS_AWARE_SCORING.md and PLAN.md for the separate implementation and validation. Earlier saved reports remain unchanged; workflow delivery alone never established verification approval. |
 | Further per-domain refinement and export polish | Baseline exists; additional scope not defined | `scoring_service.py` implements deterministic domain scores; reports route exports HTML/JSON/PDF. Phase 4 refinements beyond those delivered features require concrete acceptance criteria, not duplicate implementation or a blanket completion checkbox. |
 | Dashboard security summary | Implemented locally | Three completed organization-event counts; exact Activity links; global failed sign-ins explicitly unavailable. Scores unchanged. |

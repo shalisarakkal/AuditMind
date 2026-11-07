@@ -952,3 +952,22 @@ instant server-pushed update. Failed verification hides scores.
 Turning the setting off restores baseline interpretation without deleting reviews.
 Follow [the Chrome walkthrough](EVIDENCE_USER_VERIFICATION.md) using synthetic test
 data first. Production rollout/default-on adoption remains a separate decision.
+
+
+## Reviewed finding identity (native Nessus)
+
+Organization admins can open Findings -> Workflow -> Show source observations ->
+Review identity binding on a native Nessus observation. Register/select the scanner
+instance, verify the canonical asset UUID, enter a reason, explicitly confirm the
+mapping and save. Registration is a separate immediate write; Cancel does not
+remove a registered namespace. Asset/scanner changes require fresh confirmation.
+A cancelled editor starts a fresh review when reopened. Retirement names and
+freezes its target until cancelled/confirmed; retiring a namespace disables its
+bindings. Revocation appends a new binding version. Conflicts retain draft text
+and require Reload identity context before retrying.
+
+Candidates do not merge rows, grant absence/suppression authority, change workflow
+or affect scores. New uploads require separate review; generated profiles and
+generic CSV/JSON do not obtain native identity merely by claiming Nessus source.
+See [identity rules](FINDING_IDENTITY.md) and
+[Chrome verification steps](EVIDENCE_USER_VERIFICATION.md#reviewed-finding-identity-pb-13-local-increment-7-november-2026).

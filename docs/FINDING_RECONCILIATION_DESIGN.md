@@ -1,5 +1,10 @@
 # Individual imported-finding archive and scan reconciliation
 
+7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
+Migration 0046 adds optional administrator-reviewed tool/asset bindings;
+observations still remain ineligible for reconciliation.
+Candidate diagnostics do not change import matching or authorize reconciliation.
+
 PB-1.1 now implements the additive [source observation foundation](FINDING_OBSERVATIONS.md).
 PB-1.2 adds [source-scan declarations and metadata comparison](SCAN_SNAPSHOTS.md),
 with absence eligibility still false. It does not validate finding identity or

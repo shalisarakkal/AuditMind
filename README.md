@@ -6,6 +6,11 @@ Resolved/False positive exclusions require current administrator-approved proof;
 Mitigated retains full risk. Findings-based and Evidence-based Dashboard tabs
 separate known risk from qualified coverage. Migration 0045 is required.
 
+Finding identity: [native Nessus candidates and reviewed bindings](docs/FINDING_IDENTITY.md)
+add explicit organization-admin tool/asset review at migration 0046. New uploads
+never inherit bindings automatically. Canonical conflict resolution, absence
+reconciliation and imported-finding suppression remain future work.
+
 Optional [stored Dashboard snapshots](docs/DASHBOARD_SNAPSHOTS.md) provide
 scheduled background refresh and a per-organization Refresh dashboard action,
 with live evidence-validity checks, a one-hour Platform default and optional

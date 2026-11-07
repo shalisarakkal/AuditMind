@@ -6,7 +6,9 @@ Agreed 6 November 2026. Use filled cyan with navy text for a clear primary
 action, outlined cyan for secondary actions, and neutral styling for Close or
 Cancel. Do not manufacture a primary action when several operations have equal
 priority. Keep destructive actions explicitly labelled and use the established
-danger treatment. Row-action text buttons retain the list conventions below.
+danger treatment: solid red (`bg-red-400`) with navy text for destructive
+confirmation buttons. Avoid translucent danger fills that can drop below 4.5:1
+in layered dialogs. Row-action text buttons retain the list conventions below.
 
 Place modal actions in a separated footer. Keep Close/Cancel in a consistent
 right-aligned action area. When dismissal shares a row with a primary action,
@@ -24,7 +26,10 @@ screen-specific Cancel/Close treatments. Optional top-right close icons have a
 40px target and the same submission guard as footer dismissal and Escape.
 Disable dismissal during submission when the outcome is not yet known. Closing
 after a job is accepted never cancels that background job; retain the explicit
-queue/import cancellation wording and dedicated abort controls.
+queue/import cancellation wording and dedicated abort controls. A confirmation
+inside an existing dialog uses a blocking application dialog, freezes/names its
+target, initially focuses Cancel and isolates Escape to the topmost dialog.
+Cancelling that confirmation preserves the underlying editor and draft.
 
 Scan snapshot uses primary Declare snapshot only before a declaration exists;
 Revise declaration, baseline selection and baseline review remain secondary.

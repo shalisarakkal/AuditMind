@@ -1,5 +1,10 @@
 # Finding source observations (PB-1.1)
 
+7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
+Migration 0046 adds optional administrator-reviewed tool/asset bindings;
+observations still remain ineligible for reconciliation.
+Candidate diagnostics do not change import matching or authorize reconciliation.
+
 PB-1.1 records per-import finding provenance. Migration `0040` adds
 `finding_observations`; it does not backfill or infer historical observations.
 Current finding matching, source payloads, workflow decisions, scores and saved
@@ -31,8 +36,9 @@ category, description, filename or row number is never promoted to a stable
 finding/tool-instance identifier.
 
 **All current observations are ineligible for automated reconciliation.** Current
-imports do not configure verified tool-instance namespaces or stable canonical
-asset mappings. Each observation carries `reconciliation_eligible=false` and
+imports do not automatically configure tool-instance namespaces or canonical
+asset mappings. Migration 0046 adds explicit per-observation administrator review;
+a resulting identity candidate still grants no reconciliation authority. Each observation carries `reconciliation_eligible=false` and
 specific reasons. Even supplied identifiers and native plugin IDs do not grant
 comparability or authorize automatic updates. Existing duplicate keys associate
 observations with the finding chosen by current matching; this association is
