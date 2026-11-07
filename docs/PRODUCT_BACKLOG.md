@@ -18,7 +18,9 @@ updates, unchanged-payload write suppression and Abort foreign-key-lock handling
 are active. The exact retained file reimported 500,000 existing assets in
 213.084 seconds in an isolated test schema, with unchanged full payload checksum.
 This is not a hosted scale result or a production-duration guarantee; see the
-same validation record for limits and outstanding commit/CI review.
+same validation record for limits. Delivered through `24a5f66`; all four hosted
+Linux jobs passed in [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464).
+The subsequent PB-4.4 scoring increment has its own release checks below.
 
 Avoid rebuilding these as new features. Extend them only where an item below
 identifies a specific gap:
@@ -67,7 +69,7 @@ handoff text without erasing its audit context.
 ### PB-0.2 — Define a bounded pilot contract
 
 **Status, 5 November:** User-deferred; not completed. Customer pilot preparation
-and broader scoring rollout remain held.
+and broader evidence-qualified scoring rollout remain held.
 
 **Priority:** P0 · **Depends on:** PB-0.1
 
@@ -142,7 +144,9 @@ passed 90 checks, the final snapshot backend suite passed 40 checks and the full
 frontend suite passed 529 tests. Captured configuration, versioned source-scan declarations and
 metadata-only comparison expose scope/completeness/configuration blockers.
 Absence eligibility remains false; no findings are marked Not observed.
-Review/check-in/push and exact-commit hosted CI for this increment remain pending.
+Delivered through `dcf387a`, `b3e5095` and `24a5f66`; all four exact-commit hosted
+Linux jobs passed for `24a5f66` in
+[run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464).
 [Contract and verification](SCAN_SNAPSHOTS.md).
 
 **Priority:** P1 · **Depends on:** PB-1.1
@@ -214,6 +218,12 @@ framework references only where the source and usage rights are established.
 
 ### PB-2.1 — Attach remediation proof as a first-class record
 
+**Status, 6 November:** PB-4.4 implements the protected reference/document-version
+submission and administrator decision ledger for scoring eligibility. This is a
+bounded delivery: workflow closure remains a user assertion and rejected proof
+restores/retains full risk without automatically rewriting workflow status.
+Full transition enforcement and broader artifact workflows below remain open.
+
 **Priority:** P2 · **Depends on:** PB-1.1
 
 Extend the existing finding workflow so post-fix evidence is a protected,
@@ -230,6 +240,11 @@ state—not only free-text verification.
   security rules.
 
 ### PB-2.2 — Enforce and explain workflow transitions
+
+**Status, 6 November:** Existing role/version/deadline/note validation remains.
+PB-4.4 additionally binds scoring exclusions to approved evidence and invalidates
+them after later status changes. Requiring that decision before a workflow
+transition itself, and source-triggered reopening, remain separate future work.
 
 **Priority:** P2 · **Depends on:** PB-2.1
 
@@ -386,6 +401,65 @@ finding age, evidence freshness, and deterministic score changes.
 - The view identifies changes in coverage, scoring policy, and control catalog
   version that affect comparability.
 - Filters and totals remain organization-scoped and return a clear empty state.
+
+### PB-4.4 — Introduce verified status-aware current-risk scoring
+
+**Priority:** P4 · **Depends on:** PB-2.1, PB-2.2
+
+**Status:** Approved policy implemented and validated locally on 6 November 2026;
+commit review and hosted Linux CI remain release gates for this increment.
+See [the approved contract](STATUS_AWARE_SCORING.md).
+This belongs to Product Phase 4, not the older delivery-phase documents named
+`PHASE4_*.md`.
+
+Introduce a default-On Platform policy with an organization Inherit/On/Off
+override for versioned current-risk scoring. Preserve legacy scoring when
+disabled. This setting is separate from
+the evidence-qualified scoring setting: remediation status must not bypass
+coverage, freshness or insufficient-evidence checks.
+
+**Approved treatment**
+
+| Workflow status | Current-risk contribution |
+| --- | --- |
+| Open | Full risk contribution. |
+| Accepted risk | Full contribution; accepting risk does not remove it. |
+| Mitigated | Full contribution until an approved residual-risk assessment supports a defined reduction. |
+| Resolved | Exclude only after an authorized verification decision with supporting evidence. |
+| False positive | Exclude only after an authorized decision validates that the finding is incorrect or inapplicable. |
+
+Free-text rationale or verification notes alone do not authorize score
+exclusion. Organization admins review evidence; self-review requires explicit
+acknowledgment. Proof expires within 90 days and later observations invalidate
+exclusions. Mitigated retains full risk until a residual-risk method is approved.
+Scanner observation state remains separate
+from workflow status; absence alone must not imply resolution.
+
+**Acceptance criteria**
+
+- Existing organizations inherit the approved Platform default On. Organization
+  admins can explicitly choose On/Off or resume inheritance; changes are versioned
+  and audited. Existing notes never become verification approvals automatically.
+- Show visible finding totals separately from findings contributing to current
+  risk, using the same tenant/filter scope and explaining exclusions.
+- Exclusions/reductions identify their verification decision, evidence reference,
+  policy version and reason. Expired/revoked or invalidated verification cannot
+  silently continue suppressing risk. Reopening restores risk contribution.
+- Preserve finding severity, source observations, workflow history and saved
+  report snapshots. Do not delete or archive a finding to change its score.
+- New dashboard/report snapshots capture the scoring mode, policy version and
+  contribution/exclusion basis. Older snapshots are never recalculated in place;
+  comparisons disclose changes in policy and evidence coverage.
+- Insufficient evidence remains Not assessed. Excluding every finding must not
+  automatically establish adequate coverage or a healthy score of 100.
+- Invalidate/rebuild affected dashboard and count caches after setting changes,
+  verification decisions, proof expiry/revocation and workflow changes, without
+  allowing stale background results to overwrite newer policy/evidence state.
+- Tests cover disabled-mode parity, all statuses, unverified closure, accepted
+  risk, residual-risk rules, reopening, stale/revoked proof, missing evidence,
+  tenant/role isolation, concurrent edits, cache invalidation and immutable reports.
+- Platform default On and optional organization override are approved. Retain
+  the setting until confidence supports a separate decision to remove it.
 
 ## Phase 5 — Integrations and advanced intelligence
 

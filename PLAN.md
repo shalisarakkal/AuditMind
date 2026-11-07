@@ -2,6 +2,62 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Approved status-aware scoring policy - 6 November 2026
+
+- Dashboard follow-up: Findings-based/Evidence-based tabs with default findings
+  view, keyboard navigation, shared refresh/snapshot controls and read-only view
+  switching. Evidence-disabled messaging links to Settings without enabling it.
+  Activated locally: 537 frontend tests, lint, TypeScript and production build
+  pass. Focused real-Chrome checks with intercepted synthetic data confirm
+  desktop/mobile layout, Axe AA, keyboard selection, refresh persistence and no
+  organization writes on tab switch (`scripts/browser-dashboard-tabs.cjs`).
+- Compact Dashboard follow-up: Top issues/recent uploads shared across both tabs;
+  reduced top spacing, shorter score summaries and two-column severity counts.
+  Verified 36 page tests, lint, TypeScript, production build and focused Chrome/
+  Axe checks. All seven baseline domain cards fit at 1440 x 900 without scrolling
+  in the synthetic browser fixture; smaller displays retain normal scrolling.
+  The evidence-view clarification sits above the shared columns, so Top issues
+  and Recent uploads headings/list tops align; Chrome checks both coordinates.
+  Shared time-zone banner removed; browser-local time behavior stays documented.
+  Dashboard title, update time and Refresh share a compact desktop row and wrap
+  on mobile. Page tests, lint, TypeScript, build and focused Chrome/Axe checks pass.
+  Removed the duplicate organization-name subtitle beneath Resilience dashboard;
+  organization context continues through the shared application header/picker.
+  Inventory and finding risk is a shared summary component beside both tab
+  assessments, also visible when evidence-qualified scoring is disabled. Counts
+  stay identical across tabs and do not authorize evidence-qualified scores.
+  Verified 36 page tests, lint, TypeScript, production build and Chrome/Axe.
+  Summary tiles use matching desktop widths, padding and minimum heights across
+  both tabs. Chrome checks paired dimensions and cross-tab inventory tile sizes;
+  responsive content can still expand without clipping.
+
+- Follow-up: separate the Dashboard findings-based resilience baseline from
+  evidence-qualified scores/coverage. Preserve qualification gates, settings,
+  source counts and saved reports; reuse the same captured counts without an
+  additional inventory scan. Activated locally after 38 PostgreSQL Dashboard/
+  snapshot/policy tests, 35 frontend page tests and a 15-test policy recheck.
+  Lint, TypeScript and production build pass. Qualification and policy settings
+  remain unchanged; empty/all-excluded baselines remain unavailable.
+
+- [x] Record PB-4.4 under Product Phase 4.
+- [x] User approval: Platform default On, organization Inherit/On/Off override;
+  Mitigated retains full risk; organization admins approve evidence exclusions.
+- [x] Define source binding, freshness and review rules in
+  [STATUS_AWARE_SCORING.md](docs/STATUS_AWARE_SCORING.md).
+- [x] Complete implementation review, regression/browser checks and local activation
+  at migration 0045. Backend unit suite: 732 passed; frontend suite: 535 passed;
+  targeted PostgreSQL policy, migration, report and concurrency suites pass.
+  Chrome: 92 checks passed, including admin evidence approval and organization
+  Off/inheritance; no AI usage. Lint, production builds, high-severity Bandit,
+  tracked secret guard and diff whitespace checks pass.
+- [x] Review and prepare scoped commits: backend `d6310ab`, Dashboard/UI/CI
+  `081865d`, evidence-pilot tab acceptance `79d1b45`. User authorized push/CI.
+- [ ] Push the reviewed closeout and verify exact-commit hosted Linux CI.
+- Separate evidence-qualified scoring remains independently controlled. Historical
+  reports stay immutable. Product phases differ from older PHASE4 delivery history.
+- Import progress wording is active: approximate reading progress, exact staged
+  phase counts, and an explicit distinction between processing and committed data.
+
 ## Reviewed closeout - 6 November 2026
 
 - [x] Final review: fix import foreign-key blocking in workflow/snapshot paths
@@ -10,9 +66,10 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   90 checks passed. ESLint, production build, high-severity Bandit and tracked
   secret guard pass. Full backend execution remains a hosted Linux CI gate.
 - [x] Backend `dcf387a` and frontend/browser `b3e5095` committed separately.
-- Post-push release gate: verify the final pushed commit in
-  [hosted Linux CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml).
-  This checkpoint records local pre-push evidence; the exact run is authoritative.
+- [x] Hosted Linux CI passed for closeout commit `24a5f66`: backend, frontend,
+  browser acceptance and dependency/security jobs in
+  [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464).
+  This result does not cover the subsequent uncommitted status-scoring increment.
 
 ## Existing cloud inventory update performance - 6 November 2026
 

@@ -1,5 +1,27 @@
 # Verify the evidence-aware reporting changes
 
+Dashboard tabs: Findings-based opens by default and displays known-risk baseline
+scores. With evidence-qualified scoring enabled but no valid qualification, select
+Evidence-based and confirm its assessment remains Not assessed with coverage
+reasons. With that setting disabled, the tab explains how an admin can enable it.
+Tab changes must not change settings, submit jobs or start an evaluation. Check
+that Inventory and finding risk shows the same totals, severities, current-risk
+findings and verified exclusions on both tabs, including disabled evidence mode.
+Check
+arrows/Home/End navigation and that Refresh preserves the selected tab. Empty
+inventory and all-excluded findings still have no fabricated baseline.
+
+Automated tab presentation check, against the running local UI:
+`node scripts/browser-dashboard-tabs.cjs`. It intercepts synthetic API data and
+does not use credentials or mutate the real organization. Screenshots and results
+are saved under `temp/testing/dashboard-tabs`.
+
+PB-4.4 status-aware scoring: verify Platform default On, organization overrides,
+administrator evidence approval, Mitigated retaining full risk, and stale/revoked
+evidence restoring contribution. Workflow notes alone must not exclude findings.
+See [the Chrome checklist](STATUS_AWARE_SCORING.md#chrome-verification). This is
+separate from evidence-qualified domain coverage, whose setting is unchanged.
+
 PB-1.2 source-scan review: on Uploads, open **Snapshot**, declare source scope,
 tool instance/configuration and source snapshot time, then **Use as baseline**.
 Declare a later source snapshot and choose **Review against baseline** followed

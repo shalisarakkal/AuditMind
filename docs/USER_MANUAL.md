@@ -1,5 +1,26 @@
 # AuditMind user manual
 
+Timestamps are displayed in your browser's time zone. The persistent time-zone
+banner is omitted; this does not change stored timestamps or date processing.
+
+The Resilience dashboard has **Findings-based** and **Evidence-based** tabs.
+Both display **Inventory and finding risk**: the same asset/finding totals,
+severity counts, current-risk findings and verified exclusions. These inventory
+counts do not authorize evidence-qualified scores.
+Findings-based is the default and shows recorded-risk baselines and top issues.
+Top issues and recent uploads are shared below both tab views. The summary uses
+compact spacing and two-column severity counts to keep domain cards higher on
+desktop screens; smaller screens retain normal scrolling.
+Evidence-based shows qualified scores and domain coverage, or explains that the
+setting is disabled. Tab selection never changes settings or starts evaluation.
+The shared **Refresh dashboard** button preserves the selected tab; changing
+organization starts on Findings-based.
+
+Status-aware current-risk scoring defaults to On at Platform level. Organization
+admins can choose Inherit, On or Off in Settings. Resolved/False positive findings
+require a separate administrator evidence approval before exclusion; Mitigated
+retains full risk. See [review steps and policy](STATUS_AWARE_SCORING.md).
+
 Background processing can run concurrently across organizations with a configured
 worker limit. Within one organization, accepted jobs remain queued behind the
 active job. This does not limit how many organizations can be registered, and
@@ -318,8 +339,11 @@ People and organization/platform Activity date filters. It adds no time selector
 or new date filters to screens that do not already have them. Web requests supply
 `filter_timezone` automatically; direct API clients omitting it retain UTC behavior.
 
-Workflow status does **not** reduce deterministic scores or rewrite reports in this
-delivery. Matching re-imports preserve decisions. Restore preserves edited duplicate
+Workflow status alone does **not** authorize a scoring exclusion. With status-aware
+scoring enabled, Resolved/False positive findings need current administrator-approved
+evidence; Open, Accepted risk and Mitigated retain full risk. Existing saved reports
+are never rewritten. Matching re-imports preserve decisions while new observations
+invalidate old scoring exclusions. Restore preserves edited duplicate
 findings and their history; both remain independently counted until an explicit
 consolidation policy is implemented. Purge intentionally removes associated history.
 
@@ -540,6 +564,12 @@ finished; abort cannot undo a completed import.
 After five minutes without a progress update, the progress panel warns that
 progress has not advanced. A recent heartbeat confirms a live worker, not useful
 progress. Review or abort the import rather than submitting duplicate uploads.
+
+While reading, the row count is actual but the percentage is approximate: it is
+estimated from bytes consumed and average row size. Processing then uses the
+exact staged-record total for that phase, which may differ from the input-row
+count for some import formats. Processed records are not committed changes;
+publication completes atomically when the import finishes.
 
 Assets and Findings show a loading spinner and placeholder rows while their first
 list request runs. Search and page controls remain available. Later requests show

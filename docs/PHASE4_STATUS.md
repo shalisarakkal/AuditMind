@@ -1,12 +1,26 @@
 # Phase 4 status and next milestone
 
+Status-aware current-risk scoring is approved and implemented locally as Product Phase 4 item
+[PB-4.4](PRODUCT_BACKLOG.md#pb-44--introduce-verified-status-aware-current-risk-scoring),
+dependent on PB-2.1/PB-2.2 verification and transition controls. Its approved
+Platform default-On policy, organization override and per-status treatment are
+documented in [STATUS_AWARE_SCORING.md](STATUS_AWARE_SCORING.md). Local implementation
+and activation at migration 0045 are complete; validation and remaining release
+gates are tracked in PLAN.md. Broader product-roadmap items are not closed by this
+scoped increment.
+This product-roadmap phase is distinct from this file's older delivery-phase
+numbering.
+
 PB-1.2 source-scan declarations and metadata-only comparison are complete locally.
 The reviewed closeout also includes bulk existing-asset publication, safe import
 abort and concurrent workflow edits (migrations 0041 through 0044). Reviewed
 PostgreSQL suites: 177 passed; full frontend: 532 passed; Chrome: 90 checks passed.
-Backend and frontend are committed separately; exact-commit hosted Linux CI is
-the post-push gate. No absence
-conclusions, stable-identity authorization or workflow/score changes are enabled.
+Backend and frontend were committed separately and delivered through `24a5f66`;
+all four hosted Linux jobs passed in
+[run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464).
+This result does not cover the later PB-4.4 increment. No absence conclusions,
+stable-identity authorization or automatic source-driven workflow changes are
+enabled; approved status-aware scoring is separately documented above.
 [Contract and verification](SCAN_SNAPSHOTS.md).
 
 PB-1.1 source observations are complete locally and activated at migration 0040:
@@ -610,7 +624,8 @@ not by historical local-only notes below. The subsequent handoff update is docs-
 Phase 4 remains partial. Large-org broad-search/count/facet performance, ACLs/
 throttling/malware policy, lower-severity static triage, tenant-fair scheduling and
 production hosting/monitoring acceptance remain open. Imported identity and
-status-aware scoring need separate design approval. Docker/cache deployment and
+status-aware scoring originally needed separate approval; PB-4.4 approval and its
+current implementation supersede that historical hold. Docker/cache deployment and
 report-date UI remain Future. None is silently waived by local test success.
 
 ## Historical local checkpoints
@@ -678,7 +693,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Selection, archive confirmations, IDs and shared UI | Implemented for documented scope | Findings, Archived, Assets, Uploads; manual finding entry; inline Documents preview; full-width Settings; timed routine notices. |
 | Workflow preservation on import/restore | Partial, bounded | Existing matching skips exact duplicates; archive restore protects edited workflow (`workflow_version = 0` duplicate purge guard). This is not stable cross-scan identity or absence reconciliation. |
 | Imported individual suppression and comparable-scan absence review | Design only | `FINDING_RECONCILIATION_DESIGN.md`; implementation and identity contract still require approval. |
-| Status-aware scoring / report changes | Separate design decision | Scoring/report snapshots intentionally unchanged. Do not mark this implemented merely because workflow is delivered. |
+| Status-aware scoring / report changes | Approved PB-4.4 increment | See STATUS_AWARE_SCORING.md and PLAN.md for the separate implementation and validation. Earlier saved reports remain unchanged; workflow delivery alone never established verification approval. |
 | Further per-domain refinement and export polish | Baseline exists; additional scope not defined | `scoring_service.py` implements deterministic domain scores; reports route exports HTML/JSON/PDF. Phase 4 refinements beyond those delivered features require concrete acceptance criteria, not duplicate implementation or a blanket completion checkbox. |
 | Dashboard security summary | Implemented locally | Three completed organization-event counts; exact Activity links; global failed sign-ins explicitly unavailable. Scores unchanged. |
 | Drag/drop and multiple-file import | Implemented locally | Independent per-file source/duplicate/cancel/error/report flow; 20 queued-card limit. |

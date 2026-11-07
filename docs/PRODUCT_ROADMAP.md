@@ -74,7 +74,8 @@ PB-1.1 was pushed through `376342c` and passed all four hosted Linux jobs in
 [run 42113315252](https://github.com/shalisarakkal/AuditMind/actions/runs/42113315252).
 PB-1.2 scan declarations and metadata comparison are complete locally and active
 at migration 0041 (90 Chrome checks, 40 final snapshot backend checks and 529
-frontend tests pass). Review/check-in/push and hosted CI remain pending;
+frontend tests pass). Delivered through `24a5f66`, with all four hosted Linux jobs
+passing in [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464);
 [contract](SCAN_SNAPSHOTS.md).
 Existing matching and archive ownership remain unchanged. Stable-identity
 authorization and reconciliation (PB-1.3) remain pending; this does not enable
@@ -179,6 +180,13 @@ Deliver:
 - Comparable historical snapshots for scores, findings, and remediation
   outcomes, with clear handling of changed scoring or control versions.
 - Internal trend baselines before considering peer benchmarking.
+- Verified status-aware current-risk scoring, enabled by default at Platform level with an
+  organization override: retain full Open/Accepted risk/Mitigated contributions, and exclude Resolved/False positive only with
+  authorized supporting verification. Preserve historical reports and insufficient-
+  evidence states. Implementation is validated locally; hosted CI remains a
+  release gate for this increment; see
+  [PB-4.4](PRODUCT_BACKLOG.md#pb-44--introduce-verified-status-aware-current-risk-scoring),
+  dependent on Phase 2 evidence and transition controls (PB-2.1/PB-2.2).
 
 **Exit criteria:**
 
@@ -188,6 +196,9 @@ Deliver:
   framework versions.
 - Score or priority changes can be traced to changed evidence, context, or
   policy rather than silently shifting.
+- Status-aware scoring has approved verification/residual-risk rules, legacy
+  parity while disabled, distinct total/current-risk counts and pilot acceptance
+  before broader rollout. A note or missing scan result alone cannot remove risk.
 
 ## P5 — Integrate and automate selectively
 

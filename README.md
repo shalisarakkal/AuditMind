@@ -1,9 +1,15 @@
 # AuditMind AI
 
+Current-risk scoring: [verified status-aware policy and Dashboard tabs](docs/STATUS_AWARE_SCORING.md).
+The Platform policy defaults On, with organization Inherit/On/Off overrides.
+Resolved/False positive exclusions require current administrator-approved proof;
+Mitigated retains full risk. Findings-based and Evidence-based Dashboard tabs
+separate known risk from qualified coverage. Migration 0045 is required.
+
 Optional [stored Dashboard snapshots](docs/DASHBOARD_SNAPSHOTS.md) provide
 scheduled background refresh and a per-organization Refresh dashboard action,
 with live evidence-validity checks, a one-hour Platform default and optional
-organization-admin interval overrides. Migrate to 0035
+organization-admin interval overrides. Run migrations through the current head
 before using the updated worker.
 
 Background processing: [worker configuration and current rollout hold](docs/WORKER_POOL.md).
@@ -38,8 +44,9 @@ production deployment or live inference.
 Evidence-aware AI assessment is available **opt-in/off by default**: explicit
 unscored evidence states, reviewed coverage qualification and server aggregation.
 See [profiles/operator workflow](docs/EVIDENCE_COVERAGE_PROFILES.md) and
-[verification](docs/EVIDENCE_ASSESSMENT_VALIDATION.md). Legacy reports and the
-deterministic baseline remain unchanged; no real inference is enabled.
+[verification](docs/EVIDENCE_ASSESSMENT_VALIDATION.md). Existing report snapshots
+remain unchanged; current deterministic risk can use the separate status-aware
+policy above. No real inference is enabled.
 
 Phase 3 technical/open/deferred status: [closure checklist](docs/PHASE3_CLOSURE.md).
 Report prompt v3 adds explicit input budgets and requires approval of its updated

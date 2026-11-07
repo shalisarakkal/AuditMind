@@ -1,5 +1,54 @@
 # Phase 4 remediation workflow validation
 
+## Status-scoring and Dashboard release closeout - 6 November 2026
+
+PB-4.4 adds versioned Platform default-On status-aware scoring and optional
+organization overrides. Only organization administrators approve current evidence
+for Resolved/False positive exclusions; workflow notes alone do not qualify.
+Mitigated retains full risk. Migration **0045** adds the evidence decision ledger,
+source/workflow bindings and independent invalidation, preserving concurrent
+imports/workflow writes. Existing reports are never recalculated.
+
+The Dashboard separates Findings-based and Evidence-based tabs, with identical
+inventory/risk summaries, shared top issues, compact responsive tiles and a
+shared title/refresh row. Evidence qualification still gates qualified scores;
+known-risk baselines do not establish coverage. Empty/all-excluded baselines
+remain unavailable. The time-zone banner and duplicate organization subtitle
+are removed; displayed timestamps remain browser-local.
+
+Final review adds a fresh authorization/lifecycle fence before risk-score writes
+after their separate snapshot read, and uses one eligibility instant for counts
+and captured verification references. Synthetic demo seeding retains its single
+unpublished transaction; ordinary reports use independent repeatable-read capture.
+Narrow-screen severity counts use one column to avoid internal 320px overflow.
+
+Final local frontend suite: **537 passed**. The fresh full workflow Chrome run
+passed **93 checks**, including an independently intercepted tab-presentation
+check. A focused PostgreSQL recheck passed **33 tests**, including atomic seed
+creation and publication refusal after role/deactivation/archive changes during
+risk capture. Lint, isolated production build, high-severity Bandit and tracked
+secret guard pass. The superseded full backend run exposed demo-seed visibility
+failures; those were fixed and the fresh full PostgreSQL run is still in progress.
+It is not yet claimed as passing. The hosted full backend job remains mandatory.
+
+The fresh isolated Chrome evidence pilot also passes real elapsed-time expiry,
+saved-version reapproval, incompatible-scope suppression and default-off rollback.
+It reports no native browser warnings, page errors or AI usage.
+
+Scoped commits: backend `d6310ab`, Dashboard/UI/CI `081865d`, and extended pilot
+selectors `79d1b45`. Exact-commit hosted CI is being completed for this
+increment. The earlier `24a5f66` Linux result below covers the preceding scan/import
+closeout only. Detailed policy and Chrome steps:
+[STATUS_AWARE_SCORING.md](STATUS_AWARE_SCORING.md). Future reconciliation,
+residual-risk reductions, customer pilot, SaaS rollout and production acceptance
+are not closed by this increment. No live AI calls are authorized or performed.
+
+### Previous scan/import closeout
+
+`24a5f66` passed all four hosted jobs (backend, frontend, browser and dependency/
+security) in [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464).
+The dated pre-push record below is retained as historical evidence.
+
 ## Final review and pre-push validation - 6 November 2026
 
 Review fixed foreign-key lock interactions for workflow edits and snapshot
