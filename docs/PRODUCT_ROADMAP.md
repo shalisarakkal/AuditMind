@@ -183,8 +183,8 @@ Deliver:
 - Verified status-aware current-risk scoring, enabled by default at Platform level with an
   organization override: retain full Open/Accepted risk/Mitigated contributions, and exclude Resolved/False positive only with
   authorized supporting verification. Preserve historical reports and insufficient-
-  evidence states. Implementation is validated locally; hosted CI remains a
-  release gate for this increment; see
+  evidence states. Implemented and delivered through `8043cca`, with all four hosted Linux
+  jobs passing in [run 42319257996](https://github.com/shalisarakkal/AuditMind/actions/runs/42319257996). See
   [PB-4.4](PRODUCT_BACKLOG.md#pb-44--introduce-verified-status-aware-current-risk-scoring),
   dependent on Phase 2 evidence and transition controls (PB-2.1/PB-2.2).
 

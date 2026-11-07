@@ -407,7 +407,9 @@ finding age, evidence freshness, and deterministic score changes.
 **Priority:** P4 · **Depends on:** PB-2.1, PB-2.2
 
 **Status:** Approved policy implemented and validated locally on 6 November 2026;
-commit review and hosted Linux CI remain release gates for this increment.
+reviewed and pushed through `8043cca`. All four hosted Linux jobs passed in
+[run 42319257996](https://github.com/shalisarakkal/AuditMind/actions/runs/42319257996). Broader coverage rollout, residual-risk reductions and
+production acceptance remain separate open items.
 See [the approved contract](STATUS_AWARE_SCORING.md).
 This belongs to Product Phase 4, not the older delivery-phase documents named
 `PHASE4_*.md`.

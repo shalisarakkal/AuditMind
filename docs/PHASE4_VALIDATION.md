@@ -28,16 +28,17 @@ check. A focused PostgreSQL recheck passed **33 tests**, including atomic seed
 creation and publication refusal after role/deactivation/archive changes during
 risk capture. Lint, isolated production build, high-severity Bandit and tracked
 secret guard pass. The superseded full backend run exposed demo-seed visibility
-failures; those were fixed and the fresh full PostgreSQL run is still in progress.
-It is not yet claimed as passing. The hosted full backend job remains mandatory.
+failures; those were fixed and the fresh full PostgreSQL run passed all
+**1,601 tests** in 21m 23s. All four hosted Linux jobs passed for `8043cca`
+in [run 42319257996](https://github.com/shalisarakkal/AuditMind/actions/runs/42319257996).
 
 The fresh isolated Chrome evidence pilot also passes real elapsed-time expiry,
 saved-version reapproval, incompatible-scope suppression and default-off rollback.
 It reports no native browser warnings, page errors or AI usage.
 
 Scoped commits: backend `d6310ab`, Dashboard/UI/CI `081865d`, and extended pilot
-selectors `79d1b45`. Exact-commit hosted CI is being completed for this
-increment. The earlier `24a5f66` Linux result below covers the preceding scan/import
+selectors `79d1b45`, documentation `8043cca`. Exact-commit hosted CI passed for
+this increment. The earlier `24a5f66` Linux result below covers the preceding scan/import
 closeout only. Detailed policy and Chrome steps:
 [STATUS_AWARE_SCORING.md](STATUS_AWARE_SCORING.md). Future reconciliation,
 residual-risk reductions, customer pilot, SaaS rollout and production acceptance

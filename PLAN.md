@@ -52,7 +52,13 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   tracked secret guard and diff whitespace checks pass.
 - [x] Review and prepare scoped commits: backend `d6310ab`, Dashboard/UI/CI
   `081865d`, evidence-pilot tab acceptance `79d1b45`. User authorized push/CI.
-- [ ] Push the reviewed closeout and verify exact-commit hosted Linux CI.
+- [x] Pushed through `8043cca`; all four hosted Linux jobs passed in
+  [run 42319257996](https://github.com/shalisarakkal/AuditMind/actions/runs/42319257996). Local full PostgreSQL suite: 1,601 passed.
+- Snapshot button follow-up: separate neutral Close footer, responsive action
+  stacking and contextual primary actions; standards in docs/UI_CONVENTIONS.md.
+  Seven component tests, lint, production build and 93 fresh Chrome checks pass,
+  including 320px stacked actions, comparison dismissal and scoped Axe checks.
+  Exact-commit hosted CI remains the post-push gate for this UI follow-up.
 - Separate evidence-qualified scoring remains independently controlled. Historical
   reports stay immutable. Product phases differ from older PHASE4 delivery history.
 - Import progress wording is active: approximate reading progress, exact staged
