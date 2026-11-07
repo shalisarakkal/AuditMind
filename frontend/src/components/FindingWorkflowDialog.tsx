@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/domain";
 import { useDebounced } from "@/lib/useDebounced";
 import FindingReference from "./FindingReference";
 import FindingObservations from "./FindingObservations";
+import FindingRiskVerification from "./FindingRiskVerification";
 
 type Props = { orgId: string; orgName: string; role: string; ids: string[]; names?: string[]; onClose(): void; onSaved(): void };
 type Member = { id: string; name: string | null; email: string; status: string };
@@ -116,7 +117,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
       <div><h2 id={heading} className="text-lg font-semibold">Finding workflow</h2><p className="text-sm text-white/70">{orgName} · {ids.length} {ids.length === 1 ? "finding" : "findings"}</p></div>
       <button ref={close} type="button" aria-label="Close finding workflow" disabled={busy} onClick={onClose} className="rounded p-1 text-white underline">Close</button>
     </header>
-    <p className="my-3 text-sm text-amber-200">Workflow status does not change scores or saved reports. Verification notes are user assertions, not automatic evidence qualification.</p>
+    <p className="my-3 text-sm text-amber-200">Verification notes are user assertions. Current risk excludes Resolved or False positive findings only with administrator-approved evidence and status-aware scoring enabled. Saved reports retain their captured results.</p>
     {names && <details className="mb-3 text-sm" open={ids.length === 1}><summary>Selected findings</summary><ul className="break-words">{names.map((name, index) => <li key={ids[index]}>{name}</li>)}</ul></details>}
     <details className="mb-3 text-xs"><summary>Technical finding IDs</summary><p>Unique internal identifiers of the findings being edited, not CVE or scanner IDs. Follow a link to locate a finding; save or discard your draft first.</p><ul className="break-all">{ids.map(id => <li key={id}><FindingReference orgId={orgId} id={id} copy /></li>)}</ul></details>
     {loading && <p role="status">Loading workflow…</p>}
@@ -182,5 +183,6 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
       <div className="mt-3 flex gap-4 text-sm"><button type="button" disabled={busy || history.loading || historyOffset === 0} onClick={() => setHistoryOffset(v => v - 20)}>Newer history</button><button type="button" disabled={busy || history.loading || (history.data?.length ?? 0) < 20} onClick={() => setHistoryOffset(v => v + 20)}>Older history</button></div>
     </section>}
     {ids.length === 1 && <FindingObservations key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} />}
+    {ids.length === 1 && <FindingRiskVerification key={`proof-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} role={role} disabled={busy} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
   </dialog>;
 }

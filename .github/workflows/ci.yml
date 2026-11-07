@@ -134,3 +134,4 @@ jobs:
             temp/testing/finding-workflow
             temp/testing/evidence-review
             temp/testing/worker-pool
+            temp/testing/dashboard-tabs

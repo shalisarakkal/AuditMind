@@ -471,13 +471,14 @@ export function progressText(scan: Scan, workerDown = false): string {
     case "waiting":
       return "Waiting for another upload into this organization to finish processing…";
     case "writing":
-      return counted("Writing rows", progress.rows_done, progress.rows_total) ?? "Writing rows…";
+      return counted("Processing records", progress.rows_done, progress.rows_total) ?? "Processing records…";
     case "findings":
-      return counted("Writing findings", progress.rows_done, progress.rows_total) ?? "Writing findings…";
+      return counted("Processing findings", progress.rows_done, progress.rows_total) ?? "Processing findings…";
     case "saving":
       return "Saving changes…";
     default:
-      return counted("Reading file", progress?.rows_done, progress?.rows_total, " rows") ?? "Reading file…";
+      if (!progress?.rows_total) return "Reading file…";
+      return `Reading file: ${(progress.rows_done ?? 0).toLocaleString("en-US")} rows read · approximately ${Math.min(100, Math.floor(((progress.rows_done ?? 0) * 100) / progress.rows_total))}%`;
   }
 }
 

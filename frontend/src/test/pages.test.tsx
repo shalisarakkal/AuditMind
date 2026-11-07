@@ -555,6 +555,56 @@ describe("Dashboard page", () => {
     expect(screen.getByText("weekly.nessus")).toBeInTheDocument();
   });
 
+  it("separates known critical risk from unavailable evidence-qualified scores", async () => {
+    const { fetchMock } = await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => ({
+      ...summary, overall_score: null, overall_tier: null, scoring_mode: "evidence_qualified",
+      evaluation_state: "not_current", qualified_domain_count: 0, evidence_revision: 0, evaluation_id: null,
+      status_scoring: { enabled: true, recorded_findings: 9, current_risk_findings: 7, excluded_findings: 2, not_assessed: false, exclusions_deferred: false },
+      domains: summary.domains.map(domain => ({ ...domain, score: null, tier: null,
+        assessment_status: "not_assessed", evidence_status: "limited" })),
+      findings_baseline: { overall_score: 15, overall_tier: "critical", method: "rule-v1",
+        domains: summary.domains.map(domain => ({ ...domain, score: 0, tier: "critical" })) },
+    }), "GET /orgs/org-1/scoring/dashboard-state": () => ({ scoring_mode: "evidence_qualified", settings_version: 0, evidence_revision: 0, evaluation_id: null }) });
+    expect(await screen.findByTestId("overall-score")).toHaveTextContent("15");
+    expect(screen.getByText("Critical risk tier")).toBeVisible();
+    expect(screen.getByText("Findings-based resilience baseline")).toBeVisible();
+    const inventory = screen.getByRole("region", { name: "Inventory and finding risk" }).textContent;
+    expect(screen.getByRole("tab", { name: "Findings-based" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("region", { name: "Evidence-qualified assessment" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Evidence-based" }));
+    const evidenceInventory = screen.getByRole("region", { name: "Inventory and finding risk" });
+    expect(evidenceInventory.textContent).toBe(inventory);
+    expect(evidenceInventory).toHaveTextContent("12 assets · 9 findings");
+    expect(evidenceInventory).toHaveTextContent("Current-risk findings: 7. Verified exclusions: 2.");
+    const assessment = screen.getByRole("region", { name: "Evidence-qualified assessment" });
+    expect(screen.getByRole("heading", { name: "Top issues" })).toBeVisible();
+    expect(screen.getByText("Unpatched RCE")).toBeVisible();
+    expect(screen.getByText("Known finding risks, independent of evidence qualification.")).toBeVisible();
+    expect(assessment).toHaveTextContent("Overall assessment: Not assessed");
+    expect(assessment).toHaveTextContent("0 of 7 domains qualified");
+    expect(screen.getAllByText("Evidence coverage: Evaluation required")).toHaveLength(2);
+    expect(screen.getAllByText("Evidence-qualified score: Not assessed")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh dashboard" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh dashboard" })).toBeEnabled());
+    expect(screen.getByRole("tab", { name: "Evidence-based" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Evidence-based" }), { key: "Home" });
+    expect(screen.getByRole("tab", { name: "Findings-based" })).toHaveFocus();
+    expect(screen.getByText("Unpatched RCE")).toBeVisible();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Findings-based" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Evidence-based" })).toHaveFocus();
+    expect(fetchMock.mock.calls.filter(([url, init]) => String(url).includes("/orgs/") && ["POST", "PUT", "PATCH"].includes(init?.method ?? "GET"))).toHaveLength(0);
+  });
+
+  it("explains disabled evidence scoring without changing the organization setting", async () => {
+    await renderSignedIn(<DashboardPage />, "viewer", { "GET /orgs/org-1/dashboard": () => summary });
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence-based" }));
+    expect(screen.getByText("Evidence-based assessment is disabled")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Inventory and finding risk" })).toHaveTextContent("12 assets · 9 findings");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings");
+    expect(screen.queryByRole("region", { name: "Evidence-qualified assessment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh dashboard" })).toBeVisible();
+  });
+
   it("guides an empty org to upload findings", async () => {
     await renderSignedIn(<DashboardPage />, "admin", {
       "GET /orgs/org-1/dashboard": () => ({ ...summary, top_findings: [], recent_scans: [] }),

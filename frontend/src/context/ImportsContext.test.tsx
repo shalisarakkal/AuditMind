@@ -66,7 +66,7 @@ describe("Import tracking", () => {
     const summary = await screen.findByText("1 processing · 2 queued");
     fireEvent.click(summary.closest("summary")!);
     const active = screen.getByRole("region", { name: "Processing active.csv" });
-    expect(active).toHaveTextContent("Writing rows: 378,000 / 500,000 (75%)");
+    expect(active).toHaveTextContent("Processing records: 378,000 / 500,000 (75%)");
     expect(active.querySelector('[class*="animate-spin"]')).not.toBeNull();
     const queued = screen.getByRole("region", { name: "Queued queued-a.csv" });
     expect(queued).toHaveTextContent("Queued — waiting for an available worker.");
@@ -127,7 +127,7 @@ describe("Import tracking", () => {
     const running = await screen.findByRole("region", { name: "Processing big.csv" });
     expect(running).toHaveTextContent("Reading file…");
     step = 1;
-    expect(await screen.findByText("Writing rows: 120,000 / 500,000 (24%)")).toBeInTheDocument();
+    expect(await screen.findByText("Processing records: 120,000 / 500,000 (24%)")).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
     step = 2;
 
@@ -351,23 +351,23 @@ describe("import helpers", () => {
     expect(progressText(byWorker, true)).toBe(
       "Interrupted: the background worker stopped. This upload carries on from where it got to when it's back.",
     );
-    expect(progressText(byWorker, false)).toBe("Writing rows: 1 / 2 (50%)");
-    expect(progressText({ ...byWorker, heartbeat_at: null }, true)).toBe("Writing rows: 1 / 2 (50%)");
+    expect(progressText(byWorker, false)).toBe("Processing records: 1 / 2 (50%)");
+    expect(progressText({ ...byWorker, heartbeat_at: null }, true)).toBe("Processing records: 1 / 2 (50%)");
     expect(progressText(scan({ status: "pending" }), true)).toBe(
       "Interrupted: the background worker stopped. This upload starts when it's back.",
     );
     expect(progressText(scan({ status: "running", progress: null }))).toBe("Reading file…");
     expect(progressText(scan({ status: "running", progress: { phase: "writing", rows_done: 120000, rows_total: 500000 } }))).toBe(
-      "Writing rows: 120,000 / 500,000 (24%)",
+      "Processing records: 120,000 / 500,000 (24%)",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "reading", rows_done: 250000, rows_total: 500000 } }))).toBe(
-      "Reading file: 250,000 / 500,000 rows (50%)",
+      "Reading file: 250,000 rows read · approximately 50%",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "waiting", rows_done: 0, rows_total: 0 } }))).toBe(
       "Waiting for another upload into this organization to finish processing…",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "findings", rows_done: 120000, rows_total: 426700 } }))).toBe(
-      "Writing findings: 120,000 / 426,700 (28%)",
+      "Processing findings: 120,000 / 426,700 (28%)",
     );
     expect(progressText(scan({ status: "running", progress: { phase: "saving", rows_done: 0, rows_total: 0 } }))).toBe("Saving changes…");
     expect(progressText(scan({ status: "running", progress: { phase: "preparing" } }))).toBe("Preparing inventory matches…");

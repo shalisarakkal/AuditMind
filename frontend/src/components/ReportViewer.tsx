@@ -111,6 +111,7 @@ export function ReportViewer({ report, onDownloadHtml, onDownloadPdf }: Props) {
       <section className="rounded-xl border border-white/10 p-4 text-sm">
         {syntheticMock && <p role="note" className="mb-3 text-amber-300">Synthetic mock: fixed example evidence and scores. No model was called. Not a real audit or operational evidence qualification.</p>}
         <h2 className="font-semibold">Evidence provenance</h2>
+        {data.provenance?.status_scoring && <p>Status-aware scoring: {data.provenance.status_scoring.enabled ? "On" : "Off"} · Policy: {data.provenance.status_scoring.policy_version}. Recorded findings: {data.provenance.status_scoring.recorded_findings}; current-risk findings: {data.provenance.status_scoring.current_risk_findings}; verified exclusions: {data.provenance.status_scoring.excluded_findings}.</p>}
         {ruleBasedTest ? (
           <div>
             <p>Assessment type: deterministic rule-based test snapshot.</p>

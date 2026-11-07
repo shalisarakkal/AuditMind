@@ -181,7 +181,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(progressSummary).toBeVisible();
     await progressSummary.click();
     const activeProgress=p.getByRole('region',{name:'Processing progress-display-0.csv',exact:true});
-    await expect(activeProgress).toContainText('Writing rows: 378,000 / 500,000 (75%)');
+    await expect(activeProgress).toContainText('Processing records: 378,000 / 500,000 (75%)');
     await expect(activeProgress.locator('[class*="animate-spin"]')).toHaveCount(1);
     await expect(activeProgress).toContainText('The worker is still checking in.');
     await expect(p.getByRole('region',{name:'Queued progress-display-1.csv',exact:true}).locator('[class*="animate-spin"]')).toHaveCount(0);
@@ -1035,7 +1035,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await expect(pacific.page.getByRole('dialog')).not.toContainText(detectedZone);
     assert.equal((await pacific.request(`${list}/${zonedId}/workflow`)).body.due_expires_at,savedZone.due_expires_at);
     check('Browser-authored Kolkata deadline displays in Pacific time without changing its expiry instant');
-    await expect(india.page.getByText('All times are displayed in your browser time zone.',{exact:true})).toBeVisible();
+    await expect(india.page.getByText('All times are displayed in your browser time zone.',{exact:true})).toHaveCount(0);
     const today=await india.page.evaluate(()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');});
     const dateRequest=india.page.waitForRequest(r=>r.url().includes('/findings?')&&new URL(r.url()).searchParams.get('until')===today);
     await india.page.getByLabel('Added from',{exact:true}).fill(today);
@@ -1291,6 +1291,46 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.goto(base+'/change-password');
     for(const label of ['Current password','New password','New password again']) await expect(p.getByLabel(label,{exact:true})).toHaveAttribute('type','password');
     check('Password-change fields reveal independently, pass Axe, submit successfully through real API and remount hidden');
+    await p.goto(base+'/settings');
+    const statusSettings=p.getByRole('region',{name:'Status-aware scoring',exact:true});
+    await expect(statusSettings.getByText(/Effective policy: On/)).toBeVisible();
+    await statusSettings.getByLabel('Organization policy',{exact:true}).selectOption('off');
+    await statusSettings.getByRole('button',{name:'Save scoring policy',exact:true}).click();
+    await expect(statusSettings.getByText(/Effective policy: Off/)).toBeVisible();
+    await statusSettings.getByLabel('Organization policy',{exact:true}).selectOption('inherit');
+    await statusSettings.getByRole('button',{name:'Save scoring policy',exact:true}).click();
+    await expect(statusSettings.getByText(/Effective policy: On/)).toBeVisible();
+    check('Status-aware scoring defaults On and organization Off/inheritance round-trip through real API');
+    const verifiedName='Browser scoring evidence review';
+    const verifiedId=await create(verifiedName);
+    await p.goto(base+'/findings'); await open(verifiedName);
+    await dialog().getByLabel('New status',{exact:true}).selectOption('resolved');
+    await dialog().getByLabel('Rationale or note',{exact:true}).fill('Synthetic closure');
+    await dialog().getByLabel('Verification note',{exact:true}).fill('A note is not evidence approval');
+    await save(); await open(verifiedName);
+    await dialog().getByText('Scoring evidence review',{exact:true}).click();
+    const proof=dialog().getByRole('region',{name:'Scoring evidence review',exact:true});
+    await expect(proof.getByText(/Finding retains its full risk contribution/)).toBeVisible();
+    await proof.getByLabel('Evidence reference',{exact:true}).fill('https://evidence.example/synthetic-retest');
+    await proof.getByLabel('Observed at',{exact:true}).fill(new Date(Date.now()-86400000).toISOString().slice(0,16));
+    await proof.getByLabel('Review rationale',{exact:true}).fill('Synthetic retest evidence');
+    await proof.getByRole('button',{name:'Submit evidence',exact:true}).click();
+    await expect(proof.getByText(/Review status: pending/)).toBeVisible();
+    await proof.getByLabel('Action',{exact:true}).selectOption('review');
+    await proof.getByLabel('Approval expires at',{exact:true}).fill(new Date(Date.now()+7*86400000).toISOString().slice(0,16));
+    await proof.getByLabel('I reviewed the referenced evidence.',{exact:true}).check();
+    await proof.getByLabel('I acknowledge reviewing evidence I submitted.',{exact:true}).check();
+    await proof.getByLabel('Review rationale',{exact:true}).fill('Administrator reviewed the synthetic retest');
+    await proof.getByRole('button',{name:'Save evidence decision',exact:true}).click();
+    await expect(proof.getByText(/Current evidence qualifies for exclusion/)).toBeVisible();
+    assert.equal((await admin.request(list+`/${verifiedId}/risk-verification`)).body.eligible_for_exclusion,true);
+    const proofAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(proofAxe.violations.map(v=>v.id),[]);
+    await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
+    check('Resolved note retains full risk until explicit admin evidence review; real Chrome approval flow and Axe pass');
+    execFileSync(process.execPath,[path.join(root,'scripts/browser-dashboard-tabs.cjs')],{
+      cwd:root,windowsHide:true,stdio:'inherit',env:{...process.env,AUDITMIND_DASHBOARD_BASE_URL:base}});
+    check('Dashboard tab presentation, shared inventory, compact tiles and alignment pass desktop/mobile Axe with synthetic intercepted data');
     const stats=JSON.parse(cli('inspect')); assert.equal(stats.usage_count,0); assert.deepEqual(evidence.errors,[]); check('No AI usage or browser page errors');
   } catch(error) { evidence.failure=error.message; if(browser)try{await browser.contexts()[0]?.pages()[0]?.screenshot({path:path.join(output,'failure.png'),fullPage:true});}catch{} throw error; }
   finally { if(browser)await browser.close(); for(const child of children) {if(!child.pid||child.exitCode!==null)continue;try{if(process.platform==='win32')execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});else process.kill(-child.pid,'SIGTERM');}catch{}} if(prepared)cli('cleanup'); fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(evidence,null,2)); console.log(`${evidence.checks.length} checks; artifacts: ${output}`); }

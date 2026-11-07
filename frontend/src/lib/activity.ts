@@ -12,6 +12,7 @@ export const EVENT_LABELS: Record<string, string> = {
   asset_added: "Asset added",
   finding_added: "Finding added",
   finding_workflow_changed: "Finding remediation changed",
+  finding_verification_changed: "Scoring verification changed",
   scan_snapshot_declared: "Scan snapshot declared",
   scan_snapshot_revoked: "Scan snapshot declaration revoked",
   settings_changed: "Settings changed",

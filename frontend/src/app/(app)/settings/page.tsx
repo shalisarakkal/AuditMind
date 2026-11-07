@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ListPage";
 import OrganizationLogoSettings from "@/components/OrganizationLogo";
 import EvidenceScoringSettings from "@/components/EvidenceScoringSettings";
 import DashboardRefreshSettings from "@/components/DashboardRefreshSettings";
+import StatusScoringSettings from "@/components/StatusScoringSettings";
 
 export default function SettingsPage() {
   const { selectedOrg } = useApp();
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" orgName={org.name} total={undefined} noun="settings" />
       <OrganizationLogoSettings key={org.id} orgId={org.id} name={org.name} editable={org.role === "admin"} />
       <DashboardRefreshSettings key={`dashboard-refresh-${org.id}`} orgId={org.id} editable={org.role === "admin"} />
+      <StatusScoringSettings key={`status-scoring-${org.id}`} orgId={org.id} editable={org.role === "admin"} />
       <EvidenceScoringSettings key={`scoring-${org.id}`} orgId={org.id} editable={org.role === "admin"} />
 
       <section className="space-y-3">

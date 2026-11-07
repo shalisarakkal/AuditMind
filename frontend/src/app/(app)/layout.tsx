@@ -16,7 +16,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar />
           <main className="min-w-0 flex-1 p-3 sm:p-8">
             <ApplicationHeader />
-            <p className="mb-3 text-xs text-white/60">All times are displayed in your browser time zone.</p>
             <OrgGate>{children}</OrgGate>
           </main>
         </div>

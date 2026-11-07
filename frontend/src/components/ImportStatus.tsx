@@ -76,6 +76,9 @@ export default function ImportStatus({ page }: { page: "assets" | "findings" }) 
                 : <span aria-hidden="true" className="mr-2">{interrupted ? "⚠" : "◷"}</span>}
               {stopping ? "Abort requested. Waiting for the worker to confirm rollback; the import has not stopped yet." : progressText(scan, workerDown)}
             </p>
+            {!stopping && (scan.progress?.phase === "writing" || scan.progress?.phase === "findings") && <p className="mt-1 text-xs text-white/60">
+              Counts show records processed in this phase. Changes are committed only when the import finishes.
+            </p>}
             <p className="mt-2 text-xs text-white/60">
               {processing !== null ? <span>Processing: {duration(processing)}{elapsed !== null && ` · Queued: ${duration(Math.max(0, elapsed - processing))}`}</span>
                 : elapsed !== null && <span>Since submitted: {duration(elapsed)}</span>}
