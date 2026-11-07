@@ -24,7 +24,11 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
   const panel = primary.panel, page = primary.page;
   const region = () => panel.getByRole('region', { name: 'Organization-wide evidence evaluation', exact: true });
   const toggle = panel.getByRole('checkbox', { name: 'Evidence-qualified scoring', exact: true });
-  const cards = who => who.page.locator('section').filter({ has: who.page.getByRole('heading', { name: 'Per-domain scores', exact: true }) }).locator('div[title]');
+  const cards = who => who.page.getByRole('heading', { name: 'Per-domain evidence-qualified scores', exact: true }).locator('..').locator('div[title]');
+  async function openEvidence(who = primary) {
+    await who.page.goto(base + '/');
+    await who.page.getByRole('tab', { name: 'Evidence-based', exact: true }).click();
+  }
   async function request(who, endpoint, method = 'GET', body, status = 200) {
     const response = await who.request(endpoint, method, body);
     assert.equal(response.status, status, method + ' ' + endpoint);
@@ -143,9 +147,9 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
   await evaluate(7); await mode(true);
   await observer.page.getByLabel('Organization', { exact: true }).selectOption({ label: 'Phase3 Beta' });
   for (const who of [primary, observer]) {
-    await who.page.goto(base + '/');
-    await expect(who.page.getByText(/Evidence-qualified scoring · 7 of 7 domains qualified/)).toBeVisible();
-    await expect(who.page.getByTestId('overall-score')).toHaveText(String(Math.round(expectedOverall)));
+    await openEvidence(who);
+    await expect(who.page.getByText(/7 of 7 domains qualified/)).toBeVisible();
+    await expect(who.page.getByTestId('evidence-overall-score')).toHaveText(String(Math.round(expectedOverall)));
     await expect(cards(who)).toHaveCount(7);
     await expect(cards(who).locator('p:nth-child(2)').filter({ hasText: /^0$/ })).toHaveCount(1);
   }
@@ -165,29 +169,29 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
   }
   await expect.poll(async () => (await request(primary, scoring + '/dashboard-state')).evaluation_id).toBe(null);
   await expect(observer.page.getByText('A current evidence evaluation is required.', { exact: false })).toBeVisible({ timeout: 20000 });
-  await expect(observer.page.getByTestId('overall-score')).toHaveText('Not assessed');
-  await expect(cards(observer).getByText('Insufficient evidence', { exact: true })).toHaveCount(7);
+  await expect(observer.page.getByTestId('evidence-overall-score')).toContainText('Not assessed');
+  await expect(cards(observer).getByText('Not assessed', { exact: true })).toHaveCount(7);
   details.expiryObservedMs = +(performance.now() - expiryStarted).toFixed(1);
   const expired = await evaluate(6);
   assert.equal(expired.result.domains.find(domain => domain.domain === expiringDomain).reason_code, 'review_expired_or_invalid');
-  await page.goto(base + '/');
-  await expect(page.getByText(/Evidence-qualified scoring · 6 of 7 domains qualified/)).toBeVisible();
-  await expect(page.getByTestId('overall-score')).toHaveText('Not assessed');
+  await openEvidence();
+  await expect(page.getByText(/6 of 7 domains qualified/)).toBeVisible();
+  await expect(page.getByTestId('evidence-overall-score')).toContainText('Not assessed');
   assert.equal((await request(primary, org + '/dashboard')).overall_score, null);
   await page.screenshot({ path: path.join(output, 'pilot-review-expired.png'), fullPage: true });
   check('Real elapsed-time expiry withdraws the complete cached score; explicit reevaluation retains six domains without renormalizing an overall');
 
   await approveDomain(expiringDomain); await evaluate(7);
-  await page.goto(base + '/');
-  await expect(page.getByTestId('overall-score')).toHaveText(String(Math.round(expectedOverall)));
+  await openEvidence();
+  await expect(page.getByTestId('evidence-overall-score')).toHaveText(String(Math.round(expectedOverall)));
   check('Revoke, saved-version re-review and explicit reevaluation restore seven-domain scoring without changing deductions or weights');
   await approveDomain(expiringDomain, scope + ' — deliberately different declared scope');
   const mismatch = await evaluate(7);
   assert.equal(mismatch.result.assessment_status, 'partial');
   assert.equal(mismatch.result.overall_reason, 'scope_mismatch');
-  await page.goto(base + '/');
-  await expect(page.getByText('Qualified domain scopes differ. An overall score cannot be assigned.', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('overall-score')).toHaveText('Not assessed');
+  await openEvidence();
+  await expect(page.getByText('Qualified domain scopes differ. An evidence-qualified overall score cannot be assigned.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('evidence-overall-score')).toContainText('Not assessed');
   const mismatched = await request(primary, org + '/dashboard');
   assert.equal(mismatched.overall_score, null); assert.ok(mismatched.domains.every(domain => domain.score !== null));
   await page.screenshot({ path: path.join(output, 'pilot-scope-mismatch.png'), fullPage: true });
@@ -200,7 +204,7 @@ module.exports = async function evidencePilot({ base, seed, primary, observer, l
   }
   await mode(false);
   await page.goto(base + '/');
-  await expect(page.getByText('Findings-based baseline', { exact: true })).toBeVisible();
+  await expect(page.getByText('Findings-based resilience baseline', { exact: true })).toBeVisible();
   assert.equal((await request(observer, '/orgs/' + seed.org + '/scoring/settings')).evidence_qualified_enabled, false);
   assert.equal((await request(primary, scoring + '/qualifications')).length, 7);
   assert.equal((await request(primary, org + '/dashboard')).overall_score, baseline.overall_score);
