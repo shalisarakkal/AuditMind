@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY, DIALOG_ICON } from "./DialogActions";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/apiClient";
@@ -115,7 +116,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
     className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-white/20 bg-navy p-5 text-white shadow-xl backdrop:bg-black/75">
     <header className="flex items-start justify-between gap-4">
       <div><h2 id={heading} className="text-lg font-semibold">Finding workflow</h2><p className="text-sm text-white/70">{orgName} · {ids.length} {ids.length === 1 ? "finding" : "findings"}</p></div>
-      <button ref={close} type="button" aria-label="Close finding workflow" disabled={busy} onClick={onClose} className="rounded p-1 text-white underline">Close</button>
+      <button ref={close} type="button" aria-label="Close finding workflow" disabled={busy} onClick={() => { if (!inFlight.current) onClose(); }} className={DIALOG_ICON}>&times;</button>
     </header>
     <p className="my-3 text-sm text-amber-200">Verification notes are user assertions. Current risk excludes Resolved or False positive findings only with administrator-approved evidence and status-aware scoring enabled. Saved reports retain their captured results.</p>
     {names && <details className="mb-3 text-sm" open={ids.length === 1}><summary>Selected findings</summary><ul className="break-words">{names.map((name, index) => <li key={ids[index]}>{name}</li>)}</ul></details>}
@@ -141,7 +142,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
       </div>)}
     </dl>}
     {!writer && <p role="note" className="my-3">Read-only access: an organization admin or auditor manages remediation.</p>}
-    {writer && <form onSubmit={save} aria-label="Update finding workflow" aria-busy={busy} className="space-y-3">
+    {writer && <form id={`${heading}-form`} onSubmit={save} aria-label="Update finding workflow" aria-busy={busy} className="space-y-3">
       <fieldset disabled={busy || loading || !!loadError || needsReload} className="space-y-3">
         <legend className="sr-only">Workflow changes</legend>
         {notesOnly ? <p>Accepted-risk findings: auditors may add notes only. Ask an organization admin to change workflow fields.</p> : <>
@@ -170,7 +171,6 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
         <p className="text-xs text-white/70">Required for audit traceability. These empty fields add a new entry; saved notes are in Workflow history.</p>
         <label className="block text-sm">Add verification note<textarea aria-label="Verification note" className={control} maxLength={2000} value={verification} onChange={e => setVerification(e.target.value)} /></label>
         <p className="text-xs text-white/70">Deadline dates include the entire selected day and cannot precede the finding's creation date. Keep preserves saved deadlines. Accepted risk requires an admin and an unexpired review deadline; today is allowed. Mitigated, Resolved and False positive transitions require verification.</p>
-        <button type="submit" disabled={!!reviewError} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-navy disabled:opacity-50">{busy ? "Saving…" : ids.length === 1 ? "Save workflow" : `Apply to ${ids.length} findings`}</button>
       </fieldset>
     </form>}
     {ids.length === 1 && <section id={`${heading}-history`} tabIndex={-1} aria-label="Workflow history" className="mt-5 border-t border-white/15 pt-3">
@@ -184,5 +184,11 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
     </section>}
     {ids.length === 1 && <FindingObservations key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} />}
     {ids.length === 1 && <FindingRiskVerification key={`proof-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} role={role} disabled={busy} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
+    <footer className={DIALOG_FOOTER}>
+      <button type="button" disabled={busy} onClick={() => { if (!inFlight.current) onClose(); }} className={DIALOG_NEUTRAL}>Close</button>
+      {writer && (
+        <button type="submit" form={`${heading}-form`} disabled={busy || loading || !!loadError || needsReload || !!reviewError} className={DIALOG_PRIMARY}>{busy ? "Saving…" : ids.length === 1 ? "Save workflow" : `Apply to ${ids.length} findings`}</button>
+      )}
+    </footer>
   </dialog>;
 }

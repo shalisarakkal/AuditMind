@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { DIALOG_FOOTER, DIALOG_NEUTRAL } from "./DialogActions";
 import ConfirmPanel from "@/components/ConfirmPanel";
 import { useImports } from "@/context/ImportsContext";
 import type { ArchiveAction, ArchiveItemType } from "@/lib/types";
@@ -54,7 +55,7 @@ export default function BulkConfirm({ request, selection, onClose }: { request: 
 
   if (refused) {
     return (
-      <div role="alert" className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-yellow-400/30 bg-yellow-400/5 p-3 text-sm text-yellow-100">
+      <div role="alert" className="rounded-lg border border-yellow-400/30 bg-yellow-400/5 p-3 text-sm text-yellow-100">
         <div>
           <p>
             {refused.length.toLocaleString("en-US")} of the selected couldn&apos;t start; the others are queued:
@@ -68,9 +69,9 @@ export default function BulkConfirm({ request, selection, onClose }: { request: 
             {refused.length > 10 && <li>and {(refused.length - 10).toLocaleString("en-US")} more</li>}
           </ul>
         </div>
-        <button type="button" onClick={onClose} className="text-xs text-white/60 hover:text-white">
+        <footer className={DIALOG_FOOTER}><button type="button" onClick={onClose} className={DIALOG_NEUTRAL}>
           Dismiss
-        </button>
+        </button></footer>
       </div>
     );
   }

@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_ICON, DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY } from "./DialogActions";
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
@@ -92,8 +93,8 @@ function ReportGenerationDialog({ orgId, orgName, canApprove, mode = "ai", onClo
           <h2 id={headingId} className="text-lg font-semibold">{mode === "ai" ? "Generate AI audit report" : "Generate rule-based test report"}</h2>
           <p id={descriptionId} className="mt-1 text-sm text-white/70">For {orgName}</p>
         </div>
-        <button type="button" aria-label="Close report generation" disabled={submitting} onClick={onClose}
-          className="rounded-md p-1 text-white/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan disabled:opacity-50">×</button>
+        <button type="button" aria-label="Close report generation" disabled={submitting} onClick={() => { if (!inFlight.current) onClose(); }}
+          className={DIALOG_ICON}>×</button>
       </header>
       <form onSubmit={handleSubmit} aria-busy={submitting}>
         <div className="space-y-5 p-6">
@@ -129,10 +130,10 @@ function ReportGenerationDialog({ orgId, orgName, canApprove, mode = "ai", onClo
             </div>
           </fieldset> : <p role="note" className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">Test-only preview. This report uses deterministic finding scores; it does not use AI or an external provider, and it does not evaluate CIS, NIST, or ISO controls.</p>}
         </div>
-        <footer className="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-white/10 bg-navy p-4">
-          <button type="button" disabled={submitting} onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50">Cancel</button>
+        <footer className={`${DIALOG_FOOTER} sticky bottom-0 bg-navy p-4`}>
+          <button type="button" disabled={submitting} onClick={() => { if (!inFlight.current) onClose(); }} className={DIALOG_NEUTRAL}>Cancel</button>
           <button type="submit" disabled={submitting || !ready} aria-describedby={mode === "ai" ? prerequisiteId : undefined}
-            className="rounded-md bg-cyan px-3 py-1.5 text-sm font-medium text-navy hover:opacity-90 disabled:opacity-50">
+            className={DIALOG_PRIMARY}>
             {submitting ? "Queueing…" : mode === "ai" ? "Generate report" : "Generate test report"}
           </button>
         </footer>

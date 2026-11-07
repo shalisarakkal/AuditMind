@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY, DIALOG_SECONDARY } from "./DialogActions";
 import { useRef, useState } from "react";
 import { api, ApiError } from "@/lib/apiClient";
 import { useApi } from "@/lib/useApi";
@@ -8,10 +9,9 @@ import FindingActionDialog from "./FindingActionDialog";
 import ConfirmPanel from "./ConfirmPanel";
 
 const control = "mt-1 w-full rounded-md border border-white/20 bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50";
-const buttonBase = "min-h-10 rounded-md px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:cursor-not-allowed disabled:opacity-50";
-const button = `${buttonBase} border border-cyan text-cyan hover:bg-cyan/10`;
-const primaryButton = `${buttonBase} border border-cyan bg-cyan font-medium text-navy hover:opacity-90`;
-const neutralButton = `${buttonBase} border border-white/20 text-white/80 hover:bg-white/10`;
+const button = DIALOG_SECONDARY;
+const primaryButton = DIALOG_PRIMARY;
+const neutralButton = DIALOG_NEUTRAL;
 const actionLayout = "grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center";
 
 function Reasons({ values }: { values: string[] }) {
@@ -99,7 +99,7 @@ export default function ScanSnapshotDialog({ orgId, orgName, scanId, writer, onC
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="coverage_confirmed" defaultChecked={data.declaration?.declaration.coverage_confirmed || false} />I confirm the source scan assessed every target in the declared scope, apart from listed exclusions.</label>
           <p className="text-xs text-white/70">Complete requires confirmed coverage, no unreachable targets and an import with no errors, skips or warnings. Use Partial, Incremental, Failed or Cancelled when appropriate.</p>
           <label className="block text-sm">Declaration rationale<textarea name="rationale" className={control} required maxLength={12000} rows={2} /></label>
-          <div className="flex flex-wrap gap-3"><button type="submit" className={primaryButton}>{busy ? "Saving…" : "Save declaration"}</button><button type="button" className={neutralButton} onClick={() => { setEditing(false); setError(null); }}>Cancel editing</button></div>
+          <footer className={DIALOG_FOOTER}><button type="button" className={neutralButton} onClick={() => { setEditing(false); setError(null); }}>Cancel editing</button><button type="submit" className={primaryButton}>{busy ? "Saving…" : "Save declaration"}</button></footer>
         </fieldset></form>}
         {revoking && <div className="space-y-3"><label className="block text-sm">Revocation rationale<textarea className={control} value={reason} onChange={e => setReason(e.target.value)} maxLength={12000} disabled={busy || stale} /></label>
           <ConfirmPanel label="Revoke scan declaration" message="Append a revocation? Existing declaration history is retained." confirmLabel="Revoke declaration" busy={busy || stale}

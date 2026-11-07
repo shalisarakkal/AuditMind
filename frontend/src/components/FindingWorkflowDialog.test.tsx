@@ -174,11 +174,11 @@ describe("Finding workflow", () => {
     routes(); const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
     const view = render(<FindingWorkflowDialog {...base} />); await ready();
     const first = screen.getByRole("button", { name: "Close finding workflow" });
-    const last = screen.getByRole("button", { name: "Older history" });
-    // History pagination is disabled; the source-observation toggle follows it.
-    expect(last).toBeDisabled();
-    const observations = screen.getByRole("button", { name: "Show source observations" }); observations.focus();
-    fireEvent.keyDown(observations, { key: "Tab" }); expect(first).toHaveFocus();
+    const last = screen.getByRole("button", { name: "Save workflow" });
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" }); expect(first).toHaveFocus();
+    first.focus();
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true }); expect(last).toHaveFocus();
     view.unmount(); expect(trigger).toHaveFocus(); trigger.remove();
   });
   it("fails closed when workflow loading fails and supports retry", async () => {

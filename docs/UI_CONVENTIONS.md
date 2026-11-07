@@ -9,13 +9,22 @@ priority. Keep destructive actions explicitly labelled and use the established
 danger treatment. Row-action text buttons retain the list conventions below.
 
 Place modal actions in a separated footer. Keep Close/Cancel in a consistent
-right-aligned dismissal area, apart from the operational actions. On narrow
+right-aligned action area. When dismissal shares a row with a primary action,
+put neutral Cancel/Close first and the primary action to its right. Inspection
+dialogs with several equally important operations may keep Close in its own
+right-aligned row. On narrow
 screens, deliberately stack full-width actions with consistent gaps; do not let
 Close appear to be an accidentally wrapped fourth action. Wider layouts may wrap
 the operational group while preserving the separate dismissal area. Use sentence
 case, visible keyboard focus and at least 40px-high modal buttons. Keep existing
 focus restoration, initial safe-action focus and busy-state dismissal guards.
 Use Close for an inspection dialog and Cancel for abandoning an operation.
+Use shared styles from `frontend/src/components/DialogActions.tsx` rather than
+screen-specific Cancel/Close treatments. Optional top-right close icons have a
+40px target and the same submission guard as footer dismissal and Escape.
+Disable dismissal during submission when the outcome is not yet known. Closing
+after a job is accepted never cancels that background job; retain the explicit
+queue/import cancellation wording and dedicated abort controls.
 
 Scan snapshot uses primary Declare snapshot only before a declaration exists;
 Revise declaration, baseline selection and baseline review remain secondary.

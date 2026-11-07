@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY } from "./DialogActions";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/apiClient";
@@ -44,7 +45,7 @@ export default function AddFindingDialog({ orgId, orgName, onClose, onSaved }: {
   return <dialog ref={dialog} aria-labelledby={title} aria-modal="true"
     onCancel={event => { event.preventDefault(); if (!inFlight.current) onClose(); }}
     className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-white/20 bg-navy p-5 text-white backdrop:bg-black/75">
-    <header className="flex items-start justify-between gap-3"><div><h2 id={title} className="text-lg font-semibold">Add finding</h2><p className="text-sm text-white/70">{orgName}</p></div><button type="button" disabled={busy} onClick={onClose}>Close</button></header>
+    <header className="flex items-start justify-between gap-3"><div><h2 id={title} className="text-lg font-semibold">Add finding</h2><p className="text-sm text-white/70">{orgName}</p></div></header>
     <p className="my-3 text-sm text-white/70">Creates an organization-level manual finding, not an uploaded scan record. You can manage its workflow and archive it individually.</p>
     {error && <p role="alert" className="my-3 text-red-300">{error}</p>}
     <form onSubmit={save} aria-label="Add manual finding" aria-busy={busy}>
@@ -53,8 +54,11 @@ export default function AddFindingDialog({ orgId, orgName, onClose, onSaved }: {
         <label className="block text-sm">Severity<select name="severity" defaultValue="medium" className={input}>{SEVERITY_ORDER.map(severity => <option key={severity} value={severity}>{severity[0].toUpperCase() + severity.slice(1)}</option>)}</select></label>
         <label className="block text-sm">Description<textarea name="description" required maxLength={2000} className={input} /></label>
         <label className="block text-sm">Category (optional)<input name="category" maxLength={255} className={input} /></label>
-        <button type="submit" className="rounded bg-cyan px-4 py-2 text-navy disabled:opacity-50">{busy ? "Adding…" : "Add finding"}</button>
       </fieldset>
+      <footer className={DIALOG_FOOTER}>
+        <button type="button" disabled={busy} className={DIALOG_NEUTRAL} onClick={() => { if (!inFlight.current) onClose(); }}>Cancel</button>
+        <button type="submit" disabled={busy || uncertain} className={DIALOG_PRIMARY}>{busy ? "Adding…" : "Add finding"}</button>
+      </footer>
     </form>
   </dialog>;
 }

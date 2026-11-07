@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY } from "./DialogActions";
 
 import { useEffect, useRef, useState } from "react";
 import { evidenceOperation, type EvidenceProgress } from "@/lib/evidenceProgress";
@@ -210,12 +211,12 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
     </section>
     {confirmation && <FindingActionDialog title={confirmation.title} orgName={confirmation.domain ? DOMAIN_LABELS[confirmation.domain] : "Dashboard scoring"} onClose={cancelConfirmation}>
       <p className="mb-4 text-sm text-white/80">{confirmation.description}</p>
-      <div className="flex flex-wrap gap-3">
-        <button type="button" data-confirm-cancel className={button} onClick={cancelConfirmation}>Cancel</button>
-        <button type="button" className="rounded-md bg-cyan px-3 py-2 text-sm text-navy" onClick={() => {
+      <footer className={DIALOG_FOOTER}>
+        <button type="button" data-confirm-cancel className={DIALOG_NEUTRAL} onClick={cancelConfirmation}>Cancel</button>
+        <button type="button" className={DIALOG_PRIMARY} onClick={() => {
           const action = confirmation; setConfirmation(null); void run(action.perform);
         }}>{confirmation.label}</button>
-      </div>
+      </footer>
     </FindingActionDialog>}
   </section>;
 }

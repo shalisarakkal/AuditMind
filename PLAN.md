@@ -2,6 +2,18 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Shared dialog action conventions - 6 November 2026
+
+- Standardized neutral Cancel/Close and primary action styles through shared
+  DialogActions constants. Confirmation, report generation, upload queue, manual
+  finding, workflow, snapshot and evidence-confirmation dialogs use footer actions.
+- Preserve contextual labels, danger styling, submission guards, focus restoration
+  and the distinction between dismissing a dialog and aborting a submitted job.
+- Local verification: 537 frontend tests, lint, production build and 93 Chrome
+  workflow checks pass. Local application restarted while all queues were idle.
+  Reviewed for scoped commit/push; exact-commit hosted Linux CI is the final
+  release gate for this follow-up.
+
 ## Approved status-aware scoring policy - 6 November 2026
 
 - Dashboard follow-up: Findings-based/Evidence-based tabs with default findings
@@ -58,7 +70,8 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   stacking and contextual primary actions; standards in docs/UI_CONVENTIONS.md.
   Seven component tests, lint, production build and 93 fresh Chrome checks pass,
   including 320px stacked actions, comparison dismissal and scoped Axe checks.
-  Exact-commit hosted CI remains the post-push gate for this UI follow-up.
+  Delivered through `5cc1833`; all four hosted Linux jobs passed in
+  [run 42327353175](https://github.com/shalisarakkal/AuditMind/actions/runs/42327353175).
 - Separate evidence-qualified scoring remains independently controlled. Historical
   reports stay immutable. Product phases differ from older PHASE4 delivery history.
 - Import progress wording is active: approximate reading progress, exact staged

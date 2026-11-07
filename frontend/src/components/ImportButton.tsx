@@ -1,4 +1,5 @@
 "use client";
+import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY } from "./DialogActions";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -245,14 +246,14 @@ function ImportQueue(props: ImportButtonProps) {
       </div>
     </section>}
     {error && <p role="alert" className="text-sm text-red-300 [overflow-wrap:anywhere]">{error}</p>}
-    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 pt-4">
+    <footer className={DIALOG_FOOTER}>
       <p className="basis-full text-xs text-white/60">Cancelling removes remaining files from this queue. Submitted uploads continue; local files are unchanged.</p>
-      <button type="button" data-confirm-cancel disabled={queueLocked} onClick={cancelQueue} className="text-sm text-white/70 disabled:opacity-60">Cancel queued uploads</button>
+      <button type="button" data-confirm-cancel disabled={queueLocked} onClick={cancelQueue} className={DIALOG_NEUTRAL}>Cancel queued uploads</button>
       {(freshReady.length > 0 || running) && <button type="button" disabled={queueLocked || !freshReady.length} onClick={() => void runBatch()}
-        className="rounded-md bg-cyan px-3 py-2 text-sm font-medium text-navy disabled:opacity-60">Upload all ready files ({freshReady.length})</button>}
+        className={DIALOG_PRIMARY}>Upload all ready files ({freshReady.length})</button>}
       {failed.length > 0 && <button type="button" disabled={queueLocked} onClick={() => void runBatch("failed")} className="text-sm text-cyan disabled:opacity-60">Retry failed ({failed.length})</button>}
       {running && <button type="button" onClick={() => { stop.current = true; setProgress("Stopping after the current submission. Accepted uploads are not cancelled."); }} className="text-sm text-cyan">Stop remaining uploads</button>}
-    </div>
+    </footer>
     {progress && <p role="status" className="text-right text-sm text-white/60">{progress}</p>}
     </div>
     </div>
