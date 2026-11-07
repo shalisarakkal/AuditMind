@@ -6,6 +6,8 @@ absence, suppression or automatic matching authority. Complete release review,
 regression fixes and final per-commit gates are documented in
 [identity release review](IDENTITY_RELEASE_REVIEW.md). Remaining PB-1.3 canonical
 conflicts, review queue and suppression lifecycle are tracked in PRODUCT_BACKLOG.md.
+Delivered through `3775dc6`; all four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
+Final local suites: 1,653 backend tests, 548 frontend tests and 94 Chrome checks.
 
 
 Status-aware current-risk scoring is approved and implemented locally as Product Phase 4 item

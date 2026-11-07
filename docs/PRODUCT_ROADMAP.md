@@ -16,7 +16,8 @@ candidate work items with acceptance criteria.
 PB-1.3 starts with a local [stable identity foundation](FINDING_IDENTITY.md):
 versioned candidate contract and read-only source diagnostics. Explicit admin-reviewed
 namespace/asset bindings are implemented and activated locally at migration 0046;
-local tests/browser checks pass, with commit/hosted CI remaining. Reviewed reconciliation and suppression remain
+delivered through `3775dc6`, with all four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
+Final local suites: 1,653 backend tests, 548 frontend tests and 94 Chrome checks. Reviewed reconciliation and suppression remain
 unfinished.
 
 ## Prioritization at a glance

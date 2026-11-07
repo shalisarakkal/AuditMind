@@ -133,7 +133,9 @@ upgrade/rollback/schema drift. A later cross-tenant canonical-asset recheck also
 passed. Frontend: 542 passed; Chrome: 94 checks including real native registration,
 binding, revocation, 320px layout and scoped Axe. Build/lint pass; no AI usage.
 Activated locally at 0046 only after idle-queue checks; no production deployment.
-These changes remain uncommitted, with hosted CI pending an authorized push.
+This paragraph records the earlier local checkpoint. Reviewed delivery is
+through `3775dc6`, with all four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
+Final post-fix local backend: 1,653 passed; frontend: 548; Chrome: 94 checks.
 
 Release review: mapping edits/pagination now clear confirmation, cancelled reviews
 reopen fresh, newly registered tools remain selectable beyond the first page,

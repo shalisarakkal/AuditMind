@@ -9,8 +9,8 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   nonblocking retirement confirmation, and destructive-button contrast below AA.
   Added regression coverage and top-modal
   Escape isolation. Identity/mapping-version changes now require explicit re-review. See docs/IDENTITY_RELEASE_REVIEW.md.
-- Initial full local backend: 1,651 passed before the final contract-version fix.
-  Both new backend regressions pass; a fresh full run is in progress.
+- Final post-fix full local backend: 1,653 passed with PostgreSQL required and
+  warnings as errors (1h 15m 10s); supersedes the earlier 1,651-test checkpoint.
   Full frontend: 548 passed; Chrome: 94 checks passed. Lint, production build,
   Bandit, pip/secret guards, evidence pilot and worker recovery pass.
   Review findings and authoritative final CI gates: docs/IDENTITY_RELEASE_REVIEW.md.
@@ -29,7 +29,8 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   tests (including migrations, concurrency and batching), a cross-tenant asset
   recheck, 542 frontend tests and 94 Chrome checks pass. Production build/lint
   pass. Registration draft retention was corrected and regression-tested.
-  Foundation and binding changes remain uncommitted; hosted CI has not run.
+  Delivered through backend `275ab49`, frontend `a0b2d2f` and docs `3775dc6`.
+  All four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
 
 ## PB-1.3 stable identity foundation - 7 November 2026
 
@@ -42,8 +43,8 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   review queue and suppression remain pending. See docs/FINDING_IDENTITY.md.
 - Local validation: 62 backend identity/matching/observation/batching tests,
   4 observation UI tests and 93 Chrome workflow checks pass. Lint and production
-  build pass; local app restarted with all queues idle. Uncommitted; hosted CI
-  has not run for this identity increment.
+  build pass; local app restarted with all queues idle. Delivered through
+  `3775dc6`; final results are in docs/IDENTITY_RELEASE_REVIEW.md.
 
 ## Shared dialog action conventions - 6 November 2026
 

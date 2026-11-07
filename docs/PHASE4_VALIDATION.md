@@ -15,11 +15,11 @@ require explicit re-review. Regression tests pass; the destructive fill is solid
 See [review findings and release results](IDENTITY_RELEASE_REVIEW.md) and
 [contract/verification steps](FINDING_IDENTITY.md).
 
-The initial full local backend suite passed 1,651 tests before the final version
-fix. Both new regression cases pass, and a fresh full run is in progress.
-Frontend passes 548 tests; Chrome passes 94 checks. Evidence pilot, worker
-recovery, contrast probe, lint/build and security checks pass. Exact-commit Linux
-CI is being completed; earlier runs remain historical checkpoints.
+The final post-fix local backend suite passed 1,653 tests (required PostgreSQL,
+warnings as errors; 1h 15m 10s), superseding the earlier 1,651-test checkpoint.
+Frontend passed 548 tests; Chrome passed 94 checks. Evidence pilot, worker
+recovery, contrast probe, lint/build and security checks passed. All four Linux
+jobs passed for `3775dc6` in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
 
 
 ## Status-scoring and Dashboard release closeout - 6 November 2026

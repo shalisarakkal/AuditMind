@@ -3,7 +3,8 @@
 Scope: PB-1.3 identity candidate foundation and explicit reviewed bindings at
 migration 0046. This is not approval of reconciliation, suppression, production
 hosting or SaaS-scale operation. Earlier CI for 4e071af covers the preceding UI
-increment; this identity increment needs its own exact-commit hosted CI.
+increment; this identity increment passed all four Linux jobs through `3775dc6` in
+[run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
 
 ## Confirmed findings and reproductions
 
@@ -68,20 +69,22 @@ not. The browser test now uses the semantic role; this was a test defect.
 
 ## Release verification
 
-The initial full backend run passed **1,651 tests** (required PostgreSQL,
-warnings-as-errors, 21m 31s). This run predates the final version-binding fix;
-it is a historical checkpoint. Both added contract-version regressions pass.
-A fresh complete backend run includes that fix and is in progress alongside the
-mandatory exact-commit hosted Linux run. Do not claim the earlier run as final.
+Final post-fix local backend run: **1,653 passed** with required PostgreSQL and
+warnings as errors (1h 15m 10s). This supersedes the earlier 1,651-test run before
+the contract-version fix; both new version-change regressions are in the full run.
 
-The complete frontend suite passes **548 tests**. Fresh Chrome acceptance passes
-**94 checks**, including native registration/binding/revoke, scanner/asset
+Complete frontend: **548 passed**. Fresh real-Chrome workflow acceptance:
+**94 checks passed**, including native registration/binding/revoke, scanner/asset
 reconfirmation, long-name mobile layout, active-modal contrast/Axe and isolated
-retirement Escape. The focused six-check Chrome probe passes too. Lint,
+retirement Escape. The focused six-check Chrome probe passed too. Lint,
 production build, high-severity Bandit, pip consistency and tracked-secret guard
-pass. The real evidence pilot passes approval/expiry/requalification/scope mismatch
-and default-off rollback with no AI calls; five worker-pool recovery checks pass.
+passed. The real evidence pilot passed approval/expiry/requalification/scope
+mismatch and default-off rollback without AI calls; five worker-pool recovery
+checks passed.
 
-Release approval still requires all four Linux jobs on the pushed commit. Hosted
-Actions is the authoritative per-commit result; customer pilot, broader
-reconciliation, SaaS capacity and production acceptance are separate gates.
+Backend `275ab49`, frontend/browser `a0b2d2f` and release documentation `3775dc6`
+were pushed in scoped commits. All four exact-commit Linux jobs passed in
+[run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928). The following documentation-only closeout records
+these completed results; Actions remains the authoritative result for each tip.
+Customer pilot, broader reconciliation, SaaS capacity and production acceptance
+remain separate gates. No further blocking finding remains in this reviewed scope.

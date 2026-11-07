@@ -172,7 +172,9 @@ API/UI diagnostics. The next local increment adds explicit admin-reviewed tool a
 bindings (migration 0046); new observations do not inherit them. Reconciliation
 stays off. Cross-import canonical conflicts, review queue and suppression lifecycle
 remain open. Bindings are activated locally at 0046 after migration, concurrency,
-role/tenant, batching and browser checks; not yet committed or hosted-CI verified.
+role/tenant, batching and browser checks. Delivered through `3775dc6`; all four
+Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928). Final local suites: 1,653 backend, 548 frontend
+and 94 Chrome checks. This closes the identity/binding increment, not PB-1.3 as a whole.
 [Identity contract](FINDING_IDENTITY.md).
 
 **Priority:** P1 · **Depends on:** PB-1.1, PB-1.2
