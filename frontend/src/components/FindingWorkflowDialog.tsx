@@ -182,7 +182,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
       </li>)}</ol> : <p className="text-sm text-white/70">No workflow history yet.</p>}
       <div className="mt-3 flex gap-4 text-sm"><button type="button" disabled={busy || history.loading || historyOffset === 0} onClick={() => setHistoryOffset(v => v - 20)}>Newer history</button><button type="button" disabled={busy || history.loading || (history.data?.length ?? 0) < 20} onClick={() => setHistoryOffset(v => v + 20)}>Older history</button></div>
     </section>}
-    {ids.length === 1 && <FindingObservations key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} />}
+    {ids.length === 1 && <FindingObservations key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} canReview={role === "admin"} disabled={busy} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
     {ids.length === 1 && <FindingRiskVerification key={`proof-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} role={role} disabled={busy} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
     <footer className={DIALOG_FOOTER}>
       <button type="button" disabled={busy} onClick={() => { if (!inFlight.current) onClose(); }} className={DIALOG_NEUTRAL}>Close</button>

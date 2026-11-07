@@ -15,6 +15,7 @@ export default function FindingActionDialog({ title, orgName, onClose, children 
   }, []);
   return <dialog ref={dialog} aria-labelledby={heading} aria-modal="true" onCancel={event => {
     event.preventDefault();
+    event.stopPropagation();
     if (!dialog.current?.querySelector('[aria-busy="true"]')) onClose();
   }} className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-white/20 bg-navy p-5 text-white shadow-xl backdrop:bg-black/75">
     <h2 id={heading} className="text-lg font-semibold">{title}</h2>

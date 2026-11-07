@@ -37,6 +37,19 @@ describe("Finding source observations", () => {
     expect(screen.queryByText("source.csv · Row 2")).not.toBeInTheDocument();
   });
 
+  it("shows identity diagnostics without granting reconciliation authority", async () => {
+    mockApi({ "GET /orgs/o1/findings/f1/observations": () => [{ ...observation,
+      identity_assessment: { version: "finding-identity-v1", mapping: "nessus-plugin-service-v1", candidate_key: null } }] });
+    render(<FindingObservations orgId="o1" findingId="f1" />);
+    await userEvent.click(screen.getByRole("button", { name: "Show source observations" }));
+    await userEvent.click(await screen.findByText("Identity assessment"));
+    expect(screen.getByText("Source mapping: nessus-plugin-service-v1")).toBeVisible();
+    expect(screen.getByText(/Unavailable until tool and asset bindings/)).toBeVisible();
+    expect(screen.getByText("Not eligible for reconciliation")).toBeVisible();
+    expect(screen.getByText(/Identity diagnostics do not authorize/)).toBeVisible();
+    expect(screen.queryByRole("button", {name:"Review identity binding"})).not.toBeInTheDocument();
+  });
+
   it("uses the last observation as a seek cursor and can return to newer entries", async () => {
     mockApi({ "GET /orgs/o1/findings/f1/observations?limit=20&before=obs-19": () => [{ ...observation, id: "old", filename: "older.csv" }],
       "GET /orgs/o1/findings/f1/observations": () => Array.from({ length: 20 }, (_, i) => ({ ...observation, id: `obs-${i}` })) });

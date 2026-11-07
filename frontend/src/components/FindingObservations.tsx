@@ -1,5 +1,6 @@
 "use client";
 
+import FindingIdentityBinding from "./FindingIdentityBinding";
 import { useState } from "react";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime } from "@/lib/domain";
@@ -8,6 +9,7 @@ type Observation = {
   id: string; import_id: string; filename: string | null; source: string;
   source_row: number; recorded_at: string; observed_at: string | null;
   reconciliation_eligible: boolean; ineligibility_reasons: string[];
+  identity_assessment?: { version: string; mapping: string | null; candidate_key: string | null };
   payload: { severity?: string; category?: string; description?: string };
 };
 const reasons: Record<string, string> = {
@@ -19,7 +21,7 @@ const reasons: Record<string, string> = {
   source_observed_time_invalid: "Source observed time is invalid or has no timezone offset",
 };
 
-export default function FindingObservations({ orgId, findingId }: { orgId: string; findingId: string }) {
+export default function FindingObservations({ orgId, findingId, canReview = false, disabled = false, onBusyChange }: { orgId: string; findingId: string; canReview?: boolean; disabled?: boolean; onBusyChange?(busy: boolean): void }) {
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<string[]>([]);
   const before = pages.at(-1);
@@ -36,7 +38,15 @@ export default function FindingObservations({ orgId, findingId }: { orgId: strin
         <p className="break-words">Source: {row.source} · Severity: {row.payload.severity ? row.payload.severity.charAt(0).toUpperCase() + row.payload.severity.slice(1) : "Not provided"}</p>
         <p className="whitespace-pre-wrap break-words">{row.payload.category}{row.payload.description ? `: ${row.payload.description}` : ""}</p>
         <p>{row.reconciliation_eligible ? "Reconciliation eligible" : "Not eligible for reconciliation"}</p>
+        <p className="text-xs text-white/70">Recorded eligibility reasons at import:</p>
         <ul className="list-inside list-disc text-xs text-white/70">{row.ineligibility_reasons.map(reason => <li key={reason}>{reasons[reason] || reason.replaceAll("_", " ")}</li>)}</ul>
+        {row.identity_assessment && <details><summary>Identity assessment</summary>
+          <p className="break-words text-xs text-white/70">Version: {row.identity_assessment.version}</p>
+          <p className="break-words text-xs text-white/70">Source mapping: {row.identity_assessment.mapping || "No reviewed mapping"}</p>
+          <p className="break-all text-xs text-white/70">Identity candidate: {row.identity_assessment.candidate_key || "Unavailable until tool and asset bindings are established"}</p>
+          <p className="text-xs text-white/70">Identity diagnostics do not authorize reconciliation, suppression or workflow changes.</p>
+        </details>}
+        {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityBinding orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
         <details><summary>Import ID</summary><p className="break-all">{row.import_id}</p></details>
       </li>)}</ol> : <p className="mt-3 text-sm">No source observations recorded.</p>}
       <div className="mt-3 flex gap-4 text-sm">

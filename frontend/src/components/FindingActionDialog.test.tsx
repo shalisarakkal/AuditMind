@@ -20,3 +20,11 @@ describe("Finding action dialog", () => {
     expect(close).not.toHaveBeenCalled();
   });
 });
+
+it("cancels only the top dialog when a nested confirmation handles Escape", () => {
+  const outer = vi.fn(), inner = vi.fn();
+  render(<dialog open onCancel={outer}><FindingActionDialog title="Nested confirmation" orgName="SA01" onClose={inner}><button data-confirm-cancel>Cancel</button></FindingActionDialog></dialog>);
+  const dialog=screen.getByRole("dialog", {name:"Nested confirmation"});
+  fireEvent(dialog, new Event("cancel", {cancelable:true,bubbles:true}));
+  expect(inner).toHaveBeenCalledOnce(); expect(outer).not.toHaveBeenCalled();
+});

@@ -160,7 +160,7 @@ describe("ReportsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByRole("group", { name: "Delete report" })).toHaveClass("border-red-400/30");
     expect(screen.getByText(/Permanently delete/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete for good" })).toHaveClass("bg-red-400/80");
+    expect(screen.getByRole("button", { name: "Delete for good" })).toHaveClass("bg-red-400");
     fireEvent.click(screen.getByRole("button", { name: "Delete for good" }));
 
     await waitFor(() => expect(deleted).toBe(true));
