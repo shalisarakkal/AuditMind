@@ -57,6 +57,11 @@ visible. This read never updates finding status, archive state, scores or report
 
 ## Remaining PB-1.3 work
 
+Increment 3 adds [explicit cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md):
+pair comparison and independently confirmed same-finding carry-forward, without
+automatic reuse. Separate finding UUIDs are surfaced as canonical conflicts;
+they are not merged or reassigned. The remaining items below still apply.
+
 1. Extend the explicit per-observation bindings below with reviewed cross-import
    propagation and source-specific ambiguity/collision handling. No implicit reuse.
 2. Establish canonical duplicate resolution, collision/conflict handling and source

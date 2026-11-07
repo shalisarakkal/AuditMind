@@ -956,6 +956,13 @@ data first. Production rollout/default-on adoption remains a separate decision.
 
 ## Reviewed finding identity (native Nessus)
 
+For a repeated native Nessus upload, expand the earlier observation's
+**Observation ID**, then choose **Review against an earlier observation** on the
+later occurrence. Compare its UUID, independently verify the proposed scanner and
+canonical host, supply a reason and confirm before saving. Separate finding UUIDs
+show a canonical conflict and cannot be merged here. See the
+[cross-import walkthrough](CROSS_IMPORT_IDENTITY_REVIEW.md#chrome-verification).
+
 Organization admins can open Findings -> Workflow -> Show source observations ->
 Review identity binding on a native Nessus observation. Register/select the scanner
 instance, verify the canonical asset UUID, enter a reason, explicitly confirm the

@@ -2,6 +2,25 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## PB-1.3 cross-import review - 7 November 2026
+
+- Implement explicit pair comparison and administrator-confirmed carry-forward
+  for native Nessus observations already attached to the same finding.
+- Pin preview context, independently confirm target scanner/host, record lineage,
+  reject stale/revoked/retired mappings and expose separate-finding conflicts.
+- No automatic import matching, merging, payload publication, absence or scoring
+  changes. Existing import work remains unchanged and comparisons are bounded.
+- Local validation: expanded 119-test backend checkpoint, final 47-test
+  identity/binding regression, 553 frontend tests, lint/build/security checks
+  and seven focused Chrome checks pass. Final full Chrome regression: 95 checks
+  passed, including 320px/Axe and unchanged workflow acceptance. Activated locally
+  at existing migration 0046 after five idle-queue checks; login HTTP 200.
+  Included in the reviewed local commit; push and new hosted CI remain pending.
+  Contract and Chrome steps:
+  [Cross-import review](docs/CROSS_IMPORT_IDENTITY_REVIEW.md).
+- Remaining PB-1.3: explicit canonical conflict resolution, source payload
+  publication, not-observed queue and independent suppression/restore lifecycle.
+
 ## Identity release review and complete tests - 7 November 2026
 
 - Reproduced/fixed seven issues: stale mapping confirmation, retained cancelled

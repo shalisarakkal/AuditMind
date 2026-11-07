@@ -20,6 +20,11 @@ delivered through `3775dc6`, with all four Linux jobs passed in [run 42379393928
 Final local suites: 1,653 backend tests, 548 frontend tests and 94 Chrome checks. Reviewed reconciliation and suppression remain
 unfinished.
 
+The next staged PB-1.3 increment adds [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md):
+explicit native Nessus pair comparison and independent same-finding mapping
+carry-forward. Separate canonical findings remain a visible conflict, with no
+automatic merge or source-payload publication. Full reconciliation stays open.
+
 ## Prioritization at a glance
 
 Local baseline maintenance on 6 November addressed stalled existing-asset cloud

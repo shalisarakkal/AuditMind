@@ -1,5 +1,18 @@
 # Phase 4 remediation workflow validation
 
+## PB-1.3 cross-import review - 7 November 2026
+
+Explicit native Nessus pair comparison and independently confirmed same-finding
+mapping carry-forward are implemented locally. Separate finding UUIDs block as
+canonical conflicts; automatic merging/payload publication/absence/suppression
+remain pending. Expanded backend checkpoint: 119 passed; final identity/binding
+run: 47 passed (overlapping). Full frontend: 553 passed; full real Chrome: 95
+checks; focused real Chrome: seven. Lint, production builds, Bandit and secret
+guards passed. Mobile overflow was reproduced and fixed before final acceptance.
+Activated at existing migration 0046 after idle-queue checks; login HTTP 200.
+Included in the reviewed local commit; push and hosted CI remain pending. See
+[contract and retained verification evidence](CROSS_IMPORT_IDENTITY_REVIEW.md).
+
 ## PB-1.3 identity and reviewed bindings - 7 November 2026
 
 Migration 0046 adds organization tool namespaces and append-only observation

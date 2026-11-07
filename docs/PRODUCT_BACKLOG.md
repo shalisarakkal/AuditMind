@@ -166,9 +166,14 @@ accepted.
 
 ### PB-1.3 — Implement reviewed finding reconciliation
 
+**Current increment:** [Cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
+adds bounded native Nessus comparison and independent admin-confirmed mapping
+carry-forward for the same finding. Canonical conflicts block; automatic merging,
+payload refresh, absence queue and suppression remain pending. PB-1.3 stays open.
+
 **Status, 7 November:** Identity foundation implemented locally: versioned
 candidate-key kernel, reviewed native Nessus mapping and read-only observation
-API/UI diagnostics. The next local increment adds explicit admin-reviewed tool and canonical-asset
+API/UI diagnostics. The delivered binding increment adds explicit admin-reviewed tool and canonical-asset
 bindings (migration 0046); new observations do not inherit them. Reconciliation
 stays off. Cross-import canonical conflicts, review queue and suppression lifecycle
 remain open. Bindings are activated locally at 0046 after migration, concurrency,

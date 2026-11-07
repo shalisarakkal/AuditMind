@@ -1,5 +1,12 @@
 # Phase 4 status and next milestone
 
+The next local PB-1.3 increment adds explicit
+[cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md): native Nessus
+pair comparison, independently confirmed same-finding carry-forward and visible
+canonical conflicts. It does not enable automatic merging, payload refresh,
+absence conclusions or suppression. Current increment validation is recorded in
+that contract; the completed release results below remain the prior checkpoint.
+
 7 November: PB-1.3 identity candidate foundation and explicit admin-reviewed
 bindings are implemented and activated locally at migration 0046. This adds no
 absence, suppression or automatic matching authority. Complete release review,

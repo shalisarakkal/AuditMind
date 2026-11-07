@@ -1,5 +1,11 @@
 # Individual imported-finding archive and scan reconciliation
 
+Next staged implementation: [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
+compares one selected earlier review with a later native Nessus observation.
+Same-finding carry-forward requires independent admin confirmation; separate
+finding UUIDs block as canonical conflicts. Automatic merging/publication,
+not-observed queue and suppression below remain pending.
+
 7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
 Migration 0046 adds optional administrator-reviewed tool/asset bindings;
 observations still remain ineligible for reconciliation.

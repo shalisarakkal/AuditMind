@@ -11,6 +11,8 @@ from app.models.finding_observation import FindingObservation
 from app.models.finding_identity_binding import IdentityTool
 from app.models.user import User
 from app.schemas.identity_binding import ToolCreate, IdentityBind, IdentityDecision
+from app.schemas.identity_binding import IdentityReference, IdentityCarryForward
+from app.services.identity_comparison import compare_observation, carry_forward
 from app.schemas.finding_observation import FindingObservationRead
 from app.services.events import record_event
 from app.services import finding_identity
@@ -93,3 +95,17 @@ def revoke_identity(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uu
                     payload: IdentityDecision, db: Session = Depends(get_db),
                     member: OrgMembership = Depends(require_org_role(UserRole.admin))):
     return write_binding(db, org_id, observation(db, org_id, finding_id, observation_id), member.user_id, payload, revoke=True)
+
+
+@router.post("/findings/{finding_id}/observations/{observation_id}/identity-binding/compare")
+def compare_identity(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
+                     payload: IdentityReference, db: Session = Depends(get_db),
+                     _: OrgMembership = Depends(require_org_member)):
+    return compare_observation(db, org_id, observation(db, org_id, finding_id, observation_id), payload.source_observation_id)
+
+
+@router.post("/findings/{finding_id}/observations/{observation_id}/identity-binding/carry-forward", response_model=FindingObservationRead)
+def carry_forward_identity(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
+                           payload: IdentityCarryForward, db: Session = Depends(get_db),
+                           member: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    return carry_forward(db, org_id, observation(db, org_id, finding_id, observation_id), member.user_id, payload)

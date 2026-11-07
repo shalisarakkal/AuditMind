@@ -7,7 +7,7 @@ import ConfirmPanel from "./ConfirmPanel";
 import FindingActionDialog from "./FindingActionDialog";
 
 type Tool = { id: string; name: string; version: number; active: boolean };
-type View = { asset_identity: { asset_id?: string; hostname?: string; ip?: string; cloud_id?: string }; identity_binding?: { version: number; state: string; current: boolean; rationale: string; tool_name: string; tool_id: string; canonical_asset_id: string } | null };
+type View = { asset_identity: { asset_id?: string; hostname?: string; ip?: string; cloud_id?: string }; identity_binding?: { version: number; state: string; current: boolean; rationale: string; tool_name: string; tool_id: string; canonical_asset_id: string; reviewed_from?: { observation_id: string; version: number } | null } | null };
 export default function FindingIdentityBinding({ orgId, findingId, observationId, disabled, onBusyChange, onSaved }: {
   orgId: string; findingId: string; observationId: string; disabled: boolean;
   onBusyChange?(busy: boolean): void; onSaved(): void;
@@ -51,6 +51,7 @@ export default function FindingIdentityBinding({ orgId, findingId, observationId
     {view.error || tools.error ? <p role="alert">{view.error || tools.error} <button type="button" disabled={busy} onClick={() => { view.reload(); tools.reload(); }}>Reload identity context</button></p> : null}
     {view.data && <p className="break-words text-xs text-white/70">Captured source asset: {view.data.asset_identity.hostname || view.data.asset_identity.cloud_id || view.data.asset_identity.ip || "Not named"}. UUID: {view.data.asset_identity.asset_id || "Not available"}.</p>}
     {view.data?.identity_binding && <p className="text-xs">Saved binding version {view.data.identity_binding.version}: {view.data.identity_binding.current ? "Current" : "Not current"}. Tool: {view.data.identity_binding.tool_name}. Canonical asset: {view.data.identity_binding.canonical_asset_id}.</p>}
+    {view.data?.identity_binding?.reviewed_from && <p className="break-words text-xs text-white/70">Independently reviewed against observation {view.data.identity_binding.reviewed_from.observation_id}, binding version {view.data.identity_binding.reviewed_from.version}.</p>}
     {error && <p role="alert" className="text-sm text-red-300">{error} <button type="button" disabled={busy} className="underline" onClick={() => { view.reload(); tools.reload(); setStale(false); setConfirmed(false); setToolId(""); setCreatedTool(null); setRetiring(null); }}>Reload identity context</button></p>}
     <form onSubmit={event => { event.preventDefault(); if (retiring) return; if (!selected || !selected.active || !confirmed) { setError("Select an active tool and confirm the mapping."); return; }
       void run(() => api.put(path, { expected_version: view.data?.identity_binding?.version || 0,

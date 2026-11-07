@@ -1,5 +1,10 @@
 # Verify the evidence-aware reporting changes
 
+PB-1.3 cross-import identity review: follow the
+[native Nessus Chrome steps](CROSS_IMPORT_IDENTITY_REVIEW.md#chrome-verification)
+for explicit pair comparison, confirmation, stale-preview rejection and canonical
+conflict handling. This does not authorize automatic reconciliation or scoring.
+
 Dashboard tabs: Findings-based opens by default and displays known-risk baseline
 scores. With evidence-qualified scoring enabled but no valid qualification, select
 Evidence-based and confirm its assessment remains Not assessed with coverage

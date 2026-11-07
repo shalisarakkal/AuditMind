@@ -33,3 +33,13 @@ class IdentityBind(IdentityDecision):
     expected_tool_version: int = Field(ge=1)
     canonical_asset_id: uuid.UUID
     confirm_mapping: bool
+
+
+class IdentityReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_observation_id: uuid.UUID
+
+
+class IdentityCarryForward(IdentityReference, IdentityDecision):
+    review_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    confirm_mapping: bool

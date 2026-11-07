@@ -86,7 +86,8 @@ def read_observations(db, org_id, observations):
                 and canonical is not None and canonical.archived_at is None
                 and source is not None and source.archived_at is None
                 and scan is not None and scan.archived_at is None and scan.status == ScanStatus.completed
-                and decision.context == _context(observation, tool, canonical, source, scan))
+                and {k: v for k, v in decision.context.items() if k != "reviewed_from"}
+                    == _context(observation, tool, canonical, source, scan))
             binding = IdentityBinding(org_id, tool.id, canonical.id) if valid else None
             assessment = assess_identity(org_id=org_id, scan_type=observation.scan_type,
                 source=observation.source, profile=observation.profile,
@@ -96,6 +97,7 @@ def read_observations(db, org_id, observations):
             item.identity_assessment = assessment
             item.identity_binding = dict(version=decision.version, state=decision.state,
                 current=bool(valid), reviewed_identity_version=decision.context.get("identity_version"),
+                reviewed_from=decision.context.get("reviewed_from"),
                 reviewed_source_mapping=decision.context.get("source_mapping"), tool_id=str(decision.tool_id) if decision.tool_id else None,
                 tool_name=tool.name if tool else "Unavailable", canonical_asset_id=str(decision.canonical_asset_id) if decision.canonical_asset_id else None,
                 rationale=decision.rationale, actor_label=decision.actor_label,
@@ -106,7 +108,7 @@ def read_observations(db, org_id, observations):
     return result
 
 
-def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False):
+def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, reviewed_from=None):
     latest = latest_bindings(db, org_id, [observation.id]).get(observation.id)
     version = latest.version if latest else 0
     if version != payload.expected_version:
@@ -140,6 +142,8 @@ def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False):
             raise HTTPException(409, "Source identity is unsupported or incomplete")
         tool_id, asset_id = tool.id, canonical.id
         context = _context(observation, tool, canonical, source, scan)
+        if reviewed_from is not None:
+            context["reviewed_from"] = reviewed_from
     actor = db.get(User, actor_id)
     decision = ObservationIdentityBinding(org_id=org_id, observation_id=observation.id,
         version=version + 1, state="revoked" if revoke else "bound", tool_id=tool_id,
@@ -150,6 +154,7 @@ def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False):
     record_event(db, "identity_binding_revoked" if revoke else "identity_binding_reviewed",
         org_id=org_id, actor=actor, item=str(observation.id), details=dict(
             observation_id=str(observation.id), finding_id=str(observation.finding_id),
-            version=decision.version, rationale=payload.rationale))
+            version=decision.version, rationale=payload.rationale,
+            **({"reviewed_from": reviewed_from} if reviewed_from is not None else {})))
     db.commit()
     return read_observations(db, org_id, [observation])[0]

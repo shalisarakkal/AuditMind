@@ -1,6 +1,7 @@
 "use client";
 
 import FindingIdentityBinding from "./FindingIdentityBinding";
+import FindingIdentityComparison from "./FindingIdentityComparison";
 import { useState } from "react";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime } from "@/lib/domain";
@@ -47,6 +48,8 @@ export default function FindingObservations({ orgId, findingId, canReview = fals
           <p className="text-xs text-white/70">Identity diagnostics do not authorize reconciliation, suppression or workflow changes.</p>
         </details>}
         {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityBinding orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
+        {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityComparison orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
+        <details><summary>Observation ID</summary><p className="break-all">{row.id}</p></details>
         <details><summary>Import ID</summary><p className="break-all">{row.import_id}</p></details>
       </li>)}</ol> : <p className="mt-3 text-sm">No source observations recorded.</p>}
       <div className="mt-3 flex gap-4 text-sm">
