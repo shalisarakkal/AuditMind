@@ -23,7 +23,7 @@ from app.services.identity_bindings import (
 )
 
 
-def compare_observation(db, org_id, target, source_id):
+def compare_observation(db, org_id, target, source_id, *, include_context=False):
     source = db.scalar(select(FindingObservation).where(
         FindingObservation.org_id == org_id, FindingObservation.id == source_id))
     if source is None:
@@ -73,7 +73,7 @@ def compare_observation(db, org_id, target, source_id):
         target_version=target_decision.version if target_decision else 0, target_context=context,
         source_finding=str(source.finding_id), target_finding=str(target.finding_id))
     token = hashlib.sha256(json.dumps(token_material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return dict(review_token=token, source_observation_id=str(source.id), target_observation_id=str(target.id),
+    result = dict(review_token=token, source_observation_id=str(source.id), target_observation_id=str(target.id),
         source_finding_id=str(source.finding_id), target_finding_id=str(target.finding_id),
         source_version=decision.version, target_version=target_decision.version if target_decision else 0,
         tool_id=str(tool.id), tool_name=tool.name, tool_version=tool.version,
@@ -82,10 +82,13 @@ def compare_observation(db, org_id, target, source_id):
         result="same_finding" if source.finding_id == target.finding_id else "canonical_conflict",
         already_reviewed=target_decision is not None,
         reconciliation_eligible=False)
+    if include_context:
+        result["binding_context"] = context
+    return result
 
 
 def carry_forward(db, org_id, target, actor_id, payload):
-    preview = compare_observation(db, org_id, target, payload.source_observation_id)
+    preview = compare_observation(db, org_id, target, payload.source_observation_id, include_context=True)
     if preview["review_token"] != payload.review_token or preview["target_version"] != payload.expected_version:
         raise HTTPException(409, "Identity context changed; compare again before saving")
     if preview["already_reviewed"]:
@@ -97,5 +100,5 @@ def carry_forward(db, org_id, target, actor_id, payload):
     bind = IdentityBind(expected_version=payload.expected_version, rationale=payload.rationale,
         tool_id=preview["tool_id"], expected_tool_version=preview["tool_version"],
         canonical_asset_id=preview["canonical_asset_id"], confirm_mapping=payload.confirm_mapping)
-    return write_binding(db, org_id, target, actor_id, bind, reviewed_from=dict(
+    return write_binding(db, org_id, target, actor_id, bind, expected_context=preview["binding_context"], reviewed_from=dict(
         observation_id=preview["source_observation_id"], version=preview["source_version"]))

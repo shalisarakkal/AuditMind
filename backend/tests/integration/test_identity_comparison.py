@@ -48,6 +48,7 @@ def test_explicit_carry_forward_pins_lineage_without_changing_finding(client, db
     result = preview(client, pair)
     assert result.status_code == 200, result.text
     body = result.json()
+    assert "binding_context" not in body  # server-only final-write fence
     assert body["result"] == "same_finding"
     assert body["already_reviewed"] is False
     assert db_session.query(ObservationIdentityBinding).count() == 1  # preview is read-only
@@ -268,3 +269,19 @@ def test_review_created_during_readonly_comparison_returns_conflict_not_500(clie
     monkeypatch.setattr(identity_comparison, "read_observations", raced)
     response = preview(client, pair)
     assert response.status_code == 409, response.text
+
+
+def test_asset_edit_between_token_check_and_binding_write_is_rejected(client, db_session, pair, monkeypatch):
+    from sqlalchemy import update
+    from app.services import identity_comparison
+    body = preview(client, pair).json()
+    original = identity_comparison.write_binding
+    def raced(db, org_id, target, actor_id, binding, **kwargs):
+        # Simulate a concurrently committed importer asset edit after the save's
+        # token validation but before its binding context is captured.
+        db.execute(update(Asset).where(Asset.id == UUID(target.asset_identity["asset_id"])).values(hostname="edited-mid-save"))
+        return original(db, org_id, target, actor_id, binding, **kwargs)
+    monkeypatch.setattr(identity_comparison, "write_binding", raced)
+    response = client.post(pair[5] + "/carry-forward", headers=pair[0], json=payload(pair, body))
+    assert response.status_code == 409, response.text
+    assert db_session.query(ObservationIdentityBinding).count() == 1

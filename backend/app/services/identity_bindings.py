@@ -108,7 +108,7 @@ def read_observations(db, org_id, observations):
     return result
 
 
-def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, reviewed_from=None):
+def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, reviewed_from=None, expected_context=None):
     latest = latest_bindings(db, org_id, [observation.id]).get(observation.id)
     version = latest.version if latest else 0
     if version != payload.expected_version:
@@ -142,6 +142,8 @@ def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, r
             raise HTTPException(409, "Source identity is unsupported or incomplete")
         tool_id, asset_id = tool.id, canonical.id
         context = _context(observation, tool, canonical, source, scan)
+        if expected_context is not None and context != expected_context:
+            raise HTTPException(409, "Identity context changed during save; compare again before saving")
         if reviewed_from is not None:
             context["reviewed_from"] = reviewed_from
     actor = db.get(User, actor_id)

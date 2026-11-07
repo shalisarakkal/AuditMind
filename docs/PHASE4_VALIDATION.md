@@ -10,7 +10,9 @@ run: 47 passed (overlapping). Full frontend: 553 passed; full real Chrome: 95
 checks; focused real Chrome: seven. Lint, production builds, Bandit and secret
 guards passed. Mobile overflow was reproduced and fixed before final acceptance.
 Activated at existing migration 0046 after idle-queue checks; login HTTP 200.
-Included in the reviewed local commit; push and hosted CI remain pending. See
+Initial delivery `dd46468`; post-fix review adds a final-write context fence.
+Post-fix expanded backend: 124 passed; focused Chrome: seven checks passed.
+Final pushed-SHA hosted CI remains the release gate. See
 [contract and retained verification evidence](CROSS_IMPORT_IDENTITY_REVIEW.md).
 
 ## PB-1.3 identity and reviewed bindings - 7 November 2026

@@ -15,7 +15,9 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   and seven focused Chrome checks pass. Final full Chrome regression: 95 checks
   passed, including 320px/Axe and unchanged workflow acceptance. Activated locally
   at existing migration 0046 after five idle-queue checks; login HTTP 200.
-  Included in the reviewed local commit; push and new hosted CI remain pending.
+  Initial delivery `dd46468`; follow-up review adds the final-write context fence.
+  Post-fix 124 backend tests and seven focused Chrome checks passed. Hosted CI
+  must pass on the exact final pushed SHA before this delivery gate closes.
   Contract and Chrome steps:
   [Cross-import review](docs/CROSS_IMPORT_IDENTITY_REVIEW.md).
 - Remaining PB-1.3: explicit canonical conflict resolution, source payload

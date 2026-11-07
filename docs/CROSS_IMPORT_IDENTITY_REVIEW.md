@@ -111,5 +111,13 @@ PB-1.3 remains open until those lifecycle gates are implemented and verified.
 These are local results, not hosted CI, production-scale acceptance or closure
 of canonical merging/absence/suppression. The previous 1,653-test full backend
 release is historical and is not claimed as a rerun of this increment.
-This increment is included in the reviewed local commit. Push and hosted CI
-verification remain pending; no new hosted result is claimed.
+Initial cross-import delivery: `dd46468`. A subsequent pre-push review reproduced
+an asset edit after token validation but before the binding write: it returned
+200 and captured the changed host context. A server-only expected-context fence
+now rejects that save with 409 before appending a decision. The correction adds
+no importer work, inventory scan or new database query. Expanded post-fix local
+backend: 124 passed in 126.53 seconds. Focused real Chrome: seven checks passed
+at `temp/testing/finding-workflow/phase3_browser_79ff36dd0716`.
+
+Hosted CI is authoritative for each pushed commit in GitHub Actions; the final
+push is not considered verified until all four jobs pass on its exact SHA.
