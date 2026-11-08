@@ -1,5 +1,10 @@
 # Individual imported-finding archive and scan reconciliation
 
+[Canonical selection](CANONICAL_FINDING_REVIEW.md) adds the reviewed designation
+and immutable receipt for two independently bound native findings. Both records
+and their histories remain independent; consolidation/payload publication and
+absence/suppression below remain separate implementation gates.
+
 Next staged implementation: [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
 compares one selected earlier review with a later native Nessus observation.
 Same-finding carry-forward requires independent admin confirmation; separate

@@ -1,5 +1,22 @@
 # Phase 4 remediation workflow validation
 
+## PB-1.3 canonical-selection review - 7 November 2026
+
+Add migrations 0047/0048, explicit two-history preview/selection, append-only receipts,
+stale-context/version rejection and revocation. Preserve original findings,
+observations, workflow and scoring histories; no count or scoring change. Initial
+focused backend: 17 passed; expanded identity/schema/migration checkpoint: 77.
+Frontend checkpoint: 558 passed; focused Chrome: eight checks including real
+native aliases, two workflow states, revocation, unchanged counts and 320px/Axe.
+Review reproduced a former-assignee display defect; corrected label and added a
+regression. Final code review reproduced a race with import publication; the
+canonical save now holds the organization lock through final context validation
+and receipt commit. The new regression failed before that fix and passes after it.
+The full post-fix required-PostgreSQL backend suite passed 1,710 tests with
+warnings as errors. The earlier Chrome checkpoint is not a post-fix browser run;
+exact-SHA hosted CI remains pending.
+See [contract, retention and verification steps](CANONICAL_FINDING_REVIEW.md).
+
 ## PB-1.3 cross-import review - 7 November 2026
 
 Explicit native Nessus pair comparison and independently confirmed same-finding

@@ -2,6 +2,29 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## PB-1.3 canonical selection - 7 November 2026
+
+- Add migration 0047 for independent append-only canonical-selection receipts.
+  Admin reviews two independently bound native identities, both workflows and
+  recorded verification decisions, chooses one canonical finding and confirms.
+- Context/version fences, sorted finding locks, atomic Activity and revocation;
+  preserve both records/histories. No count, scoring, payload or archive change.
+- Bounded pair review, paged history, blocking application dialogs and neutral
+  Cancel/primary Save actions. Captured receipts survive source-row purge.
+- Full required-PostgreSQL backend suite before the final import-publication
+  concurrency fence: 1,709 passed in 1,302.78s with warnings as errors. A code
+  review then reproduced a save/import race; the regression fails without and
+  passes with the organization-lock fix. Post-fix full backend: 1,710 passed
+  in 1,578.76s. Full frontend: 560 passed; lint/build and full isolated
+  Chrome workflow: 98 checks passed, including canonical selection/revocation
+  and competing-pair guard; no browser errors or AI usage. Migration tests are
+  included in the backend run. Local demo was already at 0048; idempotent
+  prepare found no migration or schema drift, API health/routes and one-slot
+  worker are healthy, and all six work queues were idle. No restart was needed.
+  The Chrome result predates the final backend-only concurrency fence; exact-SHA
+  hosted CI remains the release gate.
+- Contract and Chrome steps: [Canonical finding review](docs/CANONICAL_FINDING_REVIEW.md).
+
 ## PB-1.3 cross-import review - 7 November 2026
 
 - Implement explicit pair comparison and administrator-confirmed carry-forward

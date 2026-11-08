@@ -66,6 +66,10 @@ and `rationale`.
 
 ## Remaining implementation sequence
 
+The [canonical-selection review flow](CANONICAL_FINDING_REVIEW.md) now implements
+the explicit two-history designation/receipt. It is not the consolidation or
+latest-payload publisher below; both original records remain independently counted.
+
 1. **Canonical conflict resolution:** explicit selection of survivor, review of
    both workflows and verification decisions, version/lifecycle fences, atomic
    retained observation/history links and safe original-upload ownership. Never

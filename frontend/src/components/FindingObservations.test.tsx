@@ -30,7 +30,7 @@ describe("Finding source observations", () => {
     await userEvent.click(screen.getByRole("button", { name: "Show source observations" }));
     expect(await screen.findByText("source.csv · Row 2")).toBeVisible();
     expect(screen.getByText("Source observed time: Not provided")).toBeVisible();
-    expect(screen.getByText("Not eligible for reconciliation")).toBeVisible();
+    expect(screen.getByText("Not eligible for automatic reconciliation")).toBeVisible();
     expect(screen.getByText("Stable source finding identifier is unavailable")).toBeVisible();
     expect(screen.getByRole("button", { name: "Older observations" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Hide source observations" }));
@@ -45,7 +45,7 @@ describe("Finding source observations", () => {
     await userEvent.click(await screen.findByText("Identity assessment"));
     expect(screen.getByText("Source mapping: nessus-plugin-service-v1")).toBeVisible();
     expect(screen.getByText(/Unavailable until tool and asset bindings/)).toBeVisible();
-    expect(screen.getByText("Not eligible for reconciliation")).toBeVisible();
+    expect(screen.getByText("Not eligible for automatic reconciliation")).toBeVisible();
     expect(screen.getByText(/Identity diagnostics do not authorize/)).toBeVisible();
     expect(screen.queryByRole("button", {name:"Review identity binding"})).not.toBeInTheDocument();
   });

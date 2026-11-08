@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC demonstration only: this invented alias represents the same fictional host as canonical-demo-primary. -->
+<NessusClientData_v2>
+  <Report name="SYNTHETIC canonical alias">
+    <ReportHost name="canonical-demo-alias">
+      <HostProperties><tag name="host-ip">10.200.0.11</tag></HostProperties>
+      <ReportItem port="443" protocol="tcp" severity="3" pluginID="99999177"
+                  pluginName="SYNTHETIC canonical alias finding" pluginFamily="General">
+        <description>Fictional alias occurrence. Canonical selection must preserve its own severity, notes and workflow status.</description>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

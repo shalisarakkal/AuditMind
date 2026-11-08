@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from app.api.deps import require_org_member, require_org_role
 from app.db.session import get_db
@@ -13,6 +13,9 @@ from app.models.user import User
 from app.schemas.identity_binding import ToolCreate, IdentityBind, IdentityDecision
 from app.schemas.identity_binding import IdentityReference, IdentityCarryForward
 from app.services.identity_comparison import compare_observation, carry_forward
+from app.schemas.identity_binding import CanonicalSelection
+from app.models.finding_canonical import FindingCanonicalDecision
+from app.services import finding_canonical
 from app.schemas.finding_observation import FindingObservationRead
 from app.services.events import record_event
 from app.services import finding_identity
@@ -109,3 +112,37 @@ def carry_forward_identity(org_id: uuid.UUID, finding_id: uuid.UUID, observation
                            payload: IdentityCarryForward, db: Session = Depends(get_db),
                            member: OrgMembership = Depends(require_org_role(UserRole.admin))):
     return carry_forward(db, org_id, observation(db, org_id, finding_id, observation_id), member.user_id, payload)
+
+
+@router.post("/findings/{finding_id}/observations/{observation_id}/identity-binding/canonical/preview")
+def preview_canonical(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
+                      payload: IdentityReference, db: Session = Depends(get_db),
+                      _: OrgMembership = Depends(require_org_member)):
+    return finding_canonical.preview(db, org_id, observation(db, org_id, finding_id, observation_id), payload.source_observation_id)
+
+
+@router.post("/findings/{finding_id}/observations/{observation_id}/identity-binding/canonical")
+def select_canonical(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
+                     payload: CanonicalSelection, db: Session = Depends(get_db),
+                     member: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    return finding_canonical.save(db, org_id, observation(db, org_id, finding_id, observation_id), member.user_id, payload)
+
+
+@router.get("/findings/{finding_id}/canonical-decisions")
+def canonical_history(org_id: uuid.UUID, finding_id: uuid.UUID, offset: int = Query(0, ge=0),
+                      db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    # Historical UUIDs remain readable after purge, scoped to this organization.
+    rows = db.scalars(select(FindingCanonicalDecision).where(FindingCanonicalDecision.org_id == org_id,
+        or_(FindingCanonicalDecision.finding_a_id == finding_id, FindingCanonicalDecision.finding_b_id == finding_id))
+        .order_by(FindingCanonicalDecision.created_at.desc(), FindingCanonicalDecision.id.desc()).offset(offset).limit(20)).all()
+    versions = dict(db.execute(select(FindingCanonicalDecision.pair_key, FindingCanonicalDecision.version).where(
+        FindingCanonicalDecision.org_id == org_id, FindingCanonicalDecision.pair_key.in_({row.pair_key for row in rows}))
+        .order_by(FindingCanonicalDecision.pair_key, FindingCanonicalDecision.version.desc())
+        .distinct(FindingCanonicalDecision.pair_key)).all()) if rows else {}
+    return [{**finding_canonical.receipt(row), "latest": row.version == versions.get(row.pair_key)} for row in rows]
+
+
+@router.post("/canonical-decisions/{decision_id}/revoke")
+def revoke_canonical(org_id: uuid.UUID, decision_id: uuid.UUID, payload: IdentityDecision,
+                     db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    return finding_canonical.revoke(db, org_id, decision_id, member.user_id, payload)

@@ -130,7 +130,7 @@ function EventRow({ event, orgId }: { event: ActivityEvent; orgId?: string }) {
         {eventLabel(event)}
         {summary && <p className="text-xs text-white/50">{summary}</p>}
       </td>
-      <td className={TD}>{orgId && ["finding_workflow_changed", "finding_verification_changed"].includes(event.type) && typeof event.details?.finding_id === "string"
+      <td className={TD}>{orgId && ["finding_workflow_changed", "finding_verification_changed", "finding_canonical_selected", "finding_canonical_revoked"].includes(event.type) && typeof event.details?.finding_id === "string"
         ? <><p className="text-xs text-white/60">Finding ID</p><FindingReference orgId={orgId} id={event.details.finding_id} /></>
         : event.item ?? "—"}</td>
       <td className={TD}>{event.actor_label}</td>

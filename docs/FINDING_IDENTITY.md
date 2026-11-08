@@ -57,6 +57,11 @@ visible. This read never updates finding status, archive state, scores or report
 
 ## Remaining PB-1.3 work
 
+[Canonical review](CANONICAL_FINDING_REVIEW.md) now adds an explicit reversible
+designation for two independently reviewed findings, with both histories retained.
+This does not consolidate records or counts; automatic matching, canonical payload
+publication and absence/suppression authority below remain pending.
+
 Increment 3 adds [explicit cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md):
 pair comparison and independently confirmed same-finding carry-forward, without
 automatic reuse. Separate finding UUIDs are surfaced as canonical conflicts;

@@ -17,6 +17,8 @@ export const EVENT_LABELS: Record<string, string> = {
   identity_tool_retired: "Identity tool instance retired",
   identity_binding_reviewed: "Finding identity binding reviewed",
   identity_binding_revoked: "Finding identity binding revoked",
+  finding_canonical_selected: "Canonical finding selected",
+  finding_canonical_revoked: "Canonical finding selection revoked",
   scan_snapshot_declared: "Scan snapshot declared",
   scan_snapshot_revoked: "Scan snapshot declaration revoked",
   settings_changed: "Settings changed",

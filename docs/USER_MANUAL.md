@@ -956,6 +956,14 @@ data first. Production rollout/default-on adoption remains a separate decision.
 
 ## Reviewed finding identity (native Nessus)
 
+For separately recorded findings with two current matching identity bindings,
+the cross-import comparison offers **Review canonical selection**. Review both
+workflows and retained-history links, choose one finding, provide a reason and
+confirm. This records a reversible designation; counts, status and approvals are
+unchanged. **Show canonical selection history** in Workflow displays receipts and
+lets an admin revoke the latest selection. See
+[the canonical review walkthrough](CANONICAL_FINDING_REVIEW.md#chrome-verification).
+
 For a repeated native Nessus upload, expand the earlier observation's
 **Observation ID**, then choose **Review against an earlier observation** on the
 later occurrence. Compare its UUID, independently verify the proposed scanner and

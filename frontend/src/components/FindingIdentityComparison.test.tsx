@@ -45,7 +45,7 @@ it("clears preview and confirmation when the reference changes", async () => {
 it("shows canonical conflicts without offering to merge or save", async () => {
   mockApi({ ["POST " + path + "/compare"]: () => ({ ...preview, result: "canonical_conflict", target_finding_id: "f2" }) });
   render(<FindingIdentityComparison {...props} />); await compare();
-  expect(screen.getByText(/Canonical conflict resolution is required/)).toBeVisible();
+  expect(screen.getByText(/Review or recheck their canonical selection/)).toBeVisible();
   expect(screen.queryByRole("button", { name: "Save reviewed mapping" })).not.toBeInTheDocument();
 });
 

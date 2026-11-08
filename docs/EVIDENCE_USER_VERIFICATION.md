@@ -1,5 +1,11 @@
 # Verify the evidence-aware reporting changes
 
+PB-1.3 canonical finding designation: follow the
+[canonical review Chrome steps](CANONICAL_FINDING_REVIEW.md#chrome-verification)
+for two independent identities, both workflow histories, explicit canonical
+selection, stale-preview conflicts, versioned revocation and retention semantics.
+This designates a pair without merging records or changing scoring/counts.
+
 PB-1.3 cross-import identity review: follow the
 [native Nessus Chrome steps](CROSS_IMPORT_IDENTITY_REVIEW.md#chrome-verification)
 for explicit pair comparison, confirmation, stale-preview rejection and canonical

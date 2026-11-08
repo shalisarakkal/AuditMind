@@ -14,6 +14,7 @@ from app.models.finding_verification import OrganizationRiskPolicy, FindingVerif
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
+from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.scan_snapshot import ScanSnapshotDeclaration
 from app.models.risk_score import RiskScore
 from app.models.report import Report
@@ -58,6 +59,7 @@ __all__ = [
     "FindingObservation",
     "IdentityTool",
     "ObservationIdentityBinding",
+    "FindingCanonicalDecision",
     "ScanSnapshotDeclaration",
     "RiskScore",
     "Report",

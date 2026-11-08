@@ -43,3 +43,9 @@ class IdentityReference(BaseModel):
 class IdentityCarryForward(IdentityReference, IdentityDecision):
     review_token: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirm_mapping: bool
+
+
+class CanonicalSelection(IdentityReference, IdentityDecision):
+    canonical_finding_id: uuid.UUID
+    review_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    confirm_histories: bool

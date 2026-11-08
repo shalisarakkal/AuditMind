@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC demonstration only: no scanner was run. Use a disposable test organization. -->
+<NessusClientData_v2>
+  <Report name="SYNTHETIC canonical baseline">
+    <ReportHost name="canonical-demo-primary">
+      <HostProperties><tag name="host-ip">10.200.0.10</tag></HostProperties>
+      <ReportItem port="443" protocol="tcp" severity="2" pluginID="99999177"
+                  pluginName="SYNTHETIC canonical baseline finding" pluginFamily="General">
+        <description>Fictional finding used only to demonstrate canonical selection and independent workflow history.</description>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

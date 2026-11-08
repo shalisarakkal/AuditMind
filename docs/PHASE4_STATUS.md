@@ -1,5 +1,16 @@
 # Phase 4 status and next milestone
 
+Current local increment: [canonical finding review](CANONICAL_FINDING_REVIEW.md),
+migrations 0047/0048. Explicit admin designation and revocation preserve both independent
+records/histories and do not consolidate counts or transfer approvals. The prior
+full backend run passed 1,709 tests before final review reproduced an import-publication
+race. The organization-lock fix and its reproducer pass; the full post-fix backend
+run passed 1,710 tests. Full frontend passed 560 tests; the full isolated Chrome
+workflow passed 98 checks before the final backend-only concurrency fence, with
+no browser errors or AI use.
+Local activation at migration 0048 is verified; exact-SHA hosted CI remains
+pending. Prior release results below do not certify this uncommitted increment.
+
 The next local PB-1.3 increment adds explicit
 [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md): native Nessus
 pair comparison, independently confirmed same-finding carry-forward and visible

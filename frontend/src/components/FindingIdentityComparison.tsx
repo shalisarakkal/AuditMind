@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY, DIALOG_SECONDARY } from "./DialogActions";
+import FindingCanonicalReview from "./FindingCanonicalReview";
 
 type Comparison = {
   review_token: string; source_observation_id: string; target_version: number;
@@ -20,6 +21,7 @@ export default function FindingIdentityComparison({ orgId, findingId, observatio
   const [preview, setPreview] = useState<Comparison | null>(null), [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canonicalOpen, setCanonicalOpen] = useState(false);
   const inFlight = useRef(false);
   const path = `/orgs/${orgId}/findings/${findingId}/observations/${observationId}/identity-binding`;
   async function run(save: boolean) {
@@ -47,7 +49,7 @@ export default function FindingIdentityComparison({ orgId, findingId, observatio
   }}>Review against an earlier observation</button>;
   return <section aria-label="Cross-import identity review" aria-busy={busy} className="mt-3 min-w-0 space-y-3 rounded border border-white/20 p-3">
     <p className="text-xs text-white/70">Compare one earlier, reviewed native Nessus observation. Independently verify the scanner and canonical host for this later upload. This does not merge findings, refresh their details or change workflow, scores or scan coverage.</p>
-    <fieldset disabled={disabled || busy} className="min-w-0 space-y-3">
+    <fieldset disabled={disabled || busy || canonicalOpen} className="min-w-0 space-y-3">
       <label className="block text-sm">Earlier observation UUID<input className="mt-1 w-full rounded border border-white/20 bg-navy p-2" value={reference} onChange={e => {
         setReference(e.target.value); setPreview(null); setConfirmed(false);
       }} /></label>
@@ -59,7 +61,9 @@ export default function FindingIdentityComparison({ orgId, findingId, observatio
         <p>Native plugin: {preview.source_material.plugin_id} · Port: {preview.source_material.port} · Protocol: {preview.source_material.protocol}</p>
         <p>Reference finding: {preview.source_finding_id}</p>
         {preview.result === "canonical_conflict"
-          ? <p className="text-amber-300">Matching identity points to separate findings. Canonical conflict resolution is required; nothing will be merged or carried forward.</p>
+          ? <><p className="text-amber-300">Matching identity points to separate findings. Review or recheck their canonical selection; neither record will be merged or carried forward.</p>
+            {preview.already_reviewed ? <button type="button" className={DIALOG_SECONDARY} onClick={() => setCanonicalOpen(true)}>Review canonical selection</button>
+              : <p>Independently review both identity bindings before selecting a canonical finding.</p>}</>
           : preview.already_reviewed ? <p>This observation already has the same current reviewed identity. No new review is needed.</p>
           : <><p>The native identity matches within the same finding. Verify that this upload came from the same scanner and represents the same canonical host.</p>
             <label className="block">Carry-forward review reason<textarea className="mt-1 w-full rounded border border-white/20 bg-navy p-2" maxLength={2000} value={reason} onChange={e => setReason(e.target.value)} /></label>
@@ -67,9 +71,10 @@ export default function FindingIdentityComparison({ orgId, findingId, observatio
           </>}
       </div>}
     </fieldset>
+    {canonicalOpen && preview && <FindingCanonicalReview orgId={orgId} path={path} sourceId={preview.source_observation_id} onClose={() => setCanonicalOpen(false)} onBusyChange={onBusyChange} onSaved={() => { setPreview(null); setConfirmed(false); onSaved(); }} />}
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     <footer className={DIALOG_FOOTER}>
-      <button type="button" className={DIALOG_NEUTRAL} disabled={disabled || busy} onClick={() => setOpen(false)}>Cancel comparison</button>
+      <button type="button" className={DIALOG_NEUTRAL} disabled={disabled || busy || canonicalOpen} onClick={() => setOpen(false)}>Cancel comparison</button>
       {preview?.result === "same_finding" && !preview.already_reviewed && <button type="button" className={DIALOG_PRIMARY} disabled={disabled || busy || !confirmed || !reason.trim()} onClick={() => void run(true)}>Save reviewed mapping</button>}
     </footer>
   </section>;

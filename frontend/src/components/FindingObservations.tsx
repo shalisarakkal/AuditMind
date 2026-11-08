@@ -2,6 +2,7 @@
 
 import FindingIdentityBinding from "./FindingIdentityBinding";
 import FindingIdentityComparison from "./FindingIdentityComparison";
+import FindingCanonicalHistory from "./FindingCanonicalHistory";
 import { useState } from "react";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime } from "@/lib/domain";
@@ -38,7 +39,7 @@ export default function FindingObservations({ orgId, findingId, canReview = fals
         <p>Source observed time: {row.observed_at ? formatDateTime(row.observed_at) : "Not provided"}</p>
         <p className="break-words">Source: {row.source} · Severity: {row.payload.severity ? row.payload.severity.charAt(0).toUpperCase() + row.payload.severity.slice(1) : "Not provided"}</p>
         <p className="whitespace-pre-wrap break-words">{row.payload.category}{row.payload.description ? `: ${row.payload.description}` : ""}</p>
-        <p>{row.reconciliation_eligible ? "Reconciliation eligible" : "Not eligible for reconciliation"}</p>
+        <p>{row.reconciliation_eligible ? "Eligible for automatic reconciliation" : "Not eligible for automatic reconciliation"}</p>
         <p className="text-xs text-white/70">Recorded eligibility reasons at import:</p>
         <ul className="list-inside list-disc text-xs text-white/70">{row.ineligibility_reasons.map(reason => <li key={reason}>{reasons[reason] || reason.replaceAll("_", " ")}</li>)}</ul>
         {row.identity_assessment && <details><summary>Identity assessment</summary>
@@ -57,5 +58,6 @@ export default function FindingObservations({ orgId, findingId, canReview = fals
         <button type="button" disabled={rows.loading || !!rows.error || (rows.data?.length ?? 0) < 20} onClick={() => { const last = rows.data?.at(-1); if (last) setPages(value => [...value, last.id]); }}>Older observations</button>
       </div>
     </div>}
+    <FindingCanonicalHistory orgId={orgId} findingId={findingId} canReview={canReview} disabled={disabled} onBusyChange={onBusyChange} />
   </section>;
 }
