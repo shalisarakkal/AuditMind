@@ -2,14 +2,17 @@
 
 [Canonical selection](CANONICAL_FINDING_REVIEW.md) adds the reviewed designation
 and immutable receipt for two independently bound native findings. Both records
-and their histories remain independent; consolidation/payload publication and
-absence/suppression below remain separate implementation gates.
+and their histories remain independent; consolidation/payload publication,
+durable absence decisions and suppression below remain separate implementation
+gates.
 
-Next staged implementation: [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
-compares one selected earlier review with a later native Nessus observation.
-Same-finding carry-forward requires independent admin confirmation; separate
-finding UUIDs block as canonical conflicts. Automatic merging/publication,
-not-observed queue and suppression below remain pending.
+Implemented PB-1.3 review increments are documented in
+[cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md) and
+[canonical selection](CANONICAL_FINDING_REVIEW.md): admins may compare supported
+native Nessus observations, explicitly carry forward a same-finding mapping, and
+record/revoke a canonical designation for a reviewed conflict. The records and
+histories remain independent. These operations do not merge findings, publish
+new scanner payloads, mark findings absent, suppress or resolve findings.
 
 7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
 Migration 0046 adds optional administrator-reviewed tool/asset bindings;
@@ -18,21 +21,29 @@ Candidate diagnostics do not change import matching or authorize reconciliation.
 
 PB-1.1 now implements the additive [source observation foundation](FINDING_OBSERVATIONS.md).
 PB-1.2 adds [source-scan declarations and metadata comparison](SCAN_SNAPSHOTS.md),
-with absence eligibility still false. It does not validate finding identity or
-enable suppression/reconciliation.
+which alone does not validate finding identity or enable suppression/reconciliation.
 The existing-behavior analysis below describes the baseline before that increment.
-Observations now record repeated occurrences; stable-identity authorization,
-refreshed canonical payloads, suppression and reconciliation remain pending. Existing matching and
-archive ownership are unchanged.
+Observations now record repeated occurrences; reviewed stable-identity bindings,
+cross-import review and canonical designation are implemented. Refreshed canonical payloads, durable comparable-scan absence decisions,
+suppression and automated reconciliation remain pending. The local scan
+comparison now has a bounded, read-only candidate preview; it records no
+disposition and does not change existing import matching or archive ownership.
 
-Status: functional rules approved on 23 October 2026; implementation remains pending
-as a separate increment after browser-timezone correction. User approved minimal
-suppression retained until explicit organization-admin clearance, independent of
-archived-row purge; newer successful observations refresh severity/details without
-overwriting workflow decisions or existing report snapshots. Comparable complete
-scan confirmation is required for absence flags; ambiguous identity is ineligible.
-Existing upload/asset archive behavior and import matching remain
-unchanged. Absence from a later file never automatically resolves or archives a finding.
+Status (8 November 2026): identity/review foundations are implemented through
+migrations 0046-0048 and hosted CI is green for those commits. The bounded
+absence-candidate preview is implemented locally, with focused regression tests
+passing. Focused frontend tests, changed-file lint and TypeScript validation also
+pass; an isolated Chrome walkthrough verified eligible candidate display and
+fail-closed behavior on an unreviewable current observation. Hosted CI for this
+local increment remains pending. The
+approved future semantics below remain design constraints, not delivered
+behavior: suppression must be retained until explicit organization-admin
+clearance independent of archived-row purge;
+newer eligible observations may refresh severity/details only through a separately
+reviewed publication design, without overwriting workflow decisions or saved
+report snapshots. Absence requires comparable complete scans and explicit review;
+ambiguous identity is ineligible. Absence never automatically resolves or archives
+a finding.
 
 ## Existing Settings/import behavior reviewed
 

@@ -10,10 +10,19 @@ export type SnapshotView = {
     rationale: string; actor_label: string; created_at: string } | null;
   declaration_blockers: string[]; complete_blockers: string[];
 };
+export type ReviewCandidate = {
+  finding_id: string; baseline_observation_id: string; reviewable_baseline_observation_count: number;
+  asset_id: string | null; description: string | null; category: string | null; domain: string;
+  severity: string; workflow_status: string; baseline_recorded_at: string;
+};
 export type Comparison = {
   reviewed_at: string; baseline: SnapshotView; current: SnapshotView; declared_metadata_matches: boolean;
-  absence_eligible: false; blocking_reasons: string[]; absence_blockers: string[];
-  scope_differences: Record<string, string[]>; not_observed_finding_ids: null;
+  absence_eligible: boolean; blocking_reasons: string[]; absence_blockers: string[];
+  scope_differences: Record<string, string[]>; review_candidates: ReviewCandidate[];
+  candidate_count: number; candidate_offset: number; candidate_limit: number;
+  baseline_reviewable_observations: number; current_reviewable_observations: number;
+  baseline_unreviewable_observations: number; current_unreviewable_observations: number;
+  ambiguous_baseline_identity_count: number;
 };
 const labels: Record<string, string> = {
   scan_not_successfully_completed: "Import has not completed successfully",
@@ -32,7 +41,8 @@ const labels: Record<string, string> = {
   target_scope_changed: "Target scopes differ", scope_exclusions_changed: "Scope exclusions differ",
   source_snapshot_time_unavailable: "Source snapshot time is not provided",
   current_source_snapshot_is_not_newer: "Current source snapshot must be newer than the baseline",
-  stable_finding_identity_and_reconciliation_not_enabled: "Stable finding identity verification and reconciliation are not enabled",
+  scan_observation_limit_exceeded: "This scan has more observations than this review can safely compare",
+  unreviewable_observations_present: "Contains observations without a current supported identity review; candidate generation is withheld",
 };
 export function snapshotReason(value: string): string {
   const [side, reason] = value.includes(":") ? value.split(":") : ["", value];

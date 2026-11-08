@@ -1,10 +1,11 @@
 "use client";
 import { DIALOG_FOOTER, DIALOG_NEUTRAL, DIALOG_PRIMARY, DIALOG_SECONDARY } from "./DialogActions";
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { api, ApiError } from "@/lib/apiClient";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime, scanTypeLabel } from "@/lib/domain";
-import { sourceTimeInput, snapshotKindLabel, snapshotKinds, snapshotReason, type SnapshotView, type Comparison } from "@/lib/scanSnapshots";
+import { sourceTimeInput, snapshotKindLabel, snapshotKinds, snapshotReason, type SnapshotView, type Comparison, type ReviewCandidate } from "@/lib/scanSnapshots";
 import FindingActionDialog from "./FindingActionDialog";
 import ConfirmPanel from "./ConfirmPanel";
 
@@ -135,38 +136,67 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
   const inFlight = useRef(false);
   const loading = baseline.loading || current.loading;
   const errorText = baseline.error || current.error || error;
-  async function compare() {
+  async function compare(offset = 0, append = false) {
     if (inFlight.current || !baseline.data?.declaration || !current.data?.declaration) return;
-    inFlight.current = true; setBusy(true); setResult(null); setError(null);
+    inFlight.current = true; setBusy(true); if (!append) setResult(null); setError(null);
     try {
-      setResult(await api.post<Comparison>(`/orgs/${orgId}/scans/snapshot-comparison`, { baseline_scan_id: baselineId, current_scan_id: currentId,
-        baseline_version: baseline.data.declaration.version, current_version: current.data.declaration.version }));
+      const next = await api.post<Comparison>(`/orgs/${orgId}/scans/snapshot-comparison`, {
+        baseline_scan_id: baselineId, current_scan_id: currentId,
+        baseline_version: baseline.data.declaration.version, current_version: current.data.declaration.version,
+        candidate_offset: offset, candidate_limit: result?.candidate_limit ?? 50,
+      });
+      setResult(previous => append && previous
+        ? { ...next, candidate_offset: previous.candidate_offset,
+          review_candidates: [...previous.review_candidates, ...next.review_candidates] }
+        : next);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not review scans"); if (err instanceof ApiError && err.status === 409) setStale(true); }
     finally { inFlight.current = false; setBusy(false); }
   }
   return <FindingActionDialog title="Review scan snapshots" orgName={orgName} onClose={() => { if (!inFlight.current) onClose(); }}>
     <div aria-busy={busy} className="space-y-3">
-      <p className="text-sm text-white/70">This review checks declared metadata only. It does not identify missing findings, resolve or archive anything, or change scores.</p>
+      <p className="text-sm text-white/70">This read-only review compares complete scan declarations and current administrator-reviewed native Nessus identities. A candidate is not proof of remediation or a workflow decision. It does not change findings, workflow, archive state or scores.</p>
       {loading ? <p role="status">Loading comparison snapshots…</p> : <>
         {baseline.data && <SnapshotDetails view={baseline.data} label="Baseline" />}
         {current.data && <SnapshotDetails view={current.data} label="Current" />}
       </>}
       {errorText && <p role="alert" className="text-sm text-red-300">{errorText}</p>}
       {result && <section aria-label="Comparison result" className="space-y-2 rounded border border-white/15 p-3 text-sm">
-        <p className="font-semibold">{result.declared_metadata_matches ? "Declared metadata matches" : "Snapshots have compatibility blockers"}</p>
+        <p className="font-semibold">{result.declared_metadata_matches ? "Declared scan metadata matches" : "Snapshots have compatibility blockers"}</p>
         <p>Reviewed: {formatDateTime(result.reviewed_at)}</p>
         <Reasons values={result.blocking_reasons} />
-        <p className="font-semibold">Not approved for absence conclusions</p><Reasons values={result.absence_blockers} />
+        <p className="font-semibold">Candidate review {result.absence_eligible ? "available" : "blocked"}</p>
+        <Reasons values={result.absence_blockers} />
+        {!result.blocking_reasons.length && !result.absence_blockers.some(reason => reason.endsWith("scan_observation_limit_exceeded")) &&
+          <p>Identity review coverage: baseline {result.baseline_reviewable_observations} reviewable / {result.baseline_unreviewable_observations} unreviewable; current {result.current_reviewable_observations} reviewable / {result.current_unreviewable_observations} unreviewable. Ambiguous baseline identities excluded: {result.ambiguous_baseline_identity_count}.</p>}
         {Object.entries(result.scope_differences).map(([key, values]) => <p key={key} className="break-words">{key.replaceAll("_", " ").replace(/^./, c => c.toUpperCase())}: {values.join(", ") || "None"}</p>)}
+        {result.absence_eligible && <div className="space-y-3 border-t border-white/15 pt-3">
+          <h3 className="font-semibold">Findings to review ({result.candidate_count})</h3>
+          <p className="text-white/70">These active findings have a current reviewed identity in the baseline but no matching identity in the current scan. Missing observations alone never resolve or archive a finding.</p>
+          {result.candidate_count === 0 && <p>{result.baseline_reviewable_observations === 0 ? "No baseline observations have a current reviewed identity supported by this comparison." : "No review candidates were found."}</p>}
+          <ul className="space-y-2">
+            {result.review_candidates.map(candidate => <ReviewCandidateRow key={candidate.finding_id} candidate={candidate} orgId={orgId} />)}
+          </ul>
+          {result.candidate_offset + result.review_candidates.length < result.candidate_count && <button type="button" className={button} disabled={busy || stale} onClick={() => void compare(result.candidate_offset + result.review_candidates.length, true)}>{busy ? "Loading…" : "Load more candidates"}</button>}
+        </div>}
       </section>}
       {!loading && (!baseline.data?.declaration || !current.data?.declaration) && <p className="text-sm">Both uploads need a saved declaration before review.</p>}
       <footer aria-label="Comparison actions" className="space-y-3 border-t border-white/15 pt-4">
       <div className={actionLayout}>
-        <button type="button" className={primaryButton} disabled={loading || busy || stale || !!baseline.error || !!current.error || !baseline.data?.declaration || !current.data?.declaration} onClick={compare}>{busy ? "Reviewing…" : "Review compatibility"}</button>
+        <button type="button" className={primaryButton} disabled={loading || busy || stale || !!baseline.error || !!current.error || !baseline.data?.declaration || !current.data?.declaration} onClick={() => void compare()}>{busy ? "Reviewing…" : "Compare scans and build review list"}</button>
         <button type="button" className={button} disabled={busy} onClick={() => { setResult(null); setError(null); setStale(false); baseline.reload(); current.reload(); }}>Reload snapshots</button>
       </div>
       <div className="flex justify-end"><button type="button" className={`${neutralButton} w-full sm:w-auto`} data-confirm-cancel disabled={busy} onClick={onClose}>Close</button></div>
       </footer>
     </div>
   </FindingActionDialog>;
+}
+
+function ReviewCandidateRow({ candidate, orgId }: { candidate: ReviewCandidate; orgId: string }) {
+  return <li className="min-w-0 rounded border border-white/15 p-3">
+    <p className="break-words font-medium">{candidate.description || candidate.category || "Finding"} · {candidate.severity}</p>
+    <p>{candidate.domain.replaceAll("_", " ")} · Workflow: {candidate.workflow_status}</p>
+    <p className="break-all text-xs text-white/70">Finding ID: {candidate.finding_id}</p>
+    <p className="text-xs text-white/70">Baseline observations: {candidate.reviewable_baseline_observation_count} · latest recorded {formatDateTime(candidate.baseline_recorded_at)}</p>
+    <Link className="text-cyan underline" href={`/findings?${new URLSearchParams({ org: orgId, finding_id: candidate.finding_id })}`}>Open finding</Link>
+  </li>;
 }

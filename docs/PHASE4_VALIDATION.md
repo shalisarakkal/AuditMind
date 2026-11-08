@@ -1,5 +1,33 @@
 # Phase 4 remediation workflow validation
 
+The newest PB-1.3 verification sections are at the top. Older dated checkpoints
+below preserve the status and test evidence as it stood at that time; their
+"pending" items do not supersede the
+[current release/readiness status](RELEASE_READINESS.md).
+
+## PB-1.3 read-only absence-candidate preview - 8 November 2026
+
+The local implementation returns a paged, non-persisted candidate list only
+when the scans are metadata-compatible and every current-scan observation has
+a current reviewed native Nessus identity. It excludes ambiguous baseline
+identity associations, counts baseline observations that cannot be reviewed,
+and withholds candidates when the 5,000-observation-per-scan limit is exceeded
+or any current observation is unreviewable. It does not record a decision or
+change finding, workflow, archive, score or report state.
+
+After the final current-scan fail-closed refinement, the sequential related
+backend integration suites passed 110 tests (snapshot comparison, identity
+bindings/comparison and observations). The focused snapshot dialog suite passed
+8 tests; ESLint on the changed UI files and `tsc --noEmit` passed. These are
+local results for uncommitted work. A new isolated real-Chrome walkthrough
+passed two scenarios: exactly one baseline-only synthetic candidate appears
+when the reviewed identities permit comparison, and candidate generation is
+withheld after revoking the current observation's identity review. It used a
+disposable `auditmind_test` schema and synthetic Nessus files, made no external
+AI calls, and removed the schema afterward. Hosted CI remains pending. The
+broader durable absence queue, dispositions, suppression, consolidation and
+payload publication remain open.
+
 ## PB-1.3 canonical-selection review - 7 November 2026
 
 Add migrations 0047/0048, explicit two-history preview/selection, append-only receipts,
@@ -30,7 +58,13 @@ guards passed. Mobile overflow was reproduced and fixed before final acceptance.
 Activated at existing migration 0046 after idle-queue checks; login HTTP 200.
 Initial delivery `dd46468`; post-fix review adds a final-write context fence.
 Post-fix expanded backend: 124 passed; focused Chrome: seven checks passed.
-Final pushed-SHA hosted CI remains the release gate. See
+All four hosted CI jobs passed on the final cross-import context-fence commit
+`4af6685` in [run 59](https://github.com/shalisarakkal/AuditMind/actions/runs/42419906660).
+The later canonical-selection commit also passed all four jobs in
+[run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513);
+the current documentation baseline passed all four in
+[run 61](https://github.com/shalisarakkal/AuditMind/actions/runs/42493878994).
+See
 [contract and retained verification evidence](CROSS_IMPORT_IDENTITY_REVIEW.md).
 
 ## PB-1.3 identity and reviewed bindings - 7 November 2026

@@ -96,7 +96,10 @@ def test_matching_declarations_are_not_absence_authority_and_preserve_finding(cl
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["declared_metadata_matches"] is True
-    assert result["absence_eligible"] is False and result["not_observed_finding_ids"] is None
+    assert result["absence_eligible"] is False and result["review_candidates"] == []
+    assert result["baseline_unreviewable_observations"] == 1
+    assert result["current_unreviewable_observations"] == 1
+    assert "current:unreviewable_observations_present" in result["absence_blockers"]
     assert result["baseline"]["scan"]["id"] == a and result["current"]["scan"]["id"] == b
     assert result["scope_differences"]["baseline_exclusions"] == ["10.0.0.20"]
     assert result["blocking_reasons"] == []
@@ -105,6 +108,165 @@ def test_matching_declarations_are_not_absence_authority_and_preserve_finding(cl
     assert workflow == {"status": finding.workflow_status, "version": finding.workflow_version,
         "severity": finding.severity, "archived_at": finding.archived_at, "scan_id": finding.scan_id}
     assert db_session.query(FindingHistory).count() == 0
+
+
+def _nessus(plugin_id):
+    return f"""<NessusClientData_v2><Report name="synthetic">
+      <ReportHost name="pilot-host"><HostProperties><tag name="host-ip">10.0.0.10</tag></HostProperties>
+        <ReportItem port="443" protocol="tcp" severity="2" pluginID="{plugin_id}" pluginName="Synthetic finding" pluginFamily="Test">
+          <risk_factor>Medium</risk_factor><synopsis>Synthetic test finding.</synopsis>
+        </ReportItem>
+      </ReportHost></Report></NessusClientData_v2>""".encode()
+
+
+def _nessus_two_hosts(plugin_id):
+    return f"""<NessusClientData_v2><Report name="synthetic">
+      <ReportHost name="pilot-a"><HostProperties><tag name="host-ip">10.0.0.10</tag></HostProperties>
+        <ReportItem port="443" protocol="tcp" severity="2" pluginID="{plugin_id}" pluginName="Synthetic finding" pluginFamily="Test">
+          <risk_factor>Medium</risk_factor><synopsis>Synthetic test finding.</synopsis>
+        </ReportItem>
+      </ReportHost>
+      <ReportHost name="pilot-b"><HostProperties><tag name="host-ip">10.0.0.11</tag></HostProperties>
+        <ReportItem port="443" protocol="tcp" severity="2" pluginID="{plugin_id}" pluginName="Synthetic finding" pluginFamily="Test">
+          <risk_factor>Medium</risk_factor><synopsis>Synthetic test finding.</synopsis>
+        </ReportItem>
+      </ReportHost></Report></NessusClientData_v2>""".encode()
+
+
+def _bind_observation(client, owner, db_session, scan_id, tool_id, canonical_asset_id):
+    from app.models.finding_observation import FindingObservation
+
+    observation = db_session.query(FindingObservation).filter_by(scan_id=uuid.UUID(scan_id)).one()
+    path = (f"/api/v1/orgs/{owner[1]}/findings/{observation.finding_id}/"
+        f"observations/{observation.id}/identity-binding")
+    response = client.put(path, headers=owner[0], json=dict(expected_version=0,
+        tool_id=tool_id, expected_tool_version=1, canonical_asset_id=str(canonical_asset_id),
+        confirm_mapping=True, rationale="Reviewed synthetic scanner and host"))
+    assert response.status_code == 200, response.text
+    return observation, response.json()["identity_assessment"]["candidate_key"]
+
+
+@pytest.mark.parametrize(("current_plugin", "expected_candidates"), [("1001", 0), ("1002", 1)])
+def test_review_queue_only_lists_absent_current_reviewed_native_identity(
+        client, owner, db_session, current_plugin, expected_candidates):
+    from app.models.finding_observation import FindingObservation
+    from app.models.finding_identity_binding import ObservationIdentityBinding
+
+    baseline_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "baseline.nessus", _nessus("1001"))
+    current_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "current.nessus", _nessus(current_plugin))
+    assert baseline_response.status_code == current_response.status_code == 201
+    baseline_id, current_id = baseline_response.json()["scan_id"], current_response.json()["scan_id"]
+    baseline_observation = db_session.query(FindingObservation).filter_by(
+        scan_id=uuid.UUID(baseline_id)).one()
+    tool_response = client.post(f"/api/v1/orgs/{owner[1]}/identity-tools",
+        headers=owner[0], json=dict(name="Synthetic Nessus", rationale="Test scanner"))
+    assert tool_response.status_code == 201, tool_response.text
+    tool_id = tool_response.json()["id"]
+    canonical_asset_id = baseline_observation.asset_identity["asset_id"]
+    baseline_observation, baseline_key = _bind_observation(
+        client, owner, db_session, baseline_id, tool_id, canonical_asset_id)
+    current_observation, current_key = _bind_observation(
+        client, owner, db_session, current_id, tool_id, canonical_asset_id)
+    assert (baseline_key == current_key) is (current_plugin == "1001")
+
+    source_time = datetime.now(timezone.utc)
+    declare(client, owner, baseline_id, {"source_snapshot_at": (source_time - timedelta(hours=1)).isoformat()})
+    declare(client, owner, current_id, {"source_snapshot_at": (source_time - timedelta(minutes=30)).isoformat()})
+    finding = db_session.get(Finding, baseline_observation.finding_id)
+    before = (finding.workflow_status, finding.workflow_version, finding.severity,
+        finding.description, finding.scan_id, finding.archived_at)
+
+    response = compare(client, owner, baseline_id, current_id)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["absence_eligible"] is True
+    assert result["candidate_count"] == expected_candidates
+    assert len(result["review_candidates"]) == expected_candidates
+    assert result["baseline_reviewable_observations"] == 1
+    assert result["current_reviewable_observations"] == 1
+    if expected_candidates:
+        candidate = result["review_candidates"][0]
+        assert candidate["finding_id"] == str(baseline_observation.finding_id)
+        assert candidate["baseline_observation_id"] == str(baseline_observation.id)
+        assert candidate["reviewable_baseline_observation_count"] == 1
+        assert candidate["severity"] == "medium"
+        next_page = compare(client, owner, baseline_id, current_id, candidate_offset=1, candidate_limit=1).json()
+        assert next_page["candidate_count"] == 1 and next_page["review_candidates"] == []
+    db_session.refresh(finding)
+    assert before == (finding.workflow_status, finding.workflow_version, finding.severity,
+        finding.description, finding.scan_id, finding.archived_at)
+    assert db_session.query(FindingHistory).count() == 0
+    assert db_session.query(ObservationIdentityBinding).count() == 2
+    assert db_session.get(FindingObservation, current_observation.id) is not None
+
+
+def test_review_queue_excludes_unreviewed_native_observations(client, owner, db_session):
+    baseline_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "baseline.nessus", _nessus("1001"))
+    current_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "current.nessus", _nessus("1002"))
+    baseline_id, current_id = baseline_response.json()["scan_id"], current_response.json()["scan_id"]
+    source_time = datetime.now(timezone.utc)
+    declare(client, owner, baseline_id, {"source_snapshot_at": (source_time - timedelta(hours=1)).isoformat()})
+    declare(client, owner, current_id, {"source_snapshot_at": (source_time - timedelta(minutes=30)).isoformat()})
+    result = compare(client, owner, baseline_id, current_id).json()
+    assert result["absence_eligible"] is False
+    assert result["review_candidates"] == []
+    assert result["baseline_unreviewable_observations"] == 1
+    assert result["current_unreviewable_observations"] == 1
+    assert "current:unreviewable_observations_present" in result["absence_blockers"]
+
+
+def test_review_queue_excludes_ambiguous_baseline_native_identity(client, owner, db_session):
+    from app.models.finding_observation import FindingObservation
+
+    baseline_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "baseline.nessus", _nessus_two_hosts("1001"))
+    current_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "current.nessus", _nessus("1002"))
+    assert baseline_response.status_code == current_response.status_code == 201
+    baseline_id, current_id = baseline_response.json()["scan_id"], current_response.json()["scan_id"]
+    observations = db_session.query(FindingObservation).filter_by(
+        scan_id=uuid.UUID(baseline_id)).order_by(FindingObservation.source_row).all()
+    assert len(observations) == 2 and observations[0].finding_id != observations[1].finding_id
+    tool_response = client.post(f"/api/v1/orgs/{owner[1]}/identity-tools",
+        headers=owner[0], json=dict(name="Synthetic Nessus", rationale="Test scanner"))
+    assert tool_response.status_code == 201, tool_response.text
+    tool_id = tool_response.json()["id"]
+    canonical_asset_id = observations[0].asset_identity["asset_id"]
+    for observation in observations:
+        path = (f"/api/v1/orgs/{owner[1]}/findings/{observation.finding_id}/"
+            f"observations/{observation.id}/identity-binding")
+        response = client.put(path, headers=owner[0], json=dict(expected_version=0,
+            tool_id=tool_id, expected_tool_version=1, canonical_asset_id=canonical_asset_id,
+            confirm_mapping=True, rationale="Reviewed duplicate synthetic identity"))
+        assert response.status_code == 200, response.text
+    _bind_observation(client, owner, db_session, current_id, tool_id, canonical_asset_id)
+    source_time = datetime.now(timezone.utc)
+    declare(client, owner, baseline_id, {"source_snapshot_at": (source_time - timedelta(hours=1)).isoformat()})
+    declare(client, owner, current_id, {"source_snapshot_at": (source_time - timedelta(minutes=30)).isoformat()})
+    result = compare(client, owner, baseline_id, current_id).json()
+    assert result["absence_eligible"] is True
+    assert result["ambiguous_baseline_identity_count"] == 1
+    assert result["candidate_count"] == 0 and result["review_candidates"] == []
+
+
+def test_review_queue_fails_closed_when_scan_observation_cap_is_exceeded(
+        client, owner, monkeypatch):
+    from app.services import scan_snapshots
+
+    baseline_id, current_id = imported(client, owner), imported(client, owner)
+    source_time = datetime.now(timezone.utc)
+    declare(client, owner, baseline_id, {"source_snapshot_at": (source_time - timedelta(hours=1)).isoformat()})
+    declare(client, owner, current_id, {"source_snapshot_at": (source_time - timedelta(minutes=30)).isoformat()})
+    monkeypatch.setattr(scan_snapshots, "_MAX_REVIEW_OBSERVATIONS_PER_SCAN", 0)
+    result = compare(client, owner, baseline_id, current_id).json()
+    assert result["absence_eligible"] is False
+    assert "baseline:scan_observation_limit_exceeded" in result["absence_blockers"]
+    assert "current:scan_observation_limit_exceeded" in result["absence_blockers"]
+    assert result["review_candidates"] == [] and result["candidate_count"] == 0
 
 
 @pytest.mark.parametrize("field,value,reason", [
@@ -125,7 +287,7 @@ def test_incompatible_metadata_is_explained(client, owner, field, value, reason)
     result = compare(client, owner, a,b).json()
     assert result["declared_metadata_matches"] is False
     assert reason in result["blocking_reasons"]
-    assert not result["absence_eligible"] and result["not_observed_finding_ids"] is None
+    assert not result["absence_eligible"] and result["review_candidates"] == []
 
 
 def test_settings_change_is_captured_at_import_not_reconstructed(client, owner):
@@ -291,7 +453,7 @@ def test_same_source_time_cannot_become_newer_by_reuploading(client,owner):
     declare(client,owner,a,{"source_snapshot_at":stamp});declare(client,owner,b,{"source_snapshot_at":stamp})
     result=compare(client,owner,a,b).json()
     assert "current_source_snapshot_is_not_newer" in result["blocking_reasons"]
-    assert result["not_observed_finding_ids"] is None
+    assert not result["absence_eligible"] and result["review_candidates"] == []
 
 
 def test_scope_order_and_duplicate_entries_do_not_change_declared_identity(client,owner):

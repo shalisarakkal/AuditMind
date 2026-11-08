@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC demonstration only: no scanner was run. Use a disposable test organization. -->
+<NessusClientData_v2>
+  <Report name="SYNTHETIC absence review baseline">
+    <ReportHost name="absence-demo-host">
+      <HostProperties><tag name="host-ip">10.200.0.20</tag></HostProperties>
+      <ReportItem port="443" protocol="tcp" severity="2" pluginID="99999180"
+                  pluginName="SYNTHETIC baseline-only review candidate" pluginFamily="General">
+        <description>Fictional finding present only in the synthetic baseline.</description>
+      </ReportItem>
+      <ReportItem port="443" protocol="tcp" severity="1" pluginID="99999181"
+                  pluginName="SYNTHETIC persistent identity control" pluginFamily="General">
+        <description>Fictional control finding retained in both synthetic snapshots.</description>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

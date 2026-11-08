@@ -1,9 +1,13 @@
-# Scan snapshot declarations and comparison review (PB-1.2)
+# Scan snapshot declarations and comparison review (PB-1.2 / PB-1.3)
 
-PB-1.2 adds source-scan declarations and an informational metadata comparison.
-It does not compute missing findings or change findings, workflow, archive
-state, scores, qualifications or saved reports. No AI provider is called.
-Finding reconciliation and stable identity verification remain PB-1.3 work.
+PB-1.2 adds source-scan declarations and metadata comparison. The local PB-1.3
+increment adds a bounded, read-only list of findings eligible for absence
+review; it does not establish that a finding was remediated or change findings,
+workflow, archive state, scores, qualifications or saved reports. No AI
+provider is called. Stable identity verification and explicit
+cross-import/canonical review are implemented in PB-1.3. Durable absence
+decisions and the reconciliation lifecycle remain open; see
+[the current identity contract](FINDING_IDENTITY.md).
 
 ## What is captured and what is declared
 
@@ -94,13 +98,25 @@ missing/stale/revoked declarations, failed/partial/incremental/cancelled source
 snapshots, unreachable targets, changed scope or configuration all block a
 matching-metadata result.
 
-**Declared metadata matches is not permission to infer absence.** Every response
-has `absence_eligible=false`, an explicit identity/reconciliation blocker and
-`not_observed_finding_ids=null`. Null means not evaluated, not an empty list of
-missing findings. No source observation is promoted to reconciliation eligible.
-Declaring a tool-instance ID does not configure a connector or verify/bind the
-IDs on individual source observations; that requires the later identity work.
-No severity, status, assignee, deadline or archive decision changes.
+**Declared metadata matches is not proof of remediation.** For a compatible
+pair, the preview evaluates at most 5,000 observations from each scan using
+current administrator-reviewed native Nessus identity bindings. Candidate
+findings must have a reviewable baseline identity key with no matching key in
+the current scan; findings associated with an ambiguous baseline key are
+excluded. Baseline observations without a current supported identity are
+counted but excluded. Any unreviewable current observation, observation-limit
+overflow, or metadata/comparability blocker withholds the candidate list.
+Generic CSV/JSON and unsupported source mappings do not qualify. Pagination
+defaults to 50 candidates and is capped at 100 per request.
+
+`absence_eligible=true` means only that this bounded candidate preview could
+be computed under those checks. It is not proof that a finding is absent,
+remediated or safe to suppress. The result is not persisted, and there is no
+disposition, suppression, archive or workflow action. No source observation is
+promoted to reconciliation eligible. Declaring a tool-instance ID does not
+configure a connector or bind individual observations; those remain explicit
+administrator reviews. No severity, status, assignee, deadline or archive
+decision changes.
 
 The comparison is a read-only, non-persisted review at the displayed time, not
 a durable authorization token. Reload and review again after source lifecycle
@@ -111,15 +127,22 @@ the organization's assets/findings or broad exact counts.
 
 ## Chrome verification
 
-For a synthetic non-production organization, these clean sample files avoid
-parser-error blockers: [baseline](examples/scan-snapshot-baseline.csv) and
-[current](examples/scan-snapshot-current.csv). They describe one synthetic host
-and the same finding key. The source times are in each file's `observed_at`;
+For a synthetic non-production organization, the clean CSV samples
+[baseline](examples/scan-snapshot-baseline.csv) and
+[current](examples/scan-snapshot-current.csv) exercise declaration and metadata
+compatibility only. Generic CSV has no reviewed identity mapping, so it cannot
+produce absence candidates. The source times are in each file's `observed_at`;
 after import, Findings → Workflow → Source observations displays those times in
 the browser timezone for use in the declaration. Use tool `Synthetic scanner`,
 instance `snapshot-demo-1`, configuration `synthetic-v1` and target scope
-`snapshot-demo-host`, with no exclusions or unreachable targets. Importing these
-files adds synthetic data; they are not real security evidence.
+`snapshot-demo-host`, with no exclusions or unreachable targets.
+
+To exercise the identity-backed preview, use the synthetic native Nessus pair:
+[baseline](examples/absence-review-baseline.nessus) and
+[current](examples/absence-review-current.nessus). They contain a persistent
+control finding and a second finding present only in the baseline, on the same
+synthetic host. Importing these files adds synthetic data; they are not real
+security evidence.
 
 1. Reimport two small compatible findings files with the same parser and effective
    settings. Use Reimport if duplicate policy would otherwise skip them.
@@ -132,8 +155,8 @@ files adds synthetic data; they are not real security evidence.
    and filtering. An organization change or full reload clears this UI-only pin.
 5. Open the later upload's Snapshot and save a suitable declaration. Select
    **Review against baseline**, then **Review compatibility**. Check both named
-   snapshots, scope/exclusions, the metadata result and **Not approved for absence
-   conclusions**, even when metadata matches.
+   snapshots and the scope/exclusions. The CSV examples only exercise metadata
+   compatibility; they do not have supported finding identity.
 6. Revise one declaration's target or configuration and compare again. The
    mismatch must be explicit. A partial/incremental/failed/cancelled declaration
    cannot produce a matching-metadata result.
@@ -142,6 +165,15 @@ files adds synthetic data; they are not real security evidence.
    then. Revoke with a reason; a new comparison must show the revocation blocker.
 8. Confirm the finding's workflow, severity, archive state and saved reports did
    not change. A viewer can review snapshots but sees no mutation controls.
+
+9. Import both Nessus examples as separate scans. Register one tool instance
+   and explicitly bind both baseline observations and the persistent current
+   observation to the same
+   reviewed tool instance and canonical asset. Declare both scans Complete with
+   matching tool/configuration/scope and increasing source times. Compare them:
+   only the baseline-only synthetic finding should appear as a candidate.
+   Leave a current observation unreviewed and compare again; candidate generation
+   must be blocked. No candidate action changes or records finding state.
 
 ## API contract
 
@@ -152,7 +184,10 @@ files adds synthetic data; they are not real security evidence.
 - `POST .../{scan_id}/snapshot/revoke`: append revocation with expected version
   and rationale.
 - `POST .../scans/snapshot-comparison`: baseline/current scan UUIDs and their
-  displayed declaration versions; returns review metadata and explicit blockers.
+  displayed declaration versions, plus optional candidate offset/limit (default
+  0/50, maximum 100); returns review metadata, candidate counts/page and explicit
+  comparability/identity blockers. The bounded observation ceiling is 5,000 per
+  scan.
 
 Validation, Chrome evidence and local activation status are tracked in
 [Phase 4 validation](PHASE4_VALIDATION.md). This increment does not authorize
