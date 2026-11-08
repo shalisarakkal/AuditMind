@@ -77,6 +77,21 @@ class SnapshotComparisonRequest(BaseModel):
     current_scan_id: uuid.UUID
     baseline_version: int = Field(ge=1)
     current_version: int = Field(ge=1)
+    candidate_offset: int = Field(default=0, ge=0)
+    candidate_limit: int = Field(default=50, ge=1, le=100)
+
+
+class NotObservedCandidate(BaseModel):
+    finding_id: uuid.UUID
+    baseline_observation_id: uuid.UUID
+    reviewable_baseline_observation_count: int
+    asset_id: uuid.UUID | None
+    description: str | None
+    category: str | None
+    domain: str
+    severity: str
+    workflow_status: str
+    baseline_recorded_at: datetime
 
 
 class SnapshotComparison(BaseModel):
@@ -84,8 +99,16 @@ class SnapshotComparison(BaseModel):
     baseline: SnapshotView
     current: SnapshotView
     declared_metadata_matches: bool
-    absence_eligible: Literal[False] = False
+    absence_eligible: bool
     blocking_reasons: list[str]
-    absence_blockers: list[str] = ["stable_finding_identity_and_reconciliation_not_enabled"]
+    absence_blockers: list[str]
     scope_differences: dict[str, list[str]]
-    not_observed_finding_ids: None = None
+    review_candidates: list[NotObservedCandidate]
+    candidate_count: int
+    candidate_offset: int
+    candidate_limit: int
+    baseline_reviewable_observations: int
+    current_reviewable_observations: int
+    baseline_unreviewable_observations: int
+    current_unreviewable_observations: int
+    ambiguous_baseline_identity_count: int

@@ -62,23 +62,27 @@ def _scans(db, org_id, ids):
         Scan.org_id == org_id, Scan.id.in_(ids))).all()}
 
 
-def read_observations(db, org_id, observations):
-    """At most five extra bounded queries per page, no inventory scans/N+1."""
+def identity_reviews(db, org_id, observations):
+    """Resolve current reviewed identity without loading observation payloads."""
     decisions = latest_bindings(db, org_id, [row.id for row in observations])
-    if not decisions:
-        return [FindingObservationRead.model_validate(row) for row in observations]
-    tools = {row.id: row for row in db.scalars(select(IdentityTool).where(
-        IdentityTool.org_id == org_id, IdentityTool.id.in_([d.tool_id for d in decisions.values() if d.tool_id])))}
-    assets = _assets(db, org_id, {value for value in
-        [*[_source_asset(o) for o in observations], *[d.canonical_asset_id for d in decisions.values()]] if value})
-    scans = _scans(db, org_id, {o.scan_id for o in observations if o.scan_id})
-    findings = {row.id: row.archived_at for row in db.execute(select(Finding.id, Finding.archived_at).where(
-        Finding.org_id == org_id, Finding.id.in_({o.finding_id for o in observations})))}
-    result = []
+    tools, assets, scans, findings = {}, {}, {}, {}
+    if decisions:
+        tools = {row.id: row for row in db.scalars(select(IdentityTool).where(
+            IdentityTool.org_id == org_id, IdentityTool.id.in_([d.tool_id for d in decisions.values() if d.tool_id])))}
+        assets = _assets(db, org_id, {value for value in
+            [*[_source_asset(o) for o in observations], *[d.canonical_asset_id for d in decisions.values()]] if value})
+        scans = _scans(db, org_id, {o.scan_id for o in observations if o.scan_id})
+        findings = {row.id: row.archived_at for row in db.execute(select(Finding.id, Finding.archived_at).where(
+            Finding.org_id == org_id, Finding.id.in_({o.finding_id for o in observations})))}
+    result = {}
     for observation in observations:
-        item = FindingObservationRead.model_validate(observation)
         decision = decisions.get(observation.id)
-        if decision is not None:
+        identity_binding = None
+        if decision is None:
+            assessment = assess_identity(org_id=org_id, scan_type=observation.scan_type,
+                source=observation.source, profile=observation.profile,
+                raw=observation.source_identity).snapshot()
+        else:
             tool, canonical = tools.get(decision.tool_id), assets.get(decision.canonical_asset_id)
             source, scan = assets.get(_source_asset(observation)), scans.get(observation.scan_id)
             valid = (observation.finding_id in findings and findings[observation.finding_id] is None
@@ -94,14 +98,24 @@ def read_observations(db, org_id, observations):
                 raw=observation.source_identity, binding=binding).snapshot()
             if not valid:
                 assessment["blocking_reasons"].append("reviewed_identity_binding_not_current")
-            item.identity_assessment = assessment
-            item.identity_binding = dict(version=decision.version, state=decision.state,
+            identity_binding = dict(version=decision.version, state=decision.state,
                 current=bool(valid), reviewed_identity_version=decision.context.get("identity_version"),
                 reviewed_from=decision.context.get("reviewed_from"),
                 reviewed_source_mapping=decision.context.get("source_mapping"), tool_id=str(decision.tool_id) if decision.tool_id else None,
                 tool_name=tool.name if tool else "Unavailable", canonical_asset_id=str(decision.canonical_asset_id) if decision.canonical_asset_id else None,
                 rationale=decision.rationale, actor_label=decision.actor_label,
                 created_at=decision.created_at.isoformat())
+        result[observation.id] = (assessment, identity_binding)
+    return result
+
+
+def read_observations(db, org_id, observations):
+    """At most five extra bounded queries per page, no inventory scans/N+1."""
+    reviews = identity_reviews(db, org_id, observations)
+    result = []
+    for observation in observations:
+        item = FindingObservationRead.model_validate(observation)
+        item.identity_assessment, item.identity_binding = reviews[observation.id]
         # Identity material is never comparability, absence or suppression authority.
         item.reconciliation_eligible = False
         result.append(item)

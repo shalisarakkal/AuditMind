@@ -768,9 +768,9 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await declareSnapshot('workflow-repeat.csv');
     await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
     const comparisonDialog=()=>p.getByRole('dialog',{name:'Review scan snapshots',exact:true});
-    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
-    await expect(comparisonDialog().getByText('Declared metadata matches',{exact:true})).toBeVisible();
-    await expect(comparisonDialog().getByText('Not approved for absence conclusions',{exact:true})).toBeVisible();
+    await comparisonDialog().getByRole('button',{name:'Compare scans and build review list',exact:true}).click();
+    await expect(comparisonDialog().getByText('Declared scan metadata matches',{exact:true})).toBeVisible();
+    await expect(comparisonDialog().getByText('Candidate review blocked',{exact:true})).toBeVisible();
     await expect(comparisonDialog().getByRole('region',{name:'Baseline',exact:true})).toContainText('workflow.csv');
     await expect(comparisonDialog().getByRole('region',{name:'Current',exact:true})).toContainText('workflow-repeat.csv');
     const snapshotReviewAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
@@ -795,8 +795,8 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await snapshotDialog().getByRole('button',{name:'Reload saved declaration',exact:true}).click();
     await expect(snapshotDialog().getByText('Version 2 · Declared',{exact:true})).toBeVisible();
     await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
-    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
-    await expect(comparisonDialog().getByText('Target scopes differ',{exact:true})).toBeVisible();
+    await comparisonDialog().getByRole('button',{name:'Compare scans and build review list',exact:true}).click();
+    await expect(comparisonDialog().getByText('Target scopes differ',{exact:true}).first()).toBeVisible();
     await expect(comparisonDialog().getByText('Baseline only targets: workflow-host',{exact:true})).toBeVisible();
     await comparisonDialog().getByRole('button',{name:'Close',exact:true}).click();
     check('Concurrent declaration revision preserves the stale draft, requires explicit reload and explains changed target scope');
@@ -806,8 +806,8 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await snapshotDialog().getByRole('group',{name:'Revoke scan declaration',exact:true}).getByRole('button',{name:'Revoke declaration',exact:true}).click();
     await expect(snapshotDialog().getByText('Version 3 · Revoked',{exact:true})).toBeVisible();
     await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
-    await comparisonDialog().getByRole('button',{name:'Review compatibility',exact:true}).click();
-    await expect(comparisonDialog().getByText('Current: Declaration was revoked',{exact:true})).toBeVisible();
+    await comparisonDialog().getByRole('button',{name:'Compare scans and build review list',exact:true}).click();
+    await expect(comparisonDialog().getByText('Current: Declaration was revoked',{exact:true}).first()).toBeVisible();
     await comparisonDialog().getByRole('button',{name:'Close',exact:true}).click();
     assert.equal((await admin.request(list+'/'+c+'/workflow')).body.version,0);
     assert.equal((await admin.request(org+`/scans/${snapshotBaselineImport.scan_id}/snapshot`)).body.declaration.version,1);

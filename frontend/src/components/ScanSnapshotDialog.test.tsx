@@ -93,24 +93,58 @@ describe("Scan snapshot declarations", () => {
 });
 
 describe("Scan snapshot comparison", () => {
-  it("requires a deliberate review and displays both snapshots, exclusions and no absence authority", async () => {
+  it("requires a deliberate review and shows a read-only reviewed-identity candidate", async () => {
     const current = { ...view, scan: { ...view.scan, id: "s2", filename: "current.csv" } };
     let body: unknown;
     const calls = mockApi({ "GET /orgs/o1/scans/s1/snapshot": () => view, "GET /orgs/o1/scans/s2/snapshot": () => current,
       "POST /orgs/o1/scans/snapshot-comparison": init => { body = JSON.parse(String(init.body)); return {
-        reviewed_at: "2026-11-05T14:00:00Z", baseline: view, current, declared_metadata_matches: true, absence_eligible: false,
-        blocking_reasons: [], absence_blockers: ["stable_finding_identity_and_reconciliation_not_enabled"],
-        scope_differences: { baseline_exclusions: ["10.0.0.20"], current_exclusions: ["10.0.0.20"] }, not_observed_finding_ids: null }; } });
+        reviewed_at: "2026-11-05T14:00:00Z", baseline: view, current, declared_metadata_matches: true, absence_eligible: true,
+        blocking_reasons: [], absence_blockers: [],
+        scope_differences: { baseline_exclusions: ["10.0.0.20"], current_exclusions: ["10.0.0.20"] },
+        review_candidates: [{ finding_id: "finding-1", baseline_observation_id: "observation-1",
+          reviewable_baseline_observation_count: 2, asset_id: "asset-1", description: "Synthetic finding",
+          category: "TEST-1", domain: "network_config", severity: "high", workflow_status: "open",
+          baseline_recorded_at: "2026-11-05T12:00:00Z" }],
+        candidate_count: 1, candidate_offset: 0, candidate_limit: 50,
+        baseline_reviewable_observations: 2, current_reviewable_observations: 1,
+        baseline_unreviewable_observations: 0, current_unreviewable_observations: 0,
+        ambiguous_baseline_identity_count: 0 }; } });
     render(<ScanSnapshotComparisonDialog orgId="o1" orgName="Synthetic org" baselineId="s1" currentId="s2" onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Review compatibility" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Compare scans and build review list" })).toBeEnabled());
     expect(calls.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
     expect(screen.getByRole("region", { name: "Baseline" })).toHaveTextContent("baseline.csv");
     expect(screen.getByRole("region", { name: "Current" })).toHaveTextContent("current.csv");
-    await userEvent.click(screen.getByRole("button", { name: "Review compatibility" }));
+    await userEvent.click(screen.getByRole("button", { name: "Compare scans and build review list" }));
     const result = await screen.findByRole("region", { name: "Comparison result" });
-    expect(within(result).getByText("Declared metadata matches")).toBeVisible();
-    expect(result).toHaveTextContent("Not approved for absence conclusions");
+    expect(within(result).getByText("Declared scan metadata matches")).toBeVisible();
+    expect(result).toHaveTextContent("Candidate review available");
+    expect(result).toHaveTextContent("Synthetic finding · high");
     expect(result).toHaveTextContent("Baseline exclusions: 10.0.0.20");
-    expect(body).toEqual({ baseline_scan_id: "s1", current_scan_id: "s2", baseline_version: 2, current_version: 2 });
+    expect(within(result).getByRole("link", { name: "Open finding" })).toHaveAttribute(
+      "href", "/findings?org=o1&finding_id=finding-1");
+    expect(body).toEqual({ baseline_scan_id: "s1", current_scan_id: "s2", baseline_version: 2, current_version: 2,
+      candidate_offset: 0, candidate_limit: 50 });
+    expect(calls.mock.calls.filter(([, init]) => init?.method && init.method !== "GET")).toHaveLength(1);
+  });
+
+  it("shows current unreviewable coverage while withholding candidates", async () => {
+    const current = { ...view, scan: { ...view.scan, id: "s2", filename: "current.nessus" } };
+    const calls = mockApi({ "GET /orgs/o1/scans/s1/snapshot": () => view, "GET /orgs/o1/scans/s2/snapshot": () => current,
+      "POST /orgs/o1/scans/snapshot-comparison": () => ({
+        reviewed_at: "2026-11-05T14:00:00Z", baseline: view, current, declared_metadata_matches: true,
+        absence_eligible: false, blocking_reasons: [], absence_blockers: ["current:unreviewable_observations_present"],
+        scope_differences: {}, review_candidates: [], candidate_count: 0, candidate_offset: 0, candidate_limit: 50,
+        baseline_reviewable_observations: 2, current_reviewable_observations: 0,
+        baseline_unreviewable_observations: 1, current_unreviewable_observations: 1,
+        ambiguous_baseline_identity_count: 0,
+      }) });
+    render(<ScanSnapshotComparisonDialog orgId="o1" orgName="Synthetic org" baselineId="s1" currentId="s2" onClose={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Compare scans and build review list" }));
+    const result = await screen.findByRole("region", { name: "Comparison result" });
+    expect(result).toHaveTextContent("Candidate review blocked");
+    expect(result).toHaveTextContent("Current: Contains observations without a current supported identity review");
+    expect(result).toHaveTextContent("baseline 2 reviewable / 1 unreviewable; current 0 reviewable / 1 unreviewable");
+    expect(result).not.toHaveTextContent("Findings to review");
+    expect(calls.mock.calls.filter(([, init]) => init?.method && init.method !== "GET")).toHaveLength(1);
   });
 });

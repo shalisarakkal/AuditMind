@@ -57,24 +57,27 @@ visible. This read never updates finding status, archive state, scores or report
 
 ## Remaining PB-1.3 work
 
-[Canonical review](CANONICAL_FINDING_REVIEW.md) now adds an explicit reversible
-designation for two independently reviewed findings, with both histories retained.
-This does not consolidate records or counts; automatic matching, canonical payload
-publication and absence/suppression authority below remain pending.
+Delivered PB-1.3 increments now include [cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md)
+and [reversible canonical designation](CANONICAL_FINDING_REVIEW.md), in addition
+to the reviewed-binding foundation above. These explicit admin decisions are
+versioned and auditable; they do not automatically reuse mappings, merge records,
+change counts or transfer workflow/scoring decisions.
 
-Increment 3 adds [explicit cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md):
-pair comparison and independently confirmed same-finding carry-forward, without
-automatic reuse. Separate finding UUIDs are surfaced as canonical conflicts;
-they are not merged or reassigned. The remaining items below still apply.
+Remaining PB-1.3 lifecycle work:
 
-1. Extend the explicit per-observation bindings below with reviewed cross-import
-   propagation and source-specific ambiguity/collision handling. No implicit reuse.
-2. Establish canonical duplicate resolution, collision/conflict handling and source
-   payload publication without losing observations or reviewed workflows.
-3. Compare eligible complete snapshots and build an explicit not-observed review
-   queue. Absence alone never resolves, suppresses or archives a finding.
-4. Add reviewed suppression, reappearance, restore and purge semantics with shared
+1. Design and verify safe canonical-record consolidation and source-payload
+   publication without losing observations, original-source ownership, reviewed
+   workflows or saved report snapshots.
+2. The scan comparison now provides a read-only, non-persisted candidate preview
+   for bounded, comparable complete snapshots. A durable not-observed queue,
+   recorded review dispositions and their lifecycle remain to be designed and
+   implemented. Absence alone never resolves, suppresses or archives a finding.
+3. Add reviewed suppression, reappearance, restore and purge semantics with shared
    lock ordering and tenant/role/version fences.
+
+The preview adds no automatic reconciliation or suppression authority. See
+[scan snapshot comparison](SCAN_SNAPSHOTS.md) for its blockers, limits and
+non-persistent semantics.
 
 See [reconciliation design](FINDING_RECONCILIATION_DESIGN.md),
 [scan snapshots](SCAN_SNAPSHOTS.md) and [observations](FINDING_OBSERVATIONS.md).

@@ -2,9 +2,12 @@
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 from app.models.archive import ArchiveJob, ArchiveBatch
 from app.models.enums import ScanStatus, ArchiveState, UserRole
+from app.models.finding import Finding
+from app.models.finding_observation import FindingObservation
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.models.scan_snapshot import ScanSnapshotDeclaration
@@ -13,6 +16,8 @@ from app.schemas.scan_snapshot import SnapshotComparison, SnapshotRead, Snapshot
 from app.services.events import actor_label, record_event
 from app.services.org_lock import lock_org_jobs
 from app.services.knowledge_service import KnowledgeError, require_active_org
+
+_MAX_REVIEW_OBSERVATIONS_PER_SCAN = 5000
 
 
 def _scan(db, org_id, scan_id, lock=False):
@@ -151,5 +156,98 @@ def compare_snapshots(db, org_id, payload):
             reasons.append(f"{side}:source_snapshot_time_unavailable")
     if left.source_snapshot_at is not None and right.source_snapshot_at is not None and right.source_snapshot_at <= left.source_snapshot_at:
         reasons.append("current_source_snapshot_is_not_newer")
+    absence_blockers = list(reasons)
+    review_candidates = []
+    candidate_count = 0
+    baseline_reviewable = current_reviewable = 0
+    baseline_unreviewable = current_unreviewable = 0
+    ambiguous_identity_count = 0
+    if not reasons:
+        baseline_observations = _scan_observations(db, org_id, payload.baseline_scan_id)
+        current_observations = _scan_observations(db, org_id, payload.current_scan_id)
+        if (len(baseline_observations) > _MAX_REVIEW_OBSERVATIONS_PER_SCAN
+                or len(current_observations) > _MAX_REVIEW_OBSERVATIONS_PER_SCAN):
+            if len(baseline_observations) > _MAX_REVIEW_OBSERVATIONS_PER_SCAN:
+                absence_blockers.append("baseline:scan_observation_limit_exceeded")
+            if len(current_observations) > _MAX_REVIEW_OBSERVATIONS_PER_SCAN:
+                absence_blockers.append("current:scan_observation_limit_exceeded")
+        else:
+            from app.services.identity_bindings import identity_reviews
+            baseline_reviews = identity_reviews(db, org_id, baseline_observations)
+            current_reviews = identity_reviews(db, org_id, current_observations)
+            baseline_keys: dict[str, set] = {}
+            finding_keys: dict[object, set[str]] = {}
+            latest_observation: dict[object, FindingObservation] = {}
+            baseline_counts: dict[object, int] = {}
+            for observation in baseline_observations:
+                candidate_key = baseline_reviews[observation.id][0]["candidate_key"]
+                if candidate_key is None:
+                    continue
+                baseline_reviewable += 1
+                baseline_keys.setdefault(candidate_key, set()).add(observation.finding_id)
+                finding_keys.setdefault(observation.finding_id, set()).add(candidate_key)
+                latest_observation.setdefault(observation.finding_id, observation)
+                baseline_counts[observation.finding_id] = baseline_counts.get(observation.finding_id, 0) + 1
+            current_keys = set()
+            for observation in current_observations:
+                candidate_key = current_reviews[observation.id][0]["candidate_key"]
+                if candidate_key is None:
+                    continue
+                current_reviewable += 1
+                current_keys.add(candidate_key)
+            baseline_unreviewable = len(baseline_observations) - baseline_reviewable
+            current_unreviewable = len(current_observations) - current_reviewable
+            if current_unreviewable:
+                absence_blockers.append("current:unreviewable_observations_present")
+            ambiguous_findings = set()
+            for findings_for_key in baseline_keys.values():
+                if len(findings_for_key) > 1:
+                    ambiguous_identity_count += 1
+                    ambiguous_findings.update(findings_for_key)
+            possible_findings = {
+                finding_id for finding_id, keys in finding_keys.items()
+                if not keys.intersection(current_keys) and finding_id not in ambiguous_findings
+            } if not current_unreviewable else set()
+            findings = db.scalars(select(Finding).options(load_only(
+                Finding.id, Finding.asset_id, Finding.description, Finding.category,
+                Finding.domain, Finding.severity, Finding.workflow_status,
+            )).where(
+                Finding.org_id == org_id, Finding.id.in_(possible_findings),
+                Finding.archived_at.is_(None)).order_by(Finding.id)).all() if possible_findings else []
+            candidate_count = len(findings)
+            for finding in findings[payload.candidate_offset:payload.candidate_offset + payload.candidate_limit]:
+                observation = latest_observation[finding.id]
+                review_candidates.append(dict(
+                    finding_id=finding.id,
+                    baseline_observation_id=observation.id,
+                    reviewable_baseline_observation_count=baseline_counts[finding.id],
+                    asset_id=finding.asset_id,
+                    description=finding.description,
+                    category=finding.category,
+                    domain=finding.domain.value,
+                    severity=finding.severity.value,
+                    workflow_status=finding.workflow_status,
+                    baseline_recorded_at=observation.recorded_at,
+                ))
+    absence_eligible = not absence_blockers
     return SnapshotComparison(reviewed_at=datetime.now(timezone.utc), baseline=baseline, current=current,
-        declared_metadata_matches=not reasons, blocking_reasons=reasons, scope_differences=differences)
+        declared_metadata_matches=not reasons, absence_eligible=absence_eligible,
+        blocking_reasons=reasons, absence_blockers=absence_blockers, scope_differences=differences,
+        review_candidates=review_candidates, candidate_count=candidate_count,
+        candidate_offset=payload.candidate_offset, candidate_limit=payload.candidate_limit,
+        baseline_reviewable_observations=baseline_reviewable,
+        current_reviewable_observations=current_reviewable,
+        baseline_unreviewable_observations=baseline_unreviewable,
+        current_unreviewable_observations=current_unreviewable,
+        ambiguous_baseline_identity_count=ambiguous_identity_count)
+
+
+def _scan_observations(db, org_id, scan_id):
+    return db.scalars(select(FindingObservation).options(load_only(
+        FindingObservation.id, FindingObservation.org_id, FindingObservation.finding_id,
+        FindingObservation.scan_id, FindingObservation.source, FindingObservation.scan_type,
+        FindingObservation.profile, FindingObservation.asset_identity,
+        FindingObservation.source_identity, FindingObservation.recorded_at,
+    )).where(FindingObservation.org_id == org_id, FindingObservation.scan_id == scan_id)
+        .order_by(FindingObservation.recorded_at.desc(), FindingObservation.id.desc())
+        .limit(_MAX_REVIEW_OBSERVATIONS_PER_SCAN + 1)).all()

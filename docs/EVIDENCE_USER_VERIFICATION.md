@@ -36,8 +36,8 @@ separate from evidence-qualified domain coverage, whose setting is unchanged.
 PB-1.2 source-scan review: on Uploads, open **Snapshot**, declare source scope,
 tool instance/configuration and source snapshot time, then **Use as baseline**.
 Declare a later source snapshot and choose **Review against baseline** followed
-by **Review compatibility**. Check both scans, scope/exclusions and the explicit
-absence blocker. Finding workflow, severity, archive state and scores must not
+by **Compare scans and build review list**. Check both scans, scope/exclusions
+and the explicit absence blocker. Finding workflow, severity, archive state and scores must not
 change. [Detailed steps and clean synthetic files](SCAN_SNAPSHOTS.md#chrome-verification).
 
 PB-1.1 source history: after installation, import a small findings file, open
