@@ -118,8 +118,8 @@ status, assignee, deadlines or history. Local activation status is tracked in
 On **Uploads**, use a row's **Snapshot** action to declare source-scan scope and
 completeness (admin/auditor), or review it read-only. **Use as baseline** pins an
 upload across paging/filtering; open another Snapshot and choose **Review against
-baseline**, then **Review compatibility**. Compatible scans can show a bounded,
-read-only candidate list only when current reviewed native Nessus identity
+baseline**, then **Compare scans and build review list**. Compatible scans can
+show a bounded, read-only candidate list only when current reviewed native Nessus identity
 bindings are available; a candidate is not proof of remediation, and no
 disposition is recorded. Matching metadata alone never authorizes an absence
 conclusion or changes findings. Old uploads require a new import to capture

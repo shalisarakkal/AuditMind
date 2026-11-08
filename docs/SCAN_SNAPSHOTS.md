@@ -98,7 +98,7 @@ missing/stale/revoked declarations, failed/partial/incremental/cancelled source
 snapshots, unreachable targets, changed scope or configuration all block a
 matching-metadata result.
 
-**Declared metadata matches is not proof of remediation.** For a compatible
+**Declared scan metadata matches is not proof of remediation.** For a compatible
 pair, the preview evaluates at most 5,000 observations from each scan using
 current administrator-reviewed native Nessus identity bindings. Candidate
 findings must have a reviewable baseline identity key with no matching key in
@@ -154,8 +154,8 @@ security evidence.
 4. Select **Use as baseline**. The pinned filename remains visible across paging
    and filtering. An organization change or full reload clears this UI-only pin.
 5. Open the later upload's Snapshot and save a suitable declaration. Select
-   **Review against baseline**, then **Review compatibility**. Check both named
-   snapshots and the scope/exclusions. The CSV examples only exercise metadata
+   **Review against baseline**, then **Compare scans and build review list**.
+   Check both named snapshots and the scope/exclusions. The CSV examples only exercise metadata
    compatibility; they do not have supported finding identity.
 6. Revise one declaration's target or configuration and compare again. The
    mismatch must be explicit. A partial/incremental/failed/cancelled declaration

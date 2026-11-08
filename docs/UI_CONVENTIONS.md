@@ -33,8 +33,8 @@ Cancelling that confirmation preserves the underlying editor and draft.
 
 Scan snapshot uses primary Declare snapshot only before a declaration exists;
 Revise declaration, baseline selection and baseline review remain secondary.
-Save declaration and Review compatibility are primary within their respective
-tasks. Both snapshot dialogs use a neutral Close footer button. This is a visual
+Save declaration and Compare scans and build review list are primary within
+their respective tasks. Both snapshot dialogs use a neutral Close footer button. This is a visual
 convention, not a claim that wrapping alone constitutes an accessibility failure.
 
 File drag/drop must not navigate to a local file. Signed-in layout installs a
