@@ -145,14 +145,16 @@ observation after the canonical save's final context check. The new regression
 fails without the fix and passes with the organization lock held through the
 receipt commit. The final backend run includes the regression and passes. The
 Chrome checkpoint predates this backend-only concurrency fix; hosted exact-SHA
-CI is the remaining release gate.
+CI passed all four jobs on `f31bb25`
+([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
 
 Local activation is verified: the demo schema was already at migration 0048.
 Idempotent preparation found no new upgrade operations or schema drift; the
 existing demo was retained. The API health check and canonical OpenAPI routes
 are available, the one-slot worker is running, and all six tracked queues were
-idle. No restart or data change was needed. Exact-SHA hosted CI remains pending.
-No production deployment or complete canonical consolidation is claimed.
+idle. No restart or data change was needed. Exact-SHA hosted CI passed all four
+jobs after this local activation check. No production deployment or complete
+canonical consolidation is claimed.
 
 Next implementation gates remain physical/logical consolidation semantics,
 latest-source payload publication, not-observed review and independent suppression

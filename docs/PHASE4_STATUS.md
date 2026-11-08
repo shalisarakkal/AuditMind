@@ -8,8 +8,9 @@ race. The organization-lock fix and its reproducer pass; the full post-fix backe
 run passed 1,710 tests. Full frontend passed 560 tests; the full isolated Chrome
 workflow passed 98 checks before the final backend-only concurrency fence, with
 no browser errors or AI use.
-Local activation at migration 0048 is verified; exact-SHA hosted CI remains
-pending. Prior release results below do not certify this uncommitted increment.
+Local activation at migration 0048 is verified. Exact-SHA hosted CI passed all
+four jobs on `f31bb25` ([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
+Prior release results below do not certify this increment.
 
 The next local PB-1.3 increment adds explicit
 [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md): native Nessus

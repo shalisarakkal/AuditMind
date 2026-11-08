@@ -21,8 +21,9 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   included in the backend run. Local demo was already at 0048; idempotent
   prepare found no migration or schema drift, API health/routes and one-slot
   worker are healthy, and all six work queues were idle. No restart was needed.
-  The Chrome result predates the final backend-only concurrency fence; exact-SHA
-  hosted CI remains the release gate.
+  The local Chrome result predates the final backend-only concurrency fence.
+  Exact-SHA hosted CI passed all four jobs on `f31bb25`; see
+  [hosted run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513).
 - Contract and Chrome steps: [Canonical finding review](docs/CANONICAL_FINDING_REVIEW.md).
 
 ## PB-1.3 cross-import review - 7 November 2026

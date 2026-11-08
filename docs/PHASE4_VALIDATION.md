@@ -14,7 +14,8 @@ canonical save now holds the organization lock through final context validation
 and receipt commit. The new regression failed before that fix and passes after it.
 The full post-fix required-PostgreSQL backend suite passed 1,710 tests with
 warnings as errors. The earlier Chrome checkpoint is not a post-fix browser run;
-exact-SHA hosted CI remains pending.
+exact-SHA hosted CI passed all four jobs on `f31bb25`
+([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
 See [contract, retention and verification steps](CANONICAL_FINDING_REVIEW.md).
 
 ## PB-1.3 cross-import review - 7 November 2026
