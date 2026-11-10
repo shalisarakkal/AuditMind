@@ -70,10 +70,13 @@ The [canonical-selection review flow](CANONICAL_FINDING_REVIEW.md) now implement
 the explicit two-history designation/receipt. It is not the consolidation or
 latest-payload publisher below; both original records remain independently counted.
 
-1. **Canonical conflict resolution:** explicit selection of survivor, review of
-   both workflows and verification decisions, version/lifecycle fences, atomic
-   retained observation/history links and safe original-upload ownership. Never
-   discard a conflicting decision merely because native identity matches.
+1. **Reviewed record consolidation (not implemented):** define and implement a
+   separate, explicit operation for reconciling the two retained records after
+   canonical designation. Specify how conflicting workflow/verification
+   decisions, observation/history links and original-upload ownership are
+   preserved; enforce version/lifecycle fences and never discard a decision
+   merely because native identity matches. Canonical designation alone does not
+   authorize consolidation.
 2. **Canonical payload publication:** choose the latest successful eligible
    observation by an approved source-time policy; refresh severity/details while
    retaining reviewed workflow and historical reports. Test out-of-order imports,
@@ -123,5 +126,9 @@ no importer work, inventory scan or new database query. Expanded post-fix local
 backend: 124 passed in 126.53 seconds. Focused real Chrome: seven checks passed
 at `temp/testing/finding-workflow/phase3_browser_79ff36dd0716`.
 
-Hosted CI is authoritative for each pushed commit in GitHub Actions; the final
-push is not considered verified until all four jobs pass on its exact SHA.
+All four hosted CI jobs passed on the final cross-import code through
+`f31bb25`; canonical selection and its follow-up verification are recorded in
+[canonical review](CANONICAL_FINDING_REVIEW.md) and the
+[current release checklist](RELEASE_READINESS.md). Hosted CI remains the
+authority for later code commits. These checks do not close production,
+customer-pilot or the remaining reconciliation lifecycle gates.

@@ -5,6 +5,16 @@ below preserve the status and test evidence as it stood at that time; their
 "pending" items do not supersede the
 [current release/readiness status](RELEASE_READINESS.md).
 
+## Current workspace review - 10 November 2026
+
+The source-integrity/code review found no blocking defect in the current
+workspace scope. All 561 frontend tests, full lint and isolated production
+build pass. All 133 unique targeted backend tests passed across private
+PostgreSQL runs, with migration-name/setup details retained in
+[current code review](CURRENT_CODE_REVIEW.md). Security, dependency and secret
+guards pass. These focused checks do not replace a full hosted suite. The
+separate uncommitted durable-review worktree is not included or certified.
+
 ## PB-1.3 read-only absence-candidate preview - 8 November 2026
 
 The local implementation returns a paged, non-persisted candidate list only
@@ -19,12 +29,16 @@ After the final current-scan fail-closed refinement, the sequential related
 backend integration suites passed 110 tests (snapshot comparison, identity
 bindings/comparison and observations). The focused snapshot dialog suite passed
 8 tests; ESLint on the changed UI files and `tsc --noEmit` passed. These are
-local results for uncommitted work. A new isolated real-Chrome walkthrough
+local focused results for the subsequently committed preview increment. A new isolated real-Chrome walkthrough
 passed two scenarios: exactly one baseline-only synthetic candidate appears
 when the reviewed identities permit comparison, and candidate generation is
 withheld after revoking the current observation's identity review. It used a
 disposable `auditmind_test` schema and synthetic Nessus files, made no external
-AI calls, and removed the schema afterward. Hosted CI remains pending. The
+AI calls, and removed the schema afterward. The preview shipped as `a83c320`;
+browser-review alignment followed in `d06d31e`. All four exact-SHA hosted Linux
+jobs (backend, frontend, browser and dependency audit) passed on `d06d31e` in
+[run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). These hosted gates cover the current code;
+the earlier local canonical test counts are historical, not a new local full run. The
 broader durable absence queue, dispositions, suppression, consolidation and
 payload publication remain open.
 

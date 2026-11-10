@@ -8,7 +8,7 @@ customer-pilot, hosting, live-AI or recovery-SLA approval.
 The project owner/user confirmed release, engineering, operations and security
 ownership on 5 November. PB-0.1 checklist/ownership reconciliation is complete;
 the remaining release decisions are tracked in
-[release readiness](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+[release readiness](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
 PB-0.2 pilot preparation, broader scoring and SaaS rollout remain deferred.
 Current search behavior is unchanged.
 

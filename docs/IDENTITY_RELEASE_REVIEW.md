@@ -58,8 +58,9 @@ not. The browser test now uses the semantic role; this was a test defect.
 - Candidates require supported native identity material and retained current
   referenced context. Revoke/retirement and missing/changed/archived references
   withhold candidates; new imports never inherit reviewed bindings silently.
-- Candidate identity remains separate from canonical conflict resolution, scan
-  comparability, absence, suppression, workflow and score exclusions. Multi-query
+- Candidate identity remains separate from canonical designation (implemented
+  later as a reversible review receipt), scan comparability, absence, suppression,
+  workflow and score exclusions. Designation does not merge findings. Multi-query
   diagnostics are not an atomic authorization snapshot for future operations.
 - Observation pages use bounded lookups rather than inventory scans or per-row
   queries. Import matching/publication does not resolve bindings. New foreign-key

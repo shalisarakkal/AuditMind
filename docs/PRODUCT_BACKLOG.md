@@ -45,10 +45,10 @@ before changing contracts.
 
 ### PB-0.1 — Reconcile release gates into one current checklist
 
-**Status, 5 November:** Complete as checklist/ownership reconciliation. The
-project owner/user confirmed release approval and engineering, operations and
-security ownership. Operational release gates remain open; this is not release
-approval. [Current gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+**Status, 8 November:** Complete as checklist/ownership reconciliation. The
+project owner/user confirmed ownership of release approval and of engineering,
+operations and security. Operational release gates remain open; this is not release
+approval. [Current gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
 
 **Priority:** P0 · **Depends on:** none
 
@@ -68,23 +68,43 @@ handoff text without erasing its audit context.
 
 ### PB-0.2 — Define a bounded pilot contract
 
-**Status, 5 November:** User-deferred; not completed. Customer pilot preparation
-and broader evidence-qualified scoring rollout remain held.
+**Status, 8 November:** User-deferred; not completed. This is the next
+pilot-readiness decision, not an engineering defect or a request to enable a
+customer deployment. The owner must first decide to resume it, then approve the
+bounded contract and scope-dependent release gates in
+[release readiness](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate).
 
 **Priority:** P0 · **Depends on:** PB-0.1
 
-Document pilot users, supported import/report workflows, data handling,
-known limitations, support path, and prohibited or disabled behavior. Preserve
-default-off controls and current serial-worker assumptions unless separately
-approved and measured.
+Before pilot code/configuration work, document the pilot objective and audience;
+participant organizations/roles; target environment and access; approved sources
+and data classification; retention, deletion and incident handling; included
+workflows; exclusions and off-by-default capabilities; support and recovery
+ownership; measurable success, stop and exit criteria; and required approvals.
+Use explicit owner-approved values, not assumptions from synthetic/local tests.
+Keep current worker limits and defaults unless separately approved and measured.
 
 **Acceptance criteria**
 
-- Pilot scope names included and excluded workflows and data sources.
-- Operators can tell which settings are off by default and what approval is
-  needed to enable them.
-- No concurrency, SaaS capacity, certification, or production-readiness claim
-  is made without corresponding acceptance evidence.
+- The versioned pilot contract names its audience, purpose, target, allowed data,
+  included workflows, exclusions, support contact, success/stop criteria and
+  approvers; undecided items block closure.
+- Each included workflow maps to an implemented path, exact-SHA verification
+  evidence, and known limitations; any missing feature is excluded rather than
+  implied.
+- Operators can identify required consent, settings and approvals; live AI,
+  broader evidence-qualified scoring, SaaS/parallel scale and not-yet-built
+  reconciliation behaviors stay excluded unless separately approved.
+- Applicable deployment, security, privacy/data-handling, monitoring,
+  backup/recovery and workload gates have evidence and explicit acceptance
+  before a real deployment or customer data is used.
+- No concurrency, SaaS capacity, certification or production-readiness claim is
+  made without corresponding evidence and approval.
+
+**To close this gate:** obtain owner decisions for every contract field and
+record approval; prepare the scope-to-evidence matrix; complete applicable
+release gates for the chosen target; then record a dated go/no-go. This closes
+pilot readiness only for that documented scope, not production readiness.
 
 ### PB-0.3 — Verify recovery and operational procedures for the pilot
 
@@ -166,27 +186,45 @@ accepted.
 
 ### PB-1.3 — Implement reviewed finding reconciliation
 
-**Current increment:** [Cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
+**Delivered increments (8 November):** [Cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
 adds bounded native Nessus comparison and independent admin-confirmed mapping
-carry-forward for the same finding. Canonical conflicts block; automatic merging,
-payload refresh, absence queue and suppression remain pending. PB-1.3 stays open.
+carry-forward for the same finding. Canonical conflicts block. The subsequent
+[canonical designation](CANONICAL_FINDING_REVIEW.md) adds reversible admin
+designation with both histories preserved, context/version fences, independent
+receipts and explicit revocation. It does not consolidate counts or transfer
+workflow/scoring decisions. All four hosted CI jobs passed on the canonical
+feature SHA `f31bb25` in
+[run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513);
+the follow-up documentation SHA passed all four in
+[run 61](https://github.com/shalisarakkal/AuditMind/actions/runs/42493878994).
+The final canonical local run passed 1,710 backend and 560 frontend tests.
+The new bounded absence-candidate preview is implemented locally and its
+focused backend regression set passes 110 tests. Its focused frontend suite
+passed 8 tests, and changed-file lint plus TypeScript checks passed. All four
+hosted Linux jobs passed on `d06d31e` in
+[run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560);
+the new isolated real-Chrome walkthrough passed two scenarios
+(candidate shown when eligible; candidates withheld when current identity
+review is revoked). Durable absence
+dispositions, consolidation, source publication and suppression remain open;
+PB-1.3 is not closed by these review increments.
 
-**Status, 7 November:** Identity foundation implemented locally: versioned
-candidate-key kernel, reviewed native Nessus mapping and read-only observation
-API/UI diagnostics. The delivered binding increment adds explicit admin-reviewed tool and canonical-asset
-bindings (migration 0046); new observations do not inherit them. Reconciliation
-stays off. Cross-import canonical conflicts, review queue and suppression lifecycle
-remain open. Bindings are activated locally at 0046 after migration, concurrency,
-role/tenant, batching and browser checks. Delivered through `3775dc6`; all four
-Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928). Final local suites: 1,653 backend, 548 frontend
-and 94 Chrome checks. This closes the identity/binding increment, not PB-1.3 as a whole.
-[Identity contract](FINDING_IDENTITY.md).
+**Identity foundation:** Versioned candidate-key logic, reviewed native Nessus
+mapping, read-only observation diagnostics, and explicit admin-reviewed tool
+and canonical-asset bindings (migration 0046) are implemented. New observations
+do not inherit bindings. Cross-import review (increment 3) and reversible
+canonical designation (increment 4, migrations 0047/0048) preserve explicit
+review and do not enable automatic reconciliation. See
+[identity contract](FINDING_IDENTITY.md). These delivered increments close
+their scoped features, not PB-1.3 as a whole.
 
 **Priority:** P1 · **Depends on:** PB-1.1, PB-1.2
 
-Create a review queue for findings not observed in comparable scans. Let an
-authorized user inspect the evidence and explicitly retain, suppress/archive,
-or restore a finding with a reason and durable history.
+Provide an authorized user with a durable review queue for findings not
+observed in comparable scans, then allow an explicit retain, suppress/archive
+or restore decision with a reason and durable history. The current local
+increment supplies only a read-only, non-persisted candidate preview; it does
+not meet the durable-queue or disposition criteria.
 
 **Acceptance criteria**
 

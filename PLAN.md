@@ -2,6 +2,36 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Current workspace review - 10 November 2026
+
+- Reviewed current code through merge `43e61bb`; application source is unchanged
+  from the delivered preview. Existing import/list performance safeguards remain
+  present. No blocking finding was identified in the reviewed scope.
+- All 561 frontend tests, full lint and isolated production build pass.
+  All 133 unique targeted backend checks passed across private PostgreSQL runs,
+  including the separately rerun migration suite. Bandit, dependency and secret
+  guards pass. See [review scope and test setup](docs/CURRENT_CODE_REVIEW.md).
+- Reconcile roadmap/release documents and preserve historical test checkpoints.
+  The separate Copilot durable-review worktree is excluded and remains unfinished.
+  This check-in still requires exact-SHA hosted CI; it does not approve a pilot.
+
+## PB-1.3 read-only absence-candidate preview - 8 November 2026
+
+- Implement a bounded, non-persisted candidate list from compatible complete
+  snapshots and current administrator-reviewed native Nessus identities.
+- Fail closed on any unreviewable current observation or observation-limit
+  overflow; exclude ambiguous baseline identity associations. No finding,
+  workflow, archive, score or report state changes, and no durable disposition.
+- Sequential related backend suites: 110 passed. Focused frontend: 8 passed;
+  changed UI lint and TypeScript check passed. An isolated real-Chrome
+  walkthrough passed candidate-display and current-identity fail-closed
+  scenarios. All four hosted Linux jobs passed on `d06d31e` in
+  [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). See
+  [scan snapshot comparison](docs/SCAN_SNAPSHOTS.md) and
+  [Phase 4 validation](docs/PHASE4_VALIDATION.md).
+- Remaining PB-1.3: durable review/dispositions, safe consolidation and
+  source-payload publication, plus independent suppression/restore lifecycle.
+
 ## PB-1.3 canonical selection - 7 November 2026
 
 - Add migration 0047 for independent append-only canonical-selection receipts.
@@ -40,12 +70,16 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   passed, including 320px/Axe and unchanged workflow acceptance. Activated locally
   at existing migration 0046 after five idle-queue checks; login HTTP 200.
   Initial delivery `dd46468`; follow-up review adds the final-write context fence.
-  Post-fix 124 backend tests and seven focused Chrome checks passed. Hosted CI
-  must pass on the exact final pushed SHA before this delivery gate closes.
+  Post-fix 124 backend tests and seven focused Chrome checks passed. All four
+  hosted CI jobs passed on exact cross-import SHA `dd46468` in
+  [run 58](https://github.com/shalisarakkal/AuditMind/actions/runs/42419540581).
+  The subsequent canonical-selection feature passed all four jobs on `f31bb25`
+  in [run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513).
   Contract and Chrome steps:
   [Cross-import review](docs/CROSS_IMPORT_IDENTITY_REVIEW.md).
-- Remaining PB-1.3: explicit canonical conflict resolution, source payload
-  publication, not-observed queue and independent suppression/restore lifecycle.
+- Remaining PB-1.3: safe record consolidation/source-payload publication,
+  durable not-observed review/dispositions, and independent suppression/restore
+  lifecycle.
 
 ## Identity release review and complete tests - 7 November 2026
 
@@ -85,7 +119,9 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 - No import matching, canonical merge, absence flags, suppression or scoring
   changes. Observations stay ineligible for reconciliation; explicit reviewed
   tool/asset bindings are delivered in the increment above. Canonical conflicts,
-  review queue and suppression remain pending. See docs/FINDING_IDENTITY.md.
+  durable review queue and suppression remain pending. A non-persisted
+  candidate preview is tracked in the 8 November increment above; see
+  docs/FINDING_IDENTITY.md.
 - Local validation: 62 backend identity/matching/observation/batching tests,
   4 observation UI tests and 93 Chrome workflow checks pass. Lint and production
   build pass; local app restarted with all queues idle. Delivered through
@@ -295,11 +331,11 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   migration, setting or running process changed in this design exercise.
   [Design, measurements and tradeoffs](docs/SHORT_FINDING_SEARCH_DESIGN.md).
 
-## Next roadmap item - release-gate reconciliation (PB-0.1)
+## Release-gate reconciliation and current next decision - 8 November 2026
 
 - [x] Consolidate current technical evidence, open operational gates, approval
   boundaries and user-deferred features in the existing authoritative
-  [release-readiness checklist](docs/RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+  [release-readiness checklist](docs/RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
   Preserve historical delivery records under an explicit historical heading.
 - [x] PB-0.1 owner assignment confirmed on 5 November: the project owner/user
   self-assigned release approval and engineering, operations and security roles.
@@ -312,6 +348,11 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
   no duplicate work on restart, no remaining private clusters or AI usage.
   [Procedure, artifacts and deployment limits](docs/RECOVERY_REHEARSAL.md).
   Intended-deployment recovery acceptance and pilot preparation remain open/deferred.
+- [ ] PB-0.2 pilot readiness remains user-deferred. Resume only after the project
+  owner records audience, environment, approved data/workflows, exclusions,
+  operating/support boundaries, success/stop criteria and approvals; then map
+  the chosen scope to applicable G-02 through G-07 evidence. See the
+  [pilot-readiness checklist](docs/RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate).
 
 ## Archive lifecycle performance follow-up - 4 November
 

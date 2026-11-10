@@ -1,6 +1,12 @@
 # Phase 4 status and next milestone
 
-Current local increment: [canonical finding review](CANONICAL_FINDING_REVIEW.md),
+Latest shipped increment: the bounded, read-only absence-candidate preview
+through `d06d31e`. All four exact-SHA hosted Linux jobs passed in
+[run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). No durable absence decision,
+workflow change, suppression or automatic reconciliation is authorized by this
+preview. [Validation](PHASE4_VALIDATION.md).
+
+Preceding shipped increment: [canonical finding review](CANONICAL_FINDING_REVIEW.md),
 migrations 0047/0048. Explicit admin designation and revocation preserve both independent
 records/histories and do not consolidate counts or transfer approvals. The prior
 full backend run passed 1,709 tests before final review reproduced an import-publication
@@ -9,22 +15,30 @@ run passed 1,710 tests. Full frontend passed 560 tests; the full isolated Chrome
 workflow passed 98 checks before the final backend-only concurrency fence, with
 no browser errors or AI use.
 Local activation at migration 0048 is verified. Exact-SHA hosted CI passed all
-four jobs on `f31bb25` ([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
-Prior release results below do not certify this increment.
+four jobs on `f31bb25` ([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513));
+the documentation follow-up passed all four jobs on `a9812a7`
+([run 61](https://github.com/shalisarakkal/AuditMind/actions/runs/42493878994)).
+The preview code was merged as `43e61bb` with an identical code tree and green
+hosted CI in [run 42531324401](https://github.com/shalisarakkal/AuditMind/actions/runs/42531324401).
+The 10 November source-integrity review is recorded in
+[current code review](CURRENT_CODE_REVIEW.md); later commits need their own CI.
 
-The next local PB-1.3 increment adds explicit
-[cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md): native Nessus
-pair comparison, independently confirmed same-finding carry-forward and visible
-canonical conflicts. It does not enable automatic merging, payload refresh,
-absence conclusions or suppression. Current increment validation is recorded in
-that contract; the completed release results below remain the prior checkpoint.
+**Next decision: PB-0.2 pilot readiness.** The gate remains user-deferred until
+the project owner approves the bounded scope, data, environment, operations,
+success/stop criteria and applicable release checks in
+[release readiness](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate).
+PB-1.3's identity, cross-import review and canonical-designation increments are
+shipped; automatic merging, payload publication, absence conclusions and
+suppression are not enabled. Remaining work is detailed in
+[the reconciliation contract](FINDING_RECONCILIATION_DESIGN.md).
 
 7 November: PB-1.3 identity candidate foundation and explicit admin-reviewed
 bindings are implemented and activated locally at migration 0046. This adds no
 absence, suppression or automatic matching authority. Complete release review,
 regression fixes and final per-commit gates are documented in
-[identity release review](IDENTITY_RELEASE_REVIEW.md). Remaining PB-1.3 canonical
-conflicts, review queue and suppression lifecycle are tracked in PRODUCT_BACKLOG.md.
+[identity release review](IDENTITY_RELEASE_REVIEW.md). Subsequent cross-import
+review and canonical selection are recorded above; review queue and suppression
+lifecycle remain tracked in PRODUCT_BACKLOG.md.
 Delivered through `3775dc6`; all four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
 Final local suites: 1,653 backend tests, 548 frontend tests and 94 Chrome checks.
 
@@ -67,7 +81,7 @@ historical backfill. [Contract and verification](FINDING_OBSERVATIONS.md);
 broader pilot/production rollout remain pending.
 
 Current release decisions and open evidence requirements are consolidated in the
-[5 November release-gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026).
+[8 November release-gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
 The project owner/user confirmed execution and approval ownership; release-gate
 sign-offs remain open. Dated entries below retain their
 checkpoint context; older pending/launch statements do not supersede that list.
@@ -723,7 +737,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Browser-local deadlines and date filters | Implemented | Author timezone/fixed expiry, today through inclusive local end of day, creation boundary; global dark native date inputs. Legacy Eastern metadata retained. |
 | Selection, archive confirmations, IDs and shared UI | Implemented for documented scope | Findings, Archived, Assets, Uploads; manual finding entry; inline Documents preview; full-width Settings; timed routine notices. |
 | Workflow preservation on import/restore | Partial, bounded | Existing matching skips exact duplicates; archive restore protects edited workflow (`workflow_version = 0` duplicate purge guard). This is not stable cross-scan identity or absence reconciliation. |
-| Imported individual suppression and comparable-scan absence review | Pending implementation | Functional rules approved; native identity candidates and explicit reviewed bindings are implemented locally at 0046. Canonical conflicts, absence queue and suppression lifecycle remain pending; see FINDING_IDENTITY.md and FINDING_RECONCILIATION_DESIGN.md. |
+| Imported individual suppression and comparable-scan absence review | Partial, local candidate preview | Bounded read-only candidates are computed from comparable complete scans and reviewed native Nessus identities; no persisted queue/disposition, suppression, archive or workflow change. Durable absence decisions and suppression lifecycle remain pending; see SCAN_SNAPSHOTS.md, FINDING_IDENTITY.md and FINDING_RECONCILIATION_DESIGN.md. |
 | Status-aware scoring / report changes | Approved PB-4.4 increment | See STATUS_AWARE_SCORING.md and PLAN.md for the separate implementation and validation. Earlier saved reports remain unchanged; workflow delivery alone never established verification approval. |
 | Further per-domain refinement and export polish | Baseline exists; additional scope not defined | `scoring_service.py` implements deterministic domain scores; reports route exports HTML/JSON/PDF. Phase 4 refinements beyond those delivered features require concrete acceptance criteria, not duplicate implementation or a blanket completion checkbox. |
 | Dashboard security summary | Implemented locally | Three completed organization-event counts; exact Activity links; global failed sign-ins explicitly unavailable. Scores unchanged. |

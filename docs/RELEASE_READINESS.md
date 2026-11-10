@@ -1,20 +1,26 @@
 # Release readiness and code review
 
-## Current release-gate checklist - 5 November 2026
+## Current release-gate checklist - 8 November 2026
 
 This is the current PB-0.1 reconciliation. Checkpoints below retain their original
 dates; old statements such as "not pushed", "frontend stopped" or "CI pending"
 do not override this section. Implementation, hosted CI, customer acceptance and
 production approval are separate decisions.
 
-**Current code baseline:** `b4230f98515c3ef480a4d2cfb4d0f25ca05ce838` on `main`.
-All four hosted Ubuntu jobs passed in
-[run 42064135975](https://github.com/shalisarakkal/AuditMind/actions/runs/42064135975):
-backend, frontend, browser and backend dependency/security audit. Local review
-passed 129 focused backend checks, 86 Chrome checks and four Windows process-stop
-regressions. These overlapping scopes must not be added as equivalent coverage.
-The later short-search index work is research only. The user chose to retain
-current search behavior and defer implementation on 5 November.
+**Latest committed baseline:**
+`d06d31ee956194bbfcd3eb93e931d8c4ebd63747` on `main`. The read-only
+absence-candidate preview and browser alignment passed all four exact-SHA hosted
+Linux jobs in [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). The canonical-selection implementation is
+`f31bb25b36a9ce6fc1c47dc6f23a43d78fbe9727`; all four hosted jobs passed in
+[run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513).
+The follow-up documentation commit also passed all four hosted jobs in
+[run 61](https://github.com/shalisarakkal/AuditMind/actions/runs/42493878994).
+The feature's local post-fix checks include 1,710 required-PostgreSQL backend
+tests, 560 frontend tests, lint/build, high-severity Bandit and secret guards.
+The earlier 98-check Chrome run predates the final backend-only concurrency
+fence; the hosted browser job passed on both exact SHAs. These overlapping
+scopes are not additive coverage or production approval. Current search behavior
+is retained; short-search index implementation remains deferred.
 [Measured tradeoffs and disposition](SHORT_FINDING_SEARCH_DESIGN.md).
 
 ### Accountability
@@ -38,7 +44,7 @@ not a failed test or automatically part of the next release.
 
 | Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
 | --- | --- | --- | --- |
-| G-01: reviewed code and correctness CI | Verified for `b4230f9` | Engineering / project release owner | Exact-SHA run above and scoped archive/search/restart review. Verify again for later implementation changes. CI is not production sign-off. |
+| G-01: reviewed code and correctness CI | Verified for current tip `d06d31e` | Engineering / project release owner | Exact-SHA run 42529240560 passed all four jobs; runs 60 and 61 verify the preceding canonical increment. The canonical increment also passed the post-fix local suite above. CI is not production sign-off; repeat for subsequent code changes. |
 | G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
 | G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
 | G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |
@@ -59,19 +65,52 @@ gates when the capability enters the agreed release scope.
 
 | Item | Current disposition | Owner / approval authority (roles held by project owner) | Evidence or next action |
 | --- | --- | --- | --- |
-| Customer pilot contract (PB-0.2) | User-deferred | Product acceptance owner and operations / project release owner | When resumed, define users, data sources, workflows, support/data-handling procedures and limitations. Synthetic pilot tests are not customer approval. |
+| Customer pilot contract (PB-0.2) | User-deferred; decision record not yet approved | Product acceptance owner with operations / project release owner | Complete and approve the bounded pilot contract below: audience/roles, target environment, allowed data and workflows, excluded features, data handling/retention, support/incident path, success/stop criteria and approvals. Synthetic tests are engineering evidence, not customer acceptance. |
 | Broader evidence-qualified scoring | Deferred; default-off retained | Product acceptance owner and evidence reviewer / authorized org admin plus release owner for broader rollout | Representative real-evidence review, workload acceptance and explicit rollout decision. Software tests do not establish evidence quality or default-on approval. |
 | Live AI/provider/model acceptance | Not approved | Engineering and security / release owner and authorized org approver | Separate account/model, pricing/budget, context/output-quality, data-processing and consent acceptance. No inference/provider change is authorized here. See PHASE3_CLOSURE.md and PHASE3_OPERATIONS.md. |
 | SaaS/parallel-worker rollout | Held; normal local operation is one slot | Engineering and operations / project release owner | Validate platform controls, representative cross-tenant load, resource bounds and recovery. Two-slot tests do not prove 32/1,000-job capacity. See WORKER_POOL.md and SAAS_JOB_SCALING.md. |
-| Imported-finding reconciliation | Design only | Engineering and product acceptance owner / project release owner | Stable identity, comparable scans and suppression/retention/reappearance contracts before implementation. Keep current upload/archive behavior. See FINDING_RECONCILIATION_DESIGN.md. |
+| Imported-finding identity and reconciliation | Partial; reviewed bindings, cross-import review, reversible canonical designation and the shipped read-only absence-candidate preview; durable lifecycle open | Engineering and product acceptance owner / project release owner | A preview candidate is not an absence conclusion. Do not claim automatic merging, payload publication, durable absence decisions or suppression. Complete the separate lifecycle gates before including those unshipped reconciliation behaviors in a pilot. See FINDING_RECONCILIATION_DESIGN.md. |
 | Short-character index implementation | User-deferred, 5 November | Engineering / product acceptance owner | Retain current search behavior. Reconsider only with an accepted write-cost budget and measured design gates. |
 | Docker/container staging and persistent model cache | User-deferred Future scope | Operations and engineering / project release owner | Resume if that deployment scope is selected. Local tests do not close container acceptance. |
+
+### PB-0.2 pilot-readiness contract: decisions required to close the gate
+
+The pilot-readiness gate is **not closed**. PB-0.2 remains deferred until the
+project owner approves a bounded contract with the following recorded decisions.
+Unknowns are intentionally left for owner input rather than inferred from local
+tests or the product roadmap.
+
+| Decision | Required record before PB-0.2 closes |
+| --- | --- |
+| Pilot objective and audience | State the problem to validate; identify whether participants are internal, design partners or customers, their organizations and user roles, and the accountable contact. |
+| Environment and access | Name the intended deployment/environment, identity and tenant setup, who can access it, and how access is provisioned/revoked. If no deployment is selected, the pilot cannot be called ready for that target. |
+| Allowed inputs and data handling | List approved scanners/file types and whether data is synthetic, sanitized or customer data. Document data classification, upload/storage locations, access, retention/deletion, backup, incident/breach contacts and any required customer/legal/privacy review. |
+| Included workflows | Explicitly choose the functions participants may exercise (for example import, finding triage/workflow, deterministic dashboard, report generation, evidence review). Tie each to an implemented path and testable acceptance criteria. |
+| Excluded or gated capabilities | State that live AI/provider inference, broader evidence-qualified scoring, SaaS/parallel-worker scale and incomplete reconciliation capabilities are excluded unless separately approved and evidenced. Record any other non-pilot functions and feature flags/settings that must remain off. |
+| Support and operations | Name who handles questions, incidents and service interruption; define contact/escalation path, operating hours/response expectations, monitoring, restore/rollback and pilot shutdown/deletion procedures. |
+| Success, stop and exit | Define measurable pilot outcomes, participant feedback/evidence, review date, stop conditions, rollback/disable plan, data disposition at exit and the person authorized to decide continue/stop. Do not invent numeric service targets without approval. |
+| Acceptance and approvals | Record product acceptance, release owner, operations/security review and any required customer/data-owner approval, with date and scope. This is separate from software CI. |
+
+**PB-0.2 closure evidence:** the completed, versioned contract and approvals;
+an implementation-to-scope matrix; verification evidence for the selected
+workflows on the exact code SHA; and explicit disposition of applicable G-02
+through G-07 gates. If the pilot uses an intended deployment or real/customer
+data, deployment, security, monitoring, recovery, workload, privacy and data
+handling gates must be accepted for that target before access/data is enabled.
+If it stays in a synthetic local environment, say so and do not describe the
+result as customer-pilot or production readiness.
+
+Closing PB-0.2 approves a bounded pilot plan only; it does not automatically
+approve live AI, broader scoring, SaaS scale, reconciliation, production release
+or any data source omitted from the contract.
 
 ### Next work and completion rule
 
 The **isolated backup/restore and worker-recovery rehearsal (PB-0.3)** is complete
 for its local synthetic scope; [results and unresolved deployment gates](RECOVERY_REHEARSAL.md)
-are recorded. Customer pilot, live AI, scoring rollout and SaaS work remain held.
+are recorded. The next decision is whether to resume PB-0.2 and fill/approve the
+pilot contract above. Live AI, broader scoring and SaaS work remain held unless
+separately approved.
 
 PB-0.1 is closed as a checklist/ownership reconciliation: open gates have an
 accountable person, evidence requirements, authority, status and next action.

@@ -7,25 +7,31 @@ evidence-backed cyber resilience workflow: teams can trust what a report says,
 decide what to do next, assign the work, and verify that risk was reduced.
 
 This is a product direction, not a claim that the capabilities below are
-implemented or approved for release. The current release still has pending
-acceptance/sign-off; see the [README status](../README.md#status) and
+implemented or approved for release. The last committed code increment is
+delivered through `d06d31e` and all four exact-SHA hosted Linux CI jobs passed
+in [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). Pilot and production acceptance remain
+separate open decisions. See [release readiness](RELEASE_READINESS.md) and
 [Phase 4 status](PHASE4_STATUS.md) for the code-backed project state.
 The [product backlog](PRODUCT_BACKLOG.md) breaks the phases into ordered
 candidate work items with acceptance criteria.
 
-PB-1.3 starts with a local [stable identity foundation](FINDING_IDENTITY.md):
-versioned candidate contract and read-only source diagnostics. Explicit admin-reviewed
-namespace/asset bindings are implemented and activated locally at migration 0046;
-delivered through `3775dc6`, with all four Linux jobs passed in [run 42379393928](https://github.com/shalisarakkal/AuditMind/actions/runs/42379393928).
-Final local suites: 1,653 backend tests, 548 frontend tests and 94 Chrome checks. Reviewed reconciliation and suppression remain
-unfinished.
-
-The next staged PB-1.3 increment adds [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md):
-explicit native Nessus pair comparison and independent same-finding mapping
-carry-forward. Separate canonical findings remain a visible conflict, with no
-automatic merge or source-payload publication. Full reconciliation stays open.
-
 ## Prioritization at a glance
+
+PB-1.3 has shipped the [stable identity foundation](FINDING_IDENTITY.md),
+[cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md), and
+[canonical designation](CANONICAL_FINDING_REVIEW.md). A bounded,
+non-persisted absence-candidate preview is also delivered through `d06d31e`. These are
+explicit review tools; they do not enable automatic merging, payload refresh,
+durable absence decisions or suppression. All four hosted jobs passed for
+feature SHA `f31bb25`
+([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
+The remaining reconciliation lifecycle is still open.
+
+**Recommended next decision:** resume PB-0.2 and approve a bounded pilot contract.
+The gate remains deferred until the project owner selects audience, environment,
+data, workflows, operating/support boundaries and acceptance criteria. The
+[release checklist](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate)
+lists the exact decisions. Do not treat green CI as pilot/customer approval.
 
 Local baseline maintenance on 6 November addressed stalled existing-asset cloud
 reimports with bounded bulk updates and safe Abort handling. Exact-file local
@@ -47,11 +53,12 @@ model or operational surface.
 
 ## P0 — Close current acceptance and operational gates
 
-**Progress, 5 November:** PB-0.1 checklist/ownership reconciliation is complete;
+**Progress, 8 November:** PB-0.1 checklist/ownership reconciliation is complete;
 the project owner/user holds release approval and engineering/operations/security
-ownership. PB-0.3 passed the isolated synthetic recovery rehearsal. PB-0.2 pilot
-preparation remains user-deferred, and production acceptance gates remain open.
-See [current release gates](RELEASE_READINESS.md#current-release-gate-checklist---5-november-2026)
+ownership. PB-0.3 passed the isolated synthetic recovery rehearsal. PB-0.2 remains
+user-deferred; its decision checklist is explicit, but the contract has not been
+approved. Production acceptance gates remain open.
+See [current release gates](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026)
 and [recovery evidence](RECOVERY_REHEARSAL.md). P0 is not wholly closed.
 
 **Outcome:** The existing product is a reliable baseline for a limited, clearly
@@ -89,9 +96,13 @@ at migration 0041 (90 Chrome checks, 40 final snapshot backend checks and 529
 frontend tests pass). Delivered through `24a5f66`, with all four hosted Linux jobs
 passing in [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464);
 [contract](SCAN_SNAPSHOTS.md).
-Existing matching and archive ownership remain unchanged. Stable-identity
-authorization and reconciliation (PB-1.3) remain pending; this does not enable
-automatic source updates, suppression or absence conclusions.
+Existing matching and archive ownership remain unchanged. PB-1.3's explicit
+identity review increments are delivered; automated reconciliation, source
+payload publication, durable absence dispositions and suppression remain
+pending. The read-only candidate preview shipped through `d06d31e`, with all
+four hosted Linux jobs passing in
+[run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560).
+A preview candidate is not a recorded absence conclusion.
 
 **Outcome:** Users can tell where evidence came from, whether it is current, and
 what security obligation a finding relates to.

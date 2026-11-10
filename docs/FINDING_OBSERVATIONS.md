@@ -1,15 +1,20 @@
 # Finding source observations (PB-1.1)
 
-7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
-Migration 0046 adds optional administrator-reviewed tool/asset bindings;
-observations still remain ineligible for reconciliation.
-Candidate diagnostics do not change import matching or authorize reconciliation.
+PB-1.3 now adds the [identity foundation](FINDING_IDENTITY.md), explicit
+[cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md) and
+[canonical designation](CANONICAL_FINDING_REVIEW.md). Migration 0046 adds
+administrator-reviewed tool/asset bindings; migration 0047 adds reversible
+canonical designation receipts and 0048 adds the identity-key conflict index.
+These are bounded review tools, not automatic
+matching, record merge, payload publication, absence or suppression authority.
+This PB-1.1 provenance layer does not itself authorize reconciliation.
 
 PB-1.1 records per-import finding provenance. Migration `0040` adds
 `finding_observations`; it does not backfill or infer historical observations.
 Current finding matching, source payloads, workflow decisions, scores and saved
-reports retain their existing behavior. Comparable scans (PB-1.2) and
-reconciliation (PB-1.3) remain separate work.
+reports retain their existing behavior. PB-1.2 scan declarations are documented
+in [scan snapshots](SCAN_SNAPSHOTS.md); PB-1.3 has explicit identity-review
+increments, while automated reconciliation lifecycle work remains separate.
 
 ## Recording and identity
 
