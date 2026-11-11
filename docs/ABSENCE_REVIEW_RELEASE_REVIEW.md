@@ -81,3 +81,21 @@ in the append-only ledger/Activity; the queue displays the latest decision.
 Tests use private PostgreSQL instances or isolated browser schemas. Normal
 application data, credentials and the other worktree are preserved. This is
 software acceptance, not customer-pilot, SaaS load or production approval.
+
+
+## Hosted runner setup follow-up
+
+The first exact-SHA run for `c6a3328` passed backend, frontend and dependency/
+security jobs. Browser setup failed during `playwright install`, before build
+or application acceptance; no browser test failed in that run. Evidence:
+[run 43039395961](https://github.com/shalisarakkal/AuditMind/actions/runs/43039395961).
+The public job metadata does not establish the precise installer root cause.
+
+Browser CI is now pinned to supported Ubuntu 24.04 rather than a rolling
+`ubuntu-latest` image, and setup permits at most three attempts. A final failed
+installation still fails the job; no test or dependency check is bypassed. The
+job's 30-minute ceiling bounds setup plus the full browser/evidence/worker
+acceptance. Other Linux jobs retain their existing environment. Application
+source is unchanged. Shell checks exercise first-attempt success, recovery on
+the third attempt and three-failure exit behavior with a mocked installer.
+A fresh exact-SHA hosted result is required at delivery.

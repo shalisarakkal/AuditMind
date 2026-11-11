@@ -2,6 +2,17 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Hosted browser setup hardening - 11 November 2026
+
+- First hosted run for `c6a3328` passed backend, frontend and security; browser
+  installation failed before build/tests. Retain that failed-run evidence in
+  the integration review rather than treating it as an application test failure.
+- Pin browser CI to supported Ubuntu 24.04 and permit at most three installer
+  attempts within a 30-minute job. Failure still blocks all browser acceptance;
+  no tests are skipped or weakened. First-success, third-success and terminal
+  failure shell checks pass. Application source remains unchanged.
+- Verify all jobs on the exact follow-up SHA at delivery.
+
 ## Durable absence review integration - 11 November 2026
 
 - User approved inclusion of both worktrees. Integrate migration 0049, retained

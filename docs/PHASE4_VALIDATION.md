@@ -5,6 +5,17 @@ below preserve the status and test evidence as it stood at that time; their
 "pending" items do not supersede the
 [current release/readiness status](RELEASE_READINESS.md).
 
+## Hosted browser setup follow-up - 11 November 2026
+
+For `c6a3328`, hosted backend, frontend and dependency/security jobs passed;
+Chromium installation failed before application build or browser tests in
+[run 43039395961](https://github.com/shalisarakkal/AuditMind/actions/runs/43039395961).
+The browser job now uses Ubuntu 24.04 with three bounded installation attempts
+and a 30-minute job ceiling. Shell-level success/recovery/failure checks pass.
+No application source or test acceptance is changed. The final delivery must
+verify the exact follow-up SHA; the installer root cause is not established by
+public annotations. See [integration review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+
 ## Durable absence review integration - 11 November 2026
 
 Both worktrees are included in this increment. The full required-PostgreSQL
