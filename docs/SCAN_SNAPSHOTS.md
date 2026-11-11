@@ -1,12 +1,12 @@
 # Scan snapshot declarations and comparison review (PB-1.2 / PB-1.3)
 
 PB-1.2 adds source-scan declarations and metadata comparison. The local PB-1.3
-increment adds a bounded, read-only list of findings eligible for absence
-review; it does not establish that a finding was remediated or change findings,
-workflow, archive state, scores, qualifications or saved reports. No AI
-provider is called. Stable identity verification and explicit
-cross-import/canonical review are implemented in PB-1.3. Durable absence
-decisions and the reconciliation lifecycle remain open; see
+increment adds a bounded candidate preview and an explicit, durable review queue;
+it does not establish that a finding was remediated or change finding workflow,
+archive state, scores, qualifications or saved reports. No AI provider is
+called. Stable identity verification and explicit cross-import/canonical review
+are implemented in PB-1.3. Suppression, archive/restore dispositions and
+reappearance reconciliation remain open; see
 [the current identity contract](FINDING_IDENTITY.md).
 
 ## What is captured and what is declared
@@ -111,19 +111,34 @@ defaults to 50 candidates and is capped at 100 per request.
 
 `absence_eligible=true` means only that this bounded candidate preview could
 be computed under those checks. It is not proof that a finding is absent,
-remediated or safe to suppress. The result is not persisted, and there is no
-disposition, suppression, archive or workflow action. No source observation is
-promoted to reconciliation eligible. Declaring a tool-instance ID does not
-configure a connector or bind individual observations; those remain explicit
-administrator reviews. No severity, status, assignee, deadline or archive
-decision changes.
+remediated or safe to suppress. The preview itself is not persisted. An
+authorized admin or auditor may explicitly save its full candidate set to the
+durable queue; this records the compared scan/declaration context, reviewed
+identity fingerprint and candidate snapshots, not a finding disposition. The
+batch is idempotent for the same scan versions and reviewed candidate context.
+Saved records have no foreign keys to scans, declarations, findings or
+observations, so source-row retention/purge cannot erase the review snapshot;
+organization deletion still removes it.
 
-The comparison is a read-only, non-persisted review at the displayed time, not
-a durable authorization token. Reload and review again after source lifecycle
-or declaration changes. Both displayed versions are supplied to the server;
-a stale or missing version is rejected. Snapshot GETs and comparison responses
-are `Cache-Control: no-store`. Reviews read a few indexed metadata rows, not
-the organization's assets/findings or broad exact counts.
+Organization members can page through saved queue items; only admins and
+auditors can save or decide them. A reviewer may append a version-fenced
+**Keep finding active** decision with a rationale, or reopen that queue item
+with another rationale. These decisions are append-only and do not change the
+finding's workflow, severity, archive state or scores. A kept-active decision
+is unavailable when the live finding is no longer active or its workflow
+version differs from the captured snapshot. Compare again to create a fresh
+review batch; the older snapshot remains historical. There is no
+suppress/archive/restore control, no automatic reappearance handling and no
+automatic reconciliation. No source observation is promoted to reconciliation
+eligible. Declaring a tool-instance ID does not configure a connector or bind
+individual observations; those remain explicit administrator reviews.
+
+The comparison is not a durable authorization token. Reload and review again
+after source lifecycle or declaration changes. Both displayed versions are
+supplied to the server; a stale or missing version is rejected. Snapshot GETs,
+comparison and queue responses are `Cache-Control: no-store`. Reviews read a
+few indexed metadata rows, not the organization's assets/findings or broad
+exact counts.
 
 ## Chrome verification
 
@@ -171,9 +186,16 @@ security evidence.
    observation to the same
    reviewed tool instance and canonical asset. Declare both scans Complete with
    matching tool/configuration/scope and increasing source times. Compare them:
-   only the baseline-only synthetic finding should appear as a candidate.
-   Leave a current observation unreviewed and compare again; candidate generation
-   must be blocked. No candidate action changes or records finding state.
+   only the baseline-only synthetic finding should appear as a candidate. Select
+   **Save candidates to review queue** and confirm the saved item count.
+10. Open the Uploads page's **Absence review queue** as a member and confirm the
+    saved snapshot is visible. As an admin or auditor, add a rationale and select
+    **Keep finding active**; then reopen the item and confirm the latest
+    decision/version appears. Check that the finding's workflow, severity,
+    archive state and saved reports are unchanged.
+11. Compare a separate pair with a current observation left unreviewed; candidate
+    generation must be blocked. No candidate action changes or records finding
+    state.
 
 ## API contract
 
@@ -188,7 +210,25 @@ security evidence.
   0/50, maximum 100); returns review metadata, candidate counts/page and explicit
   comparability/identity blockers. The bounded observation ceiling is 5,000 per
   scan.
+- `POST .../scans/snapshot-comparison/queue`: the same versioned comparison
+  contract plus the displayed comparison's `review_token`; explicitly persists the eligible full candidate set for admin or
+  auditor callers and returns the idempotent batch ID and saved item count.
+- `GET .../scans/absence-review-queue`: organization-member-scoped, bounded
+  queue page with `state=pending|kept_active|all`, `limit` up to 100 and offset.
+  Rows return compact captured scan summaries and candidate descriptions up to
+  2,000 characters; full compared declaration context remains retained once per
+  batch in the ledger.
+- `POST .../scans/absence-review-queue/{item_id}/decision`: admin/auditor-only
+  `keep_active` or `reopen` decision with expected version and rationale.
 
 Validation, Chrome evidence and local activation status are tracked in
 [Phase 4 validation](PHASE4_VALIDATION.md). This increment does not authorize
 production rollout, broader scoring enablement or SaaS capacity claims.
+
+
+11 November integration: saving rejects a changed preview instead of silently
+saving replacement candidates. Busy inventory publication returns promptly;
+recording review decisions can proceed during an import. Queue dialogs freeze
+Close, Escape, filters and paging during submission. Conflicts retain the
+rationale and require explicit reload; successful decisions return to page one.
+See [review and acceptance](ABSENCE_REVIEW_RELEASE_REVIEW.md).

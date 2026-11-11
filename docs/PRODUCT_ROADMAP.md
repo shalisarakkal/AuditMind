@@ -1,5 +1,14 @@
 # AuditMind Product Roadmap
 
+11 November local integration: the authorized durable absence-review queue
+from the second worktree is now included with review corrections. It records
+historical keep-active/reopen notes without changing findings or scores;
+local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
+checks, builds/security), and the app is active at 0049. Hosted CI is verified
+on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+This supersedes earlier statements that this feature is excluded; older dated
+test/CI results remain historical.
+
 ## Goal
 
 Evolve AuditMind from an evidence-ingestion and reporting platform into an

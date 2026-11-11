@@ -1,5 +1,10 @@
 # Current workspace code review - 10 November 2026
 
+Historical scope note: on 11 November the user authorized inclusion of the
+second worktree. The subsequent [durable-review integration](ABSENCE_REVIEW_RELEASE_REVIEW.md)
+supersedes this checkpoint's exclusion; the 10 November evidence below retains
+its original scope.
+
 ## Scope and source integrity
 
 Reviewed the current workspace against `d06d31e` and remote merge

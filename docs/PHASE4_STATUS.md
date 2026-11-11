@@ -1,5 +1,13 @@
 # Phase 4 status and next milestone
 
+Current local increment (11 November): migration 0049 durable absence review,
+integrated from both authorized worktrees with stale-context, submission and
+concurrency corrections, and activated locally. It stores review history only.
+Full local acceptance passed: 1,723 backend tests, 567 frontend tests and 99
+Chrome checks, plus builds/security. The delivery handoff verifies hosted CI
+for the exact pushed SHA; the older green runs below cover earlier commits.
+[Integration review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+
 Latest shipped increment: the bounded, read-only absence-candidate preview
 through `d06d31e`. All four exact-SHA hosted Linux jobs passed in
 [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). No durable absence decision,

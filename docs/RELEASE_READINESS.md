@@ -1,5 +1,14 @@
 # Release readiness and code review
 
+11 November local integration: the authorized durable absence-review queue
+from the second worktree is now included with review corrections. It records
+historical keep-active/reopen notes without changing findings or scores;
+local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
+checks, builds/security), and the app is active at 0049. Hosted CI is verified
+on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+This supersedes earlier statements that this feature is excluded; older dated
+test/CI results remain historical.
+
 ## Current release-gate checklist - 8 November 2026
 
 This is the current PB-0.1 reconciliation. Checkpoints below retain their original
@@ -44,7 +53,7 @@ not a failed test or automatically part of the next release.
 
 | Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
 | --- | --- | --- | --- |
-| G-01: reviewed code and correctness CI | Verified for current tip `d06d31e` | Engineering / project release owner | Exact-SHA run 42529240560 passed all four jobs; runs 60 and 61 verify the preceding canonical increment. The canonical increment also passed the post-fix local suite above. CI is not production sign-off; repeat for subsequent code changes. |
+| G-01: reviewed code and correctness CI | Preview verified for `d06d31e`; durable-review local gates passed; exact-SHA hosted result checked at delivery | Engineering / project release owner | Exact-SHA run 42529240560 passed all four jobs; runs 60 and 61 verify the preceding canonical increment. The canonical increment also passed the post-fix local suite above. CI is not production sign-off; repeat for subsequent code changes. |
 | G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
 | G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
 | G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |

@@ -1,5 +1,33 @@
 # Verify the evidence-aware reporting changes
 
+## Durable absence review verification - 11 November 2026
+
+Use a disposable organization and the synthetic native examples linked in
+[scan snapshot verification](SCAN_SNAPSHOTS.md#chrome-verification). After
+migration 0049 is activated:
+
+1. Review the scanner/host bindings and save compatible Complete declarations.
+   Compare the pair; the baseline-only candidate appears without changing it.
+2. Save candidates explicitly. Reopen Uploads, choose **Open absence review
+   queue**, and confirm the captured scan names and candidate survive reload.
+3. Enter a rationale and select **Keep finding active**. During submission,
+   Close, Escape, filters and paging must not dismiss or change the operation.
+4. In **Kept active**, enter another reason and choose **Reopen review**. This
+   reopens the queue item, not the finding workflow. Confirm both reasons remain
+   in Activity and the latest decision appears in the queue.
+5. Have a second reviewer save an older decision version: it must return a
+   conflict, retain the rationale and require explicit reload. Change the live
+   finding workflow after capture: the old snapshot cannot authorize a
+   keep-active review; compare again to save a fresh batch.
+6. A viewer can read the queue but cannot save a disposition. Verify the finding's
+   workflow version, archive state, severity and risk treatment are unchanged
+   by queue review. Saving/reviewing does not call an AI provider.
+
+Saved summaries remain after source-record purge, until organization deletion.
+Suppression, archive/restore dispositions and automatic reconciliation are not
+implemented by this queue.
+
+
 PB-1.3 canonical finding designation: follow the
 [canonical review Chrome steps](CANONICAL_FINDING_REVIEW.md#chrome-verification)
 for two independent identities, both workflow histories, explicit canonical

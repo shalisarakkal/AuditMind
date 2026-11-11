@@ -218,17 +218,44 @@ review and do not enable automatic reconciliation. See
 [identity contract](FINDING_IDENTITY.md). These delivered increments close
 their scoped features, not PB-1.3 as a whole.
 
+**Integration update, 11 November:** both worktrees are integrated with stale
+preview/workflow guards, blocking submission controls and bounded queue
+summaries. Full local backend 1,723 and frontend 567 tests, 99 Chrome checks,
+builds and security checks pass. Activated at 0049 after idle checks; hosted CI
+is verified on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+
+**Status, 8 November:** The durable absence-review queue is implemented locally
+on the PB-1.3 feature branch. Migration 0049 stores candidate/context snapshots
+without source-row foreign keys; organization members can page/read, and admins
+or auditors can explicitly save candidates and append version-fenced keep-active
+or reopen decisions. Neither action changes finding state. The focused
+PostgreSQL scan-snapshot suite passes 47 tests, including queue idempotency,
+tenant/role boundaries, pagination, decision history, unchanged finding state
+and source-row purge retention. The focused queue UI suite passes 11 tests;
+changed-file lint and TypeScript validation pass. Chrome and hosted CI remain
+pending; this is not yet a merged or deployed migration. Suppression,
+archive/restore disposition and reappearance reconciliation remain out of
+scope.
+
 **Priority:** P1 · **Depends on:** PB-1.1, PB-1.2
 
 Provide an authorized user with a durable review queue for findings not
 observed in comparable scans, then allow an explicit retain, suppress/archive
-or restore decision with a reason and durable history. The current local
-increment supplies only a read-only, non-persisted candidate preview; it does
-not meet the durable-queue or disposition criteria.
+or restore decision with a reason and durable history. The integrated local
+increment supplies the read-only preview and a durable, explicit review queue
+with keep-active/reopen notes. Suppress/archive/restore dispositions and
+reappearance handling remain open; this does not close PB-1.3 as a whole.
 
 **Acceptance criteria**
 
 - Absence never auto-resolves or archives a finding.
+- Saving a candidate batch is explicit, idempotent and preserves the compared
+  evidence after source-row retention; candidate saves and review decisions do
+  not mutate the finding.
+- Keep-active and reopen decisions are attributed, version-fenced and
+  append-only.
+- Only an explicit future suppression/archive/restore design may change
+  disposition, with stable identity and durable rationale.
 - Reappearance updates observation history and surfaces the prior review or
   suppression.
 - Suppression uses stable identity and survives ordinary source-row retention;

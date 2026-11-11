@@ -81,11 +81,13 @@ latest-payload publisher below; both original records remain independently count
    observation by an approved source-time policy; refresh severity/details while
    retaining reviewed workflow and historical reports. Test out-of-order imports,
    purged/archived sources and competing imports before activation.
-3. **Not-observed review queue:** comparable complete scan declarations and
-   reviewed scope exclusions are prerequisites. Absence is a separate review
-   flag, never automatic Resolved, archive or score exclusion.
+3. **Durable absence-review queue:** migration 0049 adds explicit candidate
+   snapshots and append-only keep-active/reopen decisions. It does not change
+   finding state. Any future disposition must preserve the comparable-scan and
+   reviewed-identity gates and must not infer remediation from absence.
 4. **Suppression/reappearance:** independent minimal tombstones, explicit restore
-   and admin clearance, retention/purge and import/archive lock ordering.
+   and admin clearance, retention/purge and import/archive lock ordering remain
+   unimplemented.
 
 PB-1.3 remains open until those lifecycle gates are implemented and verified.
 

@@ -1,5 +1,11 @@
 # AuditMind user manual
 
+11 November addition: Uploads now includes an explicit historical absence-review
+queue. Compare eligible complete native scans, save candidates, then record a
+reasoned keep-active or reopen review. These actions never change finding
+workflow, scores or archive state. See the full
+[scan snapshot walkthrough](SCAN_SNAPSHOTS.md#chrome-verification).
+
 Timestamps are displayed in your browser's time zone. The persistent time-zone
 banner is omitted; this does not change stored timestamps or date processing.
 

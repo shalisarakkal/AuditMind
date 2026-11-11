@@ -68,16 +68,19 @@ Remaining PB-1.3 lifecycle work:
 1. Design and verify safe canonical-record consolidation and source-payload
    publication without losing observations, original-source ownership, reviewed
    workflows or saved report snapshots.
-2. The scan comparison now provides a read-only, non-persisted candidate preview
-   for bounded, comparable complete snapshots. A durable not-observed queue,
-   recorded review dispositions and their lifecycle remain to be designed and
-   implemented. Absence alone never resolves, suppresses or archives a finding.
+2. The scan comparison provides a read-only candidate preview for bounded,
+   comparable complete snapshots, plus a separate explicit save to a durable
+   candidate queue. Versioned keep-active/reopen decisions record review only;
+   they do not mutate findings. Suppression and archive/restore dispositions
+   remain to be designed and implemented. Absence alone never resolves,
+   suppresses or archives a finding.
 3. Add reviewed suppression, reappearance, restore and purge semantics with shared
    lock ordering and tenant/role/version fences.
 
-The preview adds no automatic reconciliation or suppression authority. See
+The preview adds no automatic reconciliation or suppression authority, and
+queue decisions do not change finding state. See
 [scan snapshot comparison](SCAN_SNAPSHOTS.md) for its blockers, limits and
-non-persistent semantics.
+durable queue contract.
 
 See [reconciliation design](FINDING_RECONCILIATION_DESIGN.md),
 [scan snapshots](SCAN_SNAPSHOTS.md) and [observations](FINDING_OBSERVATIONS.md).

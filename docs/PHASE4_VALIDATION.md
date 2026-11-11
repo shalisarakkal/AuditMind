@@ -5,6 +5,19 @@ below preserve the status and test evidence as it stood at that time; their
 "pending" items do not supersede the
 [current release/readiness status](RELEASE_READINESS.md).
 
+## Durable absence review integration - 11 November 2026
+
+Both worktrees are included in this increment. The full required-PostgreSQL
+suite passed 1,723 tests in 2,602.03 s with warnings as errors and no skips.
+All 567 frontend tests, 99 installed-Chrome checks, lint, normal/isolated builds
+and security/dependency/secret checks pass. The earlier 56 focused checks are
+included in the full run. Two stale-save backend regressions and a held-submit
+UI regression failed before correction and pass afterward. Local activation
+at 0049 retained data/passwords and has no schema drift; six queues were idle
+before restart, and login/health/readiness return HTTP 200. Hosted acceptance
+is verified for the exact pushed SHA at handoff, not inherited from older CI.
+[Review findings and boundaries](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+
 ## Current workspace review - 10 November 2026
 
 The source-integrity/code review found no blocking defect in the current

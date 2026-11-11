@@ -2,6 +2,23 @@
 
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
+## Durable absence review integration - 11 November 2026
+
+- User approved inclusion of both worktrees. Integrate migration 0049, retained
+  candidate/context snapshots and versioned keep-active/reopen decisions; preserve
+  prior release/CI evidence when resolving documentation conflicts.
+- Reproduce and fix stale preview saves, changed-workflow review decisions and
+  dismissal during submission. Add prompt import-lock conflicts, independent
+  reviewer concurrency coverage and bounded queue response summaries.
+- Full required-PostgreSQL backend regression: 1,723 passed (43m 22s), with
+  warnings as errors. Full frontend: 567 passed; 99 Chrome checks, lint,
+  normal/isolated production builds and security checks pass. The earlier 56
+  focused backend checks overlap the full suite.
+- Activated locally at 0049 after six idle-queue checks, with no migration drift
+  or data/password reset. Login/health/readiness return HTTP 200. Verify hosted
+  Linux CI for the exact pushed SHA at delivery; prior results are historical.
+- [Review scope, fixes and acceptance](docs/ABSENCE_REVIEW_RELEASE_REVIEW.md).
+
 ## Current workspace review - 10 November 2026
 
 - Reviewed current code through merge `43e61bb`; application source is unchanged

@@ -1,10 +1,21 @@
 # Individual imported-finding archive and scan reconciliation
 
+11 November local integration: the authorized durable absence-review queue
+from the second worktree is now included with review corrections. It records
+historical keep-active/reopen notes without changing findings or scores;
+local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
+checks, builds/security), and the app is active at 0049. Hosted CI is verified
+on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+This supersedes earlier statements that this feature is excluded; older dated
+test/CI results remain historical.
+
 [Canonical selection](CANONICAL_FINDING_REVIEW.md) adds the reviewed designation
 and immutable receipt for two independently bound native findings. Both records
 and their histories remain independent; consolidation/payload publication,
-durable absence decisions and suppression below remain separate implementation
-gates.
+suppression/disposition and reappearance reconciliation remain separate
+implementation gates. A durable absence-candidate snapshot queue with
+keep-active/reopen review decisions is implemented locally; it does not change
+finding state.
 
 Implemented PB-1.3 review increments are documented in
 [cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md) and
@@ -24,18 +35,22 @@ PB-1.2 adds [source-scan declarations and metadata comparison](SCAN_SNAPSHOTS.md
 which alone does not validate finding identity or enable suppression/reconciliation.
 The existing-behavior analysis below describes the baseline before that increment.
 Observations now record repeated occurrences; reviewed stable-identity bindings,
-cross-import review and canonical designation are implemented. Refreshed canonical payloads, durable comparable-scan absence decisions,
-suppression and automated reconciliation remain pending. The local scan
-comparison now has a bounded, read-only candidate preview; it records no
-disposition and does not change existing import matching or archive ownership.
+cross-import review and canonical designation are implemented. Refreshed
+canonical payloads, suppression/disposition and automated reappearance
+reconciliation remain pending. The local scan comparison has a bounded,
+read-only candidate preview and a separate explicit save action for durable
+candidate/context snapshots. Keep-active and reopen decisions are append-only
+review history only; they do not change existing import matching, finding state
+or archive ownership.
 
 Status (8 November 2026): identity/review foundations are implemented through
 migrations 0046-0048 and hosted CI is green for those commits. The bounded
-absence-candidate preview is implemented locally, with focused regression tests
-passing. Focused frontend tests, changed-file lint and TypeScript validation also
-pass; an isolated Chrome walkthrough verified eligible candidate display and
-fail-closed behavior on an unreviewable current observation. Hosted CI for this
-local increment remains pending. The
+absence-candidate preview and migration 0049 durable queue are implemented
+locally. The focused PostgreSQL scan-snapshot suite passes 47 tests, and the
+focused frontend queue suite passes 11 tests; changed-file lint and TypeScript
+validation pass. The queue retains copied comparison/candidate context after
+source observations/declarations are removed and does not mutate findings.
+Chrome verification and hosted CI for migration 0049 remain pending. The
 approved future semantics below remain design constraints, not delivered
 behavior: suppression must be retained until explicit organization-admin
 clearance independent of archived-row purge;
