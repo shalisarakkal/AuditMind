@@ -100,7 +100,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+psycopg://auditmind:auditmind@localhost:5432/auditmind_test
       AUDITMIND_BROWSER_PYTHON: python
-      AUDITMIND_BROWSER_CHANNEL: chromium
+      AUDITMIND_BROWSER_CHANNEL: chrome
       AUDITMIND_ISOLATED_BUILD: "1"
       BACKEND_URL: http://127.0.0.1:8012
     steps:
@@ -117,19 +117,11 @@ jobs:
         run: psql "postgresql://auditmind:auditmind@localhost:5432/auditmind_test" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm"
       - run: npm ci
         working-directory: frontend
-      - name: Install Chromium with bounded retries
+      - name: Verify preinstalled Chrome can launch
         working-directory: frontend
         run: |
-          for attempt in 1 2 3; do
-            if npx playwright install --with-deps chromium; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              exit 1
-            fi
-            echo "Chromium setup failed (attempt $attempt/3); retrying in 5 seconds" >&2
-            sleep 5
-          done
+          google-chrome --version
+          node -e "const { chromium } = require('playwright'); (async () => { const browser = await chromium.launch({ channel: 'chrome', headless: true }); console.log('Acceptance browser:', browser.version()); await browser.close(); })().catch(error => { console.error(error); process.exit(1); });"
       - run: npm run build
         working-directory: frontend
       - run: node scripts/browser-finding-workflow.cjs

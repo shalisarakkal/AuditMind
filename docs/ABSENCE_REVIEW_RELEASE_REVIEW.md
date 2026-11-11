@@ -99,3 +99,12 @@ acceptance. Other Linux jobs retain their existing environment. Application
 source is unchanged. Shell checks exercise first-attempt success, recovery on
 the third attempt and three-failure exit behavior with a mocked installer.
 A fresh exact-SHA hosted result is required at delivery.
+
+
+The bounded installer retry also remained in setup for more than 15 minutes.
+CI therefore uses the Ubuntu 24.04 image's preinstalled stable Google Chrome,
+through the existing Playwright `chrome` channel, matching local acceptance.
+A mandatory version/launch preflight replaces managed Chromium installation;
+all application, evidence/pilot and worker checks remain mandatory. This avoids
+that installation dependency without claiming its unknown root cause is fixed.
+The exact pushed commit still requires a successful hosted run.
