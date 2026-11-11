@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/apiClient";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime, scanTypeLabel } from "@/lib/domain";
-import { sourceTimeInput, snapshotKindLabel, snapshotKinds, snapshotReason, type SnapshotView, type Comparison, type ReviewCandidate } from "@/lib/scanSnapshots";
+import { sourceTimeInput, snapshotKindLabel, snapshotKinds, snapshotReason, type AbsenceReviewQueueItem, type AbsenceReviewQueuePage, type SnapshotView, type Comparison, type ReviewCandidate } from "@/lib/scanSnapshots";
 import FindingActionDialog from "./FindingActionDialog";
 import ConfirmPanel from "./ConfirmPanel";
 
@@ -126,8 +126,8 @@ export default function ScanSnapshotDialog({ orgId, orgName, scanId, writer, onC
   </FindingActionDialog>;
 }
 
-export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, currentId, onClose }: {
-  orgId: string; orgName: string; baselineId: string; currentId: string; onClose(): void;
+export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, currentId, writer = false, onClose }: {
+  orgId: string; orgName: string; baselineId: string; currentId: string; writer?: boolean; onClose(): void;
 }) {
   const baseline = useApi<SnapshotView>(`/orgs/${orgId}/scans/${baselineId}/snapshot`);
   const current = useApi<SnapshotView>(`/orgs/${orgId}/scans/${currentId}/snapshot`);
@@ -145,6 +145,10 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
         baseline_version: baseline.data.declaration.version, current_version: current.data.declaration.version,
         candidate_offset: offset, candidate_limit: result?.candidate_limit ?? 50,
       });
+      if (append && result?.review_token !== next.review_token) {
+        setResult(null);
+        throw new Error("Scan review changed while loading candidates. Compare scans again before continuing.");
+      }
       setResult(previous => append && previous
         ? { ...next, candidate_offset: previous.candidate_offset,
           review_candidates: [...previous.review_candidates, ...next.review_candidates] }
@@ -152,9 +156,25 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
     } catch (err) { setError(err instanceof Error ? err.message : "Could not review scans"); if (err instanceof ApiError && err.status === 409) setStale(true); }
     finally { inFlight.current = false; setBusy(false); }
   }
+  async function saveToQueue() {
+    if (inFlight.current || !result?.absence_eligible || !result.review_token || !result.candidate_count
+        || !baseline.data?.declaration || !current.data?.declaration) return;
+    inFlight.current = true; setBusy(true); setError(null);
+    try {
+      const saved = await api.post<Comparison>(`/orgs/${orgId}/scans/snapshot-comparison/queue`, {
+        baseline_scan_id: baselineId, current_scan_id: currentId,
+        baseline_version: baseline.data.declaration.version, current_version: current.data.declaration.version,
+        candidate_offset: 0, candidate_limit: result.candidate_limit, review_token: result.review_token,
+      });
+      setResult(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save review queue");
+      if (err instanceof ApiError && err.status === 409) setStale(true);
+    } finally { inFlight.current = false; setBusy(false); }
+  }
   return <FindingActionDialog title="Review scan snapshots" orgName={orgName} onClose={() => { if (!inFlight.current) onClose(); }}>
     <div aria-busy={busy} className="space-y-3">
-      <p className="text-sm text-white/70">This read-only review compares complete scan declarations and current administrator-reviewed native Nessus identities. A candidate is not proof of remediation or a workflow decision. It does not change findings, workflow, archive state or scores.</p>
+      <p className="text-sm text-white/70">Comparing scans is read-only and uses complete declarations and current administrator-reviewed native Nessus identities. Saving candidates records a historical review snapshot that remains after source records are purged. A candidate is not proof of remediation or a workflow decision. It does not change findings, workflow, archive state or scores.</p>
       {loading ? <p role="status">Loading comparison snapshots…</p> : <>
         {baseline.data && <SnapshotDetails view={baseline.data} label="Baseline" />}
         {current.data && <SnapshotDetails view={current.data} label="Current" />}
@@ -168,6 +188,7 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
         <Reasons values={result.absence_blockers} />
         {!result.blocking_reasons.length && !result.absence_blockers.some(reason => reason.endsWith("scan_observation_limit_exceeded")) &&
           <p>Identity review coverage: baseline {result.baseline_reviewable_observations} reviewable / {result.baseline_unreviewable_observations} unreviewable; current {result.current_reviewable_observations} reviewable / {result.current_unreviewable_observations} unreviewable. Ambiguous baseline identities excluded: {result.ambiguous_baseline_identity_count}.</p>}
+        {result.review_queue_batch_id && <p role="status">Saved {result.review_queue_item_count} candidate{result.review_queue_item_count === 1 ? "" : "s"} to the durable review queue. This does not change finding state.</p>}
         {Object.entries(result.scope_differences).map(([key, values]) => <p key={key} className="break-words">{key.replaceAll("_", " ").replace(/^./, c => c.toUpperCase())}: {values.join(", ") || "None"}</p>)}
         {result.absence_eligible && <div className="space-y-3 border-t border-white/15 pt-3">
           <h3 className="font-semibold">Findings to review ({result.candidate_count})</h3>
@@ -177,6 +198,7 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
             {result.review_candidates.map(candidate => <ReviewCandidateRow key={candidate.finding_id} candidate={candidate} orgId={orgId} />)}
           </ul>
           {result.candidate_offset + result.review_candidates.length < result.candidate_count && <button type="button" className={button} disabled={busy || stale} onClick={() => void compare(result.candidate_offset + result.review_candidates.length, true)}>{busy ? "Loading…" : "Load more candidates"}</button>}
+          {writer && !result.review_queue_batch_id && <button type="button" className={button} disabled={busy || stale || !result.review_token || !result.candidate_count} onClick={() => void saveToQueue()}>{busy ? "Saving…" : "Save candidates to review queue"}</button>}
         </div>}
       </section>}
       {!loading && (!baseline.data?.declaration || !current.data?.declaration) && <p className="text-sm">Both uploads need a saved declaration before review.</p>}
@@ -186,6 +208,98 @@ export function ScanSnapshotComparisonDialog({ orgId, orgName, baselineId, curre
         <button type="button" className={button} disabled={busy} onClick={() => { setResult(null); setError(null); setStale(false); baseline.reload(); current.reload(); }}>Reload snapshots</button>
       </div>
       <div className="flex justify-end"><button type="button" className={`${neutralButton} w-full sm:w-auto`} data-confirm-cancel disabled={busy} onClick={onClose}>Close</button></div>
+      </footer>
+    </div>
+  </FindingActionDialog>;
+}
+
+export function ScanSnapshotQueueDialog({ orgId, orgName, writer, onClose }: {
+  orgId: string; orgName: string; writer: boolean; onClose(): void;
+}) {
+  const [state, setState] = useState<"pending" | "kept_active" | "all">("pending");
+  const [offset, setOffset] = useState(0);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const [conflict, setConflict] = useState(false);
+  const limit = 50;
+  const queue = useApi<AbsenceReviewQueuePage>(
+    `/orgs/${orgId}/scans/absence-review-queue?state=${state}&limit=${limit}&offset=${offset}`);
+
+  async function decide(item: AbsenceReviewQueueItem) {
+    const rationale = drafts[item.id]?.trim();
+    if (!rationale || inFlight.current || queue.loading || queue.error || conflict) return;
+    inFlight.current = true;
+    setBusyId(item.id); setError(null);
+    try {
+      await api.post<AbsenceReviewQueueItem>(`/orgs/${orgId}/scans/absence-review-queue/${item.id}/decision`, {
+        expected_version: item.decision_version,
+        action: item.state === "pending" ? "keep_active" : "reopen",
+        rationale,
+      });
+      setDrafts(values => ({ ...values, [item.id]: "" }));
+      setOffset(0);
+      queue.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update review queue");
+      if (err instanceof ApiError && err.status === 409) setConflict(true);
+    } finally { inFlight.current = false; setBusyId(null); }
+  }
+
+  const first = queue.data && queue.data.total ? offset + 1 : 0;
+  const last = queue.data ? Math.min(offset + queue.data.items.length, queue.data.total) : 0;
+  return <FindingActionDialog title="Absence review queue" orgName={orgName} onClose={() => { if (!inFlight.current) onClose(); }}>
+    <div aria-busy={busyId !== null} className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
+      <p className="text-sm text-white/70">Saved candidates are historical review snapshots retained after source-record purge, not proof of remediation. Keeping a finding active or reopening a queue item records a review only; neither action changes finding workflow, archive state or scores. Suppression and automatic reconciliation are not available here.</p>
+      <label className="block text-sm">Show
+        <select className={control} disabled={busyId !== null} value={state} onChange={event => { setState(event.target.value as typeof state); setOffset(0); setError(null); setConflict(false); }}>
+          <option value="pending">Pending review</option>
+          <option value="kept_active">Kept active</option>
+          <option value="all">All saved candidates</option>
+        </select>
+      </label>
+      {queue.loading && !queue.data && <p role="status">Loading saved review queue…</p>}
+      {queue.loading && queue.data && <p role="status">Refreshing saved review queue…</p>}
+      {queue.error && <p role="alert">{queue.error} <button type="button" className="text-cyan underline" onClick={queue.reload}>Retry queue</button></p>}
+      {error && <p role="alert">{error}</p>}
+      <button type="button" className={button} disabled={busyId !== null || queue.loading} onClick={() => { setError(null); setConflict(false); queue.reload(); }}>Reload queue</button>
+      {conflict && <p className="text-sm">Reload and review the current queue before retrying. If the finding changed, build a fresh scan comparison. Your rationale is retained.</p>}
+      {queue.data && queue.data.items.length === 0 && <p>No candidates in this queue view.</p>}
+      {queue.data && <ul className="space-y-3">
+        {queue.data.items.map(item => {
+          const candidate = item.candidate;
+          const baselineName = item.comparison.baseline.scan.filename || item.comparison.baseline.scan.id;
+          const currentName = item.comparison.current.scan.filename || item.comparison.current.scan.id;
+          return <li key={item.id} className="space-y-2 rounded border border-white/15 p-3 text-sm">
+            <p className="break-words font-medium">{candidate.description || candidate.category || "Finding"} · {candidate.severity}</p>
+            <p>{candidate.domain.replaceAll("_", " ")} · Workflow at review: {candidate.workflow_status}</p>
+            <p className="break-all text-xs text-white/70">Finding ID: {candidate.finding_id}</p>
+            <p>Baseline: {baselineName} · Current: {currentName}</p>
+            <p>Saved {formatDateTime(item.created_at)} · Baseline observation recorded {formatDateTime(candidate.baseline_recorded_at)}</p>
+            {item.rationale && <p role="status">{item.state === "kept_active" ? "Kept active" : "Review reopened"} by {item.actor_label} on {formatDateTime(item.decided_at)}: {item.rationale}</p>}
+            <Link className="text-cyan underline" href={`/findings?${new URLSearchParams({ org: orgId, finding_id: candidate.finding_id })}`}>Open finding</Link>
+            {writer && <form className="space-y-2" onSubmit={event => { event.preventDefault(); void decide(item); }}>
+              <label className="block text-sm">{item.state === "pending" ? "Review rationale" : "Reason to reopen review"}
+                <textarea className={control} rows={2} required maxLength={12000} disabled={busyId !== null || queue.loading || !!queue.error || conflict} value={drafts[item.id] || ""}
+                  onChange={event => setDrafts(values => ({ ...values, [item.id]: event.target.value }))} />
+              </label>
+              <button type="submit" className={button} disabled={busyId !== null || queue.loading || !!queue.error || conflict || !drafts[item.id]?.trim()}>
+                {busyId === item.id ? "Saving…" : item.state === "pending" ? "Keep finding active" : "Reopen review"}
+              </button>
+            </form>}
+          </li>;
+        })}
+      </ul>}
+      {queue.data && <div className="flex items-center justify-between gap-3 text-sm">
+        <span>Showing {first}–{last} of {queue.data.total}</span>
+        <div className="flex gap-2">
+          <button type="button" className={button} disabled={busyId !== null || offset === 0 || queue.loading} onClick={() => setOffset(value => Math.max(0, value - limit))}>Previous</button>
+          <button type="button" className={button} disabled={busyId !== null || last >= queue.data.total || queue.loading} onClick={() => setOffset(value => value + limit)}>Next</button>
+        </div>
+      </div>}
+      <footer className={DIALOG_FOOTER}>
+        <button type="button" data-confirm-cancel disabled={busyId !== null} className={`${neutralButton} w-full sm:w-auto`} onClick={onClose}>Close</button>
       </footer>
     </div>
   </FindingActionDialog>;

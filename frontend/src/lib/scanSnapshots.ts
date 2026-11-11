@@ -13,7 +13,7 @@ export type SnapshotView = {
 export type ReviewCandidate = {
   finding_id: string; baseline_observation_id: string; reviewable_baseline_observation_count: number;
   asset_id: string | null; description: string | null; category: string | null; domain: string;
-  severity: string; workflow_status: string; baseline_recorded_at: string;
+  severity: string; workflow_status: string; workflow_version: number; baseline_recorded_at: string;
 };
 export type Comparison = {
   reviewed_at: string; baseline: SnapshotView; current: SnapshotView; declared_metadata_matches: boolean;
@@ -23,6 +23,19 @@ export type Comparison = {
   baseline_reviewable_observations: number; current_reviewable_observations: number;
   baseline_unreviewable_observations: number; current_unreviewable_observations: number;
   ambiguous_baseline_identity_count: number;
+  review_token: string | null; review_queue_batch_id: string | null; review_queue_item_count: number;
+};
+export type AbsenceReviewQueueItem = {
+  id: string; batch_id: string; candidate: ReviewCandidate; comparison: {
+    reviewed_at: string; baseline: { scan: Pick<SnapshotView["scan"], "id" | "filename"> };
+    current: { scan: Pick<SnapshotView["scan"], "id" | "filename"> };
+    identity_review_fingerprint: string;
+  };
+  state: "pending" | "kept_active"; decision_version: number;
+  rationale: string | null; actor_label: string | null; decided_at: string | null; created_at: string;
+};
+export type AbsenceReviewQueuePage = {
+  items: AbsenceReviewQueueItem[]; total: number; limit: number; offset: number;
 };
 const labels: Record<string, string> = {
   scan_not_successfully_completed: "Import has not completed successfully",

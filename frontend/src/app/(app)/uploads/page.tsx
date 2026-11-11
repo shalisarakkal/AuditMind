@@ -33,7 +33,7 @@ import {
 } from "@/components/ListPage";
 import Pager from "@/components/Pager";
 import StatusMessage from "@/components/StatusMessage";
-import ScanSnapshotDialog, { ScanSnapshotComparisonDialog } from "@/components/ScanSnapshotDialog";
+import ScanSnapshotDialog, { ScanSnapshotComparisonDialog, ScanSnapshotQueueDialog } from "@/components/ScanSnapshotDialog";
 import { useApp } from "@/context/AppContext";
 import { isRunning, scanResult, useImports } from "@/context/ImportsContext";
 import { canWrite, formatDateTime, scanTypeLabel } from "@/lib/domain";
@@ -87,6 +87,7 @@ function Uploads() {
   const [snapshot, setSnapshot] = useState<Upload | null>(null);
   const [baseline, setBaseline] = useState<{ id: string; name: string } | null>(null);
   const [comparison, setComparison] = useState<{ baselineId: string; currentId: string } | null>(null);
+  const [absenceQueue, setAbsenceQueue] = useState(false);
   useReloadOnImport(() => { selection.clear(); reload(); });
   useReloadOnImport(facets.reload);
 
@@ -137,6 +138,9 @@ function Uploads() {
     <div className="space-y-6">
       <PageHeader title="Uploads" total={page?.total} noun="uploads" orgName={org.name} filtered={list.hasFilters} />
       <JobStatus />
+      <div>
+        <button type="button" className="text-cyan underline" onClick={() => setAbsenceQueue(true)}>Open absence review queue</button>
+      </div>
       {baseline && <div role="region" aria-label="Scan comparison baseline" className="flex flex-wrap items-center gap-3 rounded-lg border border-cyan/30 p-3 text-sm">
         <span className="min-w-0 break-words">Baseline: {baseline.name}. Open another upload&apos;s Snapshot to review against it.</span>
         <button type="button" className="text-cyan underline" onClick={() => setBaseline(null)}>Clear baseline</button>
@@ -145,7 +149,8 @@ function Uploads() {
         onClose={() => setSnapshot(null)} baselineId={baseline?.id}
         onBaseline={name => { setBaseline({ id: snapshot.id, name }); setSnapshot(null); }}
         onCompare={() => { if (baseline) { setComparison({ baselineId: baseline.id, currentId: snapshot.id }); setSnapshot(null); } }} />}
-      {comparison && <ScanSnapshotComparisonDialog orgId={org.id} orgName={org.name} {...comparison} onClose={() => setComparison(null)} />}
+      {comparison && <ScanSnapshotComparisonDialog orgId={org.id} orgName={org.name} writer={writer} {...comparison} onClose={() => setComparison(null)} />}
+      {absenceQueue && <ScanSnapshotQueueDialog orgId={org.id} orgName={org.name} writer={writer} onClose={() => setAbsenceQueue(false)} />}
       {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
       <ListToolbar list={list} label="uploads">
         <DateRangeFilter list={list} label="Uploaded" />

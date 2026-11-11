@@ -1282,6 +1282,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await p.getByRole('group',{name:'Confirm',exact:true}).getByRole('button',{name:'Reset password',exact:true}).click();
     const handover=p.getByRole('group',{name:'Temporary password',exact:true});
     await expect(handover.getByLabel('Temporary password value',{exact:true})).toHaveAttribute('type','password');
+    const resetViewerPassword=await handover.getByLabel('Temporary password value',{exact:true}).inputValue();
     await handover.getByRole('button',{name:'Show temporary password',exact:true}).click();
     await expect(handover.getByLabel('Temporary password value',{exact:true})).toHaveAttribute('type','text');
     await handover.getByRole('button',{name:'Hide temporary password',exact:true}).click();
@@ -1564,6 +1565,103 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await dialog().getByRole('button',{name:'Close finding workflow',exact:true}).click();
     await p.setViewportSize({width:1440,height:1000});
     check('Admin registers native tool and binds canonical asset; fresh confirmations, long-name mobile/Axe, versioned revoke and isolated retirement Escape pass');
+    // Durable absence review: genuine native observations, isolated scanner,
+    // real UI save/review, and no finding/workflow/scoring mutation.
+    const absenceImports=[];
+    const absenceNames=['absence-'+ 'x'.repeat(90)+'.nessus','absence-review-current.nessus'];
+    for(const kind of ['baseline','current']) {
+      const filename=`absence-review-${kind}.nessus`;
+      const displayName=absenceNames[kind==='baseline'?0:1];
+      const response=await p.request.post(base+'/api/v1'+list+'/import',{
+        headers:{Authorization:admin.authorization()},multipart:{confirm:'true',file:{name:displayName,mimeType:'text/xml',buffer:fs.readFileSync(path.join(root,'docs/examples',filename))}}});
+      assert.equal(response.status(),201); absenceImports.push(await response.json());
+    }
+    const absenceFindings=(await admin.request(list+'?finding=SYNTHETIC&limit=100')).body.items;
+    const absenceObservations=[];
+    for(const finding of absenceFindings) for(const observation of (await admin.request(list+`/${finding.id}/observations`)).body) {
+      if(absenceImports.some(imported=>imported.scan_id===observation.scan_id)) absenceObservations.push({finding,observation});
+    }
+    assert.equal(absenceObservations.length,3,'The two native fixture imports must expose exactly three source observations');
+    const absenceTool=await admin.request(org+'/identity-tools','POST',{name:'Synthetic absence scanner',rationale:'Browser test scanner namespace'});
+    assert.equal(absenceTool.status,201);
+    const absenceAsset=absenceObservations[0].observation.asset_identity.asset_id;
+    for(const {finding,observation} of absenceObservations) assert.equal((await admin.request(list+`/${finding.id}/observations/${observation.id}/identity-binding`,'PUT',{
+      expected_version:0,tool_id:absenceTool.body.id,expected_tool_version:1,canonical_asset_id:absenceAsset,confirm_mapping:true,rationale:'Reviewed synthetic scanner and host'})).status,200);
+    for(let index=0;index<2;index++) assert.equal((await admin.request(org+`/scans/${absenceImports[index].scan_id}/snapshot`,'PUT',{
+      expected_version:0,snapshot_kind:'complete',tool_name:'Synthetic absence scanner',tool_instance_id:'absence-chrome-v1',tool_configuration_id:'synthetic-v1',targets:['absence-demo-host'],exclusions:[],unreachable_targets:[],coverage_confirmed:true,rationale:'Synthetic complete scan',source_snapshot_at:new Date(Date.now()-(2-index)*60000).toISOString()})).status,200);
+    const absenceCandidate=absenceFindings.find(finding=>finding.description.includes('baseline-only'));
+    assert.ok(absenceCandidate);
+    const beforeAbsenceWorkflow=(await admin.request(list+`/${absenceCandidate.id}/workflow`)).body;
+    const beforeAbsenceTotal=(await admin.request(list)).body.total;
+    await p.goto(base+'/uploads');
+    await p.getByRole('button',{name:`Scan snapshot for ${absenceNames[0]}`,exact:true}).click();
+    await snapshotDialog().getByRole('button',{name:'Use as baseline',exact:true}).click();
+    await p.getByRole('button',{name:'Scan snapshot for absence-review-current.nessus',exact:true}).click();
+    await snapshotDialog().getByRole('button',{name:'Review against baseline',exact:true}).click();
+    const absenceComparison=p.getByRole('dialog',{name:'Review scan snapshots',exact:true});
+    await absenceComparison.getByRole('button',{name:'Compare scans and build review list',exact:true}).click();
+    await expect(absenceComparison.getByRole('heading',{name:'Findings to review (1)',exact:true})).toBeVisible();
+    await absenceComparison.getByRole('button',{name:'Save candidates to review queue',exact:true}).click();
+    await expect(absenceComparison.getByRole('status')).toContainText('Saved 1 candidate');
+    await absenceComparison.getByRole('button',{name:'Close',exact:true}).click();
+    const queued=(await admin.request(org+'/scans/absence-review-queue')).body.items;
+    assert.equal(queued.length,1);
+    await p.getByRole('button',{name:'Open absence review queue',exact:true}).click();
+    const absenceQueue=p.getByRole('dialog',{name:'Absence review queue',exact:true});
+    await expect(absenceQueue).toContainText(absenceCandidate.description);
+    await p.setViewportSize({width:320,height:844});
+    assert.ok(await absenceQueue.evaluate(node=>node.scrollWidth<=node.clientWidth));
+    const absenceAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(absenceAxe.violations.map(v=>v.id),[]);
+    await p.screenshot({path:path.join(output,'absence-queue-mobile.png'),fullPage:true});
+    await p.setViewportSize({width:1440,height:1000});
+    let releaseDecision; const decisionGate=new Promise(resolve=>{releaseDecision=resolve;});
+    await p.route('**/scans/absence-review-queue/*/decision',async route=>{await decisionGate;await route.continue();});
+    await absenceQueue.getByLabel('Review rationale',{exact:true}).fill('Still valid after reviewing the captured scan');
+    await absenceQueue.getByRole('button',{name:'Keep finding active',exact:true}).click();
+    await expect(absenceQueue.getByRole('button',{name:'Close',exact:true})).toBeDisabled();
+    await expect(absenceQueue.getByRole('combobox',{name:'Show',exact:true})).toBeDisabled();
+    await p.keyboard.press('Escape'); await expect(absenceQueue).toBeVisible();
+    releaseDecision();
+    await expect(absenceQueue.getByText('No candidates in this queue view.',{exact:true})).toBeVisible();
+    await p.unroute('**/scans/absence-review-queue/*/decision');
+    assert.equal((await auditor.request(org+`/scans/absence-review-queue/${queued[0].id}/decision`,'POST',{
+      expected_version:0,action:'keep_active',rationale:'Stale independent reviewer'})).status,409);
+    await absenceQueue.getByRole('combobox',{name:'Show',exact:true}).selectOption('kept_active');
+    await expect(absenceQueue).toContainText('Still valid after reviewing the captured scan');
+    await absenceQueue.getByLabel('Reason to reopen review',{exact:true}).fill('Reopen this historical review');
+    await absenceQueue.getByRole('button',{name:'Reopen review',exact:true}).click();
+    await expect(absenceQueue.getByText('No candidates in this queue view.',{exact:true})).toBeVisible();
+    await absenceQueue.getByRole('combobox',{name:'Show',exact:true}).selectOption('pending');
+    await expect(absenceQueue).toContainText('Review reopened by');
+    await absenceQueue.getByRole('button',{name:'Close',exact:true}).click();
+    await p.reload(); await p.getByRole('button',{name:'Open absence review queue',exact:true}).click();
+    await expect(absenceQueue).toContainText('Reopen this historical review');
+    await absenceQueue.getByRole('button',{name:'Close',exact:true}).click();
+    await viewer.page.goto(base+'/uploads');
+    // The earlier password-reset acceptance intentionally revoked this session.
+    // Reauthenticate and satisfy its mandatory password change before queue reads.
+    await expect.poll(async()=>await viewer.page.getByRole('button',{name:'Open absence review queue',exact:true}).isVisible()
+      || await viewer.page.getByLabel('Email',{exact:true}).isVisible()).toBe(true);
+    if(await viewer.page.getByLabel('Email',{exact:true}).isVisible()) {
+      await viewer.page.getByLabel('Email',{exact:true}).fill('viewer@phase3.example');
+      await viewer.page.getByLabel('Password',{exact:true}).fill(resetViewerPassword);
+      await viewer.page.getByRole('button',{name:'Sign in',exact:true}).click();
+      await viewer.page.waitForURL(base+'/change-password');
+      await viewer.page.getByLabel('Current (temporary) password',{exact:true}).fill(resetViewerPassword);
+      await viewer.page.getByLabel('New password',{exact:true}).fill(seed.password+'-viewer-final');
+      await viewer.page.getByLabel('New password again',{exact:true}).fill(seed.password+'-viewer-final');
+      await viewer.page.getByRole('button',{name:'Change password',exact:true}).click();
+      await viewer.page.waitForURL(base+'/'); await viewer.page.goto(base+'/uploads');
+    }
+    await viewer.page.getByRole('button',{name:'Open absence review queue',exact:true}).click();
+    const readOnlyQueue=viewer.page.getByRole('dialog',{name:'Absence review queue',exact:true});
+    await expect(readOnlyQueue).toContainText(absenceCandidate.description);
+    await expect(readOnlyQueue.getByRole('button',{name:'Keep finding active',exact:true})).toHaveCount(0);
+    await readOnlyQueue.getByRole('button',{name:'Close',exact:true}).click();
+    assert.equal((await admin.request(list)).body.total,beforeAbsenceTotal);
+    assert.deepEqual((await admin.request(list+`/${absenceCandidate.id}/workflow`)).body,beforeAbsenceWorkflow);
+    check('Durable absence queue saves reviewed candidates, survives reload, freezes a held save, fences stale reviewers, supports read-only members and passes mobile/Axe without finding mutations');
     execFileSync(process.execPath,[path.join(root,'scripts/browser-dashboard-tabs.cjs')],{
       cwd:root,windowsHide:true,stdio:'inherit',env:{...process.env,AUDITMIND_DASHBOARD_BASE_URL:base}});
     check('Dashboard tab presentation, shared inventory, compact tiles and alignment pass desktop/mobile Axe with synthetic intercepted data');
