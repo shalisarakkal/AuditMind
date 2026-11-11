@@ -81,6 +81,10 @@ class SnapshotComparisonRequest(BaseModel):
     candidate_limit: int = Field(default=50, ge=1, le=100)
 
 
+class SnapshotQueueRequest(SnapshotComparisonRequest):
+    review_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class NotObservedCandidate(BaseModel):
     finding_id: uuid.UUID
     baseline_observation_id: uuid.UUID
@@ -91,6 +95,7 @@ class NotObservedCandidate(BaseModel):
     domain: str
     severity: str
     workflow_status: str
+    workflow_version: int
     baseline_recorded_at: datetime
 
 
@@ -112,3 +117,33 @@ class SnapshotComparison(BaseModel):
     baseline_unreviewable_observations: int
     current_unreviewable_observations: int
     ambiguous_baseline_identity_count: int
+    review_token: str | None = None
+    review_queue_batch_id: uuid.UUID | None = None
+    review_queue_item_count: int = 0
+
+
+class AbsenceReviewDecisionWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    expected_version: int = Field(ge=0)
+    action: Literal["keep_active", "reopen"]
+    rationale: str = Field(min_length=1, max_length=12000)
+
+
+class AbsenceReviewQueueItem(BaseModel):
+    id: uuid.UUID
+    batch_id: uuid.UUID
+    candidate: NotObservedCandidate
+    comparison: dict
+    state: Literal["pending", "kept_active"]
+    decision_version: int
+    rationale: str | None = None
+    actor_label: str | None = None
+    decided_at: datetime | None = None
+    created_at: datetime
+
+
+class AbsenceReviewQueuePage(BaseModel):
+    items: list[AbsenceReviewQueueItem]
+    total: int
+    limit: int
+    offset: int

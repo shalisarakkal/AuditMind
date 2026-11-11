@@ -14,8 +14,13 @@ from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.schemas.ingestion import ImportResponse
 from app.schemas.scan import ScanCreate, ScanRead
-from app.schemas.scan_snapshot import SnapshotView, SnapshotWrite, SnapshotRevoke, SnapshotComparisonRequest, SnapshotComparison
-from app.services.scan_snapshots import read_snapshot, write_snapshot, compare_snapshots
+from app.schemas.scan_snapshot import (
+    AbsenceReviewDecisionWrite, AbsenceReviewQueueItem, AbsenceReviewQueuePage, SnapshotView, SnapshotWrite,
+    SnapshotRevoke, SnapshotComparisonRequest, SnapshotQueueRequest, SnapshotComparison,
+)
+from app.services.scan_snapshots import (
+    decide_absence_review, read_absence_review_queue, read_snapshot, write_snapshot, compare_snapshots,
+)
 
 router = APIRouter(prefix="/orgs/{org_id}/scans", tags=["scans"])
 
@@ -25,9 +30,34 @@ _ACTIVE = (ScanStatus.pending, ScanStatus.running)
 
 @router.post("/snapshot-comparison", response_model=SnapshotComparison)
 def review_scan_snapshots(org_id: uuid.UUID, payload: SnapshotComparisonRequest, response: Response,
-        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+        db: Session = Depends(get_db), membership: OrgMembership = Depends(require_org_member)):
     response.headers["Cache-Control"] = "no-store"
     return compare_snapshots(db, org_id, payload)
+
+
+@router.post("/snapshot-comparison/queue", response_model=SnapshotComparison)
+def save_scan_snapshot_review(org_id: uuid.UUID, payload: SnapshotQueueRequest, response: Response,
+        db: Session = Depends(get_db),
+        membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    response.headers["Cache-Control"] = "no-store"
+    return compare_snapshots(db, org_id, payload, persist_queue=True, membership=membership, expected_review_token=payload.review_token)
+
+
+@router.get("/absence-review-queue", response_model=AbsenceReviewQueuePage)
+def get_absence_review_queue(org_id: uuid.UUID, response: Response,
+        state: str = Query("pending", pattern="^(pending|kept_active|all)$"),
+        limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    response.headers["Cache-Control"] = "no-store"
+    return read_absence_review_queue(db, org_id, state=state, limit=limit, offset=offset)
+
+
+@router.post("/absence-review-queue/{item_id}/decision", response_model=AbsenceReviewQueueItem)
+def post_absence_review_decision(org_id: uuid.UUID, item_id: uuid.UUID, payload: AbsenceReviewDecisionWrite,
+        response: Response, db: Session = Depends(get_db),
+        membership: OrgMembership = Depends(require_org_role(UserRole.admin, UserRole.auditor))):
+    response.headers["Cache-Control"] = "no-store"
+    return decide_absence_review(db, org_id, item_id, membership, payload)
 
 
 @router.get("/{scan_id}/snapshot", response_model=SnapshotView)

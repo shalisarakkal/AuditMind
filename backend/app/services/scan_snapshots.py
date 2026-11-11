@@ -1,20 +1,28 @@
-"""Versioned declarations and metadata-only review; never produces absence facts."""
+"""Versioned declarations and bounded reviews; no absence is treated as remediation."""
+import hashlib
+import json
 from datetime import datetime, timezone
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import load_only
 
 from app.models.archive import ArchiveJob, ArchiveBatch
 from app.models.enums import ScanStatus, ArchiveState, UserRole
 from app.models.finding import Finding
+from app.models.finding_absence_review import (
+    FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
+)
 from app.models.finding_observation import FindingObservation
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.models.scan_snapshot import ScanSnapshotDeclaration
 from app.models.user import User
-from app.schemas.scan_snapshot import SnapshotComparison, SnapshotRead, SnapshotView
+from app.schemas.scan_snapshot import (
+    AbsenceReviewDecisionWrite, AbsenceReviewQueueItem, AbsenceReviewQueuePage,
+    NotObservedCandidate, SnapshotComparison, SnapshotRead, SnapshotView,
+)
 from app.services.events import actor_label, record_event
-from app.services.org_lock import lock_org_jobs
+from app.services.org_lock import lock_org, lock_org_jobs
 from app.services.knowledge_service import KnowledgeError, require_active_org
 
 _MAX_REVIEW_OBSERVATIONS_PER_SCAN = 5000
@@ -114,9 +122,27 @@ def write_snapshot(db, org_id, scan_id, membership, payload, revoke=False):
     return read_snapshot(db, org_id, scan_id)
 
 
-def compare_snapshots(db, org_id, payload):
-    # An informational, non-persisted review. It is never an authorization token
-    # and must be regenerated after later declaration/lifecycle changes.
+def compare_snapshots(db, org_id, payload, *, persist_queue=False, membership=None, expected_review_token=None):
+    # A comparison is never an authorization token; persist only an explicit,
+    # eligible candidate snapshot after rechecking organization and scan state.
+    if persist_queue:
+        if membership is None or membership.role not in (UserRole.admin, UserRole.auditor):
+            raise HTTPException(403, "Insufficient permissions")
+        def refuse_busy_inventory():
+            raise HTTPException(409, "Inventory publication is in progress; compare again after it finishes")
+        lock_org(db, org_id, on_wait=refuse_busy_inventory)
+        try:
+            require_active_org(db, org_id, lock=True)
+        except KnowledgeError as exc:
+            raise HTTPException(409, "Organization is read-only or unavailable") from exc
+        current_membership = db.scalar(select(OrgMembership).where(
+            OrgMembership.org_id == org_id, OrgMembership.user_id == membership.user_id)
+            .with_for_update().execution_options(populate_existing=True))
+        if current_membership is None or current_membership.role not in (UserRole.admin, UserRole.auditor):
+            raise HTTPException(403, "Insufficient permissions")
+        membership = current_membership
+        for scan_id in sorted((payload.baseline_scan_id, payload.current_scan_id), key=str):
+            _scan(db, org_id, scan_id, lock=True)
     if payload.baseline_scan_id == payload.current_scan_id:
         raise HTTPException(422, "Choose two different scans")
     baseline = read_snapshot(db, org_id, payload.baseline_scan_id)
@@ -162,6 +188,8 @@ def compare_snapshots(db, org_id, payload):
     baseline_reviewable = current_reviewable = 0
     baseline_unreviewable = current_unreviewable = 0
     ambiguous_identity_count = 0
+    identity_fingerprint = None
+    all_review_candidates = []
     if not reasons:
         baseline_observations = _scan_observations(db, org_id, payload.baseline_scan_id)
         current_observations = _scan_observations(db, org_id, payload.current_scan_id)
@@ -175,6 +203,8 @@ def compare_snapshots(db, org_id, payload):
             from app.services.identity_bindings import identity_reviews
             baseline_reviews = identity_reviews(db, org_id, baseline_observations)
             current_reviews = identity_reviews(db, org_id, current_observations)
+            identity_fingerprint = _identity_review_fingerprint(
+                baseline_observations, baseline_reviews, current_observations, current_reviews)
             baseline_keys: dict[str, set] = {}
             finding_keys: dict[object, set[str]] = {}
             latest_observation: dict[object, FindingObservation] = {}
@@ -208,16 +238,16 @@ def compare_snapshots(db, org_id, payload):
                 finding_id for finding_id, keys in finding_keys.items()
                 if not keys.intersection(current_keys) and finding_id not in ambiguous_findings
             } if not current_unreviewable else set()
-            findings = db.scalars(select(Finding).options(load_only(
-                Finding.id, Finding.asset_id, Finding.description, Finding.category,
-                Finding.domain, Finding.severity, Finding.workflow_status,
-            )).where(
+            findings = db.execute(select(
+                Finding.id, Finding.asset_id, func.left(Finding.description, 2000).label("description"), Finding.category,
+                Finding.domain, Finding.severity, Finding.workflow_status, Finding.workflow_version,
+            ).where(
                 Finding.org_id == org_id, Finding.id.in_(possible_findings),
                 Finding.archived_at.is_(None)).order_by(Finding.id)).all() if possible_findings else []
             candidate_count = len(findings)
-            for finding in findings[payload.candidate_offset:payload.candidate_offset + payload.candidate_limit]:
+            for finding in findings:
                 observation = latest_observation[finding.id]
-                review_candidates.append(dict(
+                all_review_candidates.append(dict(
                     finding_id=finding.id,
                     baseline_observation_id=observation.id,
                     reviewable_baseline_observation_count=baseline_counts[finding.id],
@@ -227,10 +257,80 @@ def compare_snapshots(db, org_id, payload):
                     domain=finding.domain.value,
                     severity=finding.severity.value,
                     workflow_status=finding.workflow_status,
+                    workflow_version=finding.workflow_version,
                     baseline_recorded_at=observation.recorded_at,
                 ))
+            review_candidates = all_review_candidates[
+                payload.candidate_offset:payload.candidate_offset + payload.candidate_limit]
     absence_eligible = not absence_blockers
-    return SnapshotComparison(reviewed_at=datetime.now(timezone.utc), baseline=baseline, current=current,
+    reviewed_at = datetime.now(timezone.utc)
+    review_queue_batch_id = None
+    review_queue_item_count = 0
+    snapshot_candidates = [NotObservedCandidate(**candidate).model_dump(mode="json")
+        for candidate in all_review_candidates]
+    review_context = dict(baseline=baseline.model_dump(mode="json"), current=current.model_dump(mode="json"),
+        identity_review_fingerprint=identity_fingerprint, candidates=snapshot_candidates)
+    review_token = hashlib.sha256(json.dumps(review_context, sort_keys=True,
+        separators=(",", ":")).encode()).hexdigest() if absence_eligible else None
+    if persist_queue and (not review_token or expected_review_token != review_token):
+        raise HTTPException(409, "Scan review context changed; compare again before saving candidates")
+    if persist_queue and absence_eligible and all_review_candidates:
+        actor = db.get(User, membership.user_id)
+        batch_identity = dict(
+            contract="absence-review-queue-v1",
+            org_id=str(org_id),
+            baseline_scan_id=str(payload.baseline_scan_id),
+            current_scan_id=str(payload.current_scan_id),
+            baseline_version=payload.baseline_version,
+            current_version=payload.current_version,
+            identity_review_fingerprint=identity_fingerprint,
+            review_token=review_token,
+            candidates=snapshot_candidates,
+        )
+        batch_key = hashlib.sha256(json.dumps(
+            batch_identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        batch = db.scalar(select(FindingAbsenceReviewBatch).where(
+            FindingAbsenceReviewBatch.org_id == org_id,
+            FindingAbsenceReviewBatch.batch_key == batch_key).with_for_update())
+        is_new = batch is None
+        if batch is None:
+            comparison_context = dict(
+                reviewed_at=reviewed_at.isoformat(),
+                baseline=baseline.model_dump(mode="json"),
+                current=current.model_dump(mode="json"),
+                declared_metadata_matches=True,
+                scope_differences=differences,
+                identity_review_fingerprint=identity_fingerprint,
+            )
+            batch = FindingAbsenceReviewBatch(
+                org_id=org_id, batch_key=batch_key, baseline_scan_id=payload.baseline_scan_id,
+                current_scan_id=payload.current_scan_id, baseline_version=payload.baseline_version,
+                current_version=payload.current_version, context=comparison_context,
+                actor_id=membership.user_id, actor_label=actor_label(actor), created_at=reviewed_at,
+            )
+            db.add(batch)
+            db.flush()
+            db.add_all([
+                FindingAbsenceReviewItem(
+                    org_id=org_id, batch_id=batch.id, finding_id=candidate["finding_id"],
+                    baseline_observation_id=candidate["baseline_observation_id"],
+                    candidate=candidate, created_at=reviewed_at,
+                )
+                for candidate in snapshot_candidates
+            ])
+            db.flush()
+            record_event(db, "finding_absence_review_saved", org_id=org_id, actor=actor,
+                item=f"{baseline.scan.get('filename') or baseline.scan['id']} vs {current.scan.get('filename') or current.scan['id']}",
+                details=dict(batch_id=str(batch.id), baseline_scan_id=str(payload.baseline_scan_id),
+                    current_scan_id=str(payload.current_scan_id), baseline_version=payload.baseline_version,
+                    current_version=payload.current_version, candidate_count=len(snapshot_candidates)))
+        review_queue_batch_id = batch.id
+        review_queue_item_count = db.scalar(select(func.count(FindingAbsenceReviewItem.id)).where(
+            FindingAbsenceReviewItem.org_id == org_id,
+            FindingAbsenceReviewItem.batch_id == batch.id)) or 0
+        if is_new:
+            db.commit()
+    return SnapshotComparison(reviewed_at=reviewed_at, baseline=baseline, current=current,
         declared_metadata_matches=not reasons, absence_eligible=absence_eligible,
         blocking_reasons=reasons, absence_blockers=absence_blockers, scope_differences=differences,
         review_candidates=review_candidates, candidate_count=candidate_count,
@@ -239,7 +339,143 @@ def compare_snapshots(db, org_id, payload):
         current_reviewable_observations=current_reviewable,
         baseline_unreviewable_observations=baseline_unreviewable,
         current_unreviewable_observations=current_unreviewable,
-        ambiguous_baseline_identity_count=ambiguous_identity_count)
+        ambiguous_baseline_identity_count=ambiguous_identity_count,
+        review_token=review_token, review_queue_batch_id=review_queue_batch_id,
+        review_queue_item_count=review_queue_item_count)
+
+
+def _identity_review_fingerprint(baseline_observations, baseline_reviews, current_observations, current_reviews):
+    reviewed = []
+    for observations, reviews in ((baseline_observations, baseline_reviews), (current_observations, current_reviews)):
+        for observation in observations:
+            assessment, binding = reviews[observation.id]
+            key = assessment.get("candidate_key")
+            reviewed.append(dict(
+                observation_id=str(observation.id),
+                binding_version=binding["version"] if binding else 0,
+                binding_state=binding["state"] if binding else "unreviewed",
+                binding_current=binding["current"] if binding else False,
+                candidate_key_hash=hashlib.sha256(key.encode()).hexdigest() if key else None,
+            ))
+    return hashlib.sha256(json.dumps(
+        sorted(reviewed, key=lambda value: value["observation_id"]),
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def read_absence_review_queue(db, org_id, *, state, limit, offset):
+    latest_state = select(FindingAbsenceReviewDecision.state).where(
+        FindingAbsenceReviewDecision.item_id == FindingAbsenceReviewItem.id,
+        FindingAbsenceReviewDecision.org_id == org_id,
+    ).order_by(FindingAbsenceReviewDecision.version.desc()).limit(1
+    ).correlate(FindingAbsenceReviewItem).scalar_subquery()
+    conditions = [FindingAbsenceReviewItem.org_id == org_id]
+    if state == "pending":
+        conditions.append(or_(latest_state.is_(None), latest_state == "reopened"))
+    elif state == "kept_active":
+        conditions.append(latest_state == "kept_active")
+    total = db.scalar(select(func.count(FindingAbsenceReviewItem.id)).where(*conditions)) or 0
+    rows = db.scalars(select(FindingAbsenceReviewItem).where(*conditions).order_by(
+        FindingAbsenceReviewItem.created_at.desc(), FindingAbsenceReviewItem.id.desc()
+    ).limit(limit).offset(offset)).all()
+    # Load each captured declaration context once, not once per candidate in a
+    # joined page. Return only compact batch summaries, not repeated scope JSON.
+    batches = {batch.id: batch for batch in db.scalars(select(FindingAbsenceReviewBatch).where(
+        FindingAbsenceReviewBatch.org_id == org_id,
+        FindingAbsenceReviewBatch.id.in_({item.batch_id for item in rows}))).all()} if rows else {}
+    latest_decisions = {}
+    item_ids = [item.id for item in rows]
+    if item_ids:
+        ranked_decisions = select(
+            FindingAbsenceReviewDecision.id.label("id"),
+            func.row_number().over(
+                partition_by=FindingAbsenceReviewDecision.item_id,
+                order_by=FindingAbsenceReviewDecision.version.desc(),
+            ).label("position"),
+        ).where(
+            FindingAbsenceReviewDecision.org_id == org_id,
+            FindingAbsenceReviewDecision.item_id.in_(item_ids),
+        ).subquery()
+        decisions = db.scalars(select(FindingAbsenceReviewDecision).join(
+            ranked_decisions, ranked_decisions.c.id == FindingAbsenceReviewDecision.id,
+        ).where(ranked_decisions.c.position == 1)).all()
+        latest_decisions = {decision.item_id: decision for decision in decisions}
+    return AbsenceReviewQueuePage(
+        items=[_absence_review_item(item, batches[item.batch_id], latest_decisions.get(item.id)) for item in rows],
+        total=total, limit=limit, offset=offset,
+    )
+
+
+def _absence_review_item(item, batch, decision):
+    summary = {"reviewed_at": batch.context["reviewed_at"],
+        "identity_review_fingerprint": batch.context["identity_review_fingerprint"]}
+    for side in ("baseline", "current"):
+        captured = batch.context[side]
+        summary[side] = dict(scan={key: captured["scan"].get(key) for key in ("id", "filename")},
+            declaration_version=captured["declaration"]["version"])
+    return AbsenceReviewQueueItem(
+        id=item.id, batch_id=batch.id, candidate=item.candidate, comparison=summary,
+        state="kept_active" if decision and decision.state == "kept_active" else "pending",
+        decision_version=decision.version if decision else 0,
+        rationale=decision.rationale if decision else None,
+        actor_label=decision.actor_label if decision else None,
+        decided_at=decision.created_at if decision else None,
+        created_at=item.created_at,
+    )
+
+
+def decide_absence_review(db, org_id, item_id, membership, payload: AbsenceReviewDecisionWrite):
+    # Reviewing a retained queue item never publishes inventory. Do not wait on
+    # the import lock or hold job admission behind a long-running import.
+    try:
+        require_active_org(db, org_id, lock=True)
+    except KnowledgeError as exc:
+        raise HTTPException(409, "Organization is read-only or unavailable") from exc
+    current_membership = db.scalar(select(OrgMembership).where(
+        OrgMembership.org_id == org_id, OrgMembership.user_id == membership.user_id)
+        .with_for_update().execution_options(populate_existing=True))
+    if current_membership is None or current_membership.role not in (UserRole.admin, UserRole.auditor):
+        raise HTTPException(403, "Insufficient permissions")
+    item = db.scalar(select(FindingAbsenceReviewItem).where(
+        FindingAbsenceReviewItem.org_id == org_id,
+        FindingAbsenceReviewItem.id == item_id,
+    ).with_for_update().execution_options(populate_existing=True))
+    if item is None:
+        raise HTTPException(404, "Absence review item not found")
+    if payload.action == "keep_active":
+        finding = db.scalar(select(Finding).options(load_only(Finding.id, Finding.workflow_version,
+            Finding.archived_at)).where(Finding.org_id == org_id, Finding.id == item.finding_id)
+            .with_for_update(key_share=True).execution_options(populate_existing=True))
+        if finding is None or finding.archived_at is not None:
+            raise HTTPException(409, "This finding is no longer active; refresh the scan comparison before reviewing it")
+        if finding.workflow_version != item.candidate["workflow_version"]:
+            raise HTTPException(409, "Finding workflow changed since this snapshot; compare the scans again before reviewing it")
+    previous = db.scalar(select(FindingAbsenceReviewDecision).where(
+        FindingAbsenceReviewDecision.org_id == org_id,
+        FindingAbsenceReviewDecision.item_id == item_id,
+    ).order_by(FindingAbsenceReviewDecision.version.desc()).limit(1))
+    version = previous.version if previous else 0
+    if payload.expected_version != version:
+        raise HTTPException(409, dict(code="absence_review_version_conflict",
+            message="This review changed. Reload the queue before retrying."))
+    if payload.action == "keep_active" and previous and previous.state == "kept_active":
+        raise HTTPException(409, "This candidate is already marked to remain active")
+    if payload.action == "reopen" and (previous is None or previous.state != "kept_active"):
+        raise HTTPException(409, "Only a kept-active review can be returned to the queue")
+    actor = db.get(User, current_membership.user_id)
+    state = "kept_active" if payload.action == "keep_active" else "reopened"
+    decision = FindingAbsenceReviewDecision(
+        org_id=org_id, item_id=item_id, version=version + 1, state=state,
+        rationale=payload.rationale, actor_id=current_membership.user_id,
+        actor_label=actor_label(actor),
+    )
+    db.add(decision)
+    db.flush()
+    record_event(db, "finding_absence_review_decided" if state == "kept_active" else "finding_absence_review_reopened",
+        org_id=org_id, actor=actor, item=str(item.finding_id),
+        details=dict(item_id=str(item.id), batch_id=str(item.batch_id), finding_id=str(item.finding_id), version=decision.version,
+            state=state, rationale=payload.rationale))
+    db.commit()
+    return _absence_review_item(item, db.get(FindingAbsenceReviewBatch, item.batch_id), decision)
 
 
 def _scan_observations(db, org_id, scan_id):

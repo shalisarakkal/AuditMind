@@ -15,6 +15,9 @@ from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.models.finding_canonical import FindingCanonicalDecision
+from app.models.finding_absence_review import (
+    FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
+)
 from app.models.scan_snapshot import ScanSnapshotDeclaration
 from app.models.risk_score import RiskScore
 from app.models.report import Report
@@ -60,6 +63,9 @@ __all__ = [
     "IdentityTool",
     "ObservationIdentityBinding",
     "FindingCanonicalDecision",
+    "FindingAbsenceReviewBatch",
+    "FindingAbsenceReviewItem",
+    "FindingAbsenceReviewDecision",
     "ScanSnapshotDeclaration",
     "RiskScore",
     "Report",

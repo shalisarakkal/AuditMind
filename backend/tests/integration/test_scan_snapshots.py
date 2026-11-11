@@ -133,6 +133,19 @@ def _nessus_two_hosts(plugin_id):
       </ReportHost></Report></NessusClientData_v2>""".encode()
 
 
+def _nessus_many(plugin_ids):
+    items = "".join(
+        f'<ReportItem port="443" protocol="tcp" severity="2" pluginID="{plugin_id}" '
+        f'pluginName="Synthetic finding {plugin_id}" pluginFamily="Test">'
+        '<risk_factor>Medium</risk_factor><synopsis>Synthetic finding.</synopsis></ReportItem>'
+        for plugin_id in plugin_ids
+    )
+    return f"""<NessusClientData_v2><Report name="synthetic">
+      <ReportHost name="pilot-host"><HostProperties><tag name="host-ip">10.0.0.10</tag></HostProperties>
+        {items}
+      </ReportHost></Report></NessusClientData_v2>""".encode()
+
+
 def _bind_observation(client, owner, db_session, scan_id, tool_id, canonical_asset_id):
     from app.models.finding_observation import FindingObservation
 
@@ -144,6 +157,119 @@ def _bind_observation(client, owner, db_session, scan_id, tool_id, canonical_ass
         confirm_mapping=True, rationale="Reviewed synthetic scanner and host"))
     assert response.status_code == 200, response.text
     return observation, response.json()["identity_assessment"]["candidate_key"]
+
+
+def test_durable_queue_is_idempotent_versioned_tenant_scoped_and_survives_source_purge(
+        client, owner, db_session):
+    from app.models.finding_observation import FindingObservation
+    from app.models.finding_identity_binding import ObservationIdentityBinding
+    from app.models.finding_absence_review import (
+        FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
+    )
+
+    baseline_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "baseline.nessus", _nessus_many(["1001", "1002"]))
+    current_response = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import",
+        owner[0], "current.nessus", _nessus("1003"))
+    assert baseline_response.status_code == current_response.status_code == 201
+    baseline_id, current_id = baseline_response.json()["scan_id"], current_response.json()["scan_id"]
+    baseline_observations = db_session.query(FindingObservation).filter_by(
+        scan_id=uuid.UUID(baseline_id)).order_by(FindingObservation.source_row).all()
+    current_observations = db_session.query(FindingObservation).filter_by(
+        scan_id=uuid.UUID(current_id)).all()
+    assert len(baseline_observations) == 2 and len(current_observations) == 1
+    tool_response = client.post(f"/api/v1/orgs/{owner[1]}/identity-tools",
+        headers=owner[0], json=dict(name="Synthetic Nessus", rationale="Test scanner"))
+    assert tool_response.status_code == 201, tool_response.text
+    tool_id = tool_response.json()["id"]
+    canonical_asset_id = baseline_observations[0].asset_identity["asset_id"]
+    for observation in baseline_observations + current_observations:
+        response = client.put(
+            f"/api/v1/orgs/{owner[1]}/findings/{observation.finding_id}/observations/"
+            f"{observation.id}/identity-binding",
+            headers=owner[0], json=dict(expected_version=0, tool_id=tool_id,
+                expected_tool_version=1, canonical_asset_id=canonical_asset_id,
+                confirm_mapping=True, rationale="Reviewed synthetic scanner and host"))
+        assert response.status_code == 200, response.text
+    assert db_session.query(ObservationIdentityBinding).count() == 3
+
+    source_time = datetime.now(timezone.utc)
+    declare(client, owner, baseline_id, {"source_snapshot_at": (source_time - timedelta(minutes=2)).isoformat()})
+    declare(client, owner, current_id, {"source_snapshot_at": (source_time - timedelta(minutes=1)).isoformat()})
+    payload = dict(baseline_scan_id=baseline_id, current_scan_id=current_id,
+        baseline_version=1, current_version=1, candidate_offset=0, candidate_limit=1)
+    payload["review_token"] = client.post(f"{root(owner)}/snapshot-comparison", headers=owner[0], json=payload).json()["review_token"]
+    path = f"{root(owner)}/snapshot-comparison/queue"
+    viewer = member(client, owner[0], owner[1], "viewer")
+    assert client.post(path, headers=viewer, json=payload).status_code == 403
+
+    before_findings = {
+        row.id: (row.workflow_status, row.workflow_version, row.severity, row.description, row.archived_at)
+        for row in db_session.query(Finding).all()
+    }
+    saved = client.post(path, headers=owner[0], json=payload)
+    assert saved.status_code == 200, saved.text
+    batch_id = saved.json()["review_queue_batch_id"]
+    assert batch_id and saved.json()["review_queue_item_count"] == 2
+    assert len(saved.json()["review_candidates"]) == 1
+    repeated = client.post(path, headers=owner[0], json=payload)
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["review_queue_batch_id"] == batch_id
+    assert db_session.query(FindingAbsenceReviewBatch).count() == 1
+    assert db_session.query(FindingAbsenceReviewItem).count() == 2
+
+    queue_path = f"{root(owner)}/absence-review-queue"
+    read = client.get(queue_path, headers=viewer, params={"state": "all", "limit": 1})
+    assert read.status_code == 200, read.text
+    assert read.json()["total"] == 2 and len(read.json()["items"]) == 1
+    item = read.json()["items"][0]
+    assert item["comparison"]["baseline"]["scan"]["id"] == baseline_id
+    assert item["comparison"]["current"]["scan"]["id"] == current_id
+    next_page = client.get(queue_path, headers=viewer,
+        params={"state": "all", "limit": 1, "offset": 1})
+    assert next_page.status_code == 200 and next_page.json()["total"] == 2
+    assert len(next_page.json()["items"]) == 1
+    other = register(client, "foreign-queue@example.io", "Other")
+    assert client.get(f"/api/v1/orgs/{owner[1]}/scans/absence-review-queue",
+        headers=other).status_code == 403
+
+    decision_path = f"{queue_path}/{item['id']}/decision"
+    assert client.post(decision_path, headers=viewer, json=dict(
+        expected_version=0, action="keep_active", rationale="Not authorized")).status_code == 403
+    kept = client.post(decision_path, headers=owner[0], json=dict(
+        expected_version=0, action="keep_active", rationale="Still valid in inventory"))
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["state"] == "kept_active" and kept.json()["decision_version"] == 1
+    assert client.get(queue_path, headers=viewer, params={"state": "pending"}).json()["total"] == 1
+    assert client.get(queue_path, headers=viewer, params={"state": "kept_active"}).json()["total"] == 1
+    assert client.post(decision_path, headers=owner[0], json=dict(
+        expected_version=0, action="keep_active", rationale="Stale decision")).status_code == 409
+    reopened = client.post(decision_path, headers=owner[0], json=dict(
+        expected_version=1, action="reopen", rationale="Needs another review"))
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["state"] == "pending" and reopened.json()["decision_version"] == 2
+    assert [row.version for row in db_session.query(FindingAbsenceReviewDecision).filter_by(
+        item_id=uuid.UUID(item["id"])).order_by(FindingAbsenceReviewDecision.version)] == [1, 2]
+
+    db_session.expire_all()
+    after_findings = {
+        row.id: (row.workflow_status, row.workflow_version, row.severity, row.description, row.archived_at)
+        for row in db_session.query(Finding).all()
+    }
+    assert before_findings == after_findings
+    assert db_session.query(FindingHistory).count() == 0
+
+    db_session.query(FindingObservation).filter(
+        FindingObservation.scan_id.in_([uuid.UUID(baseline_id), uuid.UUID(current_id)])
+    ).delete(synchronize_session=False)
+    db_session.query(ScanSnapshotDeclaration).filter(
+        ScanSnapshotDeclaration.scan_id.in_([uuid.UUID(baseline_id), uuid.UUID(current_id)])
+    ).delete(synchronize_session=False)
+    db_session.commit()
+    retained = client.get(queue_path, headers=viewer, params={"state": "all", "limit": 1})
+    assert retained.status_code == 200 and retained.json()["total"] == 2
+    assert retained.json()["items"][0]["candidate"]["finding_id"]
+    assert retained.json()["items"][0]["comparison"]["baseline"]["scan"]["filename"] == "baseline.nessus"
 
 
 @pytest.mark.parametrize(("current_plugin", "expected_candidates"), [("1001", 0), ("1002", 1)])
@@ -462,3 +588,153 @@ def test_scope_order_and_duplicate_entries_do_not_change_declared_identity(clien
     declare(client,owner,b,{"targets":["Host-A","Host-B"],"exclusions":["y","x"]})
     assert first["declaration"]["declaration"]["targets"] == ["Host-A","Host-B"]
     assert compare(client,owner,a,b).json()["declared_metadata_matches"] is True
+
+
+@pytest.fixture
+def queue_review_pair(client, owner, db_session):
+    from app.models.finding_observation import FindingObservation
+    baseline = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import", owner[0], "baseline.nessus", _nessus("1001")).json()["scan_id"]
+    current = upload(client, f"/api/v1/orgs/{owner[1]}/findings/import", owner[0], "current.nessus", _nessus("1002")).json()["scan_id"]
+    observation = db_session.scalar(select(FindingObservation).where(FindingObservation.scan_id == uuid.UUID(baseline)))
+    tool = client.post(f"/api/v1/orgs/{owner[1]}/identity-tools", headers=owner[0], json=dict(name="Review scanner", rationale="Synthetic test")).json()["id"]
+    for identifier in (baseline, current):
+        _bind_observation(client, owner, db_session, identifier, tool, observation.asset_identity["asset_id"])
+    now = datetime.now(timezone.utc)
+    declare(client, owner, baseline, {"source_snapshot_at": (now-timedelta(minutes=2)).isoformat()})
+    declare(client, owner, current, {"source_snapshot_at": (now-timedelta(minutes=1)).isoformat()})
+    return dict(baseline_scan_id=baseline, current_scan_id=current, baseline_version=1, current_version=1), observation.finding_id
+
+
+def test_review_regression_queue_save_rejects_changed_preview(client, owner, db_session, queue_review_pair):
+    payload, finding_id = queue_review_pair
+    preview = client.post(f"{root(owner)}/snapshot-comparison", headers=owner[0], json=payload).json()
+    finding = db_session.get(Finding, finding_id)
+    finding.workflow_status = "resolved"
+    finding.workflow_version += 1
+    db_session.commit()
+    if preview.get("review_token"):
+        payload = {**payload, "review_token": preview["review_token"]}
+    response = client.post(f"{root(owner)}/snapshot-comparison/queue", headers=owner[0], json=payload)
+    assert response.status_code == 409, response.text
+
+
+def test_review_regression_keep_active_rejects_changed_finding(client, owner, db_session, queue_review_pair):
+    payload, finding_id = queue_review_pair
+    preview = client.post(f"{root(owner)}/snapshot-comparison", headers=owner[0], json=payload).json()
+    if preview.get("review_token"):
+        payload = {**payload, "review_token": preview["review_token"]}
+    saved = client.post(f"{root(owner)}/snapshot-comparison/queue", headers=owner[0], json=payload)
+    assert saved.status_code == 200, saved.text
+    item = client.get(f"{root(owner)}/absence-review-queue", headers=owner[0]).json()["items"][0]
+    finding = db_session.get(Finding, finding_id)
+    finding.workflow_status = "resolved"
+    finding.workflow_version += 1
+    db_session.commit()
+    response = client.post(f"{root(owner)}/absence-review-queue/{item['id']}/decision", headers=owner[0],
+        json=dict(expected_version=0, action="keep_active", rationale="Reviewed original preview"))
+    assert response.status_code == 409, response.text
+
+
+@pytest.fixture
+def saved_queue_item(client, owner, queue_review_pair):
+    payload, finding_id = queue_review_pair
+    preview = client.post(f"{root(owner)}/snapshot-comparison", headers=owner[0], json=payload).json()
+    response = client.post(f"{root(owner)}/snapshot-comparison/queue", headers=owner[0],
+        json={**payload, "review_token": preview["review_token"]})
+    assert response.status_code == 200, response.text
+    item = client.get(f"{root(owner)}/absence-review-queue", headers=owner[0]).json()["items"][0]
+    return payload, finding_id, item
+
+
+def test_queue_preview_token_is_mandatory_and_bound_to_context(client, owner, queue_review_pair):
+    payload, _ = queue_review_pair
+    path = f"{root(owner)}/snapshot-comparison/queue"
+    assert client.post(path, headers=owner[0], json=payload).status_code == 422
+    assert client.post(path, headers=owner[0], json={**payload, "review_token": "0"*64}).status_code == 409
+
+
+def test_queue_save_fails_promptly_instead_of_waiting_for_import(client, owner, db_session, queue_review_pair):
+    from app.services.org_lock import lock_org
+    from app.services.scan_snapshots import compare_snapshots
+    from app.schemas.scan_snapshot import SnapshotComparisonRequest
+    payload, _ = queue_review_pair
+    member_row = db_session.scalar(select(OrgMembership).where(OrgMembership.org_id == uuid.UUID(owner[1])))
+    org_id = member_row.org_id
+    actor = SimpleNamespace(user_id=member_row.user_id, role=member_row.role)
+    with Session(db_session.get_bind()) as writer:
+        lock_org(writer, org_id)
+        db_session.execute(text("SET LOCAL statement_timeout='2s'"))
+        with pytest.raises(HTTPException) as error:
+            compare_snapshots(db_session, org_id, SnapshotComparisonRequest(**payload),
+                persist_queue=True, membership=actor, expected_review_token="0"*64)
+        assert error.value.status_code == 409
+        assert "publication" in str(error.value.detail)
+        writer.rollback()
+    db_session.rollback()
+
+
+def test_keep_active_does_not_wait_for_import_and_two_admins_cannot_overwrite(client, owner, db_session, saved_queue_item):
+    from app.services.org_lock import lock_org
+    from app.services.scan_snapshots import decide_absence_review
+    from app.schemas.scan_snapshot import AbsenceReviewDecisionWrite
+    from app.models.finding_absence_review import FindingAbsenceReviewDecision
+    payload, finding_id, item = saved_queue_item
+    member_row = db_session.scalar(select(OrgMembership).where(OrgMembership.org_id == uuid.UUID(owner[1])))
+    org_id, user_id = member_row.org_id, member_row.user_id
+    # No inventory lock is needed to record a historical review note.
+    with Session(db_session.get_bind()) as writer:
+        lock_org(writer, org_id)
+        db_session.execute(text("SET LOCAL statement_timeout='2s'"))
+        response = client.post(f"{root(owner)}/absence-review-queue/{item['id']}/decision", headers=owner[0],
+            json=dict(expected_version=0, action="keep_active", rationale="Independent of inventory publication"))
+        assert response.status_code == 200, response.text
+        writer.rollback()
+    db_session.execute(text("SET LOCAL statement_timeout=0"))
+    second_headers = member(client, owner[0], owner[1], "admin")
+    second_id = db_session.scalar(select(OrgMembership.user_id).where(
+        OrgMembership.org_id == org_id, OrgMembership.user_id != user_id))
+    engine = db_session.get_bind(); barrier = Barrier(2)
+    def save(actor_id):
+        with Session(engine) as db:
+            db.execute(text("SET LOCAL statement_timeout='10s'")); barrier.wait(timeout=10)
+            try:
+                result = decide_absence_review(db, org_id, uuid.UUID(item["id"]),
+                    SimpleNamespace(user_id=actor_id), AbsenceReviewDecisionWrite(
+                        expected_version=1, action="reopen", rationale="Independent admin review"))
+                return result.decision_version
+            except HTTPException as exc:
+                db.rollback(); return exc.status_code
+    db_session.commit()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        result = list(pool.map(save, (user_id, second_id)))
+    assert sorted(result) == [2, 409]
+    assert db_session.query(FindingAbsenceReviewDecision).count() == 2
+
+
+def test_queue_survives_actual_upload_purge_and_rejects_missing_finding(client, owner, db_session, saved_queue_item):
+    payload, finding_id, item = saved_queue_item
+    identifier = payload["baseline_scan_id"]
+    response = client.post(f"{root(owner)}/{identifier}/archive", headers=owner[0])
+    assert response.status_code == 200, response.text
+    batches = client.get(f"/api/v1/orgs/{owner[1]}/archive", headers=owner[0]).json()["items"]
+    batch = next(row["id"] for row in batches if row["item_id"] == identifier)
+    assert client.post(f"/api/v1/orgs/{owner[1]}/archive/{batch}/purge", headers=owner[0]).status_code == 200
+    assert db_session.get(Finding, finding_id) is None
+    retained = client.get(f"{root(owner)}/absence-review-queue", headers=owner[0])
+    assert retained.status_code == 200
+    assert retained.json()["items"][0]["candidate"]["finding_id"] == str(finding_id)
+    assert "declaration" not in retained.json()["items"][0]["comparison"]["baseline"]
+    response = client.post(f"{root(owner)}/absence-review-queue/{item['id']}/decision", headers=owner[0],
+        json=dict(expected_version=0, action="keep_active", rationale="Source is gone"))
+    assert response.status_code == 409
+
+
+
+def test_queue_item_ids_cannot_be_used_through_another_organization(client, owner, saved_queue_item):
+    _, _, item = saved_queue_item
+    headers = register(client, "foreign-review@example.io", "Independent organization")
+    other_id = first_org_id(client, headers)
+    response = client.post(f"/api/v1/orgs/{other_id}/scans/absence-review-queue/{item['id']}/decision",
+        headers=headers, json=dict(expected_version=0, action="keep_active", rationale="Foreign item"))
+    assert response.status_code == 404
+    assert client.get(f"/api/v1/orgs/{other_id}/scans/absence-review-queue", headers=headers).json()["total"] == 0
