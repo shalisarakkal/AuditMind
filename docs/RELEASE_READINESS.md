@@ -1,16 +1,20 @@
 # Release readiness and code review
 
-## Current suppression increment - 11 November 2026
+## Current verified application - 11 November 2026
 
-Trusted native Nessus suppression/clear, atomic visibility and risk integration,
-source-lifecycle safeguards and guarded UI actions are delivered and locally active
-at migration 0050. See [the current review and test record](SUPPRESSION_RELEASE_REVIEW.md).
-All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
-The subsequent retained-source correction `6ed32a4` passes 120 expanded and
-three final indexed-query cases. Its own exact-tip hosted result must be
-checked at delivery; the earlier green run is a dated baseline.
+Current committed application: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
+All four exact-SHA Linux jobs passed in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993). The preceding
+suppression/retained-source delivery `f97a4fb` also passed all four in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797).
+The backend, frontend, dependency/security and complete browser gates are verified
+for both commits; the earlier `cc1ca17` run is only a historical baseline.
+
+Native Nessus suppress/clear, retained-source and alias conflict guards are
+locally activated at migration 0050. The later draft-save fix preserves unchanged
+versions/audit history and required no new migration. See
+[review and validation scopes](SUPPRESSION_RELEASE_REVIEW.md).
 PB-1.3 remains partial: consolidation, source-payload publication, additional
-identity mappings and automatic reconciliation are separate work.
+identity mappings and automatic reconciliation are separate work. Pilot and
+production gates below are not closed by successful engineering CI.
 
 ### Prior delivered absence-review baseline
 
@@ -67,7 +71,7 @@ not a failed test or automatically part of the next release.
 
 | Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
 | --- | --- | --- | --- |
-| G-01: reviewed code and correctness CI | `cc1ca17` verified in all four hosted jobs | Engineering / project release owner | [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309); [current suppression review](SUPPRESSION_RELEASE_REVIEW.md). This closes bounded engineering verification, not production sign-off. |
+| G-01: reviewed code and correctness CI | Current application `e4c7488` verified in all four hosted jobs | Engineering / project release owner | [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993); preceding suppression delivery [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797); [release review](SUPPRESSION_RELEASE_REVIEW.md). Bounded engineering verification does not grant production sign-off. |
 | G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
 | G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
 | G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |

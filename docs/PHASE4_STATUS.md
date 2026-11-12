@@ -1,22 +1,32 @@
 # Phase 4 status and next milestone
 
-## Imported finding suppression and clear - 11 November 2026
+## Current delivery - 11 November 2026
 
-The end-to-end native Nessus disposition increment is implemented locally at
-migration 0050 and reviewed for delivery. It adds authorized preview/suppress/
-clear, atomic visibility/count/scoring/cache publication, durable reappearance
-review, source-retention/restore protection and guarded UI. Fresh uploads never
-inherit trusted identity bindings. Generic sources remain ineligible.
-Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
-backend focus: 46 tests passed. The full backend run passed 1,765 tests with
-one setup-readiness timeout under migration/test load. All 51 combined
-regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally;
-health/login/auth-options return 200.
-All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
-The later retained-source correction `6ed32a4` passes 120 expanded regressions
-and three final indexed-query cases. Its own exact-tip CI is checked at delivery;
-the earlier green run does not certify that later change.
-[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+Committed application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
+All four hosted Linux jobs (backend, frontend, dependency/security and browser)
+passed for both the suppression/retained-source delivery `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797)
+and the draft-save correction `e4c7488` in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
+
+- Migration 0050 is locally activated. Reviewed native Nessus suppression/clear,
+  atomic list/count/Dashboard/risk invalidation, possible-reappearance receipts,
+  source-purge retention and guarded UI are delivered.
+- Retained-source conflicts are fixed: clear refuses additional retained payloads;
+  restore checks reviewed identity as well as legacy duplicates, including aliases.
+- Save draft is disabled without persisted draft/binding changes. Identical valid
+  saves preserve version, timestamp, audit history and evidence revision. Stale
+  versions and source validation still apply; first saves create version 1.
+- Suppression acceptance: 120 expanded backend regressions, three final indexed
+  cases, 576 frontend tests and 103 Chrome checks. Draft-save acceptance: 54 backend
+  and 15 component tests, lint and production build. Scopes overlap; do not sum
+  them or treat targeted results as full-suite totals. Full hosted jobs are green.
+
+PB-1.3 remains partial: consolidation, source-payload publication, additional
+reviewed mappings and automatic reconciliation are not delivered. Recommended
+next work is a bounded consolidation/payload-publication design, then its reviewed
+implementation; PB-1.4 asset ownership/context follows. Pilot/production, broader
+evidence-qualified scoring and SaaS load gates retain their prior holds.
+[Release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
+[verification steps](EVIDENCE_USER_VERIFICATION.md).
 
 ## Prior absence-review delivery - 11 November 2026
 
@@ -31,12 +41,12 @@ Migration 0049 was active at that checkpoint; current migration is 0050. CI uses
 This supersedes older pending/unmerged queue statements; dated checkpoints
 remain historical. It does not approve a pilot, production deployment or SaaS load.
 
-Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+At that checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
 Suppression, restore, reappearance handling, consolidation and payload publication
 are not delivered by the review queue. PB-1.3 remains open.
 
 
-Current local increment (11 November): migration 0049 durable absence review,
+Historical queue checkpoint (before migration 0050): migration 0049 durable absence review,
 integrated from both authorized worktrees with stale-context, submission and
 concurrency corrections, and activated locally. It stores review history only.
 Full local acceptance passed: 1,723 backend tests, 567 frontend tests and 99
@@ -67,13 +77,14 @@ hosted CI in [run 42531324401](https://github.com/shalisarakkal/AuditMind/action
 The 10 November source-integrity review is recorded in
 [current code review](CURRENT_CODE_REVIEW.md); later commits need their own CI.
 
-**Next decision: PB-0.2 pilot readiness.** The gate remains user-deferred until
+**Held release decision: PB-0.2 pilot readiness.** The gate remains user-deferred until
 the project owner approves the bounded scope, data, environment, operations,
 success/stop criteria and applicable release checks in
 [release readiness](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate).
 PB-1.3's identity, cross-import review and canonical-designation increments are
-shipped; automatic merging, payload publication, absence conclusions and
-suppression are not enabled. Remaining work is detailed in
+shipped, as are durable review and native suppression/clear at 0050. Automatic
+merging, payload publication and automatic absence disposition remain outside
+the delivered scope. Remaining work is detailed in
 [the reconciliation contract](FINDING_RECONCILIATION_DESIGN.md).
 
 7 November: PB-1.3 identity candidate foundation and explicit admin-reviewed
@@ -781,7 +792,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Browser-local deadlines and date filters | Implemented | Author timezone/fixed expiry, today through inclusive local end of day, creation boundary; global dark native date inputs. Legacy Eastern metadata retained. |
 | Selection, archive confirmations, IDs and shared UI | Implemented for documented scope | Findings, Archived, Assets, Uploads; manual finding entry; inline Documents preview; full-width Settings; timed routine notices. |
 | Workflow preservation on import/restore | Partial, bounded | Existing matching skips exact duplicates; archive restore protects edited workflow (`workflow_version = 0` duplicate purge guard). This is not stable cross-scan identity or absence reconciliation. |
-| Imported individual suppression and comparable-scan absence review | Partial, local candidate preview | Bounded read-only candidates are computed from comparable complete scans and reviewed native Nessus identities; no persisted queue/disposition, suppression, archive or workflow change. Durable absence decisions and suppression lifecycle remain pending; see SCAN_SNAPSHOTS.md, FINDING_IDENTITY.md and FINDING_RECONCILIATION_DESIGN.md. |
+| Imported individual suppression and comparable-scan absence review | Native bounded lifecycle delivered; PB-1.3 partial | Durable queue and admin/auditor suppress/admin-only clear are delivered at 0050, with atomic visibility/risk invalidation, possible reappearance review and source retention/restore guards. Generic mappings, consolidation, payload publication and automatic reconciliation remain open. See SUPPRESSION_RELEASE_REVIEW.md. |
 | Status-aware scoring / report changes | Approved PB-4.4 increment | See STATUS_AWARE_SCORING.md and PLAN.md for the separate implementation and validation. Earlier saved reports remain unchanged; workflow delivery alone never established verification approval. |
 | Further per-domain refinement and export polish | Baseline exists; additional scope not defined | `scoring_service.py` implements deterministic domain scores; reports route exports HTML/JSON/PDF. Phase 4 refinements beyond those delivered features require concrete acceptance criteria, not duplicate implementation or a blanket completion checkbox. |
 | Dashboard security summary | Implemented locally | Three completed organization-event counts; exact Activity links; global failed sign-ins explicitly unavailable. Scores unchanged. |
@@ -792,7 +803,7 @@ historical; see [compatibility/test record](BACKEND_DEPENDENCY_REMEDIATION.md).
 | Large-organization list performance | Partial | Indexed selective Findings search delivered; short/broad searches remain slow. Dashboard/list exact counts remain; estimated counts and cached facets not completed. |
 | Security hardening | Partial; scoped local increment implemented | Process-local sign-in/upload admission is bounded; all file transports have pre-parser byte limits; metrics require platform admin; checkpoints authenticate before deserialization. Lower-severity findings triaged without suppressions. Shared/distributed limits, malware integration, actual service-account ACL validation and production secrets/CORS remain open. See SECURITY_HARDENING.md. |
 | Observability | Test-verified; production acceptance pending | Structured logs/correlation, protected process-local metrics/alerts and tests exist. External telemetry/export identity, alert delivery/load and production monitoring are not certified. |
-| CI automation | Hosted jobs exercised; final per-SHA status linked | Required PostgreSQL/warnings-as-errors, npm ci, Linux Chromium and security gates green for hardening `cd31793` in run 40799748322. Medium/low SAST triage is documented without suppressions in SECURITY_HARDENING.md; broader performance CI remains pending/on hold. |
+| CI automation | All four jobs verified for current application | Exact-SHA runs for `f97a4fb` ([run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797)) and `e4c7488` ([run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993)) passed backend/PostgreSQL, frontend, security and stable-Chrome browser acceptance. Broader load/performance acceptance remains held. |
 | Multi-worker SaaS fairness/storage/scaling | Partial foundations; pending rollout | `FOR UPDATE SKIP LOCKED`, resumable jobs and heartbeat exist. Tenant-fair scheduling, autoscaling, separate worker groups, shared object storage and plan limits are not delivered as a SaaS operating model. |
 | Hosting/keyless provider auth/managed DB/backups/production operations | Hosting-dependent, not implemented/accepted | Hosting choice and separate deployment authorization required. Existing local test success is not backup/restore, workload-identity or production acceptance. |
 

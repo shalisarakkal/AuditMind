@@ -1,24 +1,30 @@
 # Phase 4 remediation workflow validation
 
-## Suppression increment - 11 November 2026
+## Current verified application - 11 November 2026
 
-Follow-up `6ed32a4`: 120 expanded PostgreSQL regressions and three final indexed
-source-restore/clear cases pass. Local activation has clean drift and HTTP 200
-readiness. Its exact-tip hosted result is verified separately at delivery.
+- Suppression/retained-source delivery `f97a4fb`: all four hosted Linux jobs
+  passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797), including the final `6ed32a4` lifecycle guard.
+- Draft-save correction `e4c7488`: all four jobs passed in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
+  This is the current committed application baseline.
+- Suppression local scopes: 120 expanded backend regressions, three final indexed
+  cases, 576 frontend tests and 103 Chrome checks. Draft-save local scopes: 54
+  backend draft/review tests and 15 component tests, plus lint/production build.
+  These are overlapping scopes, not additive totals or a new full local rerun.
+- Local activation is at migration 0050 with clean drift and HTTP 200 readiness
+  recorded. The draft-save correction required no new migration. No evidence-
+  qualification rollout or worker-capacity setting was changed.
 
-Native reviewed suppression/clear is active locally at migration 0050.
-Final frontend acceptance passes 576 tests, lint and production build. Rebuilt
-Chrome passes 103 checks. Post-review backend acceptance passes 51 combined
-suppression/ledger/migration/abort tests plus the final isolated abort rerun.
-The full backend run passed 1,765 with one abort-test setup timeout under heavy
-migration/test load; its readiness budget was corrected without changing abort
-assertions. Exact-source full hosted CI passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309); see
-[the release review](SUPPRESSION_RELEASE_REVIEW.md). Counts overlap.
-This supersedes earlier 0049-only implementation status; older checkpoints remain
-historical. Evidence qualification settings and worker capacity are unchanged.
+The earlier full local run's abort-test setup timeout was corrected without
+relaxing cancellation assertions; subsequent exact-source full hosted suites pass.
+[Detailed review and chronology](SUPPRESSION_RELEASE_REVIEW.md).
 
+## Historical acceptance checkpoints
 
-## Suppression ledger foundation - 11 November 2026
+The following dated sections preserve their original implementation and test
+scope. Earlier pending/0049-only/foundation-only claims are superseded by the
+current delivery above; their original test counts are not reruns of later code.
+
+## Historical suppression ledger foundation - 11 November 2026
 
 Local preparatory migration 0050, read-only tenant APIs and internal ledger
 repository are implemented. Broader PostgreSQL regression: 174 passed in
@@ -31,7 +37,7 @@ publication/scoring/lifecycle integration, activation, full-suite acceptance,
 commit or hosted run is claimed. See [foundation scope and evidence](IMPORTED_FINDING_SUPPRESSION.md#foundation-implementation).
 
 
-## Verified delivery - 11 November 2026
+## Historical absence-review delivery - 11 November 2026
 
 The durable absence-review queue is delivered on `main` through `60d957b`.
 All four hosted Linux jobs passed for exact commit
@@ -39,12 +45,12 @@ All four hosted Linux jobs passed for exact commit
 [run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
 and browser acceptance (including evidence/scoring and worker recovery).
 Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
-Migration 0049 is active locally. CI uses preinstalled stable Chrome on Ubuntu
+Migration 0049 was active at that checkpoint; current recorded schema is 0050. CI uses preinstalled stable Chrome on Ubuntu
 24.04; the earlier Chromium installer failure did not recur on this path.
 This supersedes older pending/unmerged queue statements; dated checkpoints
 remain historical. It does not approve a pilot, production deployment or SaaS load.
 
-Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+At that checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
 Suppression, restore, reappearance handling, consolidation and payload publication
 are not delivered by the review queue. PB-1.3 remains open.
 

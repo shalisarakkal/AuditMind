@@ -1,72 +1,38 @@
 # Individual imported-finding archive and scan reconciliation
 
-Current supported suppression/clear behavior and limits: [release review](SUPPRESSION_RELEASE_REVIEW.md).
-The dated proposal/baseline sections below are historical where superseded.
+## Current implemented scope - 11 November 2026
 
-Current delivery and exact-SHA CI: [release review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
-The next bounded implementation contract is [suppression and restore](IMPORTED_FINDING_SUPPRESSION.md).
-The dated baseline analysis below preserves earlier behavior, not a claim that
-PB-1.1 observations or the durable queue remain absent.
+PB-1.1 source observations and PB-1.2 scan declarations/comparison are delivered.
+PB-1.3 adds reviewed native Nessus identities, cross-import review, reversible
+canonical designation, a durable absence-review queue and explicit suppression/
+clear at migration 0050. All four hosted Linux jobs passed for the retained-source
+correction through `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797); the subsequent draft-save
+correction `e4c7488` passed all four in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
 
-11 November local integration: the authorized durable absence-review queue
-from the second worktree is now included with review corrections. It records
-historical keep-active/reopen notes without changing findings or scores;
-local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
-checks, builds/security), and the app is active at 0049. Hosted CI is verified
-on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
-This supersedes earlier statements that this feature is excluded; older dated
-test/CI results remain historical.
+Suppress is organization-admin/auditor authorized; clear is admin-only. Current
+identity, version and source/lifecycle context are checked before atomic changes
+to visibility, counts, Dashboard, risk inputs, retained history and invalidation.
+Source purge preserves the ledger. Clear/restore refuse conflicting retained
+payloads, including reviewed source aliases. New uploads do not inherit trusted
+bindings; possible reappearances stay visible for independent review.
 
-[Canonical selection](CANONICAL_FINDING_REVIEW.md) adds the reviewed designation
-and immutable receipt for two independently bound native findings. Both records
-and their histories remain independent; consolidation/payload publication,
-suppression/disposition and reappearance reconciliation remain separate
-implementation gates. A durable absence-candidate snapshot queue with
-keep-active/reopen review decisions is implemented locally; it does not change
-finding state.
+The review queue's keep-active/reopen notes do not themselves change findings.
+Canonical designation does not merge records or transfer workflow/proof approval.
+No absence conclusion automatically resolves or archives a finding.
 
-Implemented PB-1.3 review increments are documented in
-[cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md) and
-[canonical selection](CANONICAL_FINDING_REVIEW.md): admins may compare supported
-native Nessus observations, explicitly carry forward a same-finding mapping, and
-record/revoke a canonical designation for a reviewed conflict. The records and
-histories remain independent. These operations do not merge findings, publish
-new scanner payloads, mark findings absent, suppress or resolve findings.
+PB-1.3 remains partial: reviewed consolidation and source-payload publication need
+a bounded design for identity, ownership of workflow/proof, provenance, conflict
+handling and rollback. Additional mappings and automatic reconciliation remain
+separate. PB-1.4 organization-managed asset context follows this work.
+[Implemented contract](IMPORTED_FINDING_SUPPRESSION.md),
+[release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
+[verification steps](EVIDENCE_USER_VERIFICATION.md) define the delivered scope.
 
-7 November 2026: PB-1.3 adds a read-only [identity foundation](FINDING_IDENTITY.md).
-Migration 0046 adds optional administrator-reviewed tool/asset bindings;
-observations still remain ineligible for reconciliation.
-Candidate diagnostics do not change import matching or authorize reconciliation.
+## Historical baseline and proposal
 
-PB-1.1 now implements the additive [source observation foundation](FINDING_OBSERVATIONS.md).
-PB-1.2 adds [source-scan declarations and metadata comparison](SCAN_SNAPSHOTS.md),
-which alone does not validate finding identity or enable suppression/reconciliation.
-The existing-behavior analysis below describes the baseline before that increment.
-Observations now record repeated occurrences; reviewed stable-identity bindings,
-cross-import review and canonical designation are implemented. Refreshed
-canonical payloads, suppression/disposition and automated reappearance
-reconciliation remain pending. The local scan comparison has a bounded,
-read-only candidate preview and a separate explicit save action for durable
-candidate/context snapshots. Keep-active and reopen decisions are append-only
-review history only; they do not change existing import matching, finding state
-or archive ownership.
-
-Historical checkpoint (8 November 2026; superseded by current delivery): identity/review foundations are implemented through
-migrations 0046-0048 and hosted CI is green for those commits. The bounded
-absence-candidate preview and migration 0049 durable queue are implemented
-locally. The focused PostgreSQL scan-snapshot suite passes 47 tests, and the
-focused frontend queue suite passes 11 tests; changed-file lint and TypeScript
-validation pass. The queue retains copied comparison/candidate context after
-source observations/declarations are removed and does not mutate findings.
-Chrome verification and hosted CI for migration 0049 remain pending. The
-approved future semantics below remain design constraints, not delivered
-behavior: suppression must be retained until explicit organization-admin
-clearance independent of archived-row purge;
-newer eligible observations may refresh severity/details only through a separately
-reviewed publication design, without overwriting workflow decisions or saved
-report snapshots. Absence requires comparable complete scans and explicit review;
-ambiguous identity is ineligible. Absence never automatically resolves or archives
-a finding.
+The remaining analysis predates these increments. Its matching/archive behavior
+is baseline evidence and its future-policy statements are design constraints,
+not claims that the current queue or suppression APIs are unavailable.
 
 ## Historical Settings/import baseline reviewed
 
@@ -87,7 +53,7 @@ universal prohibition on all asset identifier enrichment, and Add a duplicate
 does not force new assets on that finding-only path. Keep these parser-path
 differences explicit rather than advertising a global finding policy.
 
-Current finding deduplication is `(asset_id, source, category)` or, when category
+Baseline finding deduplication was `(asset_id, source, category)` or, when category
 is null, `(asset_id, source, null, description)`, always within the organization.
 Severity/domain and (when categorized) description are not part of that key;
 duplicates return without refreshing those fields or workflow. Existing

@@ -2,12 +2,14 @@
 
 PB-1.3 bounded suppression increment - 11 November 2026.
 
-The supported end-to-end increment is implemented locally and under final
-acceptance in [the release review](SUPPRESSION_RELEASE_REVIEW.md). Migration
-0050 is active in the local application; final delivery CI is pending. The historical foundation
-checkpoint below is superseded by that implementation. Generic sources,
-automatic identity inheritance, consolidation and payload refresh remain outside
-this bounded feature.
+The native Nessus suppress/clear increment and retained-source correction are
+delivered, with migration 0050 locally activated. All four hosted Linux jobs
+passed for `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797). The subsequent unchanged-draft fix
+`e4c7488` passed all four in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993). See the
+[release review](SUPPRESSION_RELEASE_REVIEW.md) for scopes and test evidence.
+Generic mappings, automatic identity inheritance, consolidation and source-payload
+refresh are outside this bounded delivery. Historical proposal/foundation sections
+below preserve earlier checkpoints and do not describe current availability.
 
 ## Current implemented contract
 

@@ -1,5 +1,11 @@
 # Durable absence review integration - 11 November 2026
 
+This document records the delivered 0049 queue checkpoint. The current application
+is at migration 0050, with native suppression/clear and the draft-save correction
+delivered and hosted CI verified. See the [current release review](SUPPRESSION_RELEASE_REVIEW.md).
+Older next-step statements below describe that earlier checkpoint.
+
+
 ## Verified delivery - 11 November 2026
 
 The durable absence-review queue is delivered on `main` through `60d957b`.
@@ -8,12 +14,12 @@ All four hosted Linux jobs passed for exact commit
 [run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
 and browser acceptance (including evidence/scoring and worker recovery).
 Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
-Migration 0049 is active locally. CI uses preinstalled stable Chrome on Ubuntu
+Migration 0049 was active at this checkpoint; current recorded schema is 0050. CI uses preinstalled stable Chrome on Ubuntu
 24.04; the earlier Chromium installer failure did not recur on this path.
 This supersedes older pending/unmerged queue statements; dated checkpoints
 remain historical. It does not approve a pilot, production deployment or SaaS load.
 
-Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+At this checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
 Suppression, restore, reappearance handling, consolidation and payload publication
 are not delivered by the review queue. PB-1.3 remains open.
 

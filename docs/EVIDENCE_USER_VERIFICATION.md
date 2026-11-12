@@ -1,5 +1,27 @@
 # Verify the evidence-aware reporting changes
 
+## Current verification baseline - 11 November 2026
+
+The committed application is `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
+All four hosted Linux jobs passed in
+[run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
+This includes the unchanged-draft correction. The preceding suppression and
+retained-source correction through `f97a4fb` passed all four jobs in
+[run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797).
+Local activation is recorded at schema 0050; the draft-save fix adds no migration.
+
+Draft-save local acceptance: 54 backend draft/review tests and 15 component tests,
+lint and production build. Earlier suppression scopes (120 expanded backend,
+three final indexed cases, 576 frontend and 103 Chrome checks) are separate,
+overlapping checkpoints; do not sum them or describe them as a fresh local full
+suite for e4c7488. Full exact-source hosted jobs are verified above.
+[Current scope and release evidence](SUPPRESSION_RELEASE_REVIEW.md).
+
+The instructions below are manual verification steps, not a claim that all
+product phases or production/pilot gates are closed. Older dated checkpoint
+statements are superseded by the current delivery record.
+
+
 ## Durable absence review verification - 11 November 2026
 
 Use a disposable organization and the synthetic native examples linked in

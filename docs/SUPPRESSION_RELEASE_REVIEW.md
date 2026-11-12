@@ -2,9 +2,13 @@
 
 11 November 2026. PB-1.3 bounded disposition increment, migration 0050.
 Implementation commit: `f26bc63`; retained-source correction: `6ed32a4`.
-Local activation and all four hosted jobs are verified for `cc1ca17`. This is not production, customer-pilot,
-SaaS-capacity or live-inference approval. See the validation record below for
-completed checks; earlier green runs do not certify later source changes.
+Final suppression/retained-source delivery: `f97a4fbf29a728a45087f03d8dabf6ea21950d4b`;
+all four hosted Linux jobs passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797). This includes the
+`6ed32a4` retained-source correction, which the earlier `cc1ca17` run did not cover.
+Current application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`;
+all four jobs passed in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993), including full backend, frontend,
+dependency/security and complete browser acceptance. These are engineering
+results; the broader PB-1.3, pilot, production and SaaS gates remain separate.
 
 ## Delivered behavior and limits
 
@@ -128,7 +132,7 @@ transaction; previous decision contexts remain historical. A later matching
 upload records a possible reappearance and stays visible for independent review.
 The regression passes in the 46-case post-review run. That run covers the latest
 backend fix; the longer full-suite run started before this small correction.
-Exact pushed-source hosted CI remains required.
+Final pushed-source hosted CI is verified in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797).
 
 ## Migration operations
 
@@ -148,8 +152,8 @@ in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/431
 frontend, dependency/security audit, and complete browser acceptance including
 finding workflow, evidence/scoring pilot and worker-pool recovery. This covers
 the latest source-alias correction and abort-test readiness adjustment. That run verifies the original publication. It does not cover the additional
-retained-source correction below, which requires its own exact-tip hosted result.
-The final delivery report links that run. PB-1.3 remains partial.
+retained-source correction below. Its own exact-tip hosted result is verified
+for `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797). PB-1.3 remains partial.
 
 ## Retained-source correction after the initial green run
 
@@ -173,6 +177,22 @@ Follow-up check-in: `6ed32a4` passes 120 expanded suppression, ledger, migration
 abort and archive regressions (624.43s). Three final indexed-query cases pass
 (13.70s); they overlap the expanded set. The normal app was restarted without a
 frontend rebuild after an idle-queue check. Migration drift is clean and health,
-login and auth-options return HTTP 200. The correction needs its own exact-tip
-hosted run; final delivery links that result rather than treating the earlier
-`cc1ca17` run as proof of later source changes.
+login and auth-options return HTTP 200. All four exact-tip hosted jobs passed
+for `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797); the earlier `cc1ca17` run remains a
+historical baseline rather than proof of later changes.
+
+## Unchanged-draft correction - delivered in e4c7488
+
+Save draft is disabled when persisted draft content and inventory binding match
+the saved draft. Review-note fields and unfinished observation inputs are separate.
+An identical valid API save preserves version, updated attribution/time, audit
+history and evidence revision. Observation ordering and equivalent time-zone
+spellings do not count as edits. First saves, actual content/binding edits and
+explicit return from a reviewed state to draft still create a version. Approved
+records remain protected; permission, source freshness and expected-version
+checks are retained before the no-op return.
+
+Targeted PostgreSQL draft/review acceptance: 54 passed. Component acceptance:
+15 passed; lint and production build passed. These overlap earlier suites and
+are not full-suite totals. All four exact-SHA hosted Linux jobs passed in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
+No new database migration was required; local activation remains at 0050.

@@ -1,22 +1,32 @@
 # AuditMind Product Backlog
 
-## Imported finding suppression and clear - 11 November 2026
+## Current delivery - 11 November 2026
 
-The end-to-end native Nessus disposition increment is implemented locally at
-migration 0050 and reviewed for delivery. It adds authorized preview/suppress/
-clear, atomic visibility/count/scoring/cache publication, durable reappearance
-review, source-retention/restore protection and guarded UI. Fresh uploads never
-inherit trusted identity bindings. Generic sources remain ineligible.
-Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
-backend focus: 46 tests passed. The full backend run passed 1,765 tests with
-one setup-readiness timeout under migration/test load. All 51 combined
-regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally;
-health/login/auth-options return 200.
-All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
-The later retained-source correction `6ed32a4` passes 120 expanded regressions
-and three final indexed-query cases. Its own exact-tip CI is checked at delivery;
-the earlier green run does not certify that later change.
-[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+Committed application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
+All four hosted Linux jobs (backend, frontend, dependency/security and browser)
+passed for both the suppression/retained-source delivery `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797)
+and the draft-save correction `e4c7488` in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
+
+- Migration 0050 is locally activated. Reviewed native Nessus suppression/clear,
+  atomic list/count/Dashboard/risk invalidation, possible-reappearance receipts,
+  source-purge retention and guarded UI are delivered.
+- Retained-source conflicts are fixed: clear refuses additional retained payloads;
+  restore checks reviewed identity as well as legacy duplicates, including aliases.
+- Save draft is disabled without persisted draft/binding changes. Identical valid
+  saves preserve version, timestamp, audit history and evidence revision. Stale
+  versions and source validation still apply; first saves create version 1.
+- Suppression acceptance: 120 expanded backend regressions, three final indexed
+  cases, 576 frontend tests and 103 Chrome checks. Draft-save acceptance: 54 backend
+  and 15 component tests, lint and production build. Scopes overlap; do not sum
+  them or treat targeted results as full-suite totals. Full hosted jobs are green.
+
+PB-1.3 remains partial: consolidation, source-payload publication, additional
+reviewed mappings and automatic reconciliation are not delivered. Recommended
+next work is a bounded consolidation/payload-publication design, then its reviewed
+implementation; PB-1.4 asset ownership/context follows. Pilot/production, broader
+evidence-qualified scoring and SaaS load gates retain their prior holds.
+[Release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
+[verification steps](EVIDENCE_USER_VERIFICATION.md).
 
 ## Prior absence-review delivery - 11 November 2026
 
@@ -31,7 +41,7 @@ Migration 0049 was active at that checkpoint; current migration is 0050. CI uses
 This supersedes older pending/unmerged queue statements; dated checkpoints
 remain historical. It does not approve a pilot, production deployment or SaaS load.
 
-Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+At that checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
 Suppression, restore, reappearance handling, consolidation and payload publication
 are not delivered by the review queue. PB-1.3 remains open.
 
@@ -222,12 +232,14 @@ accepted.
 
 ### PB-1.3 — Implement reviewed finding reconciliation
 
-**Current, 11 November:** native reviewed suppression/clear is delivered at 0050,
-including atomic visibility/count/risk invalidation, source-retention safeguards,
-possible-reappearance receipts and guarded UI. All four hosted jobs passed for
-`cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309). Consolidation, source-payload publication,
-additional mappings and automatic reconciliation remain open. Earlier dated
-checkpoints below describe their own scope, not the current suppression status.
+**Current, 11 November:** native reviewed suppression/clear and its retained-source
+conflict correction are delivered at migration 0050. All four hosted jobs passed
+for `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797); the subsequent draft-save correction
+`e4c7488` passed all four in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993). Durable review, atomic
+visibility/count/risk invalidation, source-retention safeguards, possible-
+reappearance receipts and guarded UI are implemented. Consolidation, source-
+payload publication, additional mappings and automatic reconciliation remain open.
+Earlier dated checkpoints below describe their original scope.
 
 **Delivered increments (8 November):** [Cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
 adds bounded native Nessus comparison and independent admin-confirmed mapping

@@ -1,23 +1,32 @@
 # AuditMind Product Roadmap
 
-## Imported finding suppression and clear - 11 November 2026
+## Current delivery - 11 November 2026
 
-The end-to-end native Nessus disposition increment is implemented locally at
-migration 0050 and reviewed for delivery. It adds authorized preview/suppress/
-clear, atomic visibility/count/scoring/cache publication, durable reappearance
-review, source-retention/restore protection and guarded UI. Fresh uploads never
-inherit trusted identity bindings. Generic sources remain ineligible.
-Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
-backend focus: 46 tests passed. The full backend run passed 1,765 tests with
-one setup-readiness timeout under migration/test load. All 51 combined
-regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally;
-health/login/auth-options return 200.
-All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
-The later retained-source correction `6ed32a4` passes 120 expanded regressions
-and three final indexed-query cases. Its own exact-tip CI is checked at delivery;
-the earlier green run does not certify that later change.
-[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+Committed application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
+All four hosted Linux jobs (backend, frontend, dependency/security and browser)
+passed for both the suppression/retained-source delivery `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797)
+and the draft-save correction `e4c7488` in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
 
+- Migration 0050 is locally activated. Reviewed native Nessus suppression/clear,
+  atomic list/count/Dashboard/risk invalidation, possible-reappearance receipts,
+  source-purge retention and guarded UI are delivered.
+- Retained-source conflicts are fixed: clear refuses additional retained payloads;
+  restore checks reviewed identity as well as legacy duplicates, including aliases.
+- Save draft is disabled without persisted draft/binding changes. Identical valid
+  saves preserve version, timestamp, audit history and evidence revision. Stale
+  versions and source validation still apply; first saves create version 1.
+- Suppression acceptance: 120 expanded backend regressions, three final indexed
+  cases, 576 frontend tests and 103 Chrome checks. Draft-save acceptance: 54 backend
+  and 15 component tests, lint and production build. Scopes overlap; do not sum
+  them or treat targeted results as full-suite totals. Full hosted jobs are green.
+
+PB-1.3 remains partial: consolidation, source-payload publication, additional
+reviewed mappings and automatic reconciliation are not delivered. Recommended
+next work is a bounded consolidation/payload-publication design, then its reviewed
+implementation; PB-1.4 asset ownership/context follows. Pilot/production, broader
+evidence-qualified scoring and SaaS load gates retain their prior holds.
+[Release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
+[verification steps](EVIDENCE_USER_VERIFICATION.md).
 
 ## Prior absence-review delivery - 11 November 2026
 
@@ -32,7 +41,7 @@ Migration 0049 was active at that checkpoint; current migration is 0050. CI uses
 This supersedes older pending/unmerged queue statements; dated checkpoints
 remain historical. It does not approve a pilot, production deployment or SaaS load.
 
-Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+At that checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
 Suppression, restore, reappearance handling, consolidation and payload publication
 are not delivered by the review queue. PB-1.3 remains open.
 
@@ -61,20 +70,20 @@ candidate work items with acceptance criteria.
 
 ## Prioritization at a glance
 
-PB-1.3 has shipped the [stable identity foundation](FINDING_IDENTITY.md),
-[cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md), and
-[canonical designation](CANONICAL_FINDING_REVIEW.md). A bounded,
-non-persisted absence-candidate preview is also delivered through `d06d31e`. These are
-explicit review tools; the delivered durable queue adds versioned keep-active/
-reopen notes. They do not enable automatic merging, payload refresh, disposition
-changes or suppression. All four hosted jobs passed for
-feature SHA `f31bb25`
-([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
-The remaining reconciliation lifecycle is still open.
+PB-1.3 has delivered reviewed native identities, cross-import mapping review,
+canonical designation, a durable absence-review queue and explicit native Nessus
+suppression/clear with source-lifecycle safeguards. Canonical designation does
+not merge records. New uploads do not inherit trusted identity bindings;
+possible reappearances remain visible for independent review.
+
+The next proposed engineering increment is reviewed consolidation and source-
+payload publication, with workflow/proof ownership and rollback rules designed
+before implementation. Additional source mappings and automatic reconciliation
+remain separate. PB-1.4 asset ownership/context and PB-1.5 controls/mappings follow.
 
 **Deferred decision:** resume PB-0.2 and approve a bounded pilot contract when
-the project owner resumes that gate. Current work continues the bounded PB-1.3
-suppression/restore implementation and acceptance.
+the project owner resumes that gate. The native suppression/clear increment is complete; the
+next proposed PB-1.3 work is consolidation/payload-publication design.
 The gate remains deferred until the project owner selects audience, environment,
 data, workflows, operating/support boundaries and acceptance criteria. The
 [release checklist](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate)

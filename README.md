@@ -1,10 +1,18 @@
 # AuditMind AI
 
+Verified application baseline: `e4c7488` ? all four hosted Linux CI jobs passed
+in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993); preceding suppression/retained-source delivery `f97a4fb`
+passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797). Migration 0050 is locally activated. Unchanged
+evidence draft saves preserve versions and audit history.
+[Current status and remaining work](docs/PROJECT_STATUS_AND_NEXT_STEPS.md).
+
+
 Current-risk scoring: [verified status-aware policy and Dashboard tabs](docs/STATUS_AWARE_SCORING.md).
 The Platform policy defaults On, with organization Inherit/On/Off overrides.
 Resolved/False positive exclusions require current administrator-approved proof;
 Mitigated retains full risk. Findings-based and Evidence-based Dashboard tabs
-separate known risk from qualified coverage. Migration 0045 is required.
+separate known risk from qualified coverage. Status-aware scoring was introduced in migration 0045; run migrations through
+the current head (0050).
 
 Finding identity: [native Nessus candidates and reviewed bindings](docs/FINDING_IDENTITY.md)
 add explicit organization-admin tool/asset review at migration 0046. New uploads
