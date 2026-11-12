@@ -28,15 +28,16 @@ Documentation closeout reconciles CI/source/lifecycle records and checked links.
 The baseline above identifies the delivered application code; this closeout
 changes documentation only.
 
-1. Check in the reviewed [read-only foundation](CONSOLIDATION_FOUNDATION_REVIEW.md)
-   and verify hosted Linux CI for the pushed checkpoint. Implementation `9380668`
-   delivers schema, pair preview, reserved membership/dependencies and source manifests;
-   it does not consolidate findings or publish payloads.
-2. Next implement atomic membership/dependency publication, visibility and revision
-   invalidation across consumers, group-aware proof, source lifecycle safeguards
-   and guarded UI under the [staged design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
-   Writes remain unavailable until those paths and authorization/conflict guards
-   are coherent and regression/Chrome/exact-tip CI checks pass.
+1. The reviewed [read-only foundation](CONSOLIDATION_FOUNDATION_REVIEW.md) was pushed
+   through `112646f`; all four hosted Linux jobs passed in
+   [run 43275574591](https://github.com/shalisarakkal/AuditMind/actions/runs/43275574591).
+   Implementation `9380668` delivers schema, pair preview, reserved memberships and
+   source manifests without consolidating findings or publishing payloads.
+2. The [internal metadata transaction component](CONSOLIDATION_TRANSACTIONS.md) is
+   the next local increment. It is not exposed through a route. Complete atomic
+   visibility/revision changes, group-aware proof, source lifecycle safeguards and
+   guarded UI under the [staged design](REVIEWED_FINDING_PUBLICATION_DESIGN.md)
+   before enabling production publication or accepting a production write token.
 3. Continue PB-1.4 organization-managed asset ownership/environment/criticality,
    followed by PB-1.5 versioned controls and finding mappings.
 
@@ -84,3 +85,16 @@ build/TypeScript/lint and security gates passed. Review fixed preview pool
 exhaustion, malformed manifest admission and excessive-offset validation. See
 the consolidation foundation review for overlapping scopes and performance limits.
 The foundation remains read-only; hosted CI must pass for the pushed checkpoint.
+
+## 12 November: Stage A internal metadata transaction component
+
+The next increment adds caller-owned atomic metadata staging, fresh authorization,
+try-only admission locks, idempotent receipts and source/conflict checks. It is
+not called by a route; production publication stays unconditionally disabled.
+Visibility/count/scoring/proof/lifecycle/UI integration remains pending.
+Validation and exact scope: [transaction component](CONSOLIDATION_TRANSACTIONS.md).
+
+Local transaction verification: 82 broader regression/performance checks and
+31 final unit/transaction checks passed (overlapping scopes); high-severity
+static gate passed. No normal data publication, migration or restart occurred.
+Hosted CI must be verified for the pushed transaction-component checkpoint.
