@@ -370,3 +370,51 @@ def test_explicit_reapply_updates_reappearance_source_after_reviewed_asset_alias
     db_session.refresh(registry)
     assert registry.reappearance_count==1
     assert client.get(f"/api/v1/orgs/{n['org']}/findings",headers=n['headers']).json()['total']==1
+
+
+@pytest.mark.parametrize('source_alias',[False,True])
+def test_clear_refuses_multiple_retained_payloads_after_reapply_and_source_restore(client,db_session,native,source_alias):
+    n=native;identifier=suppress(client,n);base=f"/api/v1/orgs/{n['org']}"
+    content=_nessus('1001')
+    if source_alias:
+        content=content.replace(b'pilot-host',b'pilot-alias-host').replace(b'10.0.0.10',b'10.0.0.44')
+    imported=upload(client,base+'/findings/import',n['headers'],'replacement.nessus',content)
+    assert imported.status_code==201,imported.text
+    observation,_=_bind_observation(client,(n['headers'],n['org']),db_session,imported.json()['scan_id'],n['tool'],n['asset'])
+    archived=client.post(base+f"/scans/{n['scan']}/archive",headers=n['headers'])
+    assert archived.status_code in (200,202),archived.text
+    run_worker()
+    if source_alias:
+        # Retain the independently managed canonical asset while the older
+        # source payload is archived (the binding does not recreate inventory).
+        from app.models.asset import Asset
+        db_session.get(Asset,uuid.UUID(n['asset'])).archived_at=None
+        db_session.commit()
+    replacement={**n,'finding':str(observation.finding_id)}
+    decision=client.post(root(n)+'/decisions',headers=n['headers'],json=preview(client,replacement))
+    assert decision.status_code==200,decision.text
+    restored=client.post(base+f"/archive/{archived.json()['batch_id']}/restore",headers=n['headers'])
+    assert restored.status_code in (200,202),restored.text
+    run_worker()
+    response=client.post(root(n)+'/preview',headers=n['headers'],json=dict(action='clear',suppression_id=identifier))
+    assert response.status_code==409,response.text
+    assert client.get(base+'/findings',headers=n['headers']).json()['total']==0
+    # Archive the extra retained source, then clear the one current target.
+    archived_again=client.post(base+f"/scans/{n['scan']}/archive",headers=n['headers'])
+    assert archived_again.status_code in (200,202),archived_again.text
+    run_worker()
+    cleared=client.post(root(n)+'/decisions',headers=n['headers'],json=preview(client,replacement,'clear',identifier))
+    assert cleared.status_code==200,cleared.text
+    assert client.get(base+'/findings',headers=n['headers']).json()['total']==1
+    # The old reviewed identity must not return as a duplicate, even when its
+    # legacy source asset differs from the current target's reviewed alias.
+    attempted=client.post(base+f"/archive/{archived_again.json()['batch_id']}/restore",headers=n['headers'])
+    assert attempted.status_code in (200,202),attempted.text
+    run_worker()
+    from app.models.archive import ArchiveJob
+    job=db_session.get(ArchiveJob,uuid.UUID(attempted.json()['id']));db_session.refresh(job)
+    assert job.status.value=='failed' and 'Restore blocked' in job.summary['error']
+    db_session.expire_all()
+    assert db_session.get(Finding,uuid.UUID(n['finding'])).archived_at is not None
+    assert db_session.scalar(select(func.count(Finding.id)))==2
+    assert client.get(base+'/findings',headers=n['headers']).json()['total']==1

@@ -122,6 +122,11 @@ def preview(db, org_id, target, *, lock=False):
         if registry is None: raise HTTPException(404, "Suppression record not found")
         if registry.state != "suppressed": raise HTTPException(409, "This suppression is already cleared")
         finding = _retained_finding(db, org_id, registry.finding_id, lock=lock)
+        other_retained = db.scalar(select(Finding.id).where(Finding.org_id == org_id,
+            Finding.suppression_id == registry.id, Finding.id != registry.finding_id,
+            Finding.archived_at.is_(None)).limit(1))
+        if other_retained:
+            raise HTTPException(409, "Another retained payload shares this suppression identity; archive the additional source or resolve the canonical conflict before clearing")
         life = _lifecycle(db, org_id, finding)
         identity, observation_stamp = registry.identity, None
         if finding:
