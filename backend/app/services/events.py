@@ -50,6 +50,8 @@ TYPES: dict[str, Criticality] = {
     "finding_canonical_revoked": Criticality.warning,
     "scan_snapshot_declared": Criticality.info,
     "scan_snapshot_revoked": Criticality.warning,
+    "finding_suppressed": Criticality.warning,
+    "finding_suppression_cleared": Criticality.warning,
     "finding_absence_review_saved": Criticality.info,
     "finding_absence_review_decided": Criticality.info,
     "finding_absence_review_reopened": Criticality.warning,

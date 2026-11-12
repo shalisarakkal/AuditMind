@@ -243,7 +243,7 @@ def compare_snapshots(db, org_id, payload, *, persist_queue=False, membership=No
                 Finding.domain, Finding.severity, Finding.workflow_status, Finding.workflow_version,
             ).where(
                 Finding.org_id == org_id, Finding.id.in_(possible_findings),
-                Finding.archived_at.is_(None)).order_by(Finding.id)).all() if possible_findings else []
+                Finding.active()).order_by(Finding.id)).all() if possible_findings else []
             candidate_count = len(findings)
             for finding in findings:
                 observation = latest_observation[finding.id]
@@ -443,9 +443,9 @@ def decide_absence_review(db, org_id, item_id, membership, payload: AbsenceRevie
         raise HTTPException(404, "Absence review item not found")
     if payload.action == "keep_active":
         finding = db.scalar(select(Finding).options(load_only(Finding.id, Finding.workflow_version,
-            Finding.archived_at)).where(Finding.org_id == org_id, Finding.id == item.finding_id)
+            Finding.archived_at, Finding.suppression_id)).where(Finding.org_id == org_id, Finding.id == item.finding_id)
             .with_for_update(key_share=True).execution_options(populate_existing=True))
-        if finding is None or finding.archived_at is not None:
+        if finding is None or finding.archived_at is not None or finding.suppression_id is not None:
             raise HTTPException(409, "This finding is no longer active; refresh the scan comparison before reviewing it")
         if finding.workflow_version != item.candidate["workflow_version"]:
             raise HTTPException(409, "Finding workflow changed since this snapshot; compare the scans again before reviewing it")

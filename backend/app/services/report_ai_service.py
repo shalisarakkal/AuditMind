@@ -140,7 +140,7 @@ def _read_org_audit_context(
     # 2. Findings counts by severity
     severity_counts = db.execute(
         select(Finding.severity, func.count(Finding.id))
-        .where(*finding_filters)
+        .where(*finding_filters, Finding.suppression_id.is_(None))
         .group_by(Finding.severity)
     ).all()
     findings_by_severity = {
@@ -150,12 +150,12 @@ def _read_org_audit_context(
 
     counts = {}
     for domain, severity, count in db.execute(select(Finding.domain, Finding.severity, func.count())
-            .where(*finding_filters).group_by(Finding.domain, Finding.severity)):
+            .where(*finding_filters, Finding.suppression_id.is_(None)).group_by(Finding.domain, Finding.severity)):
         counts.setdefault(domain, {})[severity] = count
     risk_counts, status_policy = status_scoring.apply_policy(db, org_id, counts, filters=finding_filters, capture_basis=True)
     if status_policy['not_assessed']:
-        raise ValueError("Not assessed: verified exclusions leave no current-risk findings; no numeric report can be generated")
-    sample_filters = finding_filters + ([status_scoring.eligible_exclusion().is_not(True)] if status_policy['enabled'] else [])
+        raise ValueError("Not assessed: all findings in this scope are suppressed; no numeric report can be generated" if status_policy.get("all_suppressed") else "Not assessed: verified exclusions leave no current-risk findings; no numeric report can be generated")
+    sample_filters = finding_filters + [Finding.suppression_id.is_(None)] + ([status_scoring.eligible_exclusion().is_not(True)] if status_policy['enabled'] else [])
 
     # 3. High/Critical sample findings for RAG
     sample_findings_rows = db.execute(
@@ -234,7 +234,7 @@ def _build_audit_prompt(
     # Decision references are retained in server-side provenance. They are not
     # additional model evidence and must not inflate the external input budget.
     policy_summary = {key: value for key, value in (context.get('status_scoring') or {}).items()
-        if key != 'verification_basis'}
+        if key not in ('verification_basis', 'suppression_basis')}
     prompt = f"""You are performing a comprehensive cyber resilience audit for organization: {org_title}.
 
 FRAMEWORKS EVALUATED: {', '.join(frameworks)}

@@ -64,6 +64,8 @@ def _assessment_display_lines(data: dict) -> list[str]:
     policy_lines = ([f"Status-aware scoring: {'On' if policy.get('enabled') else 'Off'}; policy {policy.get('policy_version')}. "
         f"Recorded findings: {policy.get('recorded_findings')}; current-risk findings: {policy.get('current_risk_findings')}; "
         f"verified exclusions: {policy.get('excluded_findings')}."] if isinstance(policy, dict) else [])
+    if isinstance(policy, dict) and policy.get("suppressed_findings"):
+        policy_lines.append(f"Suppressed findings: {policy['suppressed_findings']} (excluded from active inputs; not verified remediation).")
     if provenance.get("assessment_type") == "synthetic_mock":
         return ["SYNTHETIC MOCK - no AI calls. Fixed example evidence and scores; not a real audit or operational evidence qualification."]
     if provenance.get("assessment_type") == "rule_based_test":
@@ -220,14 +222,14 @@ def _create_rule_based_test_report(
     counts: scoring_service.SeverityCounts = {}
     severity_totals = {severity.value: 0 for severity in Severity}
     for domain, severity, count in db.query(Finding.domain, Finding.severity, func.count()).filter(
-        *finding_filters
+        *finding_filters, Finding.suppression_id.is_(None)
     ).group_by(Finding.domain, Finding.severity):
         counts.setdefault(domain, {})[severity] = count
         severity_totals[severity.value] += count
 
     counts, status_policy = status_scoring.apply_policy(db, org_id, counts, filters=finding_filters, capture_basis=True)
     if status_policy['not_assessed']:
-        raise ValueError("Not assessed: verified exclusions leave no current-risk findings; no numeric report was created")
+        raise ValueError("Not assessed: all findings in this scope are suppressed; no numeric report was created" if status_policy.get("all_suppressed") else "Not assessed: verified exclusions leave no current-risk findings; no numeric report was created")
     domain_scores = scoring_service.score_all_from_counts(counts)
     overall, _overall_scoring_tier = scoring_service.overall_score(domain_scores)
     overall_score = round(overall)

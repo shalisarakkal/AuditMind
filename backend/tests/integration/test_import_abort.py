@@ -103,7 +103,11 @@ def test_abort_interrupts_owned_long_sql_and_confirms_rollback(client, db_sessio
             return False
     with ThreadPoolExecutor(max_workers=1) as pool:
         result = pool.submit(publish)
-        assert registered.wait(5)
+        # Startup includes a real connection, registration commit and two
+        # publication flushes. Allow cold/loaded CI hosts to reach the SQL;
+        # cancellation itself still has the two-second lock timeout and
+        # five-second completion assertion below.
+        assert registered.wait(30)
         with Session(engine) as control:
             control.execute(text("SET LOCAL lock_timeout='2s'"))
             # Wait until the owned backend is inside the deliberately long SQL.

@@ -17,6 +17,8 @@ export const EVENT_LABELS: Record<string, string> = {
   identity_tool_retired: "Identity tool instance retired",
   identity_binding_reviewed: "Finding identity binding reviewed",
   identity_binding_revoked: "Finding identity binding revoked",
+  finding_suppressed: "Finding suppressed",
+  finding_suppression_cleared: "Finding suppression cleared",
   finding_absence_review_saved: "Absence review candidates saved",
   finding_absence_review_decided: "Absence review recorded",
   finding_absence_review_reopened: "Absence review reopened",

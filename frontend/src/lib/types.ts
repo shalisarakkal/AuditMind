@@ -74,7 +74,7 @@ export type AuditReportSnapshot = {
     method?: string; version?: string; external_processing?: boolean;
     framework_evaluation?: string;
     rule_based?: { overall_score: number; overall_tier: string };
-    status_scoring?: { enabled: boolean; policy_version: string; recorded_findings: number; current_risk_findings: number; excluded_findings: number };
+    status_scoring?: { enabled: boolean; policy_version: string; recorded_findings: number; suppressed_findings?: number; all_suppressed?: boolean; current_risk_findings: number; excluded_findings: number };
     sampled_findings?: { finding_id: string; description: string; severity: string }[];
   };
   title: string;
@@ -326,7 +326,7 @@ export type DomainScore = { domain: Domain; score: number | null; tier: RiskTier
 
 export type DashboardSummary = {
   findings_baseline?: { overall_score: number | null; overall_tier: RiskTier | null; domains: DomainScore[]; method: string } | null;
-  status_scoring?: { enabled: boolean; recorded_findings: number; current_risk_findings: number; excluded_findings: number; not_assessed: boolean; exclusions_deferred: boolean };
+  status_scoring?: { enabled: boolean; recorded_findings: number; suppressed_findings?: number; all_suppressed?: boolean; current_risk_findings: number; excluded_findings: number; not_assessed: boolean; exclusions_deferred: boolean };
   risk_findings_by_severity?: Record<Severity, number>;
   risk_top_stale?: boolean;
   snapshot_generated_at?: string | null;

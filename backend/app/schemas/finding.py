@@ -31,6 +31,7 @@ class FindingRead(BaseModel):
     severity: Severity
     description: str | None
     source: str | None
+    suppression_history_id: uuid.UUID | None = None
     workflow_status: WorkflowStatus = "open"
     workflow_version: int = 0
     assignee_id: uuid.UUID | None = None

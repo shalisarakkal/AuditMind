@@ -1582,7 +1582,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       if(absenceImports.some(imported=>imported.scan_id===observation.scan_id)) absenceObservations.push({finding,observation});
     }
     assert.equal(absenceObservations.length,3,'The two native fixture imports must expose exactly three source observations');
-    const absenceTool=await admin.request(org+'/identity-tools','POST',{name:'Synthetic absence scanner',rationale:'Browser test scanner namespace'});
+    const absenceTool=await admin.request(org+'/identity-tools','POST',{name:'Synthetic absence scanner '+ 'N'.repeat(130),rationale:'Browser test scanner namespace'});
     assert.equal(absenceTool.status,201);
     const absenceAsset=absenceObservations[0].observation.asset_identity.asset_id;
     for(const {finding,observation} of absenceObservations) assert.equal((await admin.request(list+`/${finding.id}/observations/${observation.id}/identity-binding`,'PUT',{
@@ -1662,6 +1662,99 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     assert.equal((await admin.request(list)).body.total,beforeAbsenceTotal);
     assert.deepEqual((await admin.request(list+`/${absenceCandidate.id}/workflow`)).body,beforeAbsenceWorkflow);
     check('Durable absence queue saves reviewed candidates, survives reload, freezes a held save, fences stale reviewers, supports read-only members and passes mobile/Axe without finding mutations');
+    // Real, reviewed native suppression: publication, UI guards, clear,
+    // concurrent review conflict and retry after a committed response is lost.
+    const suppressionRoot=org+'/finding-suppressions';
+    const nativeTarget=absenceCandidate;
+    const originalNativeWorkflow=(await admin.request(list+`/${nativeTarget.id}/workflow`)).body;
+    const originalNativeTotal=(await admin.request(list)).body.total;
+    async function decisionPayload(action, identifier) {
+      const target=action==='suppress'?{action,finding_id:identifier}:{action,suppression_id:identifier};
+      const reviewed=await admin.request(suppressionRoot+'/preview','POST',target);
+      assert.equal(reviewed.status,200,JSON.stringify(reviewed.body));
+      return {...target,review_token:reviewed.body.review_token,expected_version:reviewed.body.expected_version,
+        request_id:require('node:crypto').randomUUID(),rationale:'Independent Chrome review',confirm:true};
+    }
+    await p.goto(base+'/findings?finding_id='+nativeTarget.id);
+    await p.getByRole('button',{name:'Suppress',exact:true}).click();
+    const suppressionDialog=()=>p.getByRole('dialog',{name:'Suppress finding',exact:true});
+    await expect(suppressionDialog().getByRole('button',{name:'Suppress finding',exact:true})).toBeDisabled();
+    await suppressionDialog().getByLabel('Rationale',{exact:true}).fill('Reviewed native identity in Chrome');
+    await suppressionDialog().getByRole('checkbox').check();
+    let releaseSuppression;
+    const suppressionGate=new Promise(resolve=>{releaseSuppression=resolve;});
+    await p.route('**/finding-suppressions/decisions',async route=>{await suppressionGate;await route.continue();});
+    await suppressionDialog().getByRole('button',{name:'Suppress finding',exact:true}).click();
+    await expect(suppressionDialog().getByRole('button',{name:'Cancel',exact:true})).toBeDisabled();
+    await expect(suppressionDialog().getByLabel('Rationale',{exact:true})).toBeDisabled();
+    await p.keyboard.press('Escape');await expect(suppressionDialog()).toBeVisible();
+    releaseSuppression();await expect(suppressionDialog()).toHaveCount(0);
+    await p.unroute('**/finding-suppressions/decisions');
+    assert.equal((await admin.request(list+`?finding_id=${nativeTarget.id}`)).body.total,0);
+    assert.equal((await admin.request(list)).body.total,originalNativeTotal-1);
+    assert.deepEqual((await admin.request(list+`/${nativeTarget.id}/workflow`)).body,originalNativeWorkflow);
+    check('Native suppression requires explicit rationale/confirmation, blocks held-save dismissal and atomically removes the finding from active totals without changing workflow');
+    await p.getByRole('button',{name:'Suppressed findings',exact:true}).click();
+    const suppressionManager=()=>p.getByRole('dialog',{name:'Suppressed findings',exact:true});
+    await expect(suppressionManager()).toContainText(nativeTarget.description);
+    await suppressionManager().getByRole('button',{name:'Show history',exact:true}).click();
+    await expect(suppressionManager()).toContainText('Reviewed native identity in Chrome');
+    await p.setViewportSize({width:320,height:900});
+    assert.ok(await suppressionManager().evaluate(node=>node.scrollWidth<=node.clientWidth));
+    const suppressionAxe=await new AxeBuilder({page:p}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    assert.deepEqual(suppressionAxe.violations.map(v=>v.id),[]);
+    await p.screenshot({path:path.join(output,'suppression-manager-mobile.png'),fullPage:true});
+    await suppressionManager().getByRole('button',{name:'Clear suppression',exact:true}).click();
+    const clearSuppressionDialog=()=>p.getByRole('dialog',{name:'Clear suppression',exact:true});
+    await expect(clearSuppressionDialog()).toContainText('retained finding will return');
+    await clearSuppressionDialog().getByLabel('Rationale',{exact:true}).fill('Restore visible risk after review');
+    await clearSuppressionDialog().getByRole('checkbox').check();
+    await clearSuppressionDialog().getByRole('button',{name:'Clear suppression',exact:true}).click();
+    await expect(clearSuppressionDialog()).toHaveCount(0);
+    await suppressionManager().getByRole('button',{name:'Close',exact:true}).click();
+    assert.equal((await admin.request(list)).body.total,originalNativeTotal);
+    await p.setViewportSize({width:1440,height:1000});
+    await viewer.page.goto(base+'/findings');
+    await viewer.page.getByRole('button',{name:'Suppressed findings',exact:true}).click();
+    const viewerManager=viewer.page.getByRole('dialog',{name:'Suppressed findings',exact:true});
+    await viewerManager.getByRole('combobox',{name:'Suppression state',exact:true}).selectOption('all');
+    await expect(viewerManager).toContainText(nativeTarget.description);
+    await expect(viewerManager.getByRole('button',{name:'Clear suppression',exact:true})).toHaveCount(0);
+    await viewerManager.getByRole('button',{name:'Show history',exact:true}).click();
+    await expect(viewerManager).toContainText('Restore visible risk after review');
+    await viewerManager.getByRole('button',{name:'Close',exact:true}).click();
+    check('Suppression history and admin clear survive reload; retained risk returns, read-only members cannot clear, and 320px/Axe checks pass');
+    const secondSuppress=await admin.request(suppressionRoot+'/decisions','POST',await decisionPayload('suppress',nativeTarget.id));
+    assert.equal(secondSuppress.status,200);
+    await p.getByRole('button',{name:'Suppressed findings',exact:true}).click();
+    await suppressionManager().getByRole('button',{name:'Clear suppression',exact:true}).click();
+    await clearSuppressionDialog().getByLabel('Rationale',{exact:true}).fill('Preserve this stale reviewer draft');
+    await clearSuppressionDialog().getByRole('checkbox').check();
+    assert.equal((await admin.request(suppressionRoot+'/decisions','POST',await decisionPayload('clear',secondSuppress.body.suppression_id))).status,200);
+    await clearSuppressionDialog().getByRole('button',{name:'Clear suppression',exact:true}).click();
+    await expect(clearSuppressionDialog().getByRole('alert')).toContainText('cleared');
+    await expect(clearSuppressionDialog().getByLabel('Rationale',{exact:true})).toHaveValue('Preserve this stale reviewer draft');
+    await expect(clearSuppressionDialog().getByRole('button',{name:'Clear suppression',exact:true})).toBeDisabled();
+    await clearSuppressionDialog().getByRole('button',{name:'Cancel',exact:true}).click();
+    await suppressionManager().getByRole('button',{name:'Close',exact:true}).click();
+    check('An independently committed clear fences a stale modal, retains its rationale and requires explicit preview reload');
+    await p.reload();await p.getByRole('button',{name:'Suppress',exact:true}).click();
+    await suppressionDialog().getByLabel('Rationale',{exact:true}).fill('Retry a lost response safely');
+    await suppressionDialog().getByRole('checkbox').check();
+    const beforeRetry=(await admin.request(suppressionRoot+`/${secondSuppress.body.suppression_id}/history`)).body.items.length;
+    await p.route('**/finding-suppressions/decisions',async route=>{
+      const accepted=await route.fetch();assert.equal(accepted.status(),200);
+      await route.fulfill({status:503,json:{detail:'Synthetic response loss after commit'}});
+    });
+    await suppressionDialog().getByRole('button',{name:'Suppress finding',exact:true}).click();
+    await expect(suppressionDialog()).toContainText('outcome is unknown');
+    await p.unroute('**/finding-suppressions/decisions');
+    await suppressionDialog().getByRole('button',{name:'Retry same request',exact:true}).click();
+    await expect(suppressionDialog()).toHaveCount(0);
+    assert.equal((await admin.request(suppressionRoot+`/${secondSuppress.body.suppression_id}/history`)).body.items.length,beforeRetry+1);
+    assert.equal((await admin.request(suppressionRoot+'/decisions','POST',await decisionPayload('clear',secondSuppress.body.suppression_id))).status,200);
+    assert.deepEqual((await admin.request(list+`/${nativeTarget.id}/workflow`)).body,originalNativeWorkflow);
+    check('Retry after a genuinely committed but lost response reuses the same idempotency receipt without a second decision');
     execFileSync(process.execPath,[path.join(root,'scripts/browser-dashboard-tabs.cjs')],{
       cwd:root,windowsHide:true,stdio:'inherit',env:{...process.env,AUDITMIND_DASHBOARD_BASE_URL:base}});
     check('Dashboard tab presentation, shared inventory, compact tiles and alignment pass desktop/mobile Axe with synthetic intercepted data');

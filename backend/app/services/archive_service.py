@@ -33,7 +33,7 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, select, text, update
+from sqlalchemy import and_, or_, func, select, text, update
 from sqlalchemy.orm import Session
 
 from app.models.archive import ArchiveBatch, ArchiveJob, AssetScan
@@ -295,12 +295,12 @@ def run_job(db: Session, job_id: uuid.UUID) -> ArchiveJob:
                 ArchiveAction.restore: runner.restore,
                 ArchiveAction.purge: runner.purge,
             }[job.action]()
-        except Exception:
+        except Exception as exc:
             db.rollback()
             logger.exception("Archive job %s (%s) failed", job_id, job.action.value)
             job = db.get(ArchiveJob, job_id)
             job.status = ScanStatus.failed
-            job.summary = {"error": "Couldn't finish: start it again to carry on from where it stopped"}
+            job.summary = {"error": str(exc) if isinstance(exc, ArchiveError) else "Couldn't finish: start it again to carry on from where it stopped"}
             job.completed_at = _now()
             job.progress = None
             _record(db, job, db.get(ArchiveBatch, job.batch_id), undo, details={"error": job.summary["error"]})
@@ -453,6 +453,8 @@ class _Runner:
     # --- restore
 
     def restore(self) -> dict:
+        lock_org(self.db, self.org_id)
+        _check_suppression_restore_conflict(self.db, self.org_id, self.batch.id)
         counts = self._archived_counts()
         in_batch = "archive_batch_id = :b AND archived_at IS NOT NULL"
         ids = self._ids(f"SELECT id FROM assets WHERE {in_batch}")
@@ -471,6 +473,7 @@ class _Runner:
         for start in range(0, len(ids), CHUNK):
             lock_org(self.db, self.org_id)
             params = {**self.params, "ids": ids[start : start + CHUNK]}
+            _check_suppression_restore_conflict(self.db, self.org_id, self.batch.id, params["ids"])
             # A finding on an asset archived since (in another batch) moves to
             # that batch, to come back with it.
             gone = self.db.scalars(
@@ -503,9 +506,9 @@ class _Runner:
                 duplicates += self.db.execute(
                     text(
                         "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
-                        "AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
+                        "AND f.suppression_history_id IS NULL AND f.suppression_id IS NULL AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
                         " AND EXISTS (SELECT 1 FROM findings g WHERE g.org_id = f.org_id "
-                        "AND g.archived_at IS NULL AND g.source = f.source AND " + identity + ")"
+                        "AND g.archived_at IS NULL AND g.suppression_id IS NULL AND g.source = f.source AND " + identity + ")"
                     ),
                     params,
                 ).rowcount
@@ -602,3 +605,22 @@ def purge_expired(db: Session, now: datetime | None = None, queue: bool = False)
             elif claim_job(db, job.id) and run_job(db, job.id).status == ScanStatus.completed:
                 purged += 1
     return purged
+
+
+def _check_suppression_restore_conflict(db, org_id, batch_id, identifiers=None):
+    """Never restore a reviewed, cleared payload over an active duplicate.
+
+    Recheck under the publication lock per chunk; imports between chunks cannot
+    silently change this decision. Standing suppressions stay hidden on restore.
+    """
+    from sqlalchemy.orm import aliased
+    old, active = aliased(Finding), aliased(Finding)
+    conditions = [old.org_id == org_id, old.archive_batch_id == batch_id,
+        old.archived_at.is_not(None), old.suppression_history_id.is_not(None), old.suppression_id.is_(None)]
+    if identifiers is not None: conditions.append(old.id.in_(identifiers))
+    duplicate = select(active.id).where(active.org_id == old.org_id, active.id != old.id, active.archived_at.is_(None), active.suppression_id.is_(None),
+        active.source.is_not_distinct_from(old.source), active.asset_id.is_not_distinct_from(old.asset_id),
+        active.category.is_not_distinct_from(old.category),
+        or_(old.category.is_not(None), active.description.is_not_distinct_from(old.description))).exists()
+    if db.scalar(select(old.id).where(*conditions, duplicate).limit(1)):
+        raise ArchiveError("Restore blocked: a previously suppressed finding conflicts with an active finding. Resolve the source/canonical conflict before retrying.")

@@ -123,7 +123,7 @@ function Dashboard({ data, tab, onTabChange }: { data: DashboardSummary; tab: "f
         {tab === "evidence" && <EvidenceDashboard data={data} />}
       </section>
       <section role="tabpanel" id={`${tabsId}-findings-panel`} aria-labelledby={`${tabsId}-findings-tab`} hidden={tab !== "findings"} tabIndex={0} className="min-w-0 space-y-4">
-      {data.status_scoring?.not_assessed && data.scoring_mode !== "evidence_qualified" && <p role="status" className="text-sm text-white/70">Verified exclusions leave no current-risk findings. This does not establish evidence coverage; scores are not assessed.</p>}
+      {data.status_scoring?.not_assessed && data.scoring_mode !== "evidence_qualified" && <p role="status" className="text-sm text-white/70">{data.status_scoring?.all_suppressed ? "Suppressed findings do not establish evidence coverage; no visible finding baseline is available." : "Verified exclusions leave no current-risk findings. This does not establish evidence coverage; scores are not assessed."}</p>}
       {data.status_scoring?.exclusions_deferred && <p role="status" className="text-sm text-white/70">Inventory changed since this snapshot. Exclusions are withheld until the Dashboard is refreshed.</p>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="min-w-0 rounded-xl bg-navy-cyan-gradient p-4 md:min-h-[10rem]">
@@ -211,7 +211,7 @@ function InventoryRiskSummary({ data }: { data: DashboardSummary }) {
         <span className="font-semibold text-white">{data.findings_by_severity[severity]}</span>
       </li>)}
     </ul>
-    {typeof data.status_scoring?.current_risk_findings === "number" && <p className="mt-2 text-xs text-white/70">Current-risk findings: {data.status_scoring.current_risk_findings.toLocaleString()}. Verified exclusions: {data.status_scoring.excluded_findings.toLocaleString()}. Recorded totals include excluded findings.</p>}
+    {typeof data.status_scoring?.current_risk_findings === "number" && <p className="mt-2 text-xs text-white/70">Current-risk findings: {data.status_scoring.current_risk_findings.toLocaleString()}. Verified exclusions: {data.status_scoring.excluded_findings.toLocaleString()}. Recorded totals include excluded findings.{!!data.status_scoring.suppressed_findings && <> Suppressed findings: {data.status_scoring.suppressed_findings.toLocaleString()} (separate from verified exclusions; excluded from active totals).</>}</p>}
   </section>;
 }
 

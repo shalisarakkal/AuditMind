@@ -25,7 +25,7 @@ class EvidenceSourceError(ValueError):
 
 
 def finding_source(db: Session, org_id: uuid.UUID, source_id: uuid.UUID, *, lock=False):
-    query = select(Finding).where(Finding.id == source_id, Finding.org_id == org_id, Finding.archived_at.is_(None))
+    query = select(Finding).where(Finding.id == source_id, Finding.org_id == org_id, Finding.active())
     if lock:
         query = query.with_for_update(read=True)
     finding = db.scalar(query.execution_options(populate_existing=True))
@@ -104,7 +104,7 @@ def inventory_progress(db: Session, org_id: uuid.UUID):
         "org_archived", "org_restored")
     populations = (
         ("assets", Asset, asset_columns, (Asset.org_id == org_id, Asset.archived_at.is_(None))),
-        ("findings", Finding, finding_columns, (Finding.org_id == org_id, Finding.archived_at.is_(None))),
+        ("findings", Finding, finding_columns, (Finding.org_id == org_id, Finding.active())),
         ("lifecycle", Event, (Event.id, Event.type, Event.outcome), (Event.org_id == org_id, Event.type.in_(lifecycle_types))),
     )
     total = sum(db.scalar(select(func.count()).select_from(model).where(*filters)) for _, model, _, filters in populations)

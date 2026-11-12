@@ -200,7 +200,7 @@ def list_findings(
         # prevents PostgreSQL from using selective text indexes effectively.
         # Deduplicate candidates here. Keeping this bounded relation lets
         # PostgreSQL avoid repeated heap probes for overlapping branches.
-        active = (Finding.org_id == org_id, Finding.archived_at.is_(None))
+        active = (Finding.org_id == org_id, Finding.active())
         candidate_predicates = [
             contains(q, Finding.description, Finding.category, Finding.source),
             Finding.asset_id.in_(search_asset_ids),
@@ -241,7 +241,7 @@ def list_findings(
     # archived_at IS NULL also lets the paging below use the partial indexes.
     filters = [
         Finding.org_id == org_id,
-        Finding.archived_at.is_(None),
+        Finding.active(),
         *(c for c in conditions if c is not None),
         *dates.conditions(Finding.created_at),
     ]
@@ -280,7 +280,7 @@ def list_findings(
         expiry = _DUE_EXPIRY if overdue == "due" else _REVIEW_EXPIRY
         states = ["open", "accepted_risk", "mitigated"] if overdue == "due" else ["accepted_risk"]
         return db.scalar(select(func.min(expiry)).where(Finding.org_id == org_id,
-            Finding.archived_at.is_(None), Finding.workflow_status.in_(states), expiry > now))
+            Finding.active(), Finding.workflow_status.in_(states), expiry > now))
 
     key = {"q": q, "finding_id": finding_id, "finding": (finding or "").strip(), "asset": (asset or "").strip(),
         "severity": list_pages.choices(severity), "source": list_pages.choices(source),
@@ -513,7 +513,7 @@ def finding_facets(
 ) -> FindingFacets:
     """The values the source pick-list can offer ("" first when some
     findings have none). Severity and domain are fixed lists."""
-    findings = db.query(Finding).filter(Finding.org_id == org_id, Finding.archived_at.is_(None))
+    findings = db.query(Finding).filter(Finding.org_id == org_id, Finding.active())
     owners = indexed_values(findings, Finding.assignee_id)
     labels = dict(db.execute(select(User.id, func.coalesce(User.name, User.email))
         .join(OrgMembership, OrgMembership.user_id == User.id).where(OrgMembership.org_id == org_id,
@@ -601,7 +601,7 @@ def list_asset_findings(
 ) -> list[Finding]:
     return (
         db.query(Finding)
-        .filter(Finding.org_id == org_id, Finding.asset_id == asset_id, Finding.archived_at.is_(None))
+        .filter(Finding.org_id == org_id, Finding.asset_id == asset_id, Finding.active())
         .order_by(Finding.created_at.desc())
         .all()
     )

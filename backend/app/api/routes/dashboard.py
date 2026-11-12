@@ -159,7 +159,7 @@ def build_dashboard(org_id: uuid.UUID, db: Session, inventory: dict | None = Non
         if not enabled:
             no_score=empty or no_risk_without_coverage
             domains.append(DomainScore(domain=domain, score=None if no_score else score, tier=None if no_score else tier,
-                assessment_status=status, justification=("Verified exclusions leave no current-risk findings; this does not establish evidence coverage. Not assessed." if no_risk_without_coverage
+                assessment_status=status, justification=(("Suppressed findings do not establish evidence coverage. No visible finding baseline is available." if risk_policy.get("all_suppressed") else "Verified exclusions leave no current-risk findings; this does not establish evidence coverage. Not assessed.") if no_risk_without_coverage
                     else "No active assets or findings recorded. Not assessed.") if no_score else justification))
             continue
         coverage = qualified.get(domain.value)
@@ -225,7 +225,7 @@ def capture_inventory(org_id: uuid.UUID, db: Session) -> dict:
         top += (
             db.query(Finding)
             .options(defer(Finding.raw_data))
-            .filter(Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.severity == severity)
+            .filter(Finding.org_id == org_id, Finding.active(), Finding.severity == severity)
             .order_by(Finding.created_at.desc(), Finding.id)
             .limit(TOP_FINDINGS - len(top))
             .all()
@@ -248,9 +248,10 @@ def capture_inventory(org_id: uuid.UUID, db: Session) -> dict:
         for severity in Severity:
             if len(risk_top)==TOP_FINDINGS:break
             risk_top+=(db.query(Finding).options(defer(Finding.raw_data)).filter(Finding.org_id==org_id,
-                Finding.archived_at.is_(None),Finding.severity==severity,status_scoring.eligible_exclusion().is_not(True))
+                Finding.active(),Finding.severity==severity,status_scoring.eligible_exclusion().is_not(True))
                 .order_by(Finding.created_at.desc(),Finding.id).limit(TOP_FINDINGS-len(risk_top)).all())
-    return {"counts": {d.value: {s.value: n for s, n in values.items()} for d, values in counts.items()},
+    from app.services.finding_suppressions import revision as suppression_revision
+    return {"suppression_revision": suppression_revision(db, org_id), "counts": {d.value: {s.value: n for s, n in values.items()} for d, values in counts.items()},
             "risk_policy_stamp":risk_policy_stamp(db,org_id),"risk_excluded_count":risk_policy['excluded_findings'],
             "risk_top_findings":[FindingRead.model_validate(f).model_dump(mode='json') for f in risk_top],
             "asset_count": asset_count, "top_findings": [FindingRead.model_validate(f).model_dump(mode="json") for f in top],

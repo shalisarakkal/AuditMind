@@ -77,17 +77,20 @@ def apply_policy(db,org_id,counts,*,filters=(),source_current=True,capture_basis
         # counts on their existing covering indexes. Do not scan every finding
         # through proof joins merely to count the small verified subset.
         for domain,severity,count in db.execute(select(Finding.domain,Finding.severity,func.count()).where(
-            Finding.org_id==org_id,Finding.archived_at.is_(None),eligible_exclusion(instant),*filters)
+            Finding.org_id==org_id,Finding.active(),eligible_exclusion(instant),*filters)
                 .group_by(Finding.domain,Finding.severity)):
             count=min(count,adjusted.get(domain,{}).get(severity,0))
             adjusted.setdefault(domain,{})[severity]=adjusted.get(domain,{}).get(severity,0)-count
             excluded[severity.value]=excluded.get(severity.value,0)+count
+    suppressed = db.scalar(select(func.count()).select_from(Finding).where(Finding.org_id == org_id,
+        Finding.archived_at.is_(None), Finding.suppression_id.is_not(None), *filters)) or 0
     total=sum(sum(values.values()) for values in counts.values())
     risk=sum(sum(values.values()) for values in adjusted.values())
-    metadata={**config.model_dump(), 'recorded_findings':total,'current_risk_findings':risk,
+    metadata={**config.model_dump(), 'recorded_findings':total+suppressed,'active_findings':total,'suppressed_findings':suppressed,'current_risk_findings':risk,
         'excluded_findings':total-risk,'excluded_by_severity':excluded,
         'exclusions_deferred':config.enabled and not source_current,
-        'not_assessed':config.enabled and total>0 and risk==0 and total-risk>0,
+        'not_assessed':(config.enabled and total>0 and risk==0 and total-risk>0) or (suppressed>0 and total==0),
+        'all_suppressed':suppressed>0 and total==0,
         'mitigated_treatment':'full_risk_until_residual_policy_approved'}
     if capture_basis:
         # Keep saved context bounded even when many findings are verified.
@@ -98,13 +101,21 @@ def apply_policy(db,org_id,counts,*,filters=(),source_current=True,capture_basis
             .join(FindingVerification, and_(FindingVerification.finding_id==Finding.id,
                 FindingVerification.org_id==Finding.org_id,
                 FindingVerification.version==Finding.risk_verification_version))
-            .where(Finding.org_id==org_id, Finding.archived_at.is_(None), eligible_exclusion(instant), *filters)
+            .where(Finding.org_id==org_id, Finding.active(), eligible_exclusion(instant), *filters)
             .order_by(Finding.id).limit(100)).all() if config.enabled and source_current and total>risk else []
         metadata['verification_basis'] = [dict(finding_id=str(row[0]), decision_id=str(row[1]), version=row[2],
             source_reference=row[3], observed_at=row[4].isoformat(), reviewed_at=row[5].isoformat(),
             expires_at=row[6].isoformat()) for row in rows]
         metadata['verification_basis_truncated'] = total-risk>len(rows)
         metadata['verification_basis_limit'] = 100
+        from app.models.finding_suppression import FindingSuppression
+        hidden = db.execute(select(Finding.id, FindingSuppression.id, FindingSuppression.version)
+            .join(FindingSuppression, and_(FindingSuppression.id == Finding.suppression_id,
+                FindingSuppression.org_id == Finding.org_id)).where(Finding.org_id == org_id,
+                Finding.archived_at.is_(None), *filters).order_by(Finding.id).limit(100)).all() if suppressed else []
+        metadata['suppression_policy_version'] = 'reviewed-suppression-v1'
+        metadata['suppression_basis'] = [dict(finding_id=str(r[0]), suppression_id=str(r[1]), version=r[2]) for r in hidden]
+        metadata['suppression_basis_truncated'] = suppressed > len(hidden)
     return adjusted,metadata
 
 
@@ -130,7 +141,7 @@ def _reference(db,org_id,reference,*,lock=False):
 
 def _finding(db,org_id,finding_id,*,lock=False):
     query=select(Finding).options(defer(Finding.raw_data),defer(Finding.description),defer(Finding.details)).where(
-        Finding.org_id==org_id,Finding.id==finding_id,Finding.archived_at.is_(None))
+        Finding.org_id==org_id,Finding.id==finding_id,Finding.active())
     if lock:query=query.with_for_update(key_share=True)
     finding=db.scalar(query.execution_options(populate_existing=True))
     if finding is None:raise HTTPException(404,'Finding not found')

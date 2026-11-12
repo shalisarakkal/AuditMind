@@ -18,6 +18,8 @@ from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.finding_absence_review import (
     FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
 )
+from app.models.finding_suppression import (FindingSuppression, FindingSuppressionDecision,
+    OrganizationSuppressionRevision, FindingSuppressionReappearance)
 from app.models.scan_snapshot import ScanSnapshotDeclaration
 from app.models.risk_score import RiskScore
 from app.models.report import Report
@@ -66,6 +68,10 @@ __all__ = [
     "FindingAbsenceReviewBatch",
     "FindingAbsenceReviewItem",
     "FindingAbsenceReviewDecision",
+    "FindingSuppression",
+    "FindingSuppressionDecision",
+    "OrganizationSuppressionRevision",
+    "FindingSuppressionReappearance",
     "ScanSnapshotDeclaration",
     "RiskScore",
     "Report",

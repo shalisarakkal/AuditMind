@@ -67,7 +67,7 @@ def preview(db, org_id, target, source_id, *, lock=False):
         query = query.with_for_update(key_share=True)
     findings = db.scalars(query.options(defer(Finding.raw_data), defer(Finding.details))
         .execution_options(populate_existing=True)).all()
-    if len(findings) != 2 or any(row.archived_at is not None for row in findings):
+    if len(findings) != 2 or any(row.archived_at is not None or row.suppression_id is not None for row in findings):
         raise HTTPException(409, "Both findings must be active")
     affected = {value for row in findings for value in (row.id, row.asset_id, row.scan_id) if value}
     affected.add(uuid.UUID(comparison["canonical_asset_id"]))

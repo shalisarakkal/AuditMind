@@ -123,6 +123,10 @@ def read_observations(db, org_id, observations):
 
 
 def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, reviewed_from=None, expected_context=None):
+    from app.services.org_lock import lock_org
+    def busy():
+        raise HTTPException(409, "Inventory publication is busy; retry identity review after the current batch")
+    lock_org(db, org_id, on_wait=busy)
     latest = latest_bindings(db, org_id, [observation.id]).get(observation.id)
     version = latest.version if latest else 0
     if version != payload.expected_version:

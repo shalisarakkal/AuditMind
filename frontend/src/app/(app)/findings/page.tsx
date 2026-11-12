@@ -4,6 +4,8 @@ import { Fragment, Suspense, useState } from "react";
 
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
+import FindingSuppressionDialog, { type SuppressionTarget } from "@/components/FindingSuppressionDialog";
+import SuppressedFindingsDialog from "@/components/SuppressedFindingsDialog";
 import FindingWorkflowDialog from "@/components/FindingWorkflowDialog";
 import FindingReference from "@/components/FindingReference";
 import FindingActionDialog from "@/components/FindingActionDialog";
@@ -79,6 +81,8 @@ function Findings() {
   useReloadOnImport(selection.clear);
   const [workflow, setWorkflow] = useState<{ scope: string; ids: string[]; names: string[] } | null>(null);
   const [bulk, setBulk] = useState<{ request: BulkRequest; ids: string[]; names: string[]; scope: string } | null>(null);
+  const [suppression, setSuppression] = useState<SuppressionTarget | null>(null);
+  const [suppressedOpen, setSuppressedOpen] = useState(false);
   const [addingOrg, setAddingOrg] = useState<string | null>(null);
   const hasManual = facets.data?.has_manual_findings ?? page?.items.some(f => f.scan_id === null) ?? false;
   // The event log finding whose details are open.
@@ -144,6 +148,12 @@ function Findings() {
           )
         }
       />
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="min-h-10 text-sm text-cyan underline" onClick={() => setSuppressedOpen(true)}>Suppressed findings</button>
+        <span className="text-xs text-white/60">Individual suppression requires a current reviewed native Nessus identity.</span>
+      </div>
+      {suppressedOpen && <SuppressedFindingsDialog orgId={org.id} orgName={org.name} role={org.role} onClose={() => setSuppressedOpen(false)} onSaved={() => { reload(); facets.reload(); selection.clear(); }} />}
+      {suppression && <FindingSuppressionDialog key={suppression.finding_id} orgId={org.id} orgName={org.name} target={suppression} onClose={() => setSuppression(null)} onSaved={() => { setSuppression(null); reload(); facets.reload(); selection.clear(); }} />}
       <ImportStatus page="findings" />
       <JobStatus />
       {writer && addingOrg === org.id && <AddFindingDialog key={org.id} orgId={org.id} orgName={org.name} onClose={() => setAddingOrg(null)} onSaved={() => { reload(); facets.reload(); selection.clear(); }} />}
@@ -159,7 +169,7 @@ function Findings() {
           </select></label>
         </ListToolbar>
         {writer && !hasManual && <p className="text-xs text-white/70">No active manual findings are available to archive. Use Add finding for manual entry. Uploaded findings are archived with their upload or asset, not individually.</p>}
-        <p className="text-xs text-white/70">Search an exact Finding ID to locate it in this organization. Archived or purged findings do not appear in this active list.</p>
+        <p className="text-xs text-white/70">Search an exact Finding ID to locate it in this organization. Archived, suppressed or purged findings do not appear in this active list.</p>
         {list.text("finding_id") && <p className="text-sm">Finding ID: <span className="break-all">{list.text("finding_id")}</span></p>}
         {facets.error && <p role="alert" className="text-sm text-red-300">Could not load filter options: {facets.error} <button type="button" className="text-cyan underline" onClick={facets.reload}>Retry filter options</button></p>}
         {writer && (
@@ -280,6 +290,9 @@ function Findings() {
                     <td className={`${ACTIONS_CELL} sticky right-0 z-10 bg-navy`}>
                       <div className="flex flex-wrap justify-end gap-3">
                       <button type="button" disabled={loading || !!f.archiving || selection.count > 0} title={selection.count ? "Clear selection to use individual row actions." : undefined} className={`${ROW_ACTION_VIEW} disabled:opacity-50`} onClick={() => { setBulk(null); setWorkflow({ scope: workflowScope, ids: [f.id], names: [nameOf(f)] }); }}>Workflow</button>
+                      {writer && f.scan_id !== null && f.source === "nessus" && <button type="button" className={`${ROW_ACTION_VIEW} disabled:opacity-50`}
+                        disabled={loading || !!f.archiving || selection.count > 0} title={selection.count ? "Clear selection to use individual row actions." : "Review current identity before suppressing this finding."}
+                        onClick={() => setSuppression({ action: "suppress", finding_id: f.id })}>Suppress</button>}
                       {writer && f.scan_id === null && (
                         <ArchiveButtons
                           itemId={f.id}

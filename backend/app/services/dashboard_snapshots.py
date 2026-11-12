@@ -67,7 +67,7 @@ def enqueue(db, org_id, *, scheduled_at=None):
 
 def read(db, org_id):
     row = db.scalar(select(DashboardSnapshot).where(DashboardSnapshot.org_id == org_id))
-    if row is None:
+    if row is None or (not row.payload and row.status not in ("pending", "running")):
         if enqueue(db, org_id) is None:
             return DashboardPending(snapshot_refresh_status="failed", snapshot_error="Organization is archived or being deleted. Restore it before refreshing.")
     engine = db.get_bind()
@@ -75,7 +75,8 @@ def read(db, org_id):
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as connection:
         with Session(bind=connection) as snapshot:
             row = snapshot.scalar(select(DashboardSnapshot).where(DashboardSnapshot.org_id == org_id))
-            if not row.payload:
+            from app.services.finding_suppressions import revision as suppression_revision
+            if not row.payload or row.payload["inventory"].get("suppression_revision", 0) != suppression_revision(snapshot, org_id):
                 return DashboardPending(snapshot_refresh_status=row.status, snapshot_error=row.error_message)
             from app.api.routes.dashboard import build_dashboard, risk_policy_stamp
             result = build_dashboard(org_id, snapshot, row.payload["inventory"], row.captured_revision)
@@ -135,7 +136,12 @@ def process(db, job_id):
                            "security": build_security_summary(org_id, snapshot).model_dump(mode="json")}
                 generated = now()
         # Publish all cards atomically; retain old payload until this succeeds.
-        row = db.get(DashboardSnapshot, job_id, populate_existing=True)
+        row = db.scalar(select(DashboardSnapshot).where(DashboardSnapshot.id == job_id).with_for_update().execution_options(populate_existing=True))
+        from app.services.finding_suppressions import revision as suppression_revision
+        if payload["inventory"].get("suppression_revision", 0) != suppression_revision(db, org_id):
+            row.payload, row.status, row.requested_at = None, "pending", now()
+            db.commit()
+            return
         row.payload, row.captured_revision, row.generated_at = payload, revision, generated
         row.status, row.error_message = "completed", None
         db.commit()

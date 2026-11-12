@@ -857,6 +857,8 @@ class _PendingWrites:
             _copy_rows(self.db, Finding.__tablename__, self.findings)
         if self.observations:
             _copy_rows(self.db, FindingObservation.__tablename__, self.observations)
+            from app.services.finding_suppressions import record_reappearances
+            record_reappearances(self.db, self.observations[0]["org_id"], self.observations)
         self.findings, self.links, self.observations = [], [], []
 
 

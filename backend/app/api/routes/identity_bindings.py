@@ -54,6 +54,10 @@ def create_tool(org_id: uuid.UUID, payload: ToolCreate, db: Session = Depends(ge
 @router.post("/identity-tools/{tool_id}/retire")
 def retire_tool(org_id: uuid.UUID, tool_id: uuid.UUID, payload: IdentityDecision,
                 db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_role(UserRole.admin))):
+    from app.services.org_lock import lock_org
+    def busy():
+        raise HTTPException(409, "Inventory publication is busy; retry tool retirement after the current batch")
+    lock_org(db, org_id, on_wait=busy)
     tool = db.scalar(select(IdentityTool).where(IdentityTool.org_id == org_id, IdentityTool.id == tool_id))
     if tool is None:
         raise HTTPException(404, "Tool instance not found")

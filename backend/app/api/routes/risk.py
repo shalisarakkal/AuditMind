@@ -30,7 +30,7 @@ def run_risk_assessment(
         with Session(bind=connection) as capture:
             counts, policy = status_scoring.apply_policy(capture, org_id, count_org_findings(capture, org_id), capture_basis=True)
     if policy['not_assessed']:
-        raise HTTPException(409, "Not assessed: verified exclusions leave no current-risk findings; evidence coverage is not established")
+        raise HTTPException(409, "Not assessed: all findings are suppressed; evidence coverage is not established" if policy.get("all_suppressed") else "Not assessed: verified exclusions leave no current-risk findings; evidence coverage is not established")
     domain_scores = score_all_from_counts(counts)
     overall, tier = overall_score(domain_scores)
     # Snapshot reads release the original authorization transaction. Recheck

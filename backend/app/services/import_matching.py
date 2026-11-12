@@ -219,7 +219,7 @@ class FindingIndex:
         # Descriptions only matter for uncategorised findings.
         description = case((Finding.category.is_(None), Finding.description))
         query = select(Finding.asset_id, Finding.source, Finding.category, description, Finding.scan_id, Finding.id).where(
-            Finding.org_id == org_id, Finding.archived_at.is_(None), Finding.source.is_not(None)
+            Finding.org_id == org_id, Finding.active(), Finding.source.is_not(None)
         )
         # One object per upload, not one per row: millions of findings share
         # a few uploads.
