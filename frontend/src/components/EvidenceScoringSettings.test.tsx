@@ -117,7 +117,35 @@ describe("EvidenceScoringSettings", () => {
     await waitFor(() => expect(state.writes).toHaveLength(1));
     expect(state.writes[0]).toMatchObject({ expected_version: 0, inventory_sha256: "a".repeat(64), observations: [] });
     await screen.findByText(/Draft saved/);
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Approve saved evidence" })).toBeDisabled();
+  });
+  it.each([true, false])("only enables saving for persisted edits or a new inventory binding (already bound: %s)", async bound => {
+    const state = setup();
+    state.saved.rows = [{ domain: "identity_access", scope: "Saved scope", rationale: "Saved rationale",
+      status: "draft", version: 4, observations: [], inventory_sha256: bound ? "a".repeat(64) : null }];
+    const open = screen.getByRole("button", { name: "Open / reload domain" });
+    await waitFor(() => expect(open).toBeEnabled()); fireEvent.click(open);
+    const scope = await screen.findByLabelText("Scope description");
+    const save = screen.getByRole("button", { name: "Save draft" });
+    expect(save).toBeDisabled();
+    fireEvent.change(scope, { target: { value: "Changed scope" } });
+    expect(save).toBeEnabled();
+    fireEvent.change(scope, { target: { value: "  Saved scope  " } });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Review / revocation note"), { target: { value: "Unsaved review note" } });
+    expect(save).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Load current inventory" }));
+    await screen.findByText("2 assets · 3 findings");
+    await waitFor(() => expect(open).toBeEnabled());
+    if (bound) {
+      expect(save).toBeDisabled(); expect(state.writes).toHaveLength(0);
+    } else {
+      expect(save).toBeEnabled(); fireEvent.click(save);
+      await waitFor(() => expect(state.writes).toHaveLength(1));
+      expect(state.writes[0]).toMatchObject({ expected_version: 4, inventory_sha256: "a".repeat(64) });
+      await screen.findByText(/Draft saved/); expect(save).toBeDisabled();
+    }
   });
   it("makes the editor read-only for non-admin members", async () => {
     setup(false);

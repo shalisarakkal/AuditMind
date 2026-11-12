@@ -70,6 +70,65 @@ def test_admin_drafts_are_versioned_audited_and_do_not_affect_scores(client, own
     assert events[-1].details["after"]["version"] == 2
 
 
+def test_unchanged_draft_preserves_version_timestamp_audit_and_evidence_revision(client, owner, db_session):
+    from app.services.evidence_jobs import revision
+    headers, org, path = owner
+    first = client.put(path + '/qualifications/network_config', headers=headers, json=draft())
+    assert first.status_code == 200, first.text
+    before_revision = revision(db_session, uuid.UUID(org))
+    for _ in range(2):
+        same = client.put(path + '/qualifications/network_config', headers=headers,
+            json=draft(expected_version=1, scope='  All active organization assets  '))
+        assert same.status_code == 200, same.text
+        assert same.json() == first.json()
+        assert same.headers['cache-control'] == 'no-store'
+    assert revision(db_session, uuid.UUID(org)) == before_revision
+    assert db_session.query(Event).filter_by(item='Evidence qualification draft').count() == 1
+    changed = client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=1, scope='Changed scope'))
+    assert changed.status_code == 200 and changed.json()['version'] == 2
+    # Even identical content cannot bypass a stale expected-version fence.
+    assert client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=1, scope='Changed scope')).status_code == 409
+    assert db_session.query(Event).filter_by(item='Evidence qualification draft').count() == 2
+
+
+def test_observation_order_and_equivalent_instants_are_not_draft_edits(client, owner, db_session):
+    headers, org, path = owner
+    observations = []
+    observed = datetime.now(timezone.utc) - timedelta(days=1)
+    for label in ('First', 'Second'):
+        finding = Finding(org_id=uuid.UUID(org), domain=Domain.network_config, severity=Severity.high, description=label)
+        db_session.add(finding); db_session.commit()
+        bound = client.get(path + f'/source-findings/{finding.id}', headers=headers).json()
+        observations.append({k: bound[k] for k in ('source_type', 'source_id', 'source_sha256')})
+        observations[-1].update(objective='exposure_inventory', observed_at=observed.isoformat())
+    first = client.put(path + '/qualifications/network_config', headers=headers, json=draft(observations=observations))
+    assert first.status_code == 200, first.text
+    equivalent = [{**o, 'source_id': o['source_id'].upper(),
+        'observed_at': observed.astimezone(timezone(timedelta(hours=5, minutes=30))).isoformat()} for o in reversed(observations)]
+    same = client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=1, observations=equivalent))
+    assert same.status_code == 200, same.text
+    assert same.json() == first.json()
+
+
+def test_changing_or_removing_inventory_binding_creates_one_version(client, owner):
+    headers, _, path = owner
+    first = client.put(path + '/qualifications/network_config', headers=headers, json=draft())
+    assert first.status_code == 200
+    digest = client.get(path + '/inventory-scope', headers=headers).json()['inventory_sha256']
+    bound = client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=1, inventory_sha256=digest))
+    assert bound.status_code == 200 and bound.json()['version'] == 2
+    repeated = client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=2, inventory_sha256=digest))
+    assert repeated.status_code == 200 and repeated.json() == bound.json()
+    unbound = client.put(path + '/qualifications/network_config', headers=headers,
+        json=draft(expected_version=2))
+    assert unbound.status_code == 200 and unbound.json()['version'] == 3
+
+
 @pytest.mark.parametrize("role", ["viewer", "auditor"])
 def test_member_reads_but_only_admin_writes(client, owner, role):
     headers, org, path = owner

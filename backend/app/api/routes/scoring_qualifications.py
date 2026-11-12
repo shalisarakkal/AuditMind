@@ -263,6 +263,13 @@ def list_drafts(org_id: uuid.UUID, response: Response, db: Session = Depends(get
         DomainEvidenceQualification.org_id == org_id).order_by(DomainEvidenceQualification.domain)).all()
 
 
+def draft_content(value):
+    """Compare persisted content, independent of observation ordering/time-zone spelling."""
+    observations = sorted((o.objective, o.source_type, str(o.source_id), o.source_sha256,
+        o.observed_at.astimezone(timezone.utc).isoformat()) for o in value.observations)
+    return value.scope.strip(), value.rationale.strip(), value.inventory_sha256, observations
+
+
 @router.put("/qualifications/{domain}", response_model=QualificationRead)
 def save_draft(org_id: uuid.UUID, domain: Domain, payload: QualificationDraftUpdate,
                response: Response, db: Session = Depends(get_db),
@@ -291,7 +298,14 @@ def save_draft(org_id: uuid.UUID, domain: Domain, payload: QualificationDraftUpd
             raise HTTPException(409, "Evidence source changed or belongs to another domain; reload before retrying")
         if observation.observed_at > now:
             raise HTTPException(422, "Observation date cannot be in the future")
-    before = QualificationRead.model_validate(row).model_dump(mode="json") if row else None
+    saved = QualificationRead.model_validate(row) if row else None
+    if (saved is not None and saved.status == "draft" and row.policy_version == POLICY_VERSION
+            and draft_content(saved) == draft_content(payload)):
+        # Authorization, expected-version and source checks still apply. An
+        # unchanged draft must not touch timestamps, audit history or revisions.
+        response.headers["Cache-Control"] = "no-store"
+        return saved
+    before = saved.model_dump(mode="json") if saved else None
     if row is None:
         row = DomainEvidenceQualification(org_id=org_id, domain=domain, version=0)
         db.add(row)

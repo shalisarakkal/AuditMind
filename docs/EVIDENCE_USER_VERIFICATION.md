@@ -614,3 +614,21 @@ the additional retained source or resolve its canonical conflict before retrying
 Clearing never silently publishes both. After clearing, attempting to restore an
 older conflicting payload must fail safely while retaining its data/history;
 this also applies when its source asset differs through a reviewed alias.
+
+## Draft saves without version noise
+
+In Settings > Scoring and evidence review, open an existing saved draft.
+Save draft is disabled until persisted content or the inventory binding changes.
+Change the scope or rationale: Save draft enables. Revert the edit (including
+whitespace-only changes): it disables again. Typing only a review note or an
+unfinished source observation does not enable it. Loading the same inventory
+binding also leaves it disabled; a different/new binding enables it.
+
+The first valid save creates version 1. After a real edit, save once and verify
+one version increment followed by a disabled Save draft button. An identical
+API save with the current expected version returns the existing record without
+changing its timestamp, audit entries or evidence revision. Source validation
+and stale-version conflicts still apply. Two reviewers editing the same version
+must still receive a conflict on the stale save, even if its content matches the
+new server version. Approved records remain protected from editing; returning a
+revoked/conflicting record to draft remains an explicit state change.

@@ -1057,3 +1057,12 @@ the additional retained source or resolve its canonical conflict before retrying
 Clearing never silently publishes both. After clearing, attempting to restore an
 older conflicting payload must fail safely while retaining its data/history;
 this also applies when its source asset differs through a reviewed alias.
+
+### Evidence draft versions
+
+Save draft is disabled when the saved draft content and inventory binding are
+unchanged. Review notes and unfinished observation inputs are separate from saved
+draft content. Repeated identical API saves preserve the version, timestamp and
+audit history; source and concurrent-version checks still apply. First saves,
+real content/binding edits and explicit returns from reviewed states to draft
+create a version. Approved evidence must still be revoked before editing.

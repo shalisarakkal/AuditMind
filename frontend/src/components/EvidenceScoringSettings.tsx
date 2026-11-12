@@ -18,6 +18,11 @@ type Mode = { evidence_qualified_enabled: boolean; version: number; available: b
 const field = "w-full rounded-md border border-white/20 bg-navy px-3 py-2 text-white";
 const button = "rounded-md border border-cyan px-3 py-2 text-sm text-cyan disabled:opacity-40";
 const words = (value: string) => value.replaceAll("_", " ");
+const draftContent = (value: Pick<Qualification, "scope" | "rationale" | "inventory_sha256" | "observations">) => JSON.stringify([
+  value.scope.trim(), value.rationale.trim(), value.inventory_sha256 ?? null,
+  value.observations.map(o => JSON.stringify([o.objective, o.source_type, o.source_id.toLowerCase(), o.source_sha256,
+    new Date(o.observed_at).toISOString()])).sort(),
+]);
 
 export default function EvidenceScoringSettings({ orgId, editable }: { orgId: string; editable: boolean }) {
   const base = `/orgs/${orgId}/scoring`;
@@ -92,10 +97,11 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
     setObjective(""); setSourceId(""); setObserved(""); setSourceType("finding");
     setOpened(true); setNote(""); setExpires(""); setAttested(false); setMessage(""); setError("");
   }
+  const contentChanged = draftContent({ scope, rationale, observations,
+    inventory_sha256: inventory?.inventory_sha256 ?? draft?.inventory_sha256 ?? null }) !==
+    draftContent(draft ?? { scope: "", rationale: "", observations: [], inventory_sha256: null });
   const dirty = editable && opened && (
-    scope !== (draft?.scope ?? "") || rationale !== (draft?.rationale ?? "") ||
-    JSON.stringify(observations) !== JSON.stringify(draft?.observations ?? []) ||
-    (inventory != null && inventory.inventory_sha256 !== draft?.inventory_sha256) ||
+    contentChanged ||
     !!(note || expires || attested || objective || sourceId || observed || sourceType !== "finding")
   );
   function requestDomain(next?: Domain) {
@@ -183,7 +189,7 @@ export default function EvidenceScoringSettings({ orgId, editable }: { orgId: st
           <details><summary>Source details</summary><p className="break-all">{o.source_id}</p><p className="break-all">SHA-256: {o.source_sha256}</p></details>
           {!locked && <button type="button" className="text-cyan" onClick={() => setObservations(observations.filter((_, n) => n !== i))}>Remove observation</button>}
         </li>)}</ul>
-        <button className={button} type="button" disabled={locked || !scope.trim() || !rationale.trim()} onClick={() => run(async () => {
+        <button className={button} type="button" disabled={locked || !scope.trim() || !rationale.trim() || (draft?.status === "draft" && !contentChanged)} onClick={() => run(async () => {
           const saved = await api.put<Qualification>(`${base}/qualifications/${domain}`, { expected_version: draft?.version ?? 0, scope, rationale, observations, inventory_sha256: inventory?.inventory_sha256 ?? draft?.inventory_sha256 ?? null });
           setDraft(saved); setScope(saved.scope); setRationale(saved.rationale); setObservations(saved.observations); setInventory(null); setEvaluationRefresh(v => v + 1); records.reload(); setMessage("Draft saved. Review the saved version before approving.");
         })}>Save draft</button>
