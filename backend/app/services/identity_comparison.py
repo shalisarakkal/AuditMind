@@ -7,9 +7,11 @@ different target context later. No inventory-wide search or importer work.
 """
 import hashlib
 import json
+from types import SimpleNamespace
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.orm import defer
 
 from app.models.finding import Finding
 from app.models.enums import ScanStatus
@@ -19,18 +21,24 @@ from app.schemas.identity_binding import IdentityBind
 from app.services.finding_identity import IdentityBinding, assess_identity
 from app.services.identity_bindings import (
     _assets, _context, _scans, _source_asset, latest_bindings,
-    read_observations, write_binding,
+    identity_reviews, read_observations, write_binding,
 )
 
 
-def compare_observation(db, org_id, target, source_id, *, include_context=False):
-    source = db.scalar(select(FindingObservation).where(
-        FindingObservation.org_id == org_id, FindingObservation.id == source_id))
+def compare_observation(db, org_id, target, source_id, *, include_context=False, bounded=False):
+    query = select(FindingObservation).where(FindingObservation.org_id == org_id, FindingObservation.id == source_id)
+    if bounded:
+        query = query.options(defer(FindingObservation.payload))
+    source = db.scalar(query)
     if source is None:
         raise HTTPException(404, "Reference observation not found")
     if (source.import_id == target.import_id or source.recorded_at >= target.recorded_at):
         raise HTTPException(409, "Choose an observation from an earlier import")
-    views = read_observations(db, org_id, [source, target])
+    if bounded:
+        reviews = identity_reviews(db, org_id, [source, target])
+        views = [SimpleNamespace(identity_assessment=reviews[o.id][0], identity_binding=reviews[o.id][1]) for o in (source, target)]
+    else:
+        views = read_observations(db, org_id, [source, target])
     reference = views[0].identity_binding
     if not reference or not reference["current"]:
         raise HTTPException(409, "Reference identity review is not current; review it first")

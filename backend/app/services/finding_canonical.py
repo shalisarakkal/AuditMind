@@ -7,7 +7,7 @@ import hashlib
 import json
 import uuid
 from fastapi import HTTPException
-from sqlalchemy import literal_column, or_, select
+from sqlalchemy import func, literal_column, or_, select
 from sqlalchemy.orm import aliased, defer
 from app.models.archive import ArchiveBatch
 from app.models.finding import Finding
@@ -33,15 +33,16 @@ def receipt(row, *, current=None):
         actor_label=row.actor_label, created_at=row.created_at.isoformat())
 
 
-def _summary(db, org_id, finding):
+def _summary(db, org_id, finding, *, excerpt=None, description_hash=None):
     verification = db.scalar(select(FindingVerification).where(FindingVerification.org_id == org_id,
         FindingVerification.finding_id == finding.id).order_by(FindingVerification.version.desc()).limit(1))
     observed = db.execute(select(FindingObservation.id, FindingObservation.recorded_at,
         FindingObservation.filename, FindingObservation.source_row).where(
         FindingObservation.org_id == org_id, FindingObservation.finding_id == finding.id)
         .order_by(FindingObservation.recorded_at.desc(), FindingObservation.id.desc()).limit(1)).one_or_none()
-    return dict(id=str(finding.id), category=finding.category, description=(finding.description or "")[:2000],
-        description_sha256=hashlib.sha256((finding.description or "").encode()).hexdigest(),
+    return dict(id=str(finding.id), category=finding.category,
+        description=(finding.description or "")[:2000] if description_hash is None else excerpt,
+        description_sha256=hashlib.sha256((finding.description or "").encode()).hexdigest() if description_hash is None else description_hash,
         severity=finding.severity.value, domain=finding.domain.value, source=finding.source,
         asset_id=str(finding.asset_id) if finding.asset_id else None,
         scan_id=str(finding.scan_id) if finding.scan_id else None,
@@ -56,8 +57,8 @@ def _summary(db, org_id, finding):
             recorded_at=observed.recorded_at.isoformat()) if observed else None)
 
 
-def preview(db, org_id, target, source_id, *, lock=False):
-    comparison = compare_observation(db, org_id, target, source_id)
+def preview(db, org_id, target, source_id, *, lock=False, bounded=False):
+    comparison = compare_observation(db, org_id, target, source_id, **({"bounded": True} if bounded else {}))
     if comparison["result"] != "canonical_conflict" or not comparison["already_reviewed"]:
         raise HTTPException(409, "Two separate findings with independently current matching identity reviews are required")
     identifiers = sorted((comparison["source_finding_id"], comparison["target_finding_id"]))
@@ -65,8 +66,17 @@ def preview(db, org_id, target, source_id, *, lock=False):
     query = select(Finding).where(Finding.org_id == org_id, Finding.id.in_([uuid.UUID(value) for value in identifiers])).order_by(Finding.id)
     if lock:
         query = query.with_for_update(key_share=True)
-    findings = db.scalars(query.options(defer(Finding.raw_data), defer(Finding.details))
-        .execution_options(populate_existing=True)).all()
+    excerpts = {}
+    if bounded:
+        query = query.add_columns(func.substr(func.coalesce(Finding.description, ""), 1, 2000),
+            func.encode(func.sha256(func.convert_to(func.coalesce(Finding.description, ""), "UTF8")), "hex"))
+        rows = db.execute(query.options(defer(Finding.raw_data), defer(Finding.details), defer(Finding.description))
+            .execution_options(populate_existing=True)).all()
+        findings = [row[0] for row in rows]
+        excerpts = {row[0].id: dict(excerpt=row[1], description_hash=row[2]) for row in rows}
+    else:
+        findings = db.scalars(query.options(defer(Finding.raw_data), defer(Finding.details))
+            .execution_options(populate_existing=True)).all()
     if len(findings) != 2 or any(row.archived_at is not None or row.suppression_id is not None for row in findings):
         raise HTTPException(409, "Both findings must be active")
     affected = {value for row in findings for value in (row.id, row.asset_id, row.scan_id) if value}
@@ -95,7 +105,7 @@ def preview(db, org_id, target, source_id, *, lock=False):
             decision_id=str(conflict.id), canonical_finding_id=str(conflict.canonical_finding_id)))
     previous = latest(db, org_id, pair_key)
     context = dict(contract="canonical-selection-v1", identity_token=comparison["review_token"],
-        candidate_key=comparison["candidate_key"], findings=[_summary(db, org_id, row) for row in findings])
+        candidate_key=comparison["candidate_key"], findings=[_summary(db, org_id, row, **excerpts.get(row.id, {})) for row in findings])
     version = previous.version if previous else 0
     token = hashlib.sha256(json.dumps(dict(context=context, pair_key=pair_key, version=version),
         sort_keys=True, separators=(",", ":")).encode()).hexdigest()
