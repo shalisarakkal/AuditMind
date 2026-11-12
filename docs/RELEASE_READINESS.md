@@ -3,9 +3,12 @@
 ## Current suppression increment - 11 November 2026
 
 Trusted native Nessus suppression/clear, atomic visibility and risk integration,
-source-lifecycle safeguards and guarded UI actions are implemented under final
-acceptance. See [the current review and test record](SUPPRESSION_RELEASE_REVIEW.md).
-The new exact-SHA hosted result will be recorded after the authorized push.
+source-lifecycle safeguards and guarded UI actions are delivered and locally active
+at migration 0050. See [the current review and test record](SUPPRESSION_RELEASE_REVIEW.md).
+All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
+The subsequent retained-source correction `6ed32a4` passes 120 expanded and
+three final indexed-query cases. Its own exact-tip hosted result must be
+checked at delivery; the earlier green run is a dated baseline.
 PB-1.3 remains partial: consolidation, source-payload publication, additional
 identity mappings and automatic reconciliation are separate work.
 
@@ -64,7 +67,7 @@ not a failed test or automatically part of the next release.
 
 | Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
 | --- | --- | --- | --- |
-| G-01: reviewed code and correctness CI | `60d957b` verified; new suppression increment under final local acceptance | Engineering / project release owner | [Prior exact-SHA CI](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714); complete [current suppression review](SUPPRESSION_RELEASE_REVIEW.md), publish scoped commits and verify every job for the new exact SHA. CI is not production sign-off. |
+| G-01: reviewed code and correctness CI | `cc1ca17` verified in all four hosted jobs | Engineering / project release owner | [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309); [current suppression review](SUPPRESSION_RELEASE_REVIEW.md). This closes bounded engineering verification, not production sign-off. |
 | G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
 | G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
 | G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |
@@ -89,7 +92,7 @@ gates when the capability enters the agreed release scope.
 | Broader evidence-qualified scoring | Deferred; default-off retained | Product acceptance owner and evidence reviewer / authorized org admin plus release owner for broader rollout | Representative real-evidence review, workload acceptance and explicit rollout decision. Software tests do not establish evidence quality or default-on approval. |
 | Live AI/provider/model acceptance | Not approved | Engineering and security / release owner and authorized org approver | Separate account/model, pricing/budget, context/output-quality, data-processing and consent acceptance. No inference/provider change is authorized here. See PHASE3_CLOSURE.md and PHASE3_OPERATIONS.md. |
 | SaaS/parallel-worker rollout | Held; normal local operation is one slot | Engineering and operations / project release owner | Validate platform controls, representative cross-tenant load, resource bounds and recovery. Two-slot tests do not prove 32/1,000-job capacity. See WORKER_POOL.md and SAAS_JOB_SCALING.md. |
-| Imported-finding identity and reconciliation | Partial: reviewed identities, canonical designation and durable queue delivered; native suppression/clear implemented locally under final acceptance | Engineering and product acceptance owner / project release owner | Complete [suppression acceptance](SUPPRESSION_RELEASE_REVIEW.md); consolidation, payload publication, additional mappings and automatic reconciliation remain separate. No preview, declaration or verification note alone grants identity authority. |
+| Imported-finding identity and reconciliation | Partial: reviewed identities, canonical designation and durable queue delivered; native suppression/clear delivered with hosted verification | Engineering and product acceptance owner / project release owner | Native [suppression acceptance](SUPPRESSION_RELEASE_REVIEW.md) is verified; consolidation, payload publication, additional mappings and automatic reconciliation remain separate. No preview, declaration or verification note alone grants identity authority. |
 | Short-character index implementation | User-deferred, 5 November | Engineering / product acceptance owner | Retain current search behavior. Reconsider only with an accepted write-cost budget and measured design gates. |
 | Docker/container staging and persistent model cache | User-deferred Future scope | Operations and engineering / project release owner | Resume if that deployment scope is selected. Local tests do not close container acceptance. |
 

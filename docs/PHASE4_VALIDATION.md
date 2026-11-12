@@ -2,13 +2,17 @@
 
 ## Suppression increment - 11 November 2026
 
+Follow-up `6ed32a4`: 120 expanded PostgreSQL regressions and three final indexed
+source-restore/clear cases pass. Local activation has clean drift and HTTP 200
+readiness. Its exact-tip hosted result is verified separately at delivery.
+
 Native reviewed suppression/clear is active locally at migration 0050.
 Final frontend acceptance passes 576 tests, lint and production build. Rebuilt
 Chrome passes 103 checks. Post-review backend acceptance passes 51 combined
 suppression/ledger/migration/abort tests plus the final isolated abort rerun.
 The full backend run passed 1,765 with one abort-test setup timeout under heavy
 migration/test load; its readiness budget was corrected without changing abort
-assertions. Exact-source full hosted CI is tracked in
+assertions. Exact-source full hosted CI passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309); see
 [the release review](SUPPRESSION_RELEASE_REVIEW.md). Counts overlap.
 This supersedes earlier 0049-only implementation status; older checkpoints remain
 historical. Evidence qualification settings and worker capacity are unchanged.

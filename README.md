@@ -10,7 +10,7 @@ Finding identity: [native Nessus candidates and reviewed bindings](docs/FINDING_
 add explicit organization-admin tool/asset review at migration 0046. New uploads
 never inherit bindings automatically. Reviewed canonical designation and the
 durable absence queue are delivered. The [suppression/clear increment](docs/SUPPRESSION_RELEASE_REVIEW.md)
-is under final local acceptance; consolidation and automatic reconciliation remain
+is delivered with verified hosted CI; consolidation and automatic reconciliation remain
 future work.
 
 Optional [stored Dashboard snapshots](docs/DASHBOARD_SNAPSHOTS.md) provide

@@ -1047,3 +1047,13 @@ Not assessed, not a healthy score of 100. Saved Dashboard data captured before a
 disposition change is withheld while a coalesced current refresh runs; an import
 or other organization job can delay that refresh. No AI call is made by these
 actions. [Technical contract and validation](SUPPRESSION_RELEASE_REVIEW.md).
+
+### Multiple retained suppression payloads
+
+If a standing suppression was explicitly reapplied after archiving an older
+upload, restoring that older upload can leave multiple hidden payloads with the
+same reviewed identity. **Clear suppression** must refuse this conflict. Archive
+the additional retained source or resolve its canonical conflict before retrying.
+Clearing never silently publishes both. After clearing, attempting to restore an
+older conflicting payload must fail safely while retaining its data/history;
+this also applies when its source asset differs through a reviewed alias.

@@ -345,3 +345,13 @@ worker and frontend build after migration 0050 activation.
 
 These are feature checks, not pilot, production, model-quality or SaaS acceptance.
 See [release review](SUPPRESSION_RELEASE_REVIEW.md) for automated evidence.
+
+### Multiple retained suppression payloads
+
+If a standing suppression was explicitly reapplied after archiving an older
+upload, restoring that older upload can leave multiple hidden payloads with the
+same reviewed identity. **Clear suppression** must refuse this conflict. Archive
+the additional retained source or resolve its canonical conflict before retrying.
+Clearing never silently publishes both. After clearing, attempting to restore an
+older conflicting payload must fail safely while retaining its data/history;
+this also applies when its source asset differs through a reviewed alias.

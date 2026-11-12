@@ -3,15 +3,19 @@
 ## Imported finding suppression and clear - 11 November 2026
 
 The end-to-end native Nessus disposition increment is implemented locally at
-migration 0050 and under final acceptance. It adds authorized preview/suppress/
+migration 0050 and reviewed for delivery. It adds authorized preview/suppress/
 clear, atomic visibility/count/scoring/cache publication, durable reappearance
 review, source-retention/restore protection and guarded UI. Fresh uploads never
 inherit trusted identity bindings. Generic sources remain ineligible.
 Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
 backend focus: 46 tests passed. The full backend run passed 1,765 tests with
 one setup-readiness timeout under migration/test load. All 51 combined
-regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
-The new exact-SHA hosted result remains pending the authorized push.
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally;
+health/login/auth-options return 200.
+All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
+The later retained-source correction `6ed32a4` passes 120 expanded regressions
+and three final indexed-query cases. Its own exact-tip CI is checked at delivery;
+the earlier green run does not certify that later change.
 [Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
 
 ## Prior absence-review delivery - 11 November 2026
@@ -218,6 +222,13 @@ accepted.
 
 ### PB-1.3 — Implement reviewed finding reconciliation
 
+**Current, 11 November:** native reviewed suppression/clear is delivered at 0050,
+including atomic visibility/count/risk invalidation, source-retention safeguards,
+possible-reappearance receipts and guarded UI. All four hosted jobs passed for
+`cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309). Consolidation, source-payload publication,
+additional mappings and automatic reconciliation remain open. Earlier dated
+checkpoints below describe their own scope, not the current suppression status.
+
 **Delivered increments (8 November):** [Cross-import identity review](CROSS_IMPORT_IDENTITY_REVIEW.md)
 adds bounded native Nessus comparison and independent admin-confirmed mapping
 carry-forward for the same finding. Canonical conflicts block. The subsequent
@@ -275,8 +286,9 @@ Provide an authorized user with a durable review queue for findings not
 observed in comparable scans, then allow an explicit retain, suppress/archive
 or restore decision with a reason and durable history. The integrated local
 increment supplies the read-only preview and a durable, explicit review queue
-with keep-active/reopen notes. Suppress/archive/restore dispositions and
-reappearance handling remain open; this does not close PB-1.3 as a whole.
+with keep-active/reopen notes, plus reviewed native suppression/clear and safe
+source archive/restore/purge handling. Consolidation, source-payload publication,
+additional mappings and automatic reconciliation remain open; PB-1.3 is partial.
 
 **Acceptance criteria**
 
@@ -286,7 +298,7 @@ reappearance handling remain open; this does not close PB-1.3 as a whole.
   not mutate the finding.
 - Keep-active and reopen decisions are attributed, version-fenced and
   append-only.
-- Only an explicit future suppression/archive/restore design may change
+- Only an explicit reviewed suppression or archive/restore operation may change
   disposition, with stable identity and durable rationale.
 - Reappearance updates observation history and surfaces the prior review or
   suppression.

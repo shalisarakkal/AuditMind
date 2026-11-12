@@ -1,8 +1,8 @@
 # Imported finding suppression and clear: release review
 
 11 November 2026. PB-1.3 bounded disposition increment, migration 0050.
-Implementation commit: `f26bc63`.
-Implementation is under final acceptance. This is not production, customer-pilot,
+Implementation commit: `f26bc63`; retained-source correction: `6ed32a4`.
+Local activation and all four hosted jobs are verified for `cc1ca17`. This is not production, customer-pilot,
 SaaS-capacity or live-inference approval. See the validation record below for
 completed checks; earlier green runs do not certify later source changes.
 
@@ -140,3 +140,39 @@ check all queues, take a schema/data backup, apply the migration and verify
 Alembic drift before starting services. Local activation uses the existing
 isolated demo schema and preserves passwords, uploads and organization settings.
 A backup archive listing verifies readability; it is not a restore rehearsal.
+
+## Hosted delivery verification
+
+All four Linux jobs passed for `cc1ca17695fdf97b9748aac6c093ed27a4b621bb`
+in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309): full backend with required PostgreSQL and warnings as errors,
+frontend, dependency/security audit, and complete browser acceptance including
+finding workflow, evidence/scoring pilot and worker-pool recovery. This covers
+the latest source-alias correction and abort-test readiness adjustment. That run verifies the original publication. It does not cover the additional
+retained-source correction below, which requires its own exact-tip hosted result.
+The final delivery report links that run. PB-1.3 remains partial.
+
+## Retained-source correction after the initial green run
+
+A further reproduced case reapplied a standing suppression to a reviewed
+replacement, then restored the older suppressed upload. Clear preview incorrectly
+returned HTTP 200 although clearing would expose two retained payloads sharing
+one reviewed identity. It now returns 409 until the additional retained source
+is archived or the canonical conflict is resolved. This also protects a purged
+current target from silently exposing a different retained payload.
+
+After an authorized clear, source restore checks both legacy duplicates and the
+shared suppression-history identity, including reviewed source-asset aliases.
+Separate indexed EXISTS probes preserve the legacy asset/source path and sparse
+history-link path. A blocked restore keeps the reviewed payload and history.
+Three final targeted PostgreSQL cases pass, including unchanged/aliased source
+assets and the original cleared-payload restore conflict. Expanded regression
+results and the follow-up implementation commit are recorded at check-in below.
+The initial green `cc1ca17` run does not certify this later correction.
+
+Follow-up check-in: `6ed32a4` passes 120 expanded suppression, ledger, migration,
+abort and archive regressions (624.43s). Three final indexed-query cases pass
+(13.70s); they overlap the expanded set. The normal app was restarted without a
+frontend rebuild after an idle-queue check. Migration drift is clean and health,
+login and auth-options return HTTP 200. The correction needs its own exact-tip
+hosted run; final delivery links that result rather than treating the earlier
+`cc1ca17` run as proof of later source changes.

@@ -3,15 +3,19 @@
 ## Imported finding suppression and clear - 11 November 2026
 
 The end-to-end native Nessus disposition increment is implemented locally at
-migration 0050 and under final acceptance. It adds authorized preview/suppress/
+migration 0050 and reviewed for delivery. It adds authorized preview/suppress/
 clear, atomic visibility/count/scoring/cache publication, durable reappearance
 review, source-retention/restore protection and guarded UI. Fresh uploads never
 inherit trusted identity bindings. Generic sources remain ineligible.
 Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
 backend focus: 46 tests passed. The full backend run passed 1,765 tests with
 one setup-readiness timeout under migration/test load. All 51 combined
-regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
-The new exact-SHA hosted result remains pending the authorized push.
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally;
+health/login/auth-options return 200.
+All four hosted Linux jobs passed for `cc1ca17` in [run 43125422309](https://github.com/shalisarakkal/AuditMind/actions/runs/43125422309).
+The later retained-source correction `6ed32a4` passes 120 expanded regressions
+and three final indexed-query cases. Its own exact-tip CI is checked at delivery;
+the earlier green run does not certify that later change.
 [Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
 
 ## Prior absence-review delivery - 11 November 2026
