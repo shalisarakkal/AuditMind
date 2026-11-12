@@ -7,6 +7,10 @@ prerequisite for future consolidation, not an automatic merge or deduplication.
 Finding totals, workflow, scoring decisions, source ownership and reports are
 unchanged. The UI states this before confirmation.
 
+The next [consolidation/publication proposal](REVIEWED_FINDING_PUBLICATION_DESIGN.md)
+uses a fresh designation as one admission input to a separate operation. No new
+consolidation or publication authority is added to this existing designation API.
+
 ## Review contract
 
 1. Both observations must have current administrator-reviewed bindings to the
@@ -159,3 +163,11 @@ canonical consolidation is claimed.
 Next implementation gates remain physical/logical consolidation semantics,
 latest-source payload publication, not-observed review and independent suppression
 lifecycle. See [reconciliation design](FINDING_RECONCILIATION_DESIGN.md).
+
+## 12 November 2026: PB-1.3 read-only foundation
+
+Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
+An administrator-only preview validates current pair prerequisites in a read-only
+snapshot. No consolidation writes, visibility changes or new UI actions are enabled.
+Current membership/dependencies, proof, lifecycle and consumer integration remain
+pending before publication. Validation and API details: [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md).

@@ -28,6 +28,13 @@ separate. PB-1.4 organization-managed asset context follows this work.
 [release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
 [verification steps](EVIDENCE_USER_VERIFICATION.md) define the delivered scope.
 
+## Next bounded design
+
+[Reviewed consolidation and payload publication](REVIEWED_FINDING_PUBLICATION_DESIGN.md)
+now specifies the proposed stages, field ownership, proof dependencies, lifecycle
+blocks, undo semantics and acceptance cases. This proposal does not implement or
+authorize an automatic merge, and does not change the delivered APIs above.
+
 ## Historical baseline and proposal
 
 The remaining analysis predates these increments. Its matching/archive behavior
@@ -156,3 +163,11 @@ atomic history; existing score/report invariants; browser permissions and recove
 Approval of these functional rules does not mean implementation is complete. No
 automatic reconciliation, individual imported archive or new absence flag exists
 yet. Live inference and production release remain outside this approval.
+
+## 12 November 2026: PB-1.3 read-only foundation
+
+Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
+An administrator-only preview validates current pair prerequisites in a read-only
+snapshot. No consolidation writes, visibility changes or new UI actions are enabled.
+Current membership/dependencies, proof, lifecycle and consumer integration remain
+pending before publication. Validation and API details: [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md).

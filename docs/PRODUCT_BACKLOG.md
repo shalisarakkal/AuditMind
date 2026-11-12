@@ -1,5 +1,20 @@
 # AuditMind Product Backlog
 
+## Next PB-1.3 design prepared - 11 November 2026
+
+The [reviewed consolidation/publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md) is prepared for review, not implemented
+or enabled. Recommended stage A is reversible native Nessus pair consolidation
+with pristine-alias and explicit proof/lifecycle guards. Stage B separately
+publishes a reviewed observation onto its own non-consolidated finding; group
+publication remains later work. No physical source/history movement, automatic
+matching, workflow overwrite or inherited approval is proposed.
+
+First implementation target: stage A schema/admission/preview and receipt
+foundation; writes remain unavailable until visibility, proof, lifecycle,
+consumer invalidation and guarded UI are complete. No migration, app setting or
+running data was changed by preparing this design.
+
+
 ## Current delivery - 11 November 2026
 
 Committed application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
@@ -674,3 +689,24 @@ Every implementation item must include, as applicable:
 - Documentation of feature flags/defaults, rollout, rollback, and limitations.
 - Verification against the exact requested behavior; mocks are not evidence of
   real-provider quality or production capacity.
+
+## 12 November 2026: PB-1.3 read-only foundation
+
+Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
+An administrator-only preview validates current pair prerequisites in a read-only
+snapshot. No consolidation writes, visibility changes or new UI actions are enabled.
+Current membership/dependencies, proof, lifecycle and consumer integration remain
+pending before publication. Validation and API details: [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md).
+
+Membership/dependency follow-up: `0052` reserves tenant/generation-scoped member
+and retained source-reference tables. Read-only previews include bounded dependency
+counts and a diagnostic fingerprint. No writer, visibility integration or lifecycle
+guard is enabled. All 90 PostgreSQL regression tests passed; migration parity and
+the high-severity security gate passed. Local activation is tracked in the foundation review.
+
+Strong pre-commit review (12 November): full backend 1,820 passed; final affected
+suite 49 passed; frontend 578 passed; Chrome workflow 103 checks passed; isolated
+build/TypeScript/lint and security gates passed. Review fixed preview pool
+exhaustion, malformed manifest admission and excessive-offset validation. See
+the consolidation foundation review for overlapping scopes and performance limits.
+The foundation remains read-only; hosted CI must pass for the pushed checkpoint.

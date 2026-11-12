@@ -28,11 +28,15 @@ Documentation closeout reconciles CI/source/lifecycle records and checked links.
 The baseline above identifies the delivered application code; this closeout
 changes documentation only.
 
-1. Prepare a bounded PB-1.3 design for reviewed consolidation and source-payload
-   publication: define stable identity, canonical ownership, preservation of
-   workflow/proof, source provenance, conflict rules, atomic effects and rollback.
-2. Implement the reviewed increment with regression/Chrome checks and exact-SHA
-   CI when instructed. Canonical designation alone is not a record merge.
+1. Check in the reviewed [read-only foundation](CONSOLIDATION_FOUNDATION_REVIEW.md)
+   and verify hosted Linux CI for the pushed checkpoint. Implementation `9380668`
+   delivers schema, pair preview, reserved membership/dependencies and source manifests;
+   it does not consolidate findings or publish payloads.
+2. Next implement atomic membership/dependency publication, visibility and revision
+   invalidation across consumers, group-aware proof, source lifecycle safeguards
+   and guarded UI under the [staged design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
+   Writes remain unavailable until those paths and authorization/conflict guards
+   are coherent and regression/Chrome/exact-tip CI checks pass.
 3. Continue PB-1.4 organization-managed asset ownership/environment/criticality,
    followed by PB-1.5 versioned controls and finding mappings.
 
@@ -59,3 +63,24 @@ No new implementation is authorized by this documentation update.
 Use [PRODUCT_BACKLOG.md](PRODUCT_BACKLOG.md) for acceptance criteria and
 [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for ordering. This status update does not
 close every Product Phase 4 item or confer pilot/production approval.
+
+## 12 November 2026: PB-1.3 read-only foundation
+
+Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
+An administrator-only preview validates current pair prerequisites in a read-only
+snapshot. No consolidation writes, visibility changes or new UI actions are enabled.
+Current membership/dependencies, proof, lifecycle and consumer integration remain
+pending before publication. Validation and API details: [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md).
+
+Membership/dependency follow-up: `0052` reserves tenant/generation-scoped member
+and retained source-reference tables. Read-only previews include bounded dependency
+counts and a diagnostic fingerprint. No writer, visibility integration or lifecycle
+guard is enabled. All 90 PostgreSQL regression tests passed; migration parity and
+the high-severity security gate passed. Local activation is tracked in the foundation review.
+
+Strong pre-commit review (12 November): full backend 1,820 passed; final affected
+suite 49 passed; frontend 578 passed; Chrome workflow 103 checks passed; isolated
+build/TypeScript/lint and security gates passed. Review fixed preview pool
+exhaustion, malformed manifest admission and excessive-offset validation. See
+the consolidation foundation review for overlapping scopes and performance limits.
+The foundation remains read-only; hosted CI must pass for the pushed checkpoint.

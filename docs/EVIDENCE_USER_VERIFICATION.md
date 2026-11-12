@@ -654,3 +654,16 @@ and stale-version conflicts still apply. Two reviewers editing the same version
 must still receive a conflict on the stale save, even if its content matches the
 new server version. Approved records remain protected from editing; returning a
 revoked/conflicting record to draft remains an explicit state change.
+
+## 12 November 2026: PB-1.3 read-only foundation
+
+Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
+An administrator-only preview validates current pair prerequisites in a read-only
+snapshot. No consolidation writes, visibility changes or new UI actions are enabled.
+Current membership/dependencies, proof, lifecycle and consumer integration remain
+pending before publication. Validation and API details: [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md).
+
+The membership/dependency follow-up is also API-only: an eligible admin preview
+returns `dependency_summary` with source-type counts and a deterministic fingerprint.
+A blocked preview returns no usable manifest. This is diagnostic: `apply_available`
+remains false, and there is no Apply/Undo control to exercise in Chrome yet.
