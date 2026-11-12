@@ -222,12 +222,14 @@ def _create_rule_based_test_report(
     counts: scoring_service.SeverityCounts = {}
     severity_totals = {severity.value: 0 for severity in Severity}
     for domain, severity, count in db.query(Finding.domain, Finding.severity, func.count()).filter(
-        *finding_filters, Finding.suppression_id.is_(None)
+        *finding_filters, Finding.suppression_id.is_(None), Finding.consolidation_alias_id.is_(None)
     ).group_by(Finding.domain, Finding.severity):
         counts.setdefault(domain, {})[severity] = count
         severity_totals[severity.value] += count
 
     counts, status_policy = status_scoring.apply_policy(db, org_id, counts, filters=finding_filters, capture_basis=True)
+    if status_policy.get('all_consolidated_aliases'):
+        raise ValueError('Not assessed: this scope contains only retained consolidation aliases; include the canonical findings')
     if status_policy['not_assessed']:
         raise ValueError("Not assessed: all findings in this scope are suppressed; no numeric report was created" if status_policy.get("all_suppressed") else "Not assessed: verified exclusions leave no current-risk findings; no numeric report was created")
     domain_scores = scoring_service.score_all_from_counts(counts)

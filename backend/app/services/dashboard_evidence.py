@@ -35,6 +35,11 @@ def finding_source(db: Session, org_id: uuid.UUID, source_id: uuid.UUID, *, lock
         "id", "org_id", "asset_id", "scan_id", "domain", "severity", "category",
         "description", "source", "raw_data", "event_count", "first_seen", "last_seen")}
     snapshot["binding_version"] = "dashboard-finding-v1"
+    if finding.consolidation_history_id:
+        from app.services.consolidation_visibility import revision
+        snapshot.update(binding_version='dashboard-consolidated-finding-v1',
+            consolidation_id=finding.consolidation_id, consolidation_history_id=finding.consolidation_history_id,
+            consolidation_revision=revision(db,org_id))
     return finding, source_hash(snapshot)
 
 
@@ -91,6 +96,10 @@ def inventory_progress(db: Session, org_id: uuid.UUID):
     started = time.monotonic()
     yield {"type": "progress", "phase": "counting", "processed": 0, "total": None, "elapsed_seconds": 0}
     digest = hashlib.sha256(f"{SCOPE_VERSION}:{org_id}".encode())
+    from app.services.consolidation_visibility import revision
+    consolidation_revision = revision(db,org_id)
+    if consolidation_revision:
+        digest.update(f':consolidation:{consolidation_revision}'.encode())
     assets = findings = 0
     asset_columns = (Asset.id, Asset.type, Asset.subtype, Asset.type_known, Asset.hostname,
         Asset.ip, Asset.cloud_id, Asset.environment, Asset.criticality, Asset.tags, Asset.details)

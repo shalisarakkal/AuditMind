@@ -506,9 +506,9 @@ class _Runner:
                 duplicates += self.db.execute(
                     text(
                         "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
-                        "AND f.suppression_history_id IS NULL AND f.suppression_id IS NULL AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
+                        "AND f.consolidation_history_id IS NULL AND f.suppression_history_id IS NULL AND f.suppression_id IS NULL AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
                         " AND EXISTS (SELECT 1 FROM findings g WHERE g.org_id = f.org_id "
-                        "AND g.archived_at IS NULL AND g.suppression_id IS NULL AND g.source = f.source AND " + identity + ")"
+                        "AND g.archived_at IS NULL AND g.suppression_id IS NULL AND g.consolidation_alias_id IS NULL AND g.source = f.source AND " + identity + ")"
                     ),
                     params,
                 ).rowcount
@@ -616,13 +616,13 @@ def _check_suppression_restore_conflict(db, org_id, batch_id, identifiers=None):
     from sqlalchemy.orm import aliased
     old, active = aliased(Finding), aliased(Finding)
     conditions = [old.org_id == org_id, old.archive_batch_id == batch_id,
-        old.archived_at.is_not(None), old.suppression_history_id.is_not(None), old.suppression_id.is_(None)]
+        old.archived_at.is_not(None), old.suppression_history_id.is_not(None), old.consolidation_history_id.is_(None), old.suppression_id.is_(None)]
     if identifiers is not None: conditions.append(old.id.in_(identifiers))
     legacy_identity = and_(active.source.is_not_distinct_from(old.source), active.asset_id.is_not_distinct_from(old.asset_id),
         active.category.is_not_distinct_from(old.category),
         or_(old.category.is_not(None), active.description.is_not_distinct_from(old.description)))
     visible = (active.org_id == old.org_id, active.id != old.id,
-        active.archived_at.is_(None), active.suppression_id.is_(None))
+        active.archived_at.is_(None), active.suppression_id.is_(None), active.consolidation_alias_id.is_(None))
     # Separate probes retain the legacy asset/source access path and the new
     # sparse history-link index, instead of widening one large OR scan.
     same_review = select(active.id).where(*visible,

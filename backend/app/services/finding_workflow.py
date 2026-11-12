@@ -91,7 +91,7 @@ def update_workflows(db, org_id, membership, targets, patch):
     ids = sorted((t.finding_id for t in targets), key=str)
     rows = db.scalars(select(Finding).where(Finding.org_id == org_id, Finding.id.in_(ids))
         .order_by(Finding.id).with_for_update(key_share=True).execution_options(populate_existing=True)).all()
-    if len(rows) != len(ids) or any(f.archived_at or f.suppression_id for f in rows):
+    if len(rows) != len(ids) or any(f.archived_at or f.suppression_id or f.consolidation_alias_id for f in rows):
         raise HTTPException(404, "Finding not found or unavailable")
     affected = {identifier for f in rows for identifier in (f.id, f.asset_id, f.scan_id) if identifier}
     if db.scalar(select(ArchiveBatch.id).where(ArchiveBatch.org_id == org_id,

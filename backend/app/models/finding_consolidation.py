@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base_class import Base
@@ -120,3 +120,9 @@ class FindingConsolidationDependency(Base):
     resource_kind: Mapped[str] = mapped_column(String(24), nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     resource_version: Mapped[int | None] = mapped_column(Integer)
+
+
+class OrganizationConsolidationRevision(Base):
+    __tablename__ = "organization_consolidation_revisions"
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")

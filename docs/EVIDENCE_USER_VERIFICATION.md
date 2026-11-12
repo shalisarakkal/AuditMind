@@ -667,3 +667,14 @@ The membership/dependency follow-up is also API-only: an eligible admin preview
 returns `dependency_summary` with source-type counts and a deterministic fingerprint.
 A blocked preview returns no usable manifest. This is diagnostic: `apply_available`
 remains false, and there is no Apply/Undo control to exercise in Chrome yet.
+
+
+## Consolidation visibility integration: internal validation only
+
+The current local increment has no Apply/Undo button and publication remains
+disabled. Do not attempt to activate it by changing a setting. Automated tests
+simulate an admitted pair and check one visible canonical finding, retained
+source rows, atomic totals/evidence invalidation and safe undo/retries. Browser
+acceptance of publication belongs to the later guarded UI increment. Migration
+`0053` is not applied to the normal application database and requires coordinated
+activation. See [visibility integration](CONSOLIDATION_VISIBILITY.md).

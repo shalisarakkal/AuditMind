@@ -251,7 +251,8 @@ def capture_inventory(org_id: uuid.UUID, db: Session) -> dict:
                 Finding.active(),Finding.severity==severity,status_scoring.eligible_exclusion().is_not(True))
                 .order_by(Finding.created_at.desc(),Finding.id).limit(TOP_FINDINGS-len(risk_top)).all())
     from app.services.finding_suppressions import revision as suppression_revision
-    return {"suppression_revision": suppression_revision(db, org_id), "counts": {d.value: {s.value: n for s, n in values.items()} for d, values in counts.items()},
+    from app.services.consolidation_visibility import revision as consolidation_revision
+    return {"consolidation_revision":consolidation_revision(db,org_id), "suppression_revision": suppression_revision(db, org_id), "counts": {d.value: {s.value: n for s, n in values.items()} for d, values in counts.items()},
             "risk_policy_stamp":risk_policy_stamp(db,org_id),"risk_excluded_count":risk_policy['excluded_findings'],
             "risk_top_findings":[FindingRead.model_validate(f).model_dump(mode='json') for f in risk_top],
             "asset_count": asset_count, "top_findings": [FindingRead.model_validate(f).model_dump(mode="json") for f in top],

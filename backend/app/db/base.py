@@ -16,7 +16,7 @@ from app.models.finding_observation import FindingObservation
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.finding_consolidation import (FindingConsolidation, FindingConsolidationDecision,
-    FindingConsolidationMember, FindingConsolidationDependency)
+    FindingConsolidationMember, FindingConsolidationDependency, OrganizationConsolidationRevision)
 from app.models.finding_absence_review import (
     FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
 )
@@ -71,6 +71,7 @@ __all__ = [
     "FindingConsolidationDecision",
     "FindingConsolidationMember",
     "FindingConsolidationDependency",
+    "OrganizationConsolidationRevision",
     "FindingAbsenceReviewBatch",
     "FindingAbsenceReviewItem",
     "FindingAbsenceReviewDecision",

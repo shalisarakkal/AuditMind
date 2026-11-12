@@ -187,3 +187,24 @@ build/TypeScript/lint and security gates passed. Review fixed preview pool
 exhaustion, malformed manifest admission and excessive-offset validation. See
 the consolidation foundation review for overlapping scopes and performance limits.
 The foundation remains read-only; hosted CI must pass for the pushed checkpoint.
+
+
+## Migration 0053: internal consolidation visibility (not activated)
+
+Findings gain nullable `consolidation_id` (current group),
+`consolidation_alias_id` (hidden alias only) and `consolidation_history_id`
+(retained history marker). Each has a deferred composite `(org_id, group_id)`
+foreign key to `finding_consolidations` and a tenant-leading partial index.
+The alias check requires matching non-null current/history links. Undo clears
+current/alias links, preserving history. Source/observation/workflow ownership
+is unchanged. `Finding.active()` also requires a null alias link; 28 matching
+partial indexes are rebuilt by the migration.
+
+`organization_consolidation_revisions` stores one monotonic bigint revision per
+organization. Visibility and revision/cache invalidation share the caller's
+transaction; undo increments rather than resets the revision. Positive revisions
+also prevent destructive schema downgrade after source cleanup.
+
+Production publication remains disabled. The normal application database is
+still at the preceding schema for this increment; coordinated activation is
+required. See [visibility contract and rollout](docs/CONSOLIDATION_VISIBILITY.md).

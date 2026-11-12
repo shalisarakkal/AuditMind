@@ -59,7 +59,7 @@ def eligible_exclusion(instant=None):
     status_changed=exists(select(FindingHistory.id).where(FindingHistory.org_id==Finding.org_id,
         FindingHistory.finding_id==Finding.id,FindingHistory.version>Finding.risk_verified_workflow_version,
         FindingHistory.before['status'].astext.is_distinct_from(FindingHistory.after['status'].astext))).correlate(Finding)
-    return and_(Finding.risk_verification_state=='approved',Finding.workflow_status.in_(('resolved','false_positive')),
+    return and_(Finding.consolidation_id.is_(None), Finding.risk_verification_state=='approved',Finding.workflow_status.in_(('resolved','false_positive')),
         Finding.risk_verified_workflow_version<=Finding.workflow_version,~status_changed,
         Finding.risk_verified_at<=instant,Finding.risk_verification_expires_at>instant,
         Finding.risk_verified_observation_count==observation_count(),
@@ -84,13 +84,16 @@ def apply_policy(db,org_id,counts,*,filters=(),source_current=True,capture_basis
             excluded[severity.value]=excluded.get(severity.value,0)+count
     suppressed = db.scalar(select(func.count()).select_from(Finding).where(Finding.org_id == org_id,
         Finding.archived_at.is_(None), Finding.suppression_id.is_not(None), *filters)) or 0
+    aliases = db.scalar(select(func.count()).select_from(Finding).where(Finding.org_id == org_id,
+        Finding.archived_at.is_(None), Finding.suppression_id.is_(None), Finding.consolidation_alias_id.is_not(None), *filters)) or 0
     total=sum(sum(values.values()) for values in counts.values())
     risk=sum(sum(values.values()) for values in adjusted.values())
-    metadata={**config.model_dump(), 'recorded_findings':total+suppressed,'active_findings':total,'suppressed_findings':suppressed,'current_risk_findings':risk,
+    metadata={**config.model_dump(), 'recorded_findings':total+suppressed+aliases,'consolidated_alias_findings':aliases,'active_findings':total,'suppressed_findings':suppressed,'current_risk_findings':risk,
         'excluded_findings':total-risk,'excluded_by_severity':excluded,
         'exclusions_deferred':config.enabled and not source_current,
-        'not_assessed':(config.enabled and total>0 and risk==0 and total-risk>0) or (suppressed>0 and total==0),
+        'not_assessed':(config.enabled and total>0 and risk==0 and total-risk>0) or (suppressed>0 and total==0) or (aliases>0 and total==0),
         'all_suppressed':suppressed>0 and total==0,
+        'all_consolidated_aliases':aliases>0 and total==0,
         'mitigated_treatment':'full_risk_until_residual_policy_approved'}
     if capture_basis:
         # Keep saved context bounded even when many findings are verified.
@@ -113,6 +116,14 @@ def apply_policy(db,org_id,counts,*,filters=(),source_current=True,capture_basis
             .join(FindingSuppression, and_(FindingSuppression.id == Finding.suppression_id,
                 FindingSuppression.org_id == Finding.org_id)).where(Finding.org_id == org_id,
                 Finding.archived_at.is_(None), *filters).order_by(Finding.id).limit(100)).all() if suppressed else []
+        from app.models.finding_consolidation import FindingConsolidation
+        groups = db.execute(select(FindingConsolidation.id,FindingConsolidation.version,
+            FindingConsolidation.canonical_finding_id,Finding.id).join(Finding,
+                and_(Finding.consolidation_alias_id==FindingConsolidation.id,Finding.org_id==FindingConsolidation.org_id))
+            .where(Finding.org_id==org_id,Finding.archived_at.is_(None),*filters).order_by(Finding.id).limit(100)).all() if aliases else []
+        metadata['consolidation_policy_version']='reviewed-pair-visibility-v1'
+        metadata['consolidation_basis']=[dict(group_id=str(r[0]),version=r[1],canonical_finding_id=str(r[2]),alias_finding_id=str(r[3])) for r in groups]
+        metadata['consolidation_basis_truncated']=aliases>len(groups)
         metadata['suppression_policy_version'] = 'reviewed-suppression-v1'
         metadata['suppression_basis'] = [dict(finding_id=str(r[0]), suppression_id=str(r[1]), version=r[2]) for r in hidden]
         metadata['suppression_basis_truncated'] = suppressed > len(hidden)

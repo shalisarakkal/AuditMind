@@ -2868,3 +2868,22 @@ Local transaction verification: 82 broader regression/performance checks and
 31 final unit/transaction checks passed (overlapping scopes); high-severity
 static gate passed. No normal data publication, migration or restart occurred.
 Hosted CI must be verified for the pushed transaction-component checkpoint.
+
+
+## 12 November: Stage A visibility integration (local, unpublished)
+
+The private transaction now integrates canonical/alias visibility with lists,
+counts, Dashboard snapshots, scoring/report inputs and atomic revision
+invalidation. Both source/history rows remain retained. Publication is still
+unconditionally disabled: group-aware proof, lifecycle/reappearance, final
+policy/Activity and guarded UI gates remain. PB-1.3 is not closed. Migration
+`0053` requires coordinated activation and rebuilds 28 partial indexes; it has
+not been applied to the normal application database. Scope, validation and
+rollout limits: [visibility integration](docs/CONSOLIDATION_VISIBILITY.md).
+
+Local visibility verification completed: all 1,865 backend tests passed with
+PostgreSQL required and warnings treated as errors; isolated production build
+and all 103 existing Chromium workflow checks passed. The 100,000-finding count
+plan retained its covering index; high-severity static and whitespace gates
+passed. No normal-data migration, restart or publication occurred. This local
+result does not replace hosted CI for a subsequent committed checkpoint.

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -22,27 +23,33 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 from app.db.list_sort import severity_rank_index, SHORT_FINDING_TEXT, LONG_FINDING_TEXT
 from app.db.types import str_enum
-ACTIVE = text("archived_at IS NULL AND suppression_id IS NULL")
-SHORT_FINDING_TEXT = text(str(SHORT_FINDING_TEXT) + " AND suppression_id IS NULL")
-LONG_FINDING_TEXT = text(str(LONG_FINDING_TEXT) + " AND suppression_id IS NULL")
+ACTIVE = text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL")
+SHORT_FINDING_TEXT = text(str(SHORT_FINDING_TEXT) + " AND suppression_id IS NULL AND consolidation_alias_id IS NULL")
+LONG_FINDING_TEXT = text(str(LONG_FINDING_TEXT) + " AND suppression_id IS NULL AND consolidation_alias_id IS NULL")
 from app.models.enums import Domain, Severity
 
 class Finding(Base):
     __tablename__ = "findings"
     __table_args__ = (
+        *[ForeignKeyConstraint(['org_id', column], ['finding_consolidations.org_id', 'finding_consolidations.id'],
+            name='fk_findings_'+column, deferrable=True, initially='DEFERRED')
+          for column in ('consolidation_id', 'consolidation_alias_id', 'consolidation_history_id')],
+        CheckConstraint("consolidation_alias_id IS NULL OR (consolidation_id IS NOT NULL AND consolidation_history_id IS NOT NULL AND consolidation_alias_id = consolidation_id AND consolidation_history_id = consolidation_id)", name="ck_finding_consolidation_alias"),
+        *[Index('ix_findings_'+column, 'org_id', column, postgresql_where=text(column+' IS NOT NULL'))
+          for column in ('consolidation_id', 'consolidation_alias_id', 'consolidation_history_id')],
         Index("ix_findings_suppressed_org", "org_id", "suppression_id", "created_at",
             postgresql_where=text("archived_at IS NULL AND suppression_id IS NOT NULL")),
         Index("ix_findings_suppression_history", "suppression_history_id", postgresql_where=text("suppression_history_id IS NOT NULL")),
         Index("ix_findings_suppression_link", "suppression_id", postgresql_where=text("suppression_id IS NOT NULL")),
         Index("ix_findings_risk_verified", "org_id", "domain", "severity", "risk_verification_expires_at",
-            postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND risk_verification_state='approved'")),
+            postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL AND risk_verification_state='approved'")),
         Index("ix_findings_active_domain_page", "org_id", "domain", severity_rank_index(),
               text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE),
         *[Index(f"ix_findings_active_{field}_group_page", "org_id", field, "severity",
                 text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE)
           for field in ("workflow_status", "assignee_id")],
-        Index("ix_findings_active_due_presence", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND (due_date IS NOT NULL OR due_expires_at IS NOT NULL)")),
-        Index("ix_findings_active_review_presence", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND (risk_review_date IS NOT NULL OR risk_review_expires_at IS NOT NULL)")),
+        Index("ix_findings_active_due_presence", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL AND (due_date IS NOT NULL OR due_expires_at IS NOT NULL)")),
+        Index("ix_findings_active_review_presence", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL AND (risk_review_date IS NOT NULL OR risk_review_expires_at IS NOT NULL)")),
         *[Index(f"ix_findings_active_{field}_{direction}_page", "org_id",
                 text(f"lower({field}) {direction.upper()} NULLS LAST"), severity_rank_index(),
                 text("created_at DESC NULLS LAST"), "id", postgresql_where=ACTIVE)
@@ -72,8 +79,8 @@ class Finding(Base):
         Index("ix_findings_active_assignee", "assignee_id", postgresql_where=ACTIVE),
         *[Index(f"ix_findings_active_org_{column}", "org_id", column, postgresql_where=ACTIVE)
           for column in ("source", "workflow_status", "assignee_id", "scan_id")],
-        Index("ix_findings_active_due_search", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND due_date IS NOT NULL")),
-        Index("ix_findings_active_review_search", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND risk_review_date IS NOT NULL")),
+        Index("ix_findings_active_due_search", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL AND due_date IS NOT NULL")),
+        Index("ix_findings_active_review_search", "org_id", postgresql_where=text("archived_at IS NULL AND suppression_id IS NULL AND consolidation_alias_id IS NULL AND risk_review_date IS NOT NULL")),
         *[Index(f"ix_findings_{column}_trgm", column, postgresql_using="gin",
                 postgresql_ops={column: "gin_trgm_ops"}, postgresql_where=ACTIVE)
           for column in ("description", "category", "source")],
@@ -83,7 +90,13 @@ class Finding(Base):
 
     @classmethod
     def active(cls):
-        return and_(cls.archived_at.is_(None), cls.suppression_id.is_(None))
+        return and_(cls.archived_at.is_(None), cls.suppression_id.is_(None), cls.consolidation_alias_id.is_(None))
+
+    # Current group links are separate from source ownership and suppression.
+    # Undo clears current links; the durable history marker is retained.
+    consolidation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    consolidation_alias_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    consolidation_history_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     suppression_history_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True),
         ForeignKey("finding_suppressions.id", name="fk_findings_suppression_history", deferrable=True, initially="DEFERRED"))

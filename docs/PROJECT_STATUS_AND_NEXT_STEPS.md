@@ -1,6 +1,6 @@
 # Project status and next steps
 
-Updated 11 November 2026 against the delivered application and exact-SHA hosted
+Updated 12 November 2026 against the delivered application and exact-SHA hosted
 results. This replaces the pre-implementation assessment; its historical text is
 retained in [the e4c7488 version](https://github.com/shalisarakkal/AuditMind/blob/e4c7488/docs/PROJECT_STATUS_AND_NEXT_STEPS.md).
 
@@ -8,7 +8,7 @@ retained in [the e4c7488 version](https://github.com/shalisarakkal/AuditMind/blo
 
 | Scope | Verified status |
 | --- | --- |
-| Committed application | `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`; all four hosted Linux jobs passed in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993) |
+| Committed application | `1d5c86b3c23daef284a0d3bb41b17109304fdbd5`; all four hosted Linux jobs passed in [run 43292318027](https://github.com/shalisarakkal/AuditMind/actions/runs/43292318027). The uncommitted visibility integration is not covered by this hosted result. |
 | Suppression/retained-source delivery | `f97a4fbf29a728a45087f03d8dabf6ea21950d4b`; all four jobs passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797) |
 | Recorded local schema | 0050, activated with clean drift; the draft-save fix required no migration |
 | Suppression availability | Authorized native Nessus preview/suppress/clear APIs and guarded UI are delivered; current independent identity reviews are required |
@@ -98,3 +98,22 @@ Local transaction verification: 82 broader regression/performance checks and
 31 final unit/transaction checks passed (overlapping scopes); high-severity
 static gate passed. No normal data publication, migration or restart occurred.
 Hosted CI must be verified for the pushed transaction-component checkpoint.
+
+
+## 12 November: Stage A visibility integration (local, unpublished)
+
+The private transaction now integrates canonical/alias visibility with lists,
+counts, Dashboard snapshots, scoring/report inputs and atomic revision
+invalidation. Both source/history rows remain retained. Publication is still
+unconditionally disabled: group-aware proof, lifecycle/reappearance, final
+policy/Activity and guarded UI gates remain. PB-1.3 is not closed. Migration
+`0053` requires coordinated activation and rebuilds 28 partial indexes; it has
+not been applied to the normal application database. Scope, validation and
+rollout limits: [visibility integration](CONSOLIDATION_VISIBILITY.md).
+
+Local visibility verification completed: all 1,865 backend tests passed with
+PostgreSQL required and warnings treated as errors; isolated production build
+and all 103 existing Chromium workflow checks passed. The 100,000-finding count
+plan retained its covering index; high-severity static and whitespace gates
+passed. No normal-data migration, restart or publication occurred. This local
+result does not replace hosted CI for a subsequent committed checkpoint.

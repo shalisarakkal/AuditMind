@@ -100,3 +100,10 @@ required for this internal-only component.
 
 See [foundation review](CONSOLIDATION_FOUNDATION_REVIEW.md) and
 [the staged design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
+
+
+Subsequent internal integration: [visibility/count/scoring changes](CONSOLIDATION_VISIBILITY.md).
+The metadata-only primitive retains its original behavior; the new private
+wrapper adds atomic visibility effects. Neither is exposed as publication.
+The transaction checkpoint `1d5c86b` passed all four hosted Linux jobs in
+[run 43292318027](https://github.com/shalisarakkal/AuditMind/actions/runs/43292318027).
