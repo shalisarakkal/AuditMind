@@ -1,5 +1,37 @@
 # AuditMind Product Backlog
 
+## Imported finding suppression and clear - 11 November 2026
+
+The end-to-end native Nessus disposition increment is implemented locally at
+migration 0050 and under final acceptance. It adds authorized preview/suppress/
+clear, atomic visibility/count/scoring/cache publication, durable reappearance
+review, source-retention/restore protection and guarded UI. Fresh uploads never
+inherit trusted identity bindings. Generic sources remain ineligible.
+Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
+backend focus: 46 tests passed. The full backend run passed 1,765 tests with
+one setup-readiness timeout under migration/test load. All 51 combined
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
+The new exact-SHA hosted result remains pending the authorized push.
+[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+
+## Prior absence-review delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 was active at that checkpoint; current migration is 0050. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 This backlog turns the [product roadmap](PRODUCT_ROADMAP.md) into candidate,
 testable work items. It is grouped by product phase and ordered within each
 phase. It is not a delivery commitment; confirm scope and release gates before
@@ -48,7 +80,7 @@ before changing contracts.
 **Status, 8 November:** Complete as checklist/ownership reconciliation. The
 project owner/user confirmed ownership of release approval and of engineering,
 operations and security. Operational release gates remain open; this is not release
-approval. [Current gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
+approval. [Current gate checklist](RELEASE_READINESS.md#baseline-and-operational-gates).
 
 **Priority:** P0 · **Depends on:** none
 
@@ -206,7 +238,7 @@ hosted Linux jobs passed on `d06d31e` in
 the new isolated real-Chrome walkthrough passed two scenarios
 (candidate shown when eligible; candidates withheld when current identity
 review is revoked). Durable absence
-dispositions, consolidation, source publication and suppression remain open;
+dispositions that change finding visibility, consolidation, source publication and suppression remain open;
 PB-1.3 is not closed by these review increments.
 
 **Identity foundation:** Versioned candidate-key logic, reviewed native Nessus
@@ -224,7 +256,7 @@ summaries. Full local backend 1,723 and frontend 567 tests, 99 Chrome checks,
 builds and security checks pass. Activated at 0049 after idle checks; hosted CI
 is verified on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
 
-**Status, 8 November:** The durable absence-review queue is implemented locally
+**Historical checkpoint, 8 November (superseded by verified delivery above):** The durable absence-review queue is implemented locally
 on the PB-1.3 feature branch. Migration 0049 stores candidate/context snapshots
 without source-row foreign keys; organization members can page/read, and admins
 or auditors can explicitly save candidates and append version-fenced keep-active

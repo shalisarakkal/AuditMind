@@ -400,3 +400,15 @@ blocks are added. Existing textual tier labels remain; color is not the sole cue
 Scores and thresholds are unchanged. Evidence coverage/confidence remain separate;
 unscored report domains stay neutral. Downloaded templates are unchanged.
 
+
+
+## Reviewed suppression dialogs
+
+Use the same inspection/operation footer hierarchy and busy dismissal guard.
+Suppressed findings is inspection (**Close**); Suppress/Clear is a named operation
+(**Cancel**, followed by filled-cyan primary). Show the frozen Finding ID, current
+status, native identity, rationale and explicit acknowledgment. Ambiguity is a
+blocking explanation, not permission to guess. Stale previews retain the draft
+and require reload; unknown outcomes retry the identical request. No Close/Cancel
+text implies reversal of a committed decision. Long scanner/target labels wrap
+at 320px. Individual row actions stay disabled while bulk selection is active.

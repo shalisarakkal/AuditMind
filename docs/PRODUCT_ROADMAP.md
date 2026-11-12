@@ -1,5 +1,38 @@
 # AuditMind Product Roadmap
 
+## Imported finding suppression and clear - 11 November 2026
+
+The end-to-end native Nessus disposition increment is implemented locally at
+migration 0050 and under final acceptance. It adds authorized preview/suppress/
+clear, atomic visibility/count/scoring/cache publication, durable reappearance
+review, source-retention/restore protection and guarded UI. Fresh uploads never
+inherit trusted identity bindings. Generic sources remain ineligible.
+Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
+backend focus: 46 tests passed. The full backend run passed 1,765 tests with
+one setup-readiness timeout under migration/test load. All 51 combined
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
+The new exact-SHA hosted result remains pending the authorized push.
+[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+
+
+## Prior absence-review delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 was active at that checkpoint; current migration is 0050. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 11 November local integration: the authorized durable absence-review queue
 from the second worktree is now included with review corrections. It records
 historical keep-active/reopen notes without changing findings or scores;
@@ -16,9 +49,7 @@ evidence-backed cyber resilience workflow: teams can trust what a report says,
 decide what to do next, assign the work, and verify that risk was reduced.
 
 This is a product direction, not a claim that the capabilities below are
-implemented or approved for release. The last committed code increment is
-delivered through `d06d31e` and all four exact-SHA hosted Linux CI jobs passed
-in [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). Pilot and production acceptance remain
+implemented or approved for release. The latest delivered code and exact-SHA hosted results are recorded above. Pilot and production acceptance remain
 separate open decisions. See [release readiness](RELEASE_READINESS.md) and
 [Phase 4 status](PHASE4_STATUS.md) for the code-backed project state.
 The [product backlog](PRODUCT_BACKLOG.md) breaks the phases into ordered
@@ -30,13 +61,16 @@ PB-1.3 has shipped the [stable identity foundation](FINDING_IDENTITY.md),
 [cross-import review](CROSS_IMPORT_IDENTITY_REVIEW.md), and
 [canonical designation](CANONICAL_FINDING_REVIEW.md). A bounded,
 non-persisted absence-candidate preview is also delivered through `d06d31e`. These are
-explicit review tools; they do not enable automatic merging, payload refresh,
-durable absence decisions or suppression. All four hosted jobs passed for
+explicit review tools; the delivered durable queue adds versioned keep-active/
+reopen notes. They do not enable automatic merging, payload refresh, disposition
+changes or suppression. All four hosted jobs passed for
 feature SHA `f31bb25`
 ([run 60](https://github.com/shalisarakkal/AuditMind/actions/runs/42492464513)).
 The remaining reconciliation lifecycle is still open.
 
-**Recommended next decision:** resume PB-0.2 and approve a bounded pilot contract.
+**Deferred decision:** resume PB-0.2 and approve a bounded pilot contract when
+the project owner resumes that gate. Current work continues the bounded PB-1.3
+suppression/restore implementation and acceptance.
 The gate remains deferred until the project owner selects audience, environment,
 data, workflows, operating/support boundaries and acceptance criteria. The
 [release checklist](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate)
@@ -67,7 +101,7 @@ the project owner/user holds release approval and engineering/operations/securit
 ownership. PB-0.3 passed the isolated synthetic recovery rehearsal. PB-0.2 remains
 user-deferred; its decision checklist is explicit, but the contract has not been
 approved. Production acceptance gates remain open.
-See [current release gates](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026)
+See [current release gates](RELEASE_READINESS.md#baseline-and-operational-gates)
 and [recovery evidence](RECOVERY_REHEARSAL.md). P0 is not wholly closed.
 
 **Outcome:** The existing product is a reliable baseline for a limited, clearly
@@ -146,8 +180,8 @@ Deliver:
 
 - A remediation record linked to the finding, affected asset, evidence, and
   control; keep remediation state distinct from the scanner's finding state.
-- A small, explicit lifecycle such as **Open → Triaged → In progress → Pending
-  verification → Resolved**, with a reopen path when new evidence shows the
+- A small, explicit lifecycle such as **Open â†’ Triaged â†’ In progress â†’ Pending
+  verification â†’ Resolved**, with a reopen path when new evidence shows the
   issue persists or returns.
 - Owner, due date, notes, timestamps, and a complete change history.
 - Time-bounded risk acceptance with a justification, approver, review/expiry
@@ -284,8 +318,8 @@ with users before broadening it.
   of compliance.
 - **No unvalidated scale claims:** load, concurrency, and production readiness
   require their own measured acceptance.
-- **Build the closed loop first:** provenance → prioritization → ownership →
-  remediation → verification → trend.
+- **Build the closed loop first:** provenance â†’ prioritization â†’ ownership â†’
+  remediation â†’ verification â†’ trend.
 
 ## How to maintain this roadmap
 

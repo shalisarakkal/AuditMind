@@ -995,3 +995,55 @@ or affect scores. New uploads require separate review; generated profiles and
 generic CSV/JSON do not obtain native identity merely by claiming Nessus source.
 See [identity rules](FINDING_IDENTITY.md) and
 [Chrome verification steps](EVIDENCE_USER_VERIFICATION.md#reviewed-finding-identity-pb-13-local-increment-7-november-2026).
+
+
+## Imported finding suppression and clear
+
+Available with migration 0050 and the matching application build. This is a
+visibility decision, not a remediation status or verification approval. Manual
+finding Archive remains unchanged. Supported scope is native Nessus findings;
+a generic CSV/JSON source label of Nessus is not sufficient.
+
+1. An organization admin opens the finding's Workflow, then source observations,
+   registers/reviews the scanner and canonical asset mapping for every retained
+   observation. Suppression supports 1?1000 independently reviewed observations
+   that resolve to one current native plugin/port/protocol identity. Unbound,
+   stale, revoked or conflicting identities block the action with an explanation.
+2. Clear any row selection. On Findings, choose the row's **Suppress** action.
+   An admin or auditor reviews the current target, workflow status and native
+   identity, enters a rationale and acknowledges the visibility consequences.
+3. Choose **Suppress finding**. It leaves active lists, facets, top issues and
+   new finding-risk/report inputs. Workflow fields and saved reports remain.
+   The retained payload is not archived or deleted by suppression.
+4. Open **Suppressed findings** to inspect the state, Finding ID and attributed
+   decision history. All organization members can read; admins can choose
+   **Clear suppression** with a new rationale and confirmation. Use All/Cleared
+   to inspect cleared records. Clearing is not history deletion.
+
+A retained finding returns under its original workflow/scoring policy when
+cleared. An archived payload remains archived and requires its separate source
+restore. A purged payload cannot be recreated by clearing. Potential active
+canonical/source duplicates block restoration until reviewed; source restore
+must not silently delete a previously reviewed payload or introduce a duplicate.
+
+New uploads never inherit trusted bindings. A new unreviewed occurrence remains
+active even when its source resembles a suppressed identity. Possible-reappearance
+history records the same captured source asset/native material, not proof of the
+same scanner or a pending workflow resolution. Changed/ambiguous asset identity
+never inherits suppression by hostname or text. After explicit fresh review and
+source/canonical conflict resolution, an eligible replacement can use the standing
+identity. Its newly reviewed source context becomes the basis for future possible
+reappearance receipts. Source purge retains the minimal registry, rationale and
+history; organization deletion removes the organization-owned ledger.
+
+During saving, Cancel and Escape are blocked. After a conflict, the rationale
+remains but the preview must be reloaded. If the response is lost, **Retry same
+request** confirms the original operation without creating a second decision.
+Closing an unknown-outcome dialog never undoes an operation that completed.
+
+Suppressed counts are shown separately from verified scoring exclusions in both
+Dashboard views and new report provenance. An all-suppressed finding scope is
+Not assessed, not a healthy score of 100. Saved Dashboard data captured before a
+disposition change is withheld while a coalesced current refresh runs; an import
+or other organization job can delay that refresh. No AI call is made by these
+actions. [Technical contract and validation](SUPPRESSION_RELEASE_REVIEW.md).

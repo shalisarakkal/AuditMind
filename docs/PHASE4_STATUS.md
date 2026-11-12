@@ -1,5 +1,37 @@
 # Phase 4 status and next milestone
 
+## Imported finding suppression and clear - 11 November 2026
+
+The end-to-end native Nessus disposition increment is implemented locally at
+migration 0050 and under final acceptance. It adds authorized preview/suppress/
+clear, atomic visibility/count/scoring/cache publication, durable reappearance
+review, source-retention/restore protection and guarded UI. Fresh uploads never
+inherit trusted identity bindings. Generic sources remain ineligible.
+Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
+backend focus: 46 tests passed. The full backend run passed 1,765 tests with
+one setup-readiness timeout under migration/test load. All 51 combined
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
+The new exact-SHA hosted result remains pending the authorized push.
+[Current contract, review and acceptance](SUPPRESSION_RELEASE_REVIEW.md).
+
+## Prior absence-review delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 was active at that checkpoint; current migration is 0050. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 Current local increment (11 November): migration 0049 durable absence review,
 integrated from both authorized worktrees with stale-context, submission and
 concurrency corrections, and activated locally. It stores review history only.
@@ -8,7 +40,7 @@ Chrome checks, plus builds/security. The delivery handoff verifies hosted CI
 for the exact pushed SHA; the older green runs below cover earlier commits.
 [Integration review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
 
-Latest shipped increment: the bounded, read-only absence-candidate preview
+Preceding shipped increment: the bounded, read-only absence-candidate preview
 through `d06d31e`. All four exact-SHA hosted Linux jobs passed in
 [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). No durable absence decision,
 workflow change, suppression or automatic reconciliation is authorized by this
@@ -89,7 +121,7 @@ historical backfill. [Contract and verification](FINDING_OBSERVATIONS.md);
 broader pilot/production rollout remain pending.
 
 Current release decisions and open evidence requirements are consolidated in the
-[8 November release-gate checklist](RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
+[8 November release-gate checklist](RELEASE_READINESS.md#baseline-and-operational-gates).
 The project owner/user confirmed execution and approval ownership; release-gate
 sign-offs remain open. Dated entries below retain their
 checkpoint context; older pending/launch statements do not supersede that list.
@@ -162,7 +194,7 @@ original-predicate rechecks and ordinary-scan fallback for estimated common
 type/tag searches. 69 focused PostgreSQL checks, five final strategy/index checks,
 schema drift/readiness and signed-in Chrome pass. Source counts and account/
 Platform-setting digests match. Only the API was restarted. No-match query:
-6.5 s → 50 ms; Chrome including debounce: 487 ms. Broad tag/type result sets still
+6.5 s â†’ 50 ms; Chrome including debounce: 487 ms. Broad tag/type result sets still
 take seconds, and extra write/disk cost is measured rather than assumed away.
 Implementation is reviewed and recorded in scoped commits; benchmark tools and
 documentation are separate. Current strict PostgreSQL regression: 70 passed in
@@ -510,7 +542,7 @@ require rebind/review. Qualified scoring remains off/unavailable; automatic
 Dashboard integration and broader rollout/performance gates remain pending.
 See [measurement detail](EVIDENCE_EVALUATION_PERFORMANCE.md).
 
-Reviewer preview is now available locally at Settings → Scoring and evidence
+Reviewer preview is now available locally at Settings â†’ Scoring and evidence
 review. It supports current-policy objectives, validated source bindings,
 inventory-bound drafts, saved-version approval/conflict/revocation, and explicit
 eligibility evaluation. Non-admin members are read-only. The demo was idle before
@@ -690,7 +722,7 @@ below is historical, not rerun for this UI-only change. [Acceptance](PHASE4_VALI
 Local changes remain uncommitted/unpushed; hosted CI has not run this tree.
 
 Latest platform branding: platform-admin-only sidebar product size under Platform
-→ Product branding, Small/Medium/Large; authenticated readers use it platform-wide.
+â†’ Product branding, Small/Medium/Large; authenticated readers use it platform-wide.
 Sign-in/company branding unchanged. 406 frontend and 54 focused backend/migration/
 platform checks and 55 Chrome executions passed, plus lint/build. Uses existing platform_settings; no new
 migration (head 0028). [Current evidence](PHASE4_VALIDATION.md). Uncommitted/unpushed.

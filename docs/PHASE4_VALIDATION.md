@@ -1,11 +1,56 @@
 # Phase 4 remediation workflow validation
 
+## Suppression increment - 11 November 2026
+
+Native reviewed suppression/clear is active locally at migration 0050.
+Final frontend acceptance passes 576 tests, lint and production build. Rebuilt
+Chrome passes 103 checks. Post-review backend acceptance passes 51 combined
+suppression/ledger/migration/abort tests plus the final isolated abort rerun.
+The full backend run passed 1,765 with one abort-test setup timeout under heavy
+migration/test load; its readiness budget was corrected without changing abort
+assertions. Exact-source full hosted CI is tracked in
+[the release review](SUPPRESSION_RELEASE_REVIEW.md). Counts overlap.
+This supersedes earlier 0049-only implementation status; older checkpoints remain
+historical. Evidence qualification settings and worker capacity are unchanged.
+
+
+## Suppression ledger foundation - 11 November 2026
+
+Local preparatory migration 0050, read-only tenant APIs and internal ledger
+repository are implemented. Broader PostgreSQL regression: 174 passed in
+346.25s. After review reproduced/fixed a platform-scoring lock namespace
+collision, final ledger/migration validation: 25 passed in 45.39s. Runs overlap.
+Independent writers, idempotent/conflicting retries, savepoint rollback,
+source/actor retention, tenant foreign keys, bounded queries and migration parity
+are covered. High-severity Bandit and dependency consistency pass. No UI,
+publication/scoring/lifecycle integration, activation, full-suite acceptance,
+commit or hosted run is claimed. See [foundation scope and evidence](IMPORTED_FINDING_SUPPRESSION.md#foundation-implementation).
+
+
+## Verified delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 is active locally. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 The newest PB-1.3 verification sections are at the top. Older dated checkpoints
 below preserve the status and test evidence as it stood at that time; their
 "pending" items do not supersede the
 [current release/readiness status](RELEASE_READINESS.md).
 
-## Hosted browser setup follow-up - 11 November 2026
+## Historical hosted browser setup attempt - 11 November 2026
 
 For `c6a3328`, hosted backend, frontend and dependency/security jobs passed;
 Chromium installation failed before application build or browser tests in

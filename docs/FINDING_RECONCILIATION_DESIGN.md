@@ -1,5 +1,13 @@
 # Individual imported-finding archive and scan reconciliation
 
+Current supported suppression/clear behavior and limits: [release review](SUPPRESSION_RELEASE_REVIEW.md).
+The dated proposal/baseline sections below are historical where superseded.
+
+Current delivery and exact-SHA CI: [release review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
+The next bounded implementation contract is [suppression and restore](IMPORTED_FINDING_SUPPRESSION.md).
+The dated baseline analysis below preserves earlier behavior, not a claim that
+PB-1.1 observations or the durable queue remain absent.
+
 11 November local integration: the authorized durable absence-review queue
 from the second worktree is now included with review corrections. It records
 historical keep-active/reopen notes without changing findings or scores;
@@ -43,7 +51,7 @@ candidate/context snapshots. Keep-active and reopen decisions are append-only
 review history only; they do not change existing import matching, finding state
 or archive ownership.
 
-Status (8 November 2026): identity/review foundations are implemented through
+Historical checkpoint (8 November 2026; superseded by current delivery): identity/review foundations are implemented through
 migrations 0046-0048 and hosted CI is green for those commits. The bounded
 absence-candidate preview and migration 0049 durable queue are implemented
 locally. The focused PostgreSQL scan-snapshot suite passes 47 tests, and the
@@ -60,7 +68,7 @@ report snapshots. Absence requires comparable complete scans and explicit review
 ambiguous identity is ineligible. Absence never automatically resolves or archives
 a finding.
 
-## Existing Settings/import behavior reviewed
+## Historical Settings/import baseline reviewed
 
 The organization override `asset_existing_strategy` takes precedence over global
 `ASSET_EXISTING_STRATEGY` (default update). Settings labels correspond to the

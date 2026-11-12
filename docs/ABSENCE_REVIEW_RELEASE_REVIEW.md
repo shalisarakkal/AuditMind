@@ -1,5 +1,23 @@
 # Durable absence review integration - 11 November 2026
 
+## Verified delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 is active locally. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 ## Integrated scope
 
 The user authorized review and inclusion of both worktrees. The durable-review

@@ -8,8 +8,10 @@ separate known risk from qualified coverage. Migration 0045 is required.
 
 Finding identity: [native Nessus candidates and reviewed bindings](docs/FINDING_IDENTITY.md)
 add explicit organization-admin tool/asset review at migration 0046. New uploads
-never inherit bindings automatically. Canonical conflict resolution, absence
-reconciliation and imported-finding suppression remain future work.
+never inherit bindings automatically. Reviewed canonical designation and the
+durable absence queue are delivered. The [suppression/clear increment](docs/SUPPRESSION_RELEASE_REVIEW.md)
+is under final local acceptance; consolidation and automatic reconciliation remain
+future work.
 
 Optional [stored Dashboard snapshots](docs/DASHBOARD_SNAPSHOTS.md) provide
 scheduled background refresh and a per-organization Refresh dashboard action,

@@ -1,7 +1,9 @@
 # Security hardening — 28 October 2026
 
 Scoped local application hardening, not production certification. SaaS-scale
-testing remains on hold and scoring default-off. No tenant settings, credentials,
+testing remains on hold and evidence-qualified scoring default-off.
+Status-aware current-risk scoring is a separate default-On policy; see
+[its approved contract](STATUS_AWARE_SCORING.md). No tenant settings, credentials,
 OS ACLs or provider consent changed. No new dependency or migration is needed.
 
 ## Implemented boundaries

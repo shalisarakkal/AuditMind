@@ -1,5 +1,28 @@
 # Data Model – AI Cyber Resilience Auditor
 
+## Reviewed imported-finding disposition (0050)
+
+`finding_suppressions` owns a versioned identity-scoped registry and minimal
+current source context/label. `finding_suppression_decisions` is an attributed,
+append-only application ledger with organization/request idempotency and a
+composite tenant ownership foreign key. Historical finding/observation UUIDs
+have no source-row cascading ownership. Actor deletion nulls only actor links;
+organization deletion removes its registry/history.
+
+`findings.suppression_id` independently controls active visibility;
+`suppression_history_id` preserves prior review/restore protection after clearing.
+Both reference the registry with deferred no-action constraints: a retained
+source prevents accidental registry deletion, while organization cascades can
+remove the entire graph without intermediate visibility updates. Active Findings
+partial indexes include both archive and suppression predicates.
+
+`finding_suppression_reappearances` retains possible source/native-material
+matches without authorizing suppression or copying a trusted identity binding.
+`organization_suppression_revisions` fences saved Dashboard captures. Disposition,
+ledger/activity, list/evidence revision and coalesced Dashboard invalidation
+commit atomically. [Contract and delivery evidence](docs/SUPPRESSION_RELEASE_REVIEW.md).
+
+
 Dashboard evidence pilot (migrations 0029–0031): `organization_scoring_settings`
 holds a default-false enablement flag and expected version;
 `domain_evidence_qualifications` holds one source-/inventory-bound versioned review

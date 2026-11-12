@@ -1,22 +1,33 @@
 # Release readiness and code review
 
-11 November local integration: the authorized durable absence-review queue
-from the second worktree is now included with review corrections. It records
-historical keep-active/reopen notes without changing findings or scores;
-local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
-checks, builds/security), and the app is active at 0049. Hosted CI is verified
-on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
-This supersedes earlier statements that this feature is excluded; older dated
-test/CI results remain historical.
+## Current suppression increment - 11 November 2026
 
-## Current release-gate checklist - 8 November 2026
+Trusted native Nessus suppression/clear, atomic visibility and risk integration,
+source-lifecycle safeguards and guarded UI actions are implemented under final
+acceptance. See [the current review and test record](SUPPRESSION_RELEASE_REVIEW.md).
+The new exact-SHA hosted result will be recorded after the authorized push.
+PB-1.3 remains partial: consolidation, source-payload publication, additional
+identity mappings and automatic reconciliation are separate work.
 
-This is the current PB-0.1 reconciliation. Checkpoints below retain their original
+### Prior delivered absence-review baseline
+
+The durable absence-review queue is delivered on `main` through
+`60d957b4f9f03383e797a26677e31fb60fce2077`. All four hosted Linux jobs passed in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714).
+That baseline passed 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 was active before the current suppression increment. The queue
+records historical review decisions; it alone does not suppress findings.
+CI uses preinstalled stable Chrome on Ubuntu 24.04. This is engineering evidence,
+not pilot, production, live-AI or SaaS-load acceptance.
+
+## Current release-gate checklist - 11 November 2026
+
+This is the current PB-0.1 reconciliation; dated baseline evidence remains below. Checkpoints below retain their original
 dates; old statements such as "not pushed", "frontend stopped" or "CI pending"
 do not override this section. Implementation, hosted CI, customer acceptance and
 production approval are separate decisions.
 
-**Latest committed baseline:**
+**Prior 8 November baseline (superseded by verified delivery above):**
 `d06d31ee956194bbfcd3eb93e931d8c4ebd63747` on `main`. The read-only
 absence-candidate preview and browser alignment passed all four exact-SHA hosted
 Linux jobs in [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560). The canonical-selection implementation is
@@ -53,7 +64,7 @@ not a failed test or automatically part of the next release.
 
 | Gate | Status | Execution owner / approval authority (roles held by project owner) | Required evidence and next action |
 | --- | --- | --- | --- |
-| G-01: reviewed code and correctness CI | Preview verified for `d06d31e`; durable-review local gates passed; exact-SHA hosted result checked at delivery | Engineering / project release owner | Exact-SHA run 42529240560 passed all four jobs; runs 60 and 61 verify the preceding canonical increment. The canonical increment also passed the post-fix local suite above. CI is not production sign-off; repeat for subsequent code changes. |
+| G-01: reviewed code and correctness CI | `60d957b` verified; new suppression increment under final local acceptance | Engineering / project release owner | [Prior exact-SHA CI](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714); complete [current suppression review](SUPPRESSION_RELEASE_REVIEW.md), publish scoped commits and verify every job for the new exact SHA. CI is not production sign-off. |
 | G-02: release acceptance | Open | Project release owner / project release owner | Ownership is confirmed. Record release scope, risk dispositions and the release decision. The 23 October local-testing sign-off does not approve production. |
 | G-03: backup, restore and worker recovery | Local rehearsal verified; intended-deployment acceptance open | Operations with engineering support / project release owner | PB-0.3 passed ten synthetic operational checks plus five unit checks, using separate source/restore databases in a disposable cluster. Exact table/file checks, migration compatibility and real interrupted-job recovery pass. Select/validate actual deployment backup, secrets/roles, scale and approved recovery goals. [Evidence](RECOVERY_REHEARSAL.md). |
 | G-04: deployment and migration operations | Open; target undecided | Operations / project release owner | Select hosting/runtime identities; validate migrations, rollback, readiness and startup on the intended target. No hosting resource is selected or deployed here. |
@@ -78,7 +89,7 @@ gates when the capability enters the agreed release scope.
 | Broader evidence-qualified scoring | Deferred; default-off retained | Product acceptance owner and evidence reviewer / authorized org admin plus release owner for broader rollout | Representative real-evidence review, workload acceptance and explicit rollout decision. Software tests do not establish evidence quality or default-on approval. |
 | Live AI/provider/model acceptance | Not approved | Engineering and security / release owner and authorized org approver | Separate account/model, pricing/budget, context/output-quality, data-processing and consent acceptance. No inference/provider change is authorized here. See PHASE3_CLOSURE.md and PHASE3_OPERATIONS.md. |
 | SaaS/parallel-worker rollout | Held; normal local operation is one slot | Engineering and operations / project release owner | Validate platform controls, representative cross-tenant load, resource bounds and recovery. Two-slot tests do not prove 32/1,000-job capacity. See WORKER_POOL.md and SAAS_JOB_SCALING.md. |
-| Imported-finding identity and reconciliation | Partial; reviewed bindings, cross-import review, reversible canonical designation and the shipped read-only absence-candidate preview; durable lifecycle open | Engineering and product acceptance owner / project release owner | A preview candidate is not an absence conclusion. Do not claim automatic merging, payload publication, durable absence decisions or suppression. Complete the separate lifecycle gates before including those unshipped reconciliation behaviors in a pilot. See FINDING_RECONCILIATION_DESIGN.md. |
+| Imported-finding identity and reconciliation | Partial: reviewed identities, canonical designation and durable queue delivered; native suppression/clear implemented locally under final acceptance | Engineering and product acceptance owner / project release owner | Complete [suppression acceptance](SUPPRESSION_RELEASE_REVIEW.md); consolidation, payload publication, additional mappings and automatic reconciliation remain separate. No preview, declaration or verification note alone grants identity authority. |
 | Short-character index implementation | User-deferred, 5 November | Engineering / product acceptance owner | Retain current search behavior. Reconsider only with an accepted write-cost budget and measured design gates. |
 | Docker/container staging and persistent model cache | User-deferred Future scope | Operations and engineering / project release owner | Resume if that deployment scope is selected. Local tests do not close container acceptance. |
 
@@ -605,7 +616,7 @@ with 29 tables; Alembic drift check clean and repeated upgrade a no-op.
 | Priority | Evidence | Required action |
 | --- | --- | --- |
 | P1 | Production dependency audit finds three high-severity packages: Next 16.3.6, sharp 0.35.4, source-map-js 1.2.1. Package exposure is not a demonstrated application exploit. | Select compatible patched versions, update lockfile, rerun audit/tests/lint/build and Chrome regression. |
-| P1 | `report_ai_service.generate_ai_audit_snapshot`'s `authorize_attempt` checks target/consent, not live cancellation/status. A mock-only reproduction authorized another attempt after cancellation and failed status. Worker publication checks prevent saving, not another potentially billable retry. | Reload and verify job organization, running status and cancellation before every attempt/reservation. Test timeout → cancel → retry: no second request/reservation. An issued request can still finish. |
+| P1 | `report_ai_service.generate_ai_audit_snapshot`'s `authorize_attempt` checks target/consent, not live cancellation/status. A mock-only reproduction authorized another attempt after cancellation and failed status. Worker publication checks prevent saving, not another potentially billable retry. | Reload and verify job organization, running status and cancellation before every attempt/reservation. Test timeout â†’ cancel â†’ retry: no second request/reservation. An issued request can still finish. |
 | P2 | `GenerateReportModal` submits only title/frameworks; API date filtering exists but users cannot select a period. | Add accessible date controls, propagation and regression tests. Dates select active findings created within inclusive UTC dates; inventory is current, not historical. |
 | P2 | Direct Anthropic `estimate_cost_usd` matches model families to legacy fixed rates, rather than verified model-specific prices. | Verify configured model/prices before live use. Estimated ledger limits are not authoritative billing ceilings. OpenRouter separately uses explicit caps and reported costs. |
 | P2 hardening | Finding sample count is bounded but description bytes/tokens are not explicitly bounded before prompt construction. | Define deterministic context budgets and recorded omissions; test oversized input. No oversized-input exploit was performed. |

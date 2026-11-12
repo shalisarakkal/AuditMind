@@ -305,3 +305,43 @@ must show Not assessed with no numeric score or risk tier. Counts remain zero.
 Existing layout is preserved. Reload and check a second organization to confirm
 tenant isolation. Populated organizations keep their previous baseline scores;
 asset-only/partial coverage is not qualified evidence and remains a separate task.
+
+
+## Migration 0050: reviewed native suppression and clear
+
+Use an isolated test organization and native Nessus test file. Do not use
+production evidence to create test mutations. Requires the matching backend,
+worker and frontend build after migration 0050 activation.
+
+1. Import native Nessus and review every retained observation's scanner/canonical
+   asset identity as an organization admin. A generic source label, declaration
+   or verification note must not bypass this review.
+2. Record the Finding ID, workflow/history, filtered list total and Dashboard
+   baseline. Open row Suppress, verify that it names the exact target/status/
+   plugin/service, and try submitting without rationale or acknowledgment: blocked.
+3. Submit with both. Confirm the row/filtered total/facets/top issues exclude it,
+   workflow fields are preserved and Dashboard reports the suppressed count apart
+   from verified exclusions. While the saved Dashboard refresh is queued/running,
+   it must not display an older score as current. Existing reports are unchanged.
+4. Open Suppressed findings, inspect decision actor/rationale/time, reload and
+   confirm persistence. At 320px, long labels/tool names and the footer must wrap
+   without horizontal overflow; keyboard focus/Cancel remain visible.
+5. As viewer/auditor, inspect history but verify Clear suppression is unavailable
+   and the clear API refuses the role. An auditor may suppress eligible records;
+   only an admin may clear. A different organization cannot read or mutate these IDs.
+6. As admin, clear the retained record and verify active counts/risk return under
+   the existing policy. Archived parents stay archived; purged payloads are not
+   recreated. A duplicate/source conflict must explain why restore is blocked.
+7. Use two sessions: save one decision, then submit the other's old preview.
+   Expect a conflict with its rationale retained and no second effect. During a
+   deliberately delayed save, Cancel/Escape/inputs must be disabled.
+8. Reimport a similar source. New unreviewed data stays visible; possible
+   reappearance history does not grant a trusted mapping or resolution. Source
+   purge retains the historical decision. Fresh explicit mapping/reapply updates
+   the current source context; different service/asset/namespace does not inherit it.
+9. For an isolated transport test, drop/replace the response after a committed
+   decision and retry. Exactly one durable decision must exist for the request ID.
+   No action claims a submitted operation was cancelled by closing its dialog.
+
+These are feature checks, not pilot, production, model-quality or SaaS acceptance.
+See [release review](SUPPRESSION_RELEASE_REVIEW.md) for automated evidence.

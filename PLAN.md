@@ -1,8 +1,40 @@
 # AuditMind AI — Delivery Plan
 
+## Imported finding suppression and clear - 11 November 2026
+
+The end-to-end native Nessus disposition increment is implemented locally at
+migration 0050 and under final acceptance. It adds authorized preview/suppress/
+clear, atomic visibility/count/scoring/cache publication, durable reappearance
+review, source-retention/restore protection and guarded UI. Fresh uploads never
+inherit trusted identity bindings. Generic sources remain ineligible.
+Final frontend: 576 tests; final rebuilt Chrome: 103 checks; post-review
+backend focus: 46 tests passed. The full backend run passed 1,765 tests with
+one setup-readiness timeout under migration/test load. All 51 combined
+regressions and the final isolated abort rerun pass after review. Migration 0050 is active locally; health/login/auth-options return 200.
+The new exact-SHA hosted result remains pending the authorized push.
+[Current contract, review and acceptance](docs/SUPPRESSION_RELEASE_REVIEW.md).
+
+## Prior absence-review delivery - 11 November 2026
+
+The durable absence-review queue is delivered on `main` through `60d957b`.
+All four hosted Linux jobs passed for exact commit
+`60d957b4f9f03383e797a26677e31fb60fce2077` in
+[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
+and browser acceptance (including evidence/scoring and worker recovery).
+Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
+Migration 0049 was active at that checkpoint; current migration is 0050. CI uses preinstalled stable Chrome on Ubuntu
+24.04; the earlier Chromium installer failure did not recur on this path.
+This supersedes older pending/unmerged queue statements; dated checkpoints
+remain historical. It does not approve a pilot, production deployment or SaaS load.
+
+Next: [imported-finding suppression and restore design](docs/IMPORTED_FINDING_SUPPRESSION.md).
+Suppression, restore, reappearance handling, consolidation and payload publication
+are not delivered by the review queue. PB-1.3 remains open.
+
+
 Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (section 9).
 
-## Hosted browser setup hardening - 11 November 2026
+## Historical hosted browser setup attempt - 11 November 2026
 
 - First hosted run for `c6a3328` passed backend, frontend and security; browser
   installation failed before build/tests. Retain that failed-run evidence in
@@ -363,7 +395,7 @@ Tracks progress against the roadmap in `Blueprint.md` / `Architecture.md` (secti
 
 - [x] Consolidate current technical evidence, open operational gates, approval
   boundaries and user-deferred features in the existing authoritative
-  [release-readiness checklist](docs/RELEASE_READINESS.md#current-release-gate-checklist---8-november-2026).
+  [release-readiness checklist](docs/RELEASE_READINESS.md#baseline-and-operational-gates).
   Preserve historical delivery records under an explicit historical heading.
 - [x] PB-0.1 owner assignment confirmed on 5 November: the project owner/user
   self-assigned release approval and engineering, operations and security roles.
@@ -436,7 +468,7 @@ the next active increment. See `docs/PHASE4_STATUS.md` for the current handoff.
 
 - [x] Subsequent Assets index prototype and local trial (0037): immutable
   text-only candidate representation, original matching recheck and planner/tag
-  frequency guard. No-match query: 6.5 s → 50 ms. Chrome: 487 ms including debounce;
+  frequency guard. No-match query: 6.5 s â†’ 50 ms. Chrome: 487 ms including debounce;
   general hostname search: 222 ms for 1,000 exact matches. 69 PostgreSQL checks,
   final binding regression, readiness, drift and Chrome checks pass.
   Additional full-size index: about 287 MiB. Import write-cost measurements and
@@ -515,7 +547,7 @@ the next active increment. See `docs/PHASE4_STATUS.md` for the current handoff.
   indexes in migration 0033. Exact scores, totals and snapshot semantics retained.
 - [x] 48 focused PostgreSQL/migration/scoring/evidence tests pass. Applied to idle
   local demo without API/worker restart; counts and account/settings digests match.
-  Repeat count samples: findings 1,911 → 476 ms, assets 997 → 555 ms. Cache-sensitive
+  Repeat count samples: findings 1,911 â†’ 476 ms, assets 997 â†’ 555 ms. Cache-sensitive
   local observations, not an endpoint/load guarantee. Scoring stays off; one slot.
 - [x] Normal frontend launch and signed-in Chrome verification completed.
 - [x] Review/check in count-index increment (`4cce614`); hosted CI passed.
@@ -885,7 +917,7 @@ frontend (carried over from Phase 1).
 Split into **2a (backend)** and **2b (frontend)**, plus **2c (import
 profiles)**, added after 2a/2b were built. There is a single check-in: Phase 2
 is marked complete only after 2a, 2b and 2c are done and tested.
-Built with the feature-dev workflow (explore → clarify → design → implement →
+Built with the feature-dev workflow (explore â†’ clarify â†’ design â†’ implement â†’
 review).
 
 ### Phase 2a — Backend
@@ -933,8 +965,8 @@ sync and background paths, a defusedxml Nessus parser, and per-org settings.
       Import, Findings grouped by domain + Upload (CSV/JSON/.nessus); large
       uploads poll the scan; per-row report panel; Import/Upload hidden for
       viewers
-- [x] Settings → Ingestion: per-org overrides (admins edit/reset; others
-      read-only), incl. the org's own Nessus family → domain mappings
+- [x] Settings â†’ Ingestion: per-org overrides (admins edit/reset; others
+      read-only), incl. the org's own Nessus family â†’ domain mappings
 - [x] Tests: Vitest + Testing Library, 45 tests (API client, auth/org
       context, guard, org picker, import button incl. background polling,
       report panel, settings panel, login/register, pages incl. viewer role);
@@ -1528,7 +1560,7 @@ After the review (requested 2026-09-30):
       waiting for it or cut off by it reads "Interrupted: the background
       worker stopped." plus what happens when it's back (waiting: starts;
       an upload cut off: starts again from the beginning; an archive job
-      cut off: carries on where it left off). Shown in violet with ⚠ (the
+      cut off: carries on where it left off). Shown in violet with âš  (the
       card, its sidebar entry and the sidebar alert), so it stands out from
       running (cyan), failed (red) and report warnings (amber); rule in
       docs/UI_CONVENTIONS.md)
@@ -2396,7 +2428,7 @@ HTML/PDF snapshots; security hardening (rate limiting, audit logging, secrets ha
   - [x] File upload: drag/drop and multiple files with individual source choices,
     cancellation, errors and reports (up to 20 queued cards).
   - [x] Product logo (sidebar, login/register and browser tab).
-    Platform → Product branding offers platform-admin-only sidebar size choices
+    Platform â†’ Product branding offers platform-admin-only sidebar size choices
     Small 144×40 / Medium 180×48 (default) / Large 192×64; versioned/audited storage
     uses existing platform_settings. Authentication/company branding is unchanged.
   - [x] Shared Show/Hide password control across login/register, change-password
@@ -2639,7 +2671,7 @@ lint and isolated production build passed. No backend contract changed.
 - [x] Draft evidence-qualified dashboard contract using existing report profiles.
 - [x] Approve qualification contract, admin reviewer authority, organization-wide
   scope and maximum 90-day policy (27 October 2026), with a temporary per-org
-  Settings → Scoring switch, off by default. Global default/switch removal needs
+  Settings â†’ Scoring switch, off by default. Global default/switch removal needs
   later explicit approval after pilot confidence.
 - [x] Implement/review/test qualified domain and partial-overall scoring locally
   behind the approved default-off setting; production/default-on rollout remains separate.
