@@ -221,3 +221,12 @@ build passed. The follow-up commit requires its own green hosted run before data
 Normal data remains on 0052. The owner selected maintenance immediately after
 CI passes; backup and migrations 0053 through 0055 must precede application
 restart, with consolidation still off by default.
+
+
+The narrower 374px hosted check also exposed existing Settings text overflow;
+the page now permits word wrapping across all sections. Diagnostic bounds exclude
+content intentionally clipped by a horizontal table scroller, so a future
+failure identifies page overflow rather than normal wide-table contents.
+
+The page-level wrapping follow-up passed the full 106-check local Chrome run,
+isolated build and lint. The initial Linux backend job passed all 1,910 tests.

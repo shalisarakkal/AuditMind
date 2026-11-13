@@ -423,8 +423,8 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     for(const width of [374,390]) {
       await p.setViewportSize({width,height:844});
       const layout=await p.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,
-        overflowing:[...document.querySelectorAll('main *')].filter(el=>el.getBoundingClientRect().right>innerWidth+0.5)
-          .slice(0,12).map(el=>({tag:el.tagName,text:el.textContent?.slice(0,100),right:el.getBoundingClientRect().right}))}));
+        overflowing:[...document.querySelectorAll('main *')].filter(el=>!el.closest('.overflow-x-auto')&&el.getBoundingClientRect().right>innerWidth+0.5)
+          .slice(0,12).map(el=>({tag:el.tagName,className:el.className,text:el.textContent?.slice(0,100),right:el.getBoundingClientRect().right}))}));
       assert(layout.width<=layout.viewport,`Settings overflow at ${width}px: ${JSON.stringify(layout)}`);
     }
     await p.screenshot({path:path.join(output,'organization-logo-large-mobile.png'),fullPage:true});

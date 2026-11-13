@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const org = selectedOrg!;
 
   return (
-    <div className="min-w-0 w-full space-y-8">
+    <div className="min-w-0 w-full space-y-8 [overflow-wrap:anywhere]">
       <PageHeader title="Settings" orgName={org.name} total={undefined} noun="settings" />
       <OrganizationLogoSettings key={org.id} orgId={org.id} name={org.name} editable={org.role === "admin"} />
       <DashboardRefreshSettings key={`dashboard-refresh-${org.id}`} orgId={org.id} editable={org.role === "admin"} />
