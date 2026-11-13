@@ -1,6 +1,6 @@
 # AuditMind Product Backlog
 
-Current local work (12 November): reviewed native pair consolidation now includes group proof, lifecycle/reappearance guards and guarded UI behind a separate default-off organization opt-in. Local verification is complete; migrations `0053` through `0055` are not activated on normal data. See [release scope and validation](CONSOLIDATION_RELEASE_REVIEW.md). Earlier dated checkpoints below retain their historical scope.
+Current checkpoint (13 November): reviewed pair consolidation is pushed and Linux-verified at `427596b`. Local schema activation through `0055` and readiness checks passed; organization opt-in remains off. See [release scope and validation](CONSOLIDATION_RELEASE_REVIEW.md). Earlier dated checkpoints below retain their historical scope.
 
 ## Next PB-1.3 design prepared - 11 November 2026
 
@@ -767,3 +767,30 @@ checks passed. Retained history paging and reapply after undo are covered.
 Changes remain uncommitted; normal-data migration/restart and hosted Linux CI
 for this increment remain pending. Consolidation stays default-off. See
 [scope, measurements, activation and verification](CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+## 13 November: hosted verification and local activation complete
+
+Application commit `427596b781d278a9b65d4a8d46511662b50834ed` passed all four
+[hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43436101209):
+backend, frontend, dependency/security and browser acceptance. The hosted mobile
+Settings overflow was corrected and the 374px/390px checks remain enforced.
+
+The owner selected maintenance after CI success. Services were stopped, an
+approximately 1.74 GB custom-format `auditmind_demo` backup was created in 126.9
+seconds, and its archive listing and SHA256 were verified. Backup and manifest
+remain in the ignored local `temp/auditmind-demo/checkpoints` directory; no
+backup data or credentials are committed.
+
+Migrations `0053` through `0055` completed, including all 28 findings index
+replacements and both observation indexes. No invalid indexes or metadata drift
+remain. The maintenance script's initial Alembic version-table reflection check
+was corrected to match `demo.prepare`; this required no application/schema fix.
+The frontend was rebuilt and API/frontend/one-slot worker restarted. `/health`,
+`/ready` (database/uploads/worker) and `/login` passed. Existing accounts and
+passwords were retained. No organization is opted in and no alias was published.
+
+The application is available at http://localhost:3000/login. Enabling the
+separate organization setting and applying a reviewed pair remain explicit
+admin actions. Remaining PB-1.3 scope is unchanged: Stage B payload publication,
+additional identity mappings, larger groups and automatic reconciliation.

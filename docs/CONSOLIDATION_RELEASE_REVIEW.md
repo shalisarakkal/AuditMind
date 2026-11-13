@@ -230,3 +230,30 @@ failure identifies page overflow rather than normal wide-table contents.
 
 The page-level wrapping follow-up passed the full 106-check local Chrome run,
 isolated build and lint. The initial Linux backend job passed all 1,910 tests.
+
+
+## 13 November: hosted verification and local activation complete
+
+Application commit `427596b781d278a9b65d4a8d46511662b50834ed` passed all four
+[hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43436101209):
+backend, frontend, dependency/security and browser acceptance. The hosted mobile
+Settings overflow was corrected and the 374px/390px checks remain enforced.
+
+The owner selected maintenance after CI success. Services were stopped, an
+approximately 1.74 GB custom-format `auditmind_demo` backup was created in 126.9
+seconds, and its archive listing and SHA256 were verified. Backup and manifest
+remain in the ignored local `temp/auditmind-demo/checkpoints` directory; no
+backup data or credentials are committed.
+
+Migrations `0053` through `0055` completed, including all 28 findings index
+replacements and both observation indexes. No invalid indexes or metadata drift
+remain. The maintenance script's initial Alembic version-table reflection check
+was corrected to match `demo.prepare`; this required no application/schema fix.
+The frontend was rebuilt and API/frontend/one-slot worker restarted. `/health`,
+`/ready` (database/uploads/worker) and `/login` passed. Existing accounts and
+passwords were retained. No organization is opted in and no alias was published.
+
+The application is available at http://localhost:3000/login. Enabling the
+separate organization setting and applying a reviewed pair remain explicit
+admin actions. Remaining PB-1.3 scope is unchanged: Stage B payload publication,
+additional identity mappings, larger groups and automatic reconciliation.
