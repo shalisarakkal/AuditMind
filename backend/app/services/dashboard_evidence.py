@@ -4,7 +4,7 @@ import uuid
 import time
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, func, cast, Text
+from sqlalchemy import select, func, cast, case, Text
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
@@ -37,9 +37,14 @@ def finding_source(db: Session, org_id: uuid.UUID, source_id: uuid.UUID, *, lock
     snapshot["binding_version"] = "dashboard-finding-v1"
     if finding.consolidation_history_id:
         from app.services.consolidation_visibility import revision
-        snapshot.update(binding_version='dashboard-consolidated-finding-v1',
+        snapshot.update(binding_version='dashboard-consolidated-finding-v2',
             consolidation_id=finding.consolidation_id, consolidation_history_id=finding.consolidation_history_id,
             consolidation_revision=revision(db,org_id))
+        if finding.consolidation_id:
+            group_digest=db.scalar(select(func.am_consolidation_proof_v1(org_id,finding.consolidation_id)))
+            if group_digest is None:
+                raise EvidenceSourceError('Current consolidated source context is unavailable; undo or review its retained sources')
+            snapshot['group_source_digest']=group_digest
     return finding, source_hash(snapshot)
 
 
@@ -124,6 +129,10 @@ def inventory_progress(db: Session, org_id: uuid.UUID):
         # PostgreSQL canonical JSONB preserves all projected semantic fields.
         # Only fixed-size hashes cross the wire, not millions of JSON payloads.
         row_hash = func.sha256(func.convert_to(cast(func.jsonb_build_array(*columns), Text), "UTF8"))
+        if kind=='findings':
+            grouped=func.sha256(func.convert_to(cast(func.jsonb_build_array(*columns,
+                func.am_consolidation_proof_v1(Finding.org_id,Finding.consolidation_id)),Text),'UTF8'))
+            row_hash=case((Finding.consolidation_id.is_not(None),grouped),else_=row_hash)
         # Materialize the compact projection before sorting. Sorting on the base
         # UUID key otherwise encourages millions of random heap-page reads.
         compact = select(model.id.label("id"), row_hash.label("digest")).where(*filters).cte("inventory_hashes").prefix_with("MATERIALIZED")

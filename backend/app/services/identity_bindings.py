@@ -127,6 +127,8 @@ def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, r
     def busy():
         raise HTTPException(409, "Inventory publication is busy; retry identity review after the current batch")
     lock_org(db, org_id, on_wait=busy)
+    from app.services.consolidation_lifecycle import ensure_free
+    ensure_free(db,org_id,'observation',observation.id)
     latest = latest_bindings(db, org_id, [observation.id]).get(observation.id)
     version = latest.version if latest else 0
     if version != payload.expected_version:
@@ -158,6 +160,8 @@ def write_binding(db, org_id, observation, actor_id, payload, *, revoke=False, r
             binding=IdentityBinding(org_id, tool.id, canonical.id))
         if assessment.candidate_key is None:
             raise HTTPException(409, "Source identity is unsupported or incomplete")
+        from app.services.consolidation_lifecycle import ensure_identity_free
+        ensure_identity_free(db,org_id,assessment.candidate_key)
         tool_id, asset_id = tool.id, canonical.id
         context = _context(observation, tool, canonical, source, scan)
         if expected_context is not None and context != expected_context:

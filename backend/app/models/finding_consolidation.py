@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, BigInteger, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base_class import Base
@@ -69,10 +69,10 @@ class FindingConsolidationDecision(Base):
 
 
 class FindingConsolidationMember(Base):
-    """Reserved current-generation membership. No production writer exists yet.
+    """Retained current-generation membership for reviewed pair publication.
 
-    Resource UUIDs are references, not cascading ownership links. Future writes
-    must validate tenant ownership and exact pair/role agreement under locks.
+    Resource UUIDs are references, not cascading ownership links. Authorized writes
+    validate tenant ownership and exact pair/role agreement under locks.
     Rows alone do not hide findings or authorize any operation.
     """
     __tablename__ = "finding_consolidation_members"
@@ -126,3 +126,10 @@ class OrganizationConsolidationRevision(Base):
     __tablename__ = "organization_consolidation_revisions"
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+
+
+class OrganizationConsolidationSettings(Base):
+    __tablename__ = 'organization_consolidation_settings'
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey('organizations.id',ondelete='CASCADE'),primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean,nullable=False,default=False,server_default=text('false'))
+    version: Mapped[int] = mapped_column(Integer,nullable=False,default=0,server_default='0')

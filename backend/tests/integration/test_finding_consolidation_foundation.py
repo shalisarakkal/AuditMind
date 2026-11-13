@@ -107,7 +107,8 @@ def test_valid_preview_is_read_only_and_cannot_authorize_a_write(client,db_sessi
     assert db_session.query(Event).count()==before
     assert db_session.query(FindingConsolidation).count()==0
     assert db_session.query(FindingConsolidationDecision).count()==0
-    for suffix in ('','/apply','/undo','/publish'):
+    assert client.post(n['root']+'/apply',headers=n['headers'],json={}).status_code==422
+    for suffix in ('','/undo','/publish'):
         assert client.post(n['root']+suffix,headers=n['headers'],json={}).status_code in (404,405)
     assert preview(client,n,confirm=True).status_code==422
 

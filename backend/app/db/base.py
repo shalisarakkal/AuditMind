@@ -16,7 +16,7 @@ from app.models.finding_observation import FindingObservation
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.finding_consolidation import (FindingConsolidation, FindingConsolidationDecision,
-    FindingConsolidationMember, FindingConsolidationDependency, OrganizationConsolidationRevision)
+    FindingConsolidationMember, FindingConsolidationDependency, OrganizationConsolidationRevision, OrganizationConsolidationSettings)
 from app.models.finding_absence_review import (
     FindingAbsenceReviewBatch, FindingAbsenceReviewDecision, FindingAbsenceReviewItem,
 )
@@ -47,6 +47,9 @@ register_workflows(Base.metadata)
 from app.db.status_scoring_revision import register as register_status_scoring
 register_status_scoring(Base.metadata)
 
+from app.db.consolidation_proof import register as register_consolidation_proof
+register_consolidation_proof(Base.metadata)
+
 __all__ = [
     "WorkerDispatch",
     "OrganizationEvidenceRevision",
@@ -72,6 +75,7 @@ __all__ = [
     "FindingConsolidationMember",
     "FindingConsolidationDependency",
     "OrganizationConsolidationRevision",
+    "OrganizationConsolidationSettings",
     "FindingAbsenceReviewBatch",
     "FindingAbsenceReviewItem",
     "FindingAbsenceReviewDecision",

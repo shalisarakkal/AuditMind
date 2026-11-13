@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +16,8 @@ class FindingObservation(Base):
         Index("ix_finding_observations_page", "org_id", "finding_id", "recorded_at", "id"),
         Index("ix_finding_observations_finding", "finding_id"),
         Index("ix_finding_observations_scan", "scan_id"),
+        Index("ix_finding_observations_org_scan_finding", "org_id", "scan_id", "finding_id"),
+        Index("ix_finding_observations_source_asset", "org_id", text("(asset_identity->>'asset_id')"), "finding_id"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"))

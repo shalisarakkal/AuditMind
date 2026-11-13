@@ -24,9 +24,7 @@ from app.services.consolidation_dependencies import MAX_OBSERVATIONS, manifest
 from app.services.finding_identity import IDENTITY_VERSION, NESSUS_MAPPING
 from app.services.identity_bindings import identity_reviews
 
-PENDING_COMPONENTS = ("atomic_membership_and_dependency_publication", "atomic_visibility_publication",
-    "group_aware_proof", "source_lifecycle_guards", "external_identity_conflict_validation",
-    "pending_source_job_validation", "transactional_write_admission", "guarded_ui")
+PENDING_COMPONENTS = ('explicit_opt_in_publication_preview',)
 
 
 def page(db, org_id, *, limit, offset):
@@ -198,4 +196,4 @@ def _preview(db, org_id, actor_id, identifier):
         dependency_summary=dependency_summary,
         findings=prepared["context"]["findings"], apply_available=False,
         pending_components=PENDING_COMPONENTS,
-        availability_reason="Read-only Stage A foundation. No consolidation or payload publication can be applied.")
+        availability_reason="Diagnostic preview only. Pair publication needs its separate opt-in authorized preview; observation payload publication remains unavailable.")

@@ -71,8 +71,8 @@ def _digest(value):
 
 
 def publish(*args, **kwargs):
-    """Unconditional release gate; there is no settings/client/test bypass."""
-    raise HTTPException(409, "Consolidation publication is unavailable until visibility, proof and lifecycle integration is complete")
+    """Retired legacy entry point; client flags never confer publication authority."""
+    raise HTTPException(409, "This legacy entry point is unavailable; use the authorized default-off pair publication routes")
 
 
 def _third_identity_conflict(db, org_id, ids, identity, material):
@@ -128,13 +128,15 @@ def _prepare(db, org_id, actor_id, identifier):
     if db.scalar(select(or_(pending_batches, pending_jobs, importing))):
         raise HTTPException(409, "An import or affected source lifecycle operation is pending or running")
     recorded = pair["recorded_group"]
-    context = dict(contract=CONTRACT, org_id=str(org_id), actor_id=str(actor_id),
+    from app.services.consolidation_policy import configuration
+    policy=configuration(db,org_id)
+    context = dict(contract=CONTRACT, feature_version=policy['version'], feature_enabled=policy['enabled'], org_id=str(org_id), actor_id=str(actor_id),
         canonical_decision_id=str(identifier), pair_key=decision.pair_key,
         expected_version=recorded["version"] if recorded else 0,
         pair_fingerprint=pair["snapshot_fingerprint"], dependency_fingerprint=sources["fingerprint"],
         members=sources["members"], resources=sources["resources"], identity=pair["identity"])
     return dict(context=context, review_token=_digest(context), expected_version=context["expected_version"],
-        canonical_decision_id=str(identifier), apply_available=False)
+        canonical_decision_id=str(identifier), findings=pair["findings"], apply_available=False)
 
 
 def metadata_preview(db, org_id, actor_id, identifier):

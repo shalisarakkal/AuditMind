@@ -5,9 +5,9 @@ import { useApi } from "@/lib/useApi";
 import { formatDateTime } from "@/lib/domain";
 import StatusMessage from "./StatusMessage";
 
-type Review = { version: number; workflow_version: number; workflow_status: string; state: string;
+type Review = { group_scope?: {version:number;member_ids:string[];observation_count:number;bounded:boolean}|null; version: number; workflow_version: number; workflow_status: string; state: string;
   eligible_for_exclusion: boolean; can_review: boolean; self_review_required: boolean;
-  records: { id: string; state: string; actor_label: string; note: string; source_reference: string; created_at: string; expires_at: string | null }[] };
+  records: { id: string; state: string; actor_label: string; note: string; source_reference: string; created_at: string; expires_at: string | null; attestation?: {group_context?:{version:number;member_ids:string[];observation_count:number}} }[] };
 const control = "mt-1 block w-full rounded-md border border-white/20 bg-navy p-2 text-sm";
 
 export default function FindingRiskVerification({ orgId, findingId, role, disabled, onBusyChange }: { orgId: string; findingId: string; role: string; disabled: boolean; onBusyChange(value: boolean): void }) {
@@ -25,13 +25,14 @@ function ReviewPanel({ orgId, findingId, role, disabled, onBusyChange }: { orgId
     <p className="text-sm text-white/70">Verification notes do not authorize scoring exclusions. Submit current retest evidence for an organization administrator to review. Mitigated retains full risk even after review.</p>
     <StatusMessage loading={loading} error={error} />
     <button type="button" disabled={disabled} className="text-cyan underline" onClick={reload}>Reload evidence review</button>
-    {data && <><p>Review status: {data.state.replaceAll("_", " ")}. {data.eligible_for_exclusion ? "Current evidence qualifies for exclusion when status-aware scoring is On." : "Finding retains its full risk contribution."}</p>
+    {data && <>{data.group_scope&&<p className="rounded border border-white/15 p-3 text-sm">This evidence review covers the entire consolidated pair: {data.group_scope.member_ids.length} findings, group version {data.group_scope.version}, {data.group_scope.observation_count}{!data.group_scope.bounded?"+":""} observations. Review both retained source records before approving. An individual member approval is insufficient.</p>}<p>Review status: {data.state.replaceAll("_", " ")}. {data.eligible_for_exclusion ? "Current evidence qualifies for exclusion when status-aware scoring is On." : "Finding retains its full risk contribution."}</p>
       <ReviewForm key={`${data.version}:${data.workflow_version}`} data={data} role={role} path={path} disabled={disabled} onBusyChange={onBusyChange} reload={reload} />
       <h4 className="font-semibold">Evidence review history</h4>
       {data.records.length ? <ol className="space-y-2">{data.records.map(record => <li key={record.id} className="rounded border border-white/15 p-3 text-sm">
         <p>{record.actor_label} · {formatDateTime(record.created_at)} · {record.state}</p>
         <p className="break-words">Evidence reference: {record.source_reference}</p>
         <p className="whitespace-pre-wrap break-words">{record.note}</p>
+        {record.attestation?.group_context && <p>Evidence scope: consolidated pair, version {record.attestation.group_context.version}; {record.attestation.group_context.member_ids.length} findings and {record.attestation.group_context.observation_count} observations.</p>}
         {record.expires_at && <p>Expires: {formatDateTime(record.expires_at)}</p>}
       </li>)}</ol> : <p>No scoring evidence submitted.</p>}
       {data.records.length === 20 && <p className="text-xs text-white/60">Showing the latest 20 decisions.</p>}</>}
@@ -46,11 +47,11 @@ function ReviewForm({ data, role, path, disabled, reload, onBusyChange }: { data
   const [reviewed, setReviewed] = useState(false);
   const [selfReview, setSelfReview] = useState(false);
   const [decision, setDecision] = useState("approved");
-  const [mode, setMode] = useState(["admin", "auditor"].includes(role) && ["resolved", "false_positive", "mitigated"].includes(data.workflow_status) ? "submit" : "review");
+  const [mode, setMode] = useState(data.group_scope && data.state === "approved" ? "review" : ["admin", "auditor"].includes(role) && ["resolved", "false_positive", "mitigated"].includes(data.workflow_status) ? "submit" : "review");
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canSubmit = ["admin", "auditor"].includes(role) && ["resolved", "false_positive", "mitigated"].includes(data.workflow_status);
+  const canSubmit = !(data.group_scope && data.state === "approved") && ["admin", "auditor"].includes(role) && ["resolved", "false_positive", "mitigated"].includes(data.workflow_status);
   const canReview = data.can_review && ["pending", "approved"].includes(data.state);
   if (!canSubmit && !canReview) return <p className="text-sm text-white/60">Evidence can be submitted by organization admins and auditors for Resolved, False positive or Mitigated findings.</p>;
   const reviewing = mode === "review" && canReview;

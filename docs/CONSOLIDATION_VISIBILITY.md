@@ -1,5 +1,7 @@
 # Consolidation visibility integration
 
+Current follow-up: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md) describes the local default-off proof/lifecycle/publication/UI implementation under final verification. The earlier checkpoint below retains its historical scope. No normal-data activation has occurred.
+
 ## Status: internal integration; publication disabled
 
 12 November 2026. This follows the [metadata transaction component](CONSOLIDATION_TRANSACTIONS.md).

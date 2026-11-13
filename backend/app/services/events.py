@@ -46,6 +46,8 @@ TYPES: dict[str, Criticality] = {
     "identity_tool_retired": Criticality.warning,
     "identity_binding_reviewed": Criticality.info,
     "identity_binding_revoked": Criticality.warning,
+    "finding_consolidated": Criticality.warning,
+    "finding_consolidation_undone": Criticality.warning,
     "finding_canonical_selected": Criticality.info,
     "finding_canonical_revoked": Criticality.warning,
     "scan_snapshot_declared": Criticality.info,

@@ -6,6 +6,7 @@ import uuid
 from sqlalchemy import select
 
 from app.models.enums import ScanStatus
+from app.models.archive import AssetScan
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.services.identity_bindings import _assets, _scans, _source_asset
 
@@ -35,6 +36,9 @@ def manifest(db, org_id, decision, findings, observations, identity):
         _source_asset(row) for row in observations} | {canonical_asset_id}
     scan_ids = {row.scan_id for row in findings.values()} | {row.scan_id for row in observations}
     if None in asset_ids or None in scan_ids:
+        return None
+    scan_ids.update(db.scalars(select(AssetScan.scan_id).where(AssetScan.asset_id.in_(asset_ids),AssetScan.created.is_(True))))
+    if len(scan_ids)>MAX_OBSERVATIONS*3:
         return None
     assets, scans = _assets(db, org_id, asset_ids), _scans(db, org_id, scan_ids)
     if (set(assets) != asset_ids or set(scans) != scan_ids

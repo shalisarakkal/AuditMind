@@ -63,6 +63,8 @@ def retire_tool(org_id: uuid.UUID, tool_id: uuid.UUID, payload: IdentityDecision
         raise HTTPException(404, "Tool instance not found")
     if tool.version != payload.expected_version or not tool.active:
         raise HTTPException(409, "Tool instance changed or retired; reload before retrying")
+    from app.services.consolidation_lifecycle import ensure_free
+    ensure_free(db,org_id,'tool',tool_id)
     tool.active = False
     tool.version += 1
     record_event(db, "identity_tool_retired", org_id=org_id, actor=db.get(User, member.user_id),

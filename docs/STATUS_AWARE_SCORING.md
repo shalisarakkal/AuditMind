@@ -103,3 +103,15 @@ Local activation uses migration 0045. Validation: 732 backend unit tests, 535
 frontend tests, targeted PostgreSQL policy/migration/report/concurrency suites,
 and 92 Chrome checks. Lint, production builds and high-severity Bandit pass.
 PLAN.md tracks closeout; commit review and hosted Linux CI remain release gates.
+
+
+## Reviewed consolidated pairs (local Stage A increment)
+
+An individual physical-finding approval cannot exclude a consolidated pair.
+The new approval binds both retained member observation sets and current group
+source context. Either member's source drift invalidates eligibility. Group
+approvals must be explicitly revoked before replacement submission or undo;
+assignment/note-only canonical changes do not invalidate them. Provenance retains
+group scope. Native consolidation is a separate default-off organization opt-in;
+the status-aware policy default and thresholds are unchanged. See the
+[release contract and verification](CONSOLIDATION_RELEASE_REVIEW.md).

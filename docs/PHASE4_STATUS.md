@@ -1,6 +1,6 @@
 # Phase 4 status and next milestone
 
-Current local work (12 November): internal consolidation visibility integration is implemented for testing; production publication remains disabled. Migration `0053` is not activated on normal data. See [scope and validation](CONSOLIDATION_VISIBILITY.md). Earlier dated checkpoints below retain their historical scope.
+Current local work (12 November): reviewed native pair consolidation now includes group proof, lifecycle/reappearance guards and guarded UI behind a separate default-off organization opt-in. Local verification is complete; migrations `0053` through `0055` are not activated on normal data. See [release scope and validation](CONSOLIDATION_RELEASE_REVIEW.md). Earlier dated checkpoints below retain their historical scope.
 
 ## Next PB-1.3 design prepared - 11 November 2026
 
@@ -934,3 +934,26 @@ and all 103 existing Chromium workflow checks passed. The 100,000-finding count
 plan retained its covering index; high-severity static and whitespace gates
 passed. No normal-data migration, restart or publication occurred. This local
 result does not replace hosted CI for a subsequent committed checkpoint.
+
+
+## 12 November: reviewed native pair publication (Stage A, locally verified)
+
+Group-scoped scoring proof, source lifecycle/reappearance guards, default-off
+organization opt-in, authorized apply/undo and guarded UI are implemented locally.
+Both source records/workflows remain; no payload is copied. Existing notes are
+not approvals, and undo requires explicit approval revocation. PB-1.3 remains
+partial: Stage B payload publication and additional/automatic mappings are open.
+No normal-data migration or restart occurred. Contract, activation and Chrome
+steps: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+## 13 November: Stage A local review closeout
+
+Local validation passed: 1,903 full backend tests, 585 frontend tests, 106 full
+Chrome checks and the final focused Chrome walkthrough. The final 58-test
+PostgreSQL run covers the subsequent failed-archive revocation recovery fix;
+these scopes overlap. Lint, high-severity static security, secret and whitespace
+checks passed. Retained history paging and reapply after undo are covered.
+Changes remain uncommitted; normal-data migration/restart and hosted Linux CI
+for this increment remain pending. Consolidation stays default-off. See
+[scope, measurements, activation and verification](CONSOLIDATION_RELEASE_REVIEW.md).

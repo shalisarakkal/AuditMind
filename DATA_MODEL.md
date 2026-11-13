@@ -208,3 +208,20 @@ also prevent destructive schema downgrade after source cleanup.
 Production publication remains disabled. The normal application database is
 still at the preceding schema for this increment; coordinated activation is
 required. See [visibility contract and rollout](docs/CONSOLIDATION_VISIBILITY.md).
+
+
+## Migrations 0054?0055: group proof and separate opt-in
+
+`0054` installs `am_consolidation_hash_v1(text)` and
+`am_consolidation_proof_v1(org_id, group_id)`. The bounded current-source digest
+runs only for grouped approved candidates; the shared approval ledger stores
+`attestation.group_context` (contract/group version/member IDs/count/digest).
+No source payload or workflow is copied. The migration also adds
+`ix_finding_observations_source_asset` on organization, source-asset JSON text
+and finding ID, plus an organization/scan/finding index, for targeted lifecycle probes.
+
+`0055` adds `organization_consolidation_settings`: organization UUID primary key
+with organization-cascade ownership, non-null enabled flag default False and
+integer version default 0. Disabling does not clear existing memberships.
+These migrations are not activated on the normal application database. See
+[Stage A contract](docs/CONSOLIDATION_RELEASE_REVIEW.md).

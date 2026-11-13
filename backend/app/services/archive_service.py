@@ -103,6 +103,7 @@ def start_archive(
             422,
         )
 
+    _check_consolidation_lifecycle(db,org_id,item_type,item_id)
     # An archive that stopped half-way resumes with its own batch.
     batch = db.scalars(
         select(ArchiveBatch).where(
@@ -144,6 +145,7 @@ def start_batch_job(
         allowed.add(ArchiveState.archiving)
     if batch.state not in allowed:
         raise ArchiveError(f"This item is {batch.state.value}, so it can't be {_past(action)}")
+    _check_consolidation_lifecycle(db,org_id,batch.item_type,batch.item_id)
     return _new_job(db, batch, action, user_id)
 
 
@@ -364,6 +366,9 @@ class _Runner:
         self.org_id = batch.org_id
         self.params = {"b": batch.id, "item": batch.item_id, "now": batch.created_at}
 
+    def _guard(self):
+        _check_consolidation_lifecycle(self.db,self.org_id,self.batch.item_type,self.batch.item_id)
+
     def _ids(self, sql: str) -> list[uuid.UUID]:
         """The rows a step will do, read once: re-reading them for each chunk
         would walk past the rows already done every time."""
@@ -375,6 +380,7 @@ class _Runner:
         done = 0
         for start in range(0, len(ids), CHUNK):
             lock_org(self.db, self.org_id)
+            self._guard()
             done += self.db.execute(text(sql), {**self.params, "ids": ids[start : start + CHUNK]}).rowcount
             self.job.progress = {"phase": phase, "rows_done": min(start + CHUNK, len(ids)), "rows_total": len(ids)}
             self.db.commit()
@@ -385,6 +391,7 @@ class _Runner:
         run_job): sweeps up rows added since the ids were read, and marks the
         item itself."""
         lock_org(self.db, self.org_id)
+        self._guard()
         for sql in statements:
             self.db.execute(text(sql), self.params)
 
@@ -409,6 +416,8 @@ class _Runner:
     # --- archive
 
     def archive(self) -> dict:
+        lock_org(self.db,self.org_id)
+        self._guard()
         kind = self.batch.item_type
         mark = "SET archived_at = :now, archive_batch_id = :b"
         active_ids = "id = ANY(:ids) AND archived_at IS NULL"
@@ -454,6 +463,8 @@ class _Runner:
 
     def restore(self) -> dict:
         lock_org(self.db, self.org_id)
+        self._guard()
+        _check_consolidation_restore_conflict(self.db,self.org_id,self.batch.id)
         _check_suppression_restore_conflict(self.db, self.org_id, self.batch.id)
         counts = self._archived_counts()
         in_batch = "archive_batch_id = :b AND archived_at IS NOT NULL"
@@ -473,6 +484,7 @@ class _Runner:
         for start in range(0, len(ids), CHUNK):
             lock_org(self.db, self.org_id)
             params = {**self.params, "ids": ids[start : start + CHUNK]}
+            _check_consolidation_restore_conflict(self.db,self.org_id,self.batch.id,params["ids"])
             _check_suppression_restore_conflict(self.db, self.org_id, self.batch.id, params["ids"])
             # A finding on an asset archived since (in another batch) moves to
             # that batch, to come back with it.
@@ -530,6 +542,8 @@ class _Runner:
     # --- purge
 
     def purge(self) -> dict:
+        lock_org(self.db,self.org_id)
+        self._guard()
         in_batch = "archive_batch_id = :b AND archived_at IS NOT NULL"
         # Only rows still archived: never one restored meanwhile.
         by_id = "id = ANY(:ids) AND archived_at IS NOT NULL"
@@ -630,3 +644,27 @@ def _check_suppression_restore_conflict(db, org_id, batch_id, identifiers=None):
     legacy_duplicate = select(active.id).where(*visible, legacy_identity).exists()
     if db.scalar(select(old.id).where(*conditions, or_(same_review, legacy_duplicate)).limit(1)):
         raise ArchiveError("Restore blocked: a previously suppressed finding conflicts with an active finding. Resolve the source/canonical conflict before retrying.")
+
+
+def _check_consolidation_lifecycle(db,org_id,item_type,item_id):
+    from fastapi import HTTPException
+    from app.services.consolidation_lifecycle import ensure_free
+    try:
+        ensure_free(db,org_id,'scan' if item_type==ArchiveItemType.upload else item_type.value,item_id)
+    except HTTPException as error:
+        raise ArchiveError(error.detail['message']) from error
+
+
+def _check_consolidation_restore_conflict(db,org_id,batch_id,identifiers=None):
+    from sqlalchemy.orm import aliased
+    old,active=aliased(Finding),aliased(Finding)
+    conditions=[old.org_id==org_id,old.archive_batch_id==batch_id,old.archived_at.is_not(None),
+        old.consolidation_history_id.is_not(None)]
+    if identifiers is not None:conditions.append(old.id.in_(identifiers))
+    conflict=select(active.id).where(active.org_id==org_id,active.id!=old.id,active.archived_at.is_(None),active.suppression_id.is_(None),active.consolidation_alias_id.is_(None),
+        active.consolidation_history_id.is_distinct_from(old.consolidation_history_id),
+        active.asset_id.is_not_distinct_from(old.asset_id),active.source.is_not_distinct_from(old.source),
+        active.category.is_not_distinct_from(old.category),
+        or_(old.category.is_not(None),active.description.is_not_distinct_from(old.description)))
+    if db.scalar(select(old.id).where(*conditions,conflict.exists()).limit(1)):
+        raise ArchiveError('A restored consolidation history conflicts with another active payload; review the source conflict before restoring')

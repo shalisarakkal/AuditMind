@@ -22,6 +22,8 @@ export const EVENT_LABELS: Record<string, string> = {
   finding_absence_review_saved: "Absence review candidates saved",
   finding_absence_review_decided: "Absence review recorded",
   finding_absence_review_reopened: "Absence review reopened",
+  finding_consolidated: "Finding pair consolidated",
+  finding_consolidation_undone: "Finding consolidation undone",
   finding_canonical_selected: "Canonical finding selected",
   finding_canonical_revoked: "Canonical finding selection revoked",
   scan_snapshot_declared: "Scan snapshot declared",

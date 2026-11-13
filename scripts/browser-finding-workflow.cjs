@@ -103,6 +103,12 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       return {page,request,context,authorization:()=>token};
     }
     const admin=await session('admin'), p=admin.page, org=`/orgs/${seed.org}`, list=org+'/findings';
+    if(process.env.AUDITMIND_CONSOLIDATION_ONLY==='1') {
+      const viewer=await session('viewer');
+      await require('./browser-consolidation.cjs')({page:p,admin,viewer,base,org,list,check});
+      assert.deepEqual(evidence.errors,[]);
+      return;
+    }
     // Hold only the large summary response: the shell/security data must paint
     // while it is pending, without fake scores or blocking navigation.
     let releaseDashboard;
@@ -1758,6 +1764,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     execFileSync(process.execPath,[path.join(root,'scripts/browser-dashboard-tabs.cjs')],{
       cwd:root,windowsHide:true,stdio:'inherit',env:{...process.env,AUDITMIND_DASHBOARD_BASE_URL:base}});
     check('Dashboard tab presentation, shared inventory, compact tiles and alignment pass desktop/mobile Axe with synthetic intercepted data');
+    await require('./browser-consolidation.cjs')({page:p,admin,viewer,base,org,list,check});
     const stats=JSON.parse(cli('inspect')); assert.equal(stats.usage_count,0); assert.deepEqual(evidence.errors,[]); check('No AI usage or browser page errors');
   } catch(error) { evidence.failure=error.message; if(browser)try{await browser.contexts()[0]?.pages()[0]?.screenshot({path:path.join(output,'failure.png'),fullPage:true});}catch{} throw error; }
   finally { if(browser)await browser.close(); for(const child of children) {if(!child.pid||child.exitCode!==null)continue;try{if(process.platform==='win32')execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});else process.kill(-child.pid,'SIGTERM');}catch{}} if(prepared)cli('cleanup'); fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(evidence,null,2)); console.log(`${evidence.checks.length} checks; artifacts: ${output}`); }

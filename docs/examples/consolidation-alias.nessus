@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC demonstration only. No scanner was run. Use a disposable organization.
+     Both invented aliases represent one fictional host for explicit identity review. -->
+<NessusClientData_v2>
+  <Report name="SYNTHETIC consolidation alias">
+    <ReportHost name="consolidation-demo-alias">
+      <HostProperties><tag name="host-ip">10.200.1.11</tag></HostProperties>
+      <ReportItem port="443" protocol="tcp" severity="3" pluginID="99999178"
+                  pluginName="SYNTHETIC reviewed pair alias" pluginFamily="General">
+        <description>Fictional alias record for explicit native pair consolidation. Both examples have matching domain and severity.</description>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

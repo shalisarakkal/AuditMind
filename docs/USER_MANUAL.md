@@ -1066,3 +1066,26 @@ draft content. Repeated identical API saves preserve the version, timestamp and
 audit history; source and concurrent-version checks still apply. First saves,
 real content/binding edits and explicit returns from reviewed states to draft
 create a version. Approved evidence must still be revoked before editing.
+
+
+## 12 November: reviewed native pair publication (Stage A, locally verified)
+
+Group-scoped scoring proof, source lifecycle/reappearance guards, default-off
+organization opt-in, authorized apply/undo and guarded UI are implemented locally.
+Both source records/workflows remain; no payload is copied. Existing notes are
+not approvals, and undo requires explicit approval revocation. PB-1.3 remains
+partial: Stage B payload publication and additional/automatic mappings are open.
+No normal-data migration or restart occurred. Contract, activation and Chrome
+steps: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+## 13 November: Stage A local review closeout
+
+Local validation passed: 1,903 full backend tests, 585 frontend tests, 106 full
+Chrome checks and the final focused Chrome walkthrough. The final 58-test
+PostgreSQL run covers the subsequent failed-archive revocation recovery fix;
+these scopes overlap. Lint, high-severity static security, secret and whitespace
+checks passed. Retained history paging and reapply after undo are covered.
+Changes remain uncommitted; normal-data migration/restart and hosted Linux CI
+for this increment remain pending. Consolidation stays default-off. See
+[scope, measurements, activation and verification](CONSOLIDATION_RELEASE_REVIEW.md).

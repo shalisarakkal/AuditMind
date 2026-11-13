@@ -1,5 +1,7 @@
 # Reviewed finding consolidation and payload publication
 
+Current follow-up: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md) describes the local default-off proof/lifecycle/publication/UI implementation under final verification. The earlier checkpoint below retains its historical scope. No normal-data activation has occurred.
+
 PB-1.3 staged design, 11 November 2026.
 
 12 November checkpoint: the schema/read-only preview foundation is implemented

@@ -139,6 +139,8 @@ def preview(db, org_id, target, *, lock=False):
     else:
         finding = _retained_finding(db, org_id, target.finding_id, lock=lock)
         if finding is None: raise HTTPException(404, "Finding not found")
+        from app.services.consolidation_lifecycle import ensure_free
+        ensure_free(db,org_id,'finding',finding.id)
         life = _lifecycle(db, org_id, finding)
         if life["state"] != "retained" or finding.suppression_id:
             raise HTTPException(409, "Choose a retained active finding that is not already suppressed")

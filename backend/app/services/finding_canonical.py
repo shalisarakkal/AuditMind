@@ -120,6 +120,9 @@ def save(db, org_id, target, actor_id, payload):
     # through the final context check and receipt commit so a later observation
     # cannot appear between preview validation and publication.
     lock_org(db, org_id)
+    from app.services.consolidation_lifecycle import ensure_free
+    ensure_free(db,org_id,'observation',target.id)
+    ensure_free(db,org_id,'observation',payload.source_observation_id)
     prepared = preview(db, org_id, target, payload.source_observation_id, lock=True)
     if prepared["review_token"] != payload.review_token or prepared["expected_version"] != payload.expected_version:
         raise HTTPException(409, "Canonical review context changed; reload and review again")
@@ -150,6 +153,9 @@ def save(db, org_id, target, actor_id, payload):
 
 
 def revoke(db, org_id, decision_id, actor_id, payload):
+    lock_org(db,org_id)
+    from app.services.consolidation_lifecycle import ensure_free
+    ensure_free(db,org_id,'canonical_decision',decision_id)
     row = db.scalar(select(Decision).where(Decision.org_id == org_id, Decision.id == decision_id))
     if row is None:
         raise HTTPException(404, "Canonical decision not found")

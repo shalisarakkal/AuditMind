@@ -8,7 +8,7 @@ retained in [the e4c7488 version](https://github.com/shalisarakkal/AuditMind/blo
 
 | Scope | Verified status |
 | --- | --- |
-| Committed application | `1d5c86b3c23daef284a0d3bb41b17109304fdbd5`; all four hosted Linux jobs passed in [run 43292318027](https://github.com/shalisarakkal/AuditMind/actions/runs/43292318027). The uncommitted visibility integration is not covered by this hosted result. |
+| Committed application | `bb07019e599bfb714a96b0b12a362f4550eadf95`; all four hosted Linux jobs passed in [run 43323043722](https://github.com/shalisarakkal/AuditMind/actions/runs/43323043722). The new uncommitted Stage A publication/proof/lifecycle/UI increment is not covered by this hosted result. |
 | Suppression/retained-source delivery | `f97a4fbf29a728a45087f03d8dabf6ea21950d4b`; all four jobs passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797) |
 | Recorded local schema | 0050, activated with clean drift; the draft-save fix required no migration |
 | Suppression availability | Authorized native Nessus preview/suppress/clear APIs and guarded UI are delivered; current independent identity reviews are required |
@@ -117,3 +117,26 @@ and all 103 existing Chromium workflow checks passed. The 100,000-finding count
 plan retained its covering index; high-severity static and whitespace gates
 passed. No normal-data migration, restart or publication occurred. This local
 result does not replace hosted CI for a subsequent committed checkpoint.
+
+
+## 12 November: reviewed native pair publication (Stage A, locally verified)
+
+Group-scoped scoring proof, source lifecycle/reappearance guards, default-off
+organization opt-in, authorized apply/undo and guarded UI are implemented locally.
+Both source records/workflows remain; no payload is copied. Existing notes are
+not approvals, and undo requires explicit approval revocation. PB-1.3 remains
+partial: Stage B payload publication and additional/automatic mappings are open.
+No normal-data migration or restart occurred. Contract, activation and Chrome
+steps: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+## 13 November: Stage A local review closeout
+
+Local validation passed: 1,903 full backend tests, 585 frontend tests, 106 full
+Chrome checks and the final focused Chrome walkthrough. The final 58-test
+PostgreSQL run covers the subsequent failed-archive revocation recovery fix;
+these scopes overlap. Lint, high-severity static security, secret and whitespace
+checks passed. Retained history paging and reapply after undo are covered.
+Changes remain uncommitted; normal-data migration/restart and hosted Linux CI
+for this increment remain pending. Consolidation stays default-off. See
+[scope, measurements, activation and verification](CONSOLIDATION_RELEASE_REVIEW.md).

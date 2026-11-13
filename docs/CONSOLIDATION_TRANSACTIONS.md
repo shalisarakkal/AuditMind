@@ -1,5 +1,7 @@
 # Consolidation metadata transaction component
 
+Current follow-up: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md) describes the local default-off proof/lifecycle/publication/UI implementation under final verification. The earlier checkpoint below retains its historical scope. No normal-data activation has occurred.
+
 PB-1.3 Stage A internal checkpoint, 12 November 2026.
 
 This increment adds an internal transaction component on schema `0052`. It does

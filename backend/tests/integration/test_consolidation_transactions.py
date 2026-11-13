@@ -282,11 +282,12 @@ def test_revoked_third_identity_does_not_block_admission(client, db_session, nat
     assert stage(db_session, native, who, payload)['version'] == 1
 
 
-def test_production_entry_and_routes_stay_closed(client, db_session, native):
+def test_legacy_entry_stays_closed_and_new_publication_is_default_off(client, db_session, native):
     who, payload = request(db_session, native)
     with pytest.raises(HTTPException) as caught:
         transactions.publish(db_session, uuid.UUID(native['org']), who, payload)
     assert caught.value.status_code == 409
-    for action in ('apply', 'publish', 'undo', 'decisions'):
+    assert client.post(native['root']+'/apply', headers=native['headers'], json=payload.model_dump(mode='json')).status_code == 409
+    for action in ('publish', 'undo', 'decisions'):
         assert client.post(native['root']+'/'+action, headers=native['headers'], json=payload.model_dump(mode='json')).status_code == 404
     assert counts(db_session) == [0, 0, 0, 0]

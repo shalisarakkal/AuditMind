@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConsolidationPreviewRequest(BaseModel):
@@ -40,7 +40,7 @@ class ConsolidationPage(BaseModel):
     limit: int
     offset: int
     apply_available: Literal[False] = False
-    availability_reason: str = "Retained ledger only; consolidation publication is not enabled."
+    availability_reason: str = "Read-only ledger response; apply requires a separate current authorized publication preview."
 
 
 class ConsolidationHistoryPage(BaseModel):
@@ -49,4 +49,19 @@ class ConsolidationHistoryPage(BaseModel):
     limit: int
     before_version: int | None
     apply_available: Literal[False] = False
-    availability_reason: str = "Retained ledger only; consolidation publication is not enabled."
+    availability_reason: str = "Read-only ledger response; apply requires a separate current authorized publication preview."
+
+
+class ConsolidationSettingUpdate(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    expected_version:int=Field(ge=0,le=2147483646)
+    enabled:bool
+
+
+class ConsolidationUndoRequest(BaseModel):
+    model_config=ConfigDict(extra='forbid',str_strip_whitespace=True)
+    request_id:uuid.UUID
+    expected_version:int=Field(ge=1,le=2147483646)
+    review_token:str=Field(pattern='^[a-f0-9]{64}$')
+    rationale:str=Field(min_length=1,max_length=2000)
+    confirm:bool
