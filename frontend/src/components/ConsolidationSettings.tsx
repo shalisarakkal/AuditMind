@@ -9,7 +9,7 @@ type Setting={enabled:boolean;version:number};
 export default function ConsolidationSettings({orgId,editable}:{orgId:string;editable:boolean}) {
   const path=`/orgs/${orgId}/finding-consolidations/settings`;
   const saved=useApi<Setting>(path);
-  return <section aria-label="Reviewed finding consolidation" className="min-w-0 space-y-3 rounded-xl border border-white/10 p-5">
+  return <section aria-label="Reviewed finding consolidation" className="min-w-0 space-y-3 [overflow-wrap:anywhere] rounded-xl border border-white/10 p-5">
     <h2 className="text-lg font-semibold">Reviewed finding consolidation</h2>
     <p className="text-sm text-white/70">Optional native Nessus pair review. An administrator can count an independently reviewed pair once while retaining both source records and histories. Disabled by default; separate from scoring settings. Turning this off blocks new consolidations and does not undo existing pairs.</p>
     <StatusMessage loading={saved.loading} error={saved.error}/>
@@ -25,7 +25,7 @@ function SettingForm({path,saved,onSaved}:{path:string;saved:Setting;onSaved():v
     catch(cause){setError(cause instanceof Error?cause.message:"Could not save consolidation setting");}
     finally{pending.current=false;setBusy(false);}}
   return <form onSubmit={event=>{event.preventDefault();void save();}} className="space-y-3">
-    <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} disabled={busy||!!error} onChange={e=>setEnabled(e.target.checked)}/>Allow reviewed native pair consolidation</label>
+    <label className="flex items-start gap-2"><input className="mt-1 shrink-0" type="checkbox" checked={enabled} disabled={busy||!!error} onChange={e=>setEnabled(e.target.checked)}/><span className="min-w-0">Allow reviewed native pair consolidation</span></label>
     {error&&<p role="alert">{error} Reload the saved setting before retrying.</p>}
     <button className={DIALOG_PRIMARY} disabled={busy||!!error||enabled===saved.enabled}>{busy?"Saving...":"Save consolidation setting"}</button>
   </form>;

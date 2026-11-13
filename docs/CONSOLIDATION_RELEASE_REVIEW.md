@@ -207,3 +207,17 @@ increment. Changes remain uncommitted and unpublished. The normal application
 has not been migrated or restarted. Next release steps are scoped diff/check-in,
 push and hosted Linux CI, followed by coordinated migration/activation and an
 explicit organization opt-in. This does not close the remaining PB-1.3 scope.
+
+
+## Hosted Linux follow-up - 13 November 2026
+
+Commit `fd3cf10` is pushed. In run 43432914113, frontend and dependency/security
+checks passed, but browser acceptance caught a 3-pixel Settings overflow at
+390px with the large organization logo. The consolidation opt-in card now wraps
+long text and gives its checkbox label a shrinkable text span. Browser regression
+checks both 374px and 390px and reports overflowing elements on failure. The
+full local Chrome rerun passed all 106 checks; lint and the isolated production
+build passed. The follow-up commit requires its own green hosted run before database activation.
+Normal data remains on 0052. The owner selected maintenance immediately after
+CI passes; backup and migrations 0053 through 0055 must precede application
+restart, with consolidation still off by default.
