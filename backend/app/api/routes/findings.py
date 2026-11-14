@@ -38,12 +38,26 @@ from app.schemas.finding_workflow import HistoryRead, WorkflowBulk, WorkflowRead
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.schemas.finding_observation import FindingObservationRead
+from app.schemas.observation_publication import PublicationPreviewRequest
 from app.services.finding_workflow import get_finding, read_history, read_workflow, update_workflows
 from app.services.workflow_deadlines import deadline_now
 from app.services import list_pages
 from app.db.list_sort import severity_rank, finding_text_size, TEXT_SORT_BYTES
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
+
+
+@router.post("/findings/{finding_id}/observations/{observation_id}/publication-preview")
+def observation_publication_preview(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
+        payload: PublicationPreviewRequest,
+        response: Response, db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_member)):
+    from app.services.observation_publication import preview
+    actor_id = member.user_id
+    if db.new or db.dirty or db.deleted:
+        raise HTTPException(409, "Pending database changes must be completed before preview")
+    db.rollback()  # Release auth reads before the independent snapshot/pool checkout.
+    response.headers["Cache-Control"] = "no-store"
+    return preview(db, org_id, actor_id, finding_id, observation_id)
 
 
 @router.get("/findings/{finding_id}/observations", response_model=list[FindingObservationRead])

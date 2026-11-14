@@ -1,5 +1,25 @@
 # Verify the evidence-aware reporting changes
 
+## 13 November: manual acceptance deferred; next engineering scope
+
+- [ ] Complete the [manual consolidation acceptance walkthrough](CONSOLIDATION_CHROME_WALKTHROUGH.md)
+  in a test organization. **TODO, deferred at the user's request**; the complete
+  manual flow has not been signed off. No user testing is required now.
+- [x] Automated verification remains complete: local/hosted Chrome, backend,
+  frontend and security checks passed; local schema activation is at `0055`.
+  This is separate from manual user/pilot acceptance.
+- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+  payload contract, ownership/identity/context admission and bounded read-only
+  publication preview, following the [publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
+  Preserve finding ownership/workflow and retained history. Publication writes,
+  scoring/evidence invalidation and guarded UI must be reviewed/tested before
+  exposing Apply. Stage B is not implemented by this documentation update.
+
+Deferring manual acceptance does not close PB-1.3 or approve broader feature
+rollout. Existing settings, partial test records and running services are unchanged.
+
+For the activated consolidation feature, use the complete [step-by-step Chrome walkthrough](CONSOLIDATION_CHROME_WALKTHROUGH.md), including both sample files, identity/canonical setup, Apply, scoring approval and Undo.
+
 ## Current verification baseline - 11 November 2026
 
 The committed application is `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
@@ -728,3 +748,13 @@ The application is available at http://localhost:3000/login. Enabling the
 separate organization setting and applying a reviewed pair remain explicit
 admin actions. Remaining PB-1.3 scope is unchanged: Stage B payload publication,
 additional identity mappings, larger groups and automatic reconciliation.
+
+
+## Stage B preview foundation - automated local verification
+
+The [versioned native payload/read-only preview](OBSERVATION_PAYLOAD_PREVIEW.md)
+is locally verified: full backend 1,960 passed and Chrome 106 checks passed, plus
+focused context-drift checks. This adds an administrator-only read-only API and
+passive version stamps on newly captured native snapshots. Publication and Undo
+remain unavailable and there is no new publication UI to test yet. No manual
+action is requested; the existing Stage A user/pilot acceptance stays TODO.

@@ -984,3 +984,41 @@ The application is available at http://localhost:3000/login. Enabling the
 separate organization setting and applying a reviewed pair remain explicit
 admin actions. Remaining PB-1.3 scope is unchanged: Stage B payload publication,
 additional identity mappings, larger groups and automatic reconciliation.
+
+
+## 13 November: manual acceptance deferred; next engineering scope
+
+- [ ] Complete the [manual consolidation acceptance walkthrough](CONSOLIDATION_CHROME_WALKTHROUGH.md)
+  in a test organization. **TODO, deferred at the user's request**; the complete
+  manual flow has not been signed off. No user testing is required now.
+- [x] Automated verification remains complete: local/hosted Chrome, backend,
+  frontend and security checks passed; local schema activation is at `0055`.
+  This is separate from manual user/pilot acceptance.
+- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+  payload contract, ownership/identity/context admission and bounded read-only
+  publication preview, following the [publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
+  Preserve finding ownership/workflow and retained history. Publication writes,
+  scoring/evidence invalidation and guarded UI must be reviewed/tested before
+  exposing Apply. Stage B is not implemented by this documentation update.
+
+Deferring manual acceptance does not close PB-1.3 or approve broader feature
+rollout. Existing settings, partial test records and running services are unchanged.
+
+
+## 13 November: Stage B read-only payload preview (locally verified)
+
+New native snapshots have a strict server mapping stamp inside existing JSON;
+legacy snapshots are not rewritten. A tenant/actual-admin guarded API previews
+only the latest independently reviewed ordinary native observation, with full
+hashes and bounded field differences. It cannot publish or undo. No migration
+or running-application restart occurred. Manual Stage A acceptance stays TODO.
+See [contract, verification and remaining publication gates](OBSERVATION_PAYLOAD_PREVIEW.md).
+
+Local Stage B verification: full backend 1,960 passed; Chrome 106 checks passed;
+final focused preview/metadata regressions passed (52 plus three overlapping
+metadata cases). High-severity security, source secret-pattern and whitespace
+checks passed. No publication/undo writer, new UI, migration or normal-application
+restart is included. This increment requires exact-commit hosted verification
+before activation; Stage A manual acceptance
+remains TODO/deferred. Next is reviewed snapshot/decision storage and atomic
+publish/undo with consumer/lifecycle/proof guards before exposing Apply.

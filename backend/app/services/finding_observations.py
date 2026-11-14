@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from psycopg.types.json import Jsonb
+from app.services.observation_payload import MAPPING_KEY, MAPPING_VERSION
 
 
 def observation_values(row, asset, scan, finding_id, occurrence):
@@ -42,7 +43,8 @@ def observation_values(row, asset, scan, finding_id, occurrence):
             hostname=row.hostname, ip=row.ip, cloud_id=row.cloud_id),
         source_identity=identity, reconciliation_eligible=False,
         ineligibility_reasons=Jsonb(reasons),
-        payload=dict(domain=row.domain.value, severity=row.severity.value, category=row.category,
+        payload=dict(**({MAPPING_KEY: MAPPING_VERSION} if scan.scan_type == "nessus" and row.source == "nessus" and scan.profile is None else {}),
+            domain=row.domain.value, severity=row.severity.value, category=row.category,
             description=row.description, event_count=row.event_count,
             first_seen=row.first_seen.isoformat() if row.first_seen else None,
             last_seen=row.last_seen.isoformat() if row.last_seen else None,

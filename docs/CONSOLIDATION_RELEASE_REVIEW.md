@@ -1,9 +1,11 @@
 # Reviewed native pair consolidation
 
-12 November 2026. Stage A of PB-1.3; local implementation under final verification.
-The running application database has not been migrated or restarted for this
-increment. The feature defaults **Off** for every organization. Completing this
-increment does not close PB-1.3 or enable observation-payload publication.
+Current status, 13 November 2026: Stage A is implemented and activated locally
+through schema `0055`. Hosted Linux checks passed for the application and the
+subsequent documentation checkpoint. The feature defaults **Off** for every
+organization. This does not close PB-1.3 or enable observation-payload publication.
+Use the [complete Chrome walkthrough](CONSOLIDATION_CHROME_WALKTHROUGH.md) for
+manual acceptance; earlier dated checkpoints below preserve their historical scope.
 
 ## What changes
 
@@ -257,3 +259,22 @@ The application is available at http://localhost:3000/login. Enabling the
 separate organization setting and applying a reviewed pair remain explicit
 admin actions. Remaining PB-1.3 scope is unchanged: Stage B payload publication,
 additional identity mappings, larger groups and automatic reconciliation.
+
+
+## 13 November: manual acceptance deferred; next engineering scope
+
+- [ ] Complete the [manual consolidation acceptance walkthrough](CONSOLIDATION_CHROME_WALKTHROUGH.md)
+  in a test organization. **TODO, deferred at the user's request**; the complete
+  manual flow has not been signed off. No user testing is required now.
+- [x] Automated verification remains complete: local/hosted Chrome, backend,
+  frontend and security checks passed; local schema activation is at `0055`.
+  This is separate from manual user/pilot acceptance.
+- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+  payload contract, ownership/identity/context admission and bounded read-only
+  publication preview, following the [publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
+  Preserve finding ownership/workflow and retained history. Publication writes,
+  scoring/evidence invalidation and guarded UI must be reviewed/tested before
+  exposing Apply. Stage B is not implemented by this documentation update.
+
+Deferring manual acceptance does not close PB-1.3 or approve broader feature
+rollout. Existing settings, partial test records and running services are unchanged.

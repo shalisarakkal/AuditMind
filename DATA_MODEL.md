@@ -225,3 +225,15 @@ with organization-cascade ownership, non-null enabled flag default False and
 integer version default 0. Disabling does not clear existing memberships.
 These migrations are not activated on the normal application database. See
 [Stage A contract](docs/CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+## Stage B native snapshot mapping (local read-only increment)
+
+New native Nessus `finding_observations.payload` JSON carries server-generated
+`mapping_version: nessus-observation-payload-v1`. Generic/profile snapshots and
+legacy rows are unchanged; no schema migration, index rebuild or backfill is
+required. The strict mapping is independent of reviewed identity and does not
+authorize publication. A read-only preview returns bounded differences and full
+hashes while distinguishing original retention ownership from proposed display
+provenance. No publication snapshots, decision tables or current publication
+pointers have been added yet. See [contract and limits](docs/OBSERVATION_PAYLOAD_PREVIEW.md).
