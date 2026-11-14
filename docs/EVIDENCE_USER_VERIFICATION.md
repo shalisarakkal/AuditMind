@@ -1,5 +1,10 @@
 # Verify the evidence-aware reporting changes
 
+Local private-core follow-up: [Publish/Undo transaction contract](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
+passed 210 targeted checks. It is uncommitted/unactivated and adds no public
+write or settings control. There is no new GUI action for the user to test yet;
+consumer/proof/lifecycle integration must precede that UI.
+
 Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
 
 ## 13 November: manual acceptance deferred; next engineering scope

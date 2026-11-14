@@ -260,3 +260,23 @@ Downgrade refuses to discard retained receipts, including undone history.
 These rows confer no publication authority. Publish/Undo, feature opt-in,
 consumer/proof invalidation, lifecycle admission and UI remain future work.
 See [storage contract and verified review](docs/OBSERVATION_PUBLICATION_STORAGE.md).
+
+## Stage B private transaction admission — migration 0057
+
+Local, uncommitted and unactivated. `organization_publication_settings` has an
+organization-cascading UUID primary key, enabled=False and version=0 defaults,
+and a nonnegative-version constraint. It is separate from consolidation and
+scoring settings; its value alone cannot open the closed public writers.
+
+Receipts gain `admission_contract` (default `reserved-storage-v1`) and nullable
+64-character `source_context_hash`. Legacy rows are not backfilled as trusted
+transaction receipts. New private-core receipts explicitly use
+`observation-publication-core-v1` and a server-derived source fingerprint. Existing
+before/after snapshot ownership and minimal-ledger retention are preserved.
+Downgrade refuses retained non-reserved admission receipts or policy history.
+
+The private transaction stages snapshots, typed bounded dependencies, receipt,
+current generation, source-only fields and Activity in a caller-owned savepoint.
+It never commits and has no route/worker caller. Consumer/proof invalidation and
+lifecycle guards remain prerequisites for exposing an integrated publisher.
+See [core contract and targeted verification](docs/OBSERVATION_PUBLICATION_TRANSACTIONS.md).

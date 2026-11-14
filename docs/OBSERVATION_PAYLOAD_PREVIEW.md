@@ -1,5 +1,9 @@
 # Stage B: native observation payload contract and read-only preview
 
+The [local private transaction follow-up](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
+uses a distinct admission contract and keeps public writes closed. This public
+read-only preview retains its existing response contract and availability.
+
 Status: first engineering increment implemented and locally verified. Stage B is
 not complete. Publication, Undo, snapshots/decision ledgers, consumer invalidation
 and a guarded publication UI remain unavailable. Stage A manual acceptance remains

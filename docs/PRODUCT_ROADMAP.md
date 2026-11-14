@@ -1,5 +1,10 @@
 # AuditMind Product Roadmap
 
+Local Stage B follow-up (14 November): [private transaction core](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
+implemented; 210 targeted checks passed. This is not a full-suite or hosted result
+for the new work. Public writes remain closed and migration 0057 is unactivated.
+Next: consumer/proof invalidation and lifecycle guards, then guarded UI.
+
 Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
 
 ## Next PB-1.3 design prepared - 11 November 2026

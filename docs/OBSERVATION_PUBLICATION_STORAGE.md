@@ -1,5 +1,10 @@
 # Stage B publication storage
 
+Local follow-up: the [private transaction core](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
+adds default-off policy and admission fields in migration 0057. It is uncommitted
+and unactivated; no public writer is enabled. The verification below belongs to
+the committed storage baseline, not that follow-up.
+
 Reviewed application source `2751c3b`, 14 November 2026. Follows the
 read-only preview foundation (`531d8e9`, hosted Linux verified).
 This is reserved storage, not an enabled publication service. Existing preview

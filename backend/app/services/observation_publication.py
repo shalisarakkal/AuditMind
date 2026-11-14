@@ -24,7 +24,7 @@ def blocked(message):
     raise HTTPException(409, message)
 
 
-def _prepare(db, org_id, actor_id, finding_id, observation_id):
+def _check_actor(db, org_id, actor_id):
     actor = db.execute(select(User.is_active, User.must_change_password, User.password_changed_at)
         .where(User.id == actor_id)).one_or_none()
     member = db.scalar(select(OrgMembership.role).where(OrgMembership.org_id == org_id,
@@ -35,6 +35,11 @@ def _prepare(db, org_id, actor_id, finding_id, observation_id):
         .where(Organization.id == org_id)).one_or_none()
     if org is None or org.archived_at is not None or org.purge_requested_at is not None:
         blocked("Organization is read-only or unavailable")
+    return actor
+
+
+def _prepare(db, org_id, actor_id, finding_id, observation_id, *, _private=False, _require_latest=True):
+    actor = _check_actor(db, org_id, actor_id)
     finding = db.scalar(select(Finding).options(defer(Finding.description), defer(Finding.raw_data),
         defer(Finding.details)).where(Finding.org_id == org_id, Finding.id == finding_id))
     if finding is None:
@@ -54,13 +59,14 @@ def _prepare(db, org_id, actor_id, finding_id, observation_id):
         blocked("Only the strict native Nessus mapping supports payload review")
     if not isinstance(observation.source_identity, dict) or not isinstance(observation.asset_identity, dict):
         blocked("Retained native source/asset identity is malformed")
-    latest = db.execute(select(FindingObservation.id, FindingObservation.recorded_at).where(
-        FindingObservation.org_id == org_id, FindingObservation.finding_id == finding_id)
-        .order_by(FindingObservation.recorded_at.desc(), FindingObservation.id.desc()).limit(2)).all()
-    if len(latest) > 1 and latest[0].recorded_at == latest[1].recorded_at:
-        blocked("Latest observations have ambiguous equal server-recorded times")
-    if latest[0].id != observation.id:
-        blocked("Select the latest server-recorded observation; newer retained context exists")
+    if _require_latest:
+        latest = db.execute(select(FindingObservation.id, FindingObservation.recorded_at).where(
+            FindingObservation.org_id == org_id, FindingObservation.finding_id == finding_id)
+            .order_by(FindingObservation.recorded_at.desc(), FindingObservation.id.desc()).limit(2)).all()
+        if len(latest) > 1 and latest[0].recorded_at == latest[1].recorded_at:
+            blocked("Latest observations have ambiguous equal server-recorded times")
+        if latest[0].id != observation.id:
+            blocked("Select the latest server-recorded observation; newer retained context exists")
     stamp, size = db.execute(select(FindingObservation.payload[contract.MAPPING_KEY].astext,
         func.octet_length(cast(FindingObservation.payload, Text))).where(
             FindingObservation.org_id == org_id, FindingObservation.id == observation_id)).one()
@@ -149,7 +155,7 @@ def _prepare(db, org_id, actor_id, finding_id, observation_id):
         original_created_at=finding.created_at.isoformat() if finding.created_at else None,
         assets=[{k: str(v) if isinstance(v, uuid.UUID) else v for k, v in row._mapping.items()} for row in sorted(assets, key=lambda r:r.id)],
         scans=[{k: str(v) if isinstance(v, uuid.UUID) else v for k, v in row._mapping.items()} for row in sorted(scans, key=lambda r:r.id)])
-    return dict(preview_contract=PREVIEW_CONTRACT, mapping_version=stamp, review_token=contract.digest(context),
+    result = dict(preview_contract=PREVIEW_CONTRACT, mapping_version=stamp, review_token=contract.digest(context),
         publish_available=False, apply_available=False, no_op=not changes, changes=changes,
         current_sha256=context["current_sha256"], observation_sha256=context["observation_sha256"],
         observation_context_sha256=context["observation_context_sha256"],
@@ -161,6 +167,9 @@ def _prepare(db, org_id, actor_id, finding_id, observation_id):
             recorded_at=context["recorded_at"], observed_at=context["observed_at"]),
         workflow=dict(status=finding.workflow_status, version=finding.workflow_version, preserved=True),
         message="Read-only preview. No scanner fields, ownership, workflow, proof or scores were changed. This token does not authorize publication. Latest server recording does not prove latest scanner time.")
+    if _private:
+        result['_transaction'] = dict(before=before, after=replacement, context=context)
+    return result
 
 
 def preview(db, org_id, actor_id, finding_id, observation_id):

@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,7 @@ class ObservationPublicationDecision(Base):
         CheckConstraint("operation IN ('publish','undo')", name="ck_observation_publication_operation"),
         CheckConstraint("length(btrim(rationale)) BETWEEN 1 AND 2000", name="ck_observation_publication_rationale"),
         CheckConstraint("length(request_hash) = 64 AND length(before_hash) = 64 AND length(after_hash) = 64", name="ck_observation_publication_hashes"),
+        CheckConstraint("source_context_hash IS NULL OR length(source_context_hash) = 64", name="ck_publication_source_hash"),
         # The unique finding/version index also serves ordered history reads.
         Index("ix_observation_publication_actor", "actor_id"),
     )
@@ -36,6 +37,9 @@ class ObservationPublicationDecision(Base):
     before_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     after_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     mapping_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    admission_contract: Mapped[str] = mapped_column(String(80), nullable=False,
+        default='reserved-storage-v1', server_default=text("'reserved-storage-v1'"))
+    source_context_hash: Mapped[str | None] = mapped_column(String(64))
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     operation: Mapped[str] = mapped_column(String(10), nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
@@ -94,3 +98,12 @@ class ObservationPublicationDependency(Base):
     decision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     resource_kind: Mapped[str] = mapped_column(String(20), nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+
+
+class OrganizationPublicationSettings(Base):
+    """Separate default-off policy; enabling it alone never opens a writer."""
+    __tablename__ = 'organization_publication_settings'
+    __table_args__ = (CheckConstraint('version >= 0', name='ck_publication_settings_version'),)
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('organizations.id', ondelete='CASCADE'), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text('false'))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')

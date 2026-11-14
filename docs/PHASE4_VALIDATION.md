@@ -1,5 +1,11 @@
 # Phase 4 remediation workflow validation
 
+14 November local private-core scope: 210 targeted PostgreSQL/unit/regression
+checks passed in 397.22 seconds; compilation, high-severity Bandit and whitespace
+checks passed. See [transaction scope and open integration gates](OBSERVATION_PUBLICATION_TRANSACTIONS.md).
+This is not a new complete backend/frontend/Chrome or hosted run. The core is
+uncommitted/unactivated; manual acceptance remains separate and deferred.
+
 Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
 
 ## Current verified application - 11 November 2026
