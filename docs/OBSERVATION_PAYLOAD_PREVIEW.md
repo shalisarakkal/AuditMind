@@ -130,3 +130,7 @@ remain immutable. Manual acceptance is not being represented as completed.
 
 The running application has not been restarted for this increment. Normal data,
 organization opt-ins and the pending manual acceptance task remain unchanged.
+
+Reviewed follow-up (`2751c3b`): [reserved publication storage](OBSERVATION_PUBLICATION_STORAGE.md)
+adds source-owned payload snapshots and minimal retained receipts. It does not
+enable Publish/Undo or change the running database.

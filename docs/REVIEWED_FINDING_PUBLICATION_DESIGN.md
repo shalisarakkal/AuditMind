@@ -1,6 +1,11 @@
 # Reviewed finding consolidation and payload publication
 
-Current follow-up: [Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md) describes the local default-off proof/lifecycle/publication/UI implementation under final verification. The earlier checkpoint below retains its historical scope. No normal-data activation has occurred.
+Current checkpoint (14 November): Stage A is locally activated through 0055
+and remains default-off; manual acceptance is deferred. Stage B preview is
+hosted-verified at 531d8e9, and reserved storage is committed in 2751c3b.
+[Storage review](OBSERVATION_PUBLICATION_STORAGE.md) records full local checks.
+Migration 0056 is not activated; payload publication and Undo remain unavailable.
+The earlier design checkpoints below are historical, not current delivery status.
 
 PB-1.3 staged design, 11 November 2026.
 

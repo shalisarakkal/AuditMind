@@ -1,6 +1,8 @@
 # Project status and next steps
 
-Updated 12 November 2026 against the delivered application and exact-SHA hosted
+Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
+
+Updated 14 November 2026; the current checkpoint above supersedes earlier hosted
 results. This replaces the pre-implementation assessment; its historical text is
 retained in [the e4c7488 version](https://github.com/shalisarakkal/AuditMind/blob/e4c7488/docs/PROJECT_STATUS_AND_NEXT_STEPS.md).
 
@@ -8,13 +10,14 @@ retained in [the e4c7488 version](https://github.com/shalisarakkal/AuditMind/blo
 
 | Scope | Verified status |
 | --- | --- |
-| Committed application | `bb07019e599bfb714a96b0b12a362f4550eadf95`; all four hosted Linux jobs passed in [run 43323043722](https://github.com/shalisarakkal/AuditMind/actions/runs/43323043722). The new uncommitted Stage A publication/proof/lifecycle/UI increment is not covered by this hosted result. |
+| Committed application source | `2751c3b` storage foundation; full local verification below. Preview `531d8e9` passed all four jobs in [run 43538479642](https://github.com/shalisarakkal/AuditMind/actions/runs/43538479642). [Storage delivery CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). |
 | Suppression/retained-source delivery | `f97a4fbf29a728a45087f03d8dabf6ea21950d4b`; all four jobs passed in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797) |
-| Recorded local schema | 0050, activated with clean drift; the draft-save fix required no migration |
+| Recorded local schema | 0055, activated with clean drift; reserved-storage migration 0056 is not activated |
 | Suppression availability | Authorized native Nessus preview/suppress/clear APIs and guarded UI are delivered; current independent identity reviews are required |
 | Source lifecycle | Purge retains the minimal ledger; clear/restore refuse conflicting retained payloads, including aliases; possible reappearances stay visible until independently reviewed |
 | Unchanged drafts | Save draft disabled without persisted changes; identical valid saves preserve version, timestamp, audit and evidence revision; stale/source checks remain |
-| Local validation scopes | Suppression: 120 expanded backend, three final indexed, 576 frontend and 103 Chrome checks. Draft-save: 54 backend and 15 component tests, lint/build. Counts overlap, not full-suite totals |
+| Current local validation | Full backend 1,981 passed; frontend 585 passed across 61 files; Chrome 106 checks passed; lint/build, migration/drift, performance and security scopes passed as detailed below |
+| Historical overlapping scopes | Suppression: 120 expanded backend, three final indexed, 576 frontend and 103 Chrome checks. Draft-save: 54 backend and 15 component tests, lint/build. These overlap later full runs |
 
 [Release evidence](SUPPRESSION_RELEASE_REVIEW.md),
 [verification steps](EVIDENCE_USER_VERIFICATION.md),
@@ -177,12 +180,12 @@ additional identity mappings, larger groups and automatic reconciliation.
 - [x] Automated verification remains complete: local/hosted Chrome, backend,
   frontend and security checks passed; local schema activation is at `0055`.
   This is separate from manual user/pilot acceptance.
-- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+- [x] Delivered in `531d8e9` (hosted Linux verified): Stage B's versioned native observation
   payload contract, ownership/identity/context admission and bounded read-only
   publication preview, following the [publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
   Preserve finding ownership/workflow and retained history. Publication writes,
   scoring/evidence invalidation and guarded UI must be reviewed/tested before
-  exposing Apply. Stage B is not implemented by this documentation update.
+  exposing Apply. The preview is complete; Stage B publication remains incomplete.
 
 Deferring manual acceptance does not close PB-1.3 or approve broader feature
 rollout. Existing settings, partial test records and running services are unchanged.
@@ -205,3 +208,29 @@ restart is included. This increment requires exact-commit hosted verification
 before activation; Stage A manual acceptance
 remains TODO/deferred. Next is reviewed snapshot/decision storage and atomic
 publish/undo with consumer/lifecycle/proof guards before exposing Apply.
+
+
+## 14 November: reviewed Stage B storage delivery
+
+Application source: `2751c3b`. [Storage contract and review](OBSERVATION_PUBLICATION_STORAGE.md).
+Migration 0056 reserves source-owned before/after snapshots, minimal retained
+receipts, exact current-generation references and indexed dependencies. A
+reproduced cross-tenant snapshot-owner gap is fixed by a snapshot-only database
+guard. Actor lookups have an index; a redundant history index was removed.
+
+Verification: full backend **1,981 passed in 2,180.81 seconds**; frontend **585
+passed across 61 files**; lint/production build passed; installed Chrome **106
+checks passed**. The final storage suite passed **18 checks in 38.09 seconds**
+(overlaps the full suite). Migration up/down/drift, retention, tenant boundaries,
+actor deletion and the indexed 100,000-dependency probe passed. One local warm
+probe measured 0.151 ms; this is not API latency or SaaS capacity evidence.
+High-severity Bandit, tracked-secret checks, pip consistency and the backend
+dependency audit passed. Frontend production audit found zero vulnerabilities;
+seven moderate ESLint-chain development findings are a separate dependency follow-up.
+
+No normal migration, restart, source-field publication or feature enablement was
+performed. Still required: default-off publication settings, authorized atomic
+Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
+PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
+is the post-push acceptance gate; see the main workflow and delivery confirmation
+for the exact pushed-commit result.

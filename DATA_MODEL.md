@@ -223,7 +223,8 @@ and finding ID, plus an organization/scan/finding index, for targeted lifecycle 
 `0055` adds `organization_consolidation_settings`: organization UUID primary key
 with organization-cascade ownership, non-null enabled flag default False and
 integer version default 0. Disabling does not clear existing memberships.
-These migrations are not activated on the normal application database. See
+Stage A migrations through `0055` were activated locally on 13 November; the
+subsequent storage migration `0056` remains unactivated. See
 [Stage A contract](docs/CONSOLIDATION_RELEASE_REVIEW.md).
 
 
@@ -235,5 +236,27 @@ legacy rows are unchanged; no schema migration, index rebuild or backfill is
 required. The strict mapping is independent of reviewed identity and does not
 authorize publication. A read-only preview returns bounded differences and full
 hashes while distinguishing original retention ownership from proposed display
-provenance. No publication snapshots, decision tables or current publication
-pointers have been added yet. See [contract and limits](docs/OBSERVATION_PAYLOAD_PREVIEW.md).
+provenance. The preview-only checkpoint did not add publication storage; the subsequent
+reserved storage increment is described below. See [contract and limits](docs/OBSERVATION_PAYLOAD_PREVIEW.md).
+
+
+## Stage B reserved publication storage — migration 0056
+
+Application source `2751c3b`; normal database activation remains deferred at
+0055. Four empty tables reserve minimal receipts, source-owned before/after
+payloads, exact current generations and indexed source dependencies. No Finding
+column or active index is rebuilt and no historical source data is rewritten.
+
+Receipts have tenant-scoped request and finding/version uniqueness and retain
+only bounded audit text, UUIDs and hashes. Snapshots reference the exact
+organization/finding/decision and cascade on either Finding or supplying Scan
+purge. A snapshot-only insert/owner-update guard checks both live owner tenants.
+State uses an exact organization/finding/decision/version foreign key, with one
+current row per target. Dependencies preserve historical UUIDs and provide
+targeted organization/kind/resource lookups. Organization purge removes all four
+tables' owned records; user deletion nulls the actor reference and keeps its label.
+Downgrade refuses to discard retained receipts, including undone history.
+
+These rows confer no publication authority. Publish/Undo, feature opt-in,
+consumer/proof invalidation, lifecycle admission and UI remain future work.
+See [storage contract and verified review](docs/OBSERVATION_PUBLICATION_STORAGE.md).

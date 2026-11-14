@@ -1,5 +1,9 @@
 # Consolidation foundation review
 
+Historical Stage A foundation record. Current delivery is described in the
+[Stage A release review](CONSOLIDATION_RELEASE_REVIEW.md) and
+[Stage B storage review](OBSERVATION_PUBLICATION_STORAGE.md).
+
 Review date: 12 November 2026. Local schema: `0052`.
 
 The read-only foundation and membership/dependency schema are implemented and

@@ -1,5 +1,7 @@
 # Phase 4 remediation workflow validation
 
+Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
+
 ## Current verified application - 11 November 2026
 
 - Suppression/retained-source delivery `f97a4fb`: all four hosted Linux jobs
@@ -2830,3 +2832,29 @@ the reviewer draft/inventory/evaluation path; artifacts:
 This is a focused run, not a rerun of the full 71-check browser suite or exhaustive
 approval/revocation browser acceptance.
 Dashboard scoring integration and performance acceptance remain pending.
+
+
+## 14 November: reviewed Stage B storage delivery
+
+Application source: `2751c3b`. [Storage contract and review](OBSERVATION_PUBLICATION_STORAGE.md).
+Migration 0056 reserves source-owned before/after snapshots, minimal retained
+receipts, exact current-generation references and indexed dependencies. A
+reproduced cross-tenant snapshot-owner gap is fixed by a snapshot-only database
+guard. Actor lookups have an index; a redundant history index was removed.
+
+Verification: full backend **1,981 passed in 2,180.81 seconds**; frontend **585
+passed across 61 files**; lint/production build passed; installed Chrome **106
+checks passed**. The final storage suite passed **18 checks in 38.09 seconds**
+(overlaps the full suite). Migration up/down/drift, retention, tenant boundaries,
+actor deletion and the indexed 100,000-dependency probe passed. One local warm
+probe measured 0.151 ms; this is not API latency or SaaS capacity evidence.
+High-severity Bandit, tracked-secret checks, pip consistency and the backend
+dependency audit passed. Frontend production audit found zero vulnerabilities;
+seven moderate ESLint-chain development findings are a separate dependency follow-up.
+
+No normal migration, restart, source-field publication or feature enablement was
+performed. Still required: default-off publication settings, authorized atomic
+Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
+PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
+is the post-push acceptance gate; see the main workflow and delivery confirmation
+for the exact pushed-commit result.

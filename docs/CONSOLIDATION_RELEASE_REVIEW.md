@@ -1,5 +1,7 @@
 # Reviewed native pair consolidation
 
+Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
+
 Current status, 13 November 2026: Stage A is implemented and activated locally
 through schema `0055`. Hosted Linux checks passed for the application and the
 subsequent documentation checkpoint. The feature defaults **Off** for every
@@ -269,12 +271,38 @@ additional identity mappings, larger groups and automatic reconciliation.
 - [x] Automated verification remains complete: local/hosted Chrome, backend,
   frontend and security checks passed; local schema activation is at `0055`.
   This is separate from manual user/pilot acceptance.
-- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+- [x] Delivered in `531d8e9` (hosted Linux verified): Stage B's versioned native observation
   payload contract, ownership/identity/context admission and bounded read-only
   publication preview, following the [publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md).
   Preserve finding ownership/workflow and retained history. Publication writes,
   scoring/evidence invalidation and guarded UI must be reviewed/tested before
-  exposing Apply. Stage B is not implemented by this documentation update.
+  exposing Apply. The preview is complete; Stage B publication remains incomplete.
 
 Deferring manual acceptance does not close PB-1.3 or approve broader feature
 rollout. Existing settings, partial test records and running services are unchanged.
+
+
+## 14 November: reviewed Stage B storage delivery
+
+Application source: `2751c3b`. [Storage contract and review](OBSERVATION_PUBLICATION_STORAGE.md).
+Migration 0056 reserves source-owned before/after snapshots, minimal retained
+receipts, exact current-generation references and indexed dependencies. A
+reproduced cross-tenant snapshot-owner gap is fixed by a snapshot-only database
+guard. Actor lookups have an index; a redundant history index was removed.
+
+Verification: full backend **1,981 passed in 2,180.81 seconds**; frontend **585
+passed across 61 files**; lint/production build passed; installed Chrome **106
+checks passed**. The final storage suite passed **18 checks in 38.09 seconds**
+(overlaps the full suite). Migration up/down/drift, retention, tenant boundaries,
+actor deletion and the indexed 100,000-dependency probe passed. One local warm
+probe measured 0.151 ms; this is not API latency or SaaS capacity evidence.
+High-severity Bandit, tracked-secret checks, pip consistency and the backend
+dependency audit passed. Frontend production audit found zero vulnerabilities;
+seven moderate ESLint-chain development findings are a separate dependency follow-up.
+
+No normal migration, restart, source-field publication or feature enablement was
+performed. Still required: default-off publication settings, authorized atomic
+Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
+PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
+is the post-push acceptance gate; see the main workflow and delivery confirmation
+for the exact pushed-commit result.

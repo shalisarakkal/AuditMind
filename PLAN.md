@@ -1,6 +1,6 @@
 # AuditMind AI — Delivery Plan
 
-Current local checkpoint (13 November): Stage A is pushed and Linux-verified at `427596b`; local activation through `0055` is complete. Consolidation remains default-off. See [release review](docs/CONSOLIDATION_RELEASE_REVIEW.md). Earlier dated entries below are historical checkpoints.
+Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](docs/OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
 
 ## PB-1.3 consolidation/publication design - 11 November 2026
 
@@ -2949,12 +2949,12 @@ additional identity mappings, larger groups and automatic reconciliation.
 - [x] Automated verification remains complete: local/hosted Chrome, backend,
   frontend and security checks passed; local schema activation is at `0055`.
   This is separate from manual user/pilot acceptance.
-- [ ] Next PB-1.3 engineering increment: Stage B's versioned native observation
+- [x] Delivered in `531d8e9` (hosted Linux verified): Stage B's versioned native observation
   payload contract, ownership/identity/context admission and bounded read-only
   publication preview, following the [publication design](docs/REVIEWED_FINDING_PUBLICATION_DESIGN.md).
   Preserve finding ownership/workflow and retained history. Publication writes,
   scoring/evidence invalidation and guarded UI must be reviewed/tested before
-  exposing Apply. Stage B is not implemented by this documentation update.
+  exposing Apply. The preview is complete; Stage B publication remains incomplete.
 
 Deferring manual acceptance does not close PB-1.3 or approve broader feature
 rollout. Existing settings, partial test records and running services are unchanged.
@@ -2977,3 +2977,43 @@ restart is included. This increment requires exact-commit hosted verification
 before activation; Stage A manual acceptance
 remains TODO/deferred. Next is reviewed snapshot/decision storage and atomic
 publish/undo with consumer/lifecycle/proof guards before exposing Apply.
+
+## Stage B storage follow-up — 13 November
+
+The preview foundation `531d8e9` is pushed and all four Linux CI jobs passed.
+Current work reserves source-owned before/after snapshots, minimal retained
+decision receipts, exact current-generation references and indexed dependencies
+in migration 0056. See [storage scope](docs/OBSERVATION_PUBLICATION_STORAGE.md).
+No publication route or normal database activation is included. Transaction,
+consumer/proof/lifecycle integration and guarded UI remain required before writes.
+
+Storage verification passed: 48 isolated PostgreSQL storage/preview/migration
+checks, then all 12 final storage checks including retained-receipt downgrade
+protection (overlapping scopes). Compilation, high-severity Bandit and whitespace
+checks passed. Storage is committed in `2751c3b`; normal database activation remains deferred.
+
+
+## 14 November: reviewed Stage B storage delivery
+
+Application source: `2751c3b`. [Storage contract and review](docs/OBSERVATION_PUBLICATION_STORAGE.md).
+Migration 0056 reserves source-owned before/after snapshots, minimal retained
+receipts, exact current-generation references and indexed dependencies. A
+reproduced cross-tenant snapshot-owner gap is fixed by a snapshot-only database
+guard. Actor lookups have an index; a redundant history index was removed.
+
+Verification: full backend **1,981 passed in 2,180.81 seconds**; frontend **585
+passed across 61 files**; lint/production build passed; installed Chrome **106
+checks passed**. The final storage suite passed **18 checks in 38.09 seconds**
+(overlaps the full suite). Migration up/down/drift, retention, tenant boundaries,
+actor deletion and the indexed 100,000-dependency probe passed. One local warm
+probe measured 0.151 ms; this is not API latency or SaaS capacity evidence.
+High-severity Bandit, tracked-secret checks, pip consistency and the backend
+dependency audit passed. Frontend production audit found zero vulnerabilities;
+seven moderate ESLint-chain development findings are a separate dependency follow-up.
+
+No normal migration, restart, source-field publication or feature enablement was
+performed. Still required: default-off publication settings, authorized atomic
+Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
+PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
+is the post-push acceptance gate; see the main workflow and delivery confirmation
+for the exact pushed-commit result.
