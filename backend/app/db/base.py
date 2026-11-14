@@ -13,6 +13,7 @@ from app.models.finding import Finding
 from app.models.finding_verification import OrganizationRiskPolicy, FindingVerification
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
+from app.models.observation_publication import ObservationPublicationDecision, ObservationPublicationSnapshot, ObservationPublicationState, ObservationPublicationDependency
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.finding_consolidation import (FindingConsolidation, FindingConsolidationDecision,
@@ -50,6 +51,9 @@ register_status_scoring(Base.metadata)
 from app.db.consolidation_proof import register as register_consolidation_proof
 register_consolidation_proof(Base.metadata)
 
+from app.db.publication_storage import register as register_publication_storage
+register_publication_storage(Base.metadata)
+
 __all__ = [
     "WorkerDispatch",
     "OrganizationEvidenceRevision",
@@ -67,6 +71,10 @@ __all__ = [
     "Finding",
     "FindingHistory",
     "FindingObservation",
+    "ObservationPublicationDecision",
+    "ObservationPublicationSnapshot",
+    "ObservationPublicationState",
+    "ObservationPublicationDependency",
     "IdentityTool",
     "ObservationIdentityBinding",
     "FindingCanonicalDecision",
