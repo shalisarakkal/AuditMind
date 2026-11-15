@@ -1,6 +1,7 @@
 "use client";
 
 import FindingIdentityBinding from "./FindingIdentityBinding";
+import { ObservationPublicationPreview } from "./FindingPublication";
 import FindingIdentityComparison from "./FindingIdentityComparison";
 import FindingCanonicalHistory from "./FindingCanonicalHistory";
 import { useState } from "react";
@@ -50,6 +51,7 @@ export default function FindingObservations({ orgId, findingId, canReview = fals
         </details>}
         {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityBinding orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
         {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityComparison orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
+        {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <ObservationPublicationPreview orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} />}
         <details><summary>Observation ID</summary><p className="break-all">{row.id}</p></details>
         <details><summary>Import ID</summary><p className="break-all">{row.import_id}</p></details>
       </li>)}</ol> : <p className="mt-3 text-sm">No source observations recorded.</p>}

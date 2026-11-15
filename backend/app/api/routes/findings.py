@@ -47,6 +47,18 @@ from app.db.list_sort import severity_rank, finding_text_size, TEXT_SORT_BYTES
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
 
 
+@router.get("/findings/{finding_id}/publication-status")
+def observation_publication_status(org_id: uuid.UUID, finding_id: uuid.UUID, response: Response,
+        limit: int = Query(20, ge=1, le=20), before_version: int | None = Query(None, ge=1),
+        db: Session = Depends(get_db), _: OrgMembership = Depends(require_org_member)):
+    from app.services.publication_read import read
+    if db.new or db.dirty or db.deleted:
+        raise HTTPException(409, 'Pending database changes must be completed before reading history')
+    db.rollback()
+    response.headers['Cache-Control'] = 'no-store'
+    return read(db, org_id, finding_id, limit=limit, before_version=before_version)
+
+
 @router.post("/findings/{finding_id}/observations/{observation_id}/publication-preview")
 def observation_publication_preview(org_id: uuid.UUID, finding_id: uuid.UUID, observation_id: uuid.UUID,
         payload: PublicationPreviewRequest,

@@ -1,5 +1,10 @@
 # Stage B publication consumers and lifecycle guards
 
+Read-only checkpoint reviewed 15 November: [publication provenance and scanner-field preview](OBSERVATION_PUBLICATION_UI.md)
+verified locally: 120 post-review backend checks, 595 frontend tests and 107
+Chrome checks passed. No public writer, setting, migration or normal application
+restart is added. This read-only checkpoint remains unactivated; prior checkpoints below are historical.
+
 14 November 2026 private integration checkpoint after core `fceedd4`.
 This work is not activated. There is no public Publish/Undo/settings writer
 and no new GUI. Normal schema remains 0055; migrations 0056 through 0058 require

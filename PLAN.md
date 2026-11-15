@@ -1,5 +1,10 @@
 # AuditMind AI — Delivery Plan
 
+Read-only checkpoint reviewed 15 November: [publication provenance and scanner-field preview](docs/OBSERVATION_PUBLICATION_UI.md)
+verified locally: 120 post-review backend checks, 595 frontend tests and 107
+Chrome checks passed. No public writer, setting, migration or normal application
+restart is added. This read-only checkpoint remains unactivated; prior checkpoints below are historical.
+
 Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](docs/OBSERVATION_PUBLICATION_INTEGRATION.md)
 verified locally: 2,070 full backend tests and 106 browser checks passed.
 This private checkpoint remains unactivated;

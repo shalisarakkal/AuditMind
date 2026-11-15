@@ -1089,3 +1089,15 @@ checks passed. Retained history paging and reapply after undo are covered.
 Changes remain uncommitted; normal-data migration/restart and hosted Linux CI
 for this increment remain pending. Consolidation stays default-off. See
 [scope, measurements, activation and verification](CONSOLIDATION_RELEASE_REVIEW.md).
+
+
+### Publication provenance and scanner differences (pending activation)
+
+The pending read-only increment adds **Show publication history** in a single
+finding's Workflow window. It shows recorded decisions and source retention,
+not permission to publish or undo. Admins can open **Show source observations** ?
+**Preview scanner-field differences** for supported native observations. The preview
+changes no data. Original owner import and compared/decision source are different
+references, and missing source time is shown as Not provided. Publication storage
+that is not installed is labeled unavailable pending database activation. See
+[the read-only guide](OBSERVATION_PUBLICATION_UI.md) for recovery meanings and limits.
