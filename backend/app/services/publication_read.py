@@ -13,14 +13,10 @@ from app.models.observation_publication import (
 )
 
 CONTRACTS = ('observation-publication-core-v1', 'observation-publication-consumers-v1')
-NOTICE = 'Read-only retention metadata. Current scanner fields, identity and eligibility require a fresh review. Publish and Undo are unavailable.'
+NOTICE = 'Read-only retention metadata. Current scanner fields, identity and eligibility require a fresh review. This view does not authorize Publish or Undo.'
 
 
-def _read(db, org_id, finding_id, *, limit=20, before_version=None):
-    finding = db.execute(select(Finding.scan_id, Finding.asset_id, Finding.created_at).where(
-        Finding.org_id == org_id, Finding.id == finding_id)).one_or_none()
-    if finding is None:
-        raise HTTPException(404, 'Finding not found')
+def storage_available(db):
     tables = ('observation_publication_decisions', 'observation_publication_states', 'observation_publication_snapshots')
     installed = all(db.scalar(select(func.to_regclass(name))) is not None for name in tables)
     if installed:
@@ -30,6 +26,15 @@ def _read(db, org_id, finding_id, *, limit=20, before_version=None):
             WHERE attrelid = to_regclass('observation_publication_decisions')
               AND attname IN ('admission_contract', 'source_context_hash')
               AND attnum > 0 AND NOT attisdropped'''))
+    return bool(installed)
+
+
+def _read(db, org_id, finding_id, *, limit=20, before_version=None):
+    finding = db.execute(select(Finding.scan_id, Finding.asset_id, Finding.created_at).where(
+        Finding.org_id == org_id, Finding.id == finding_id)).one_or_none()
+    if finding is None:
+        raise HTTPException(404, 'Finding not found')
+    installed = storage_available(db)
     if not installed:
         return dict(availability='not_installed', status='unavailable', current=None, items=[],
             has_more=False, next_before_version=None, publish_available=False, undo_available=False,

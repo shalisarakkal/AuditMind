@@ -802,3 +802,8 @@ Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
 PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
 is the post-push acceptance gate; see the main workflow and delivery confirmation
 for the exact pushed-commit result.
+
+
+### Guarded publication actions - local checkpoint, 2026-11-15
+
+See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Normal database activation remains pending; legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Commit/push, hosted CI and coordinated activation remain pending.

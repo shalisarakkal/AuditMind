@@ -1,5 +1,7 @@
 # AuditMind Product Backlog
 
+Latest local work (15 November): [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds the separate default-off organization setting and authorized single-finding Publish/Undo UI/API. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Prior checkpoint descriptions below are historical. Normal database activation and hosted CI for this increment are pending.
+
 Read-only checkpoint reviewed 15 November: [publication provenance and scanner-field preview](OBSERVATION_PUBLICATION_UI.md)
 verified locally: 120 post-review backend checks, 595 frontend tests and 107
 Chrome checks passed. No public writer, setting, migration or normal application
@@ -894,3 +896,8 @@ for the exact pushed-commit result.
   moderate ESLint/minimatch development-chain findings with compatibility tests.
   Production frontend audit: zero findings; no high/critical development findings.
   Do not apply the audit tool's forced downgrade without compatibility review.
+
+
+### Guarded publication actions - local checkpoint, 2026-11-15
+
+See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Normal database activation remains pending; legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Commit/push, hosted CI and coordinated activation remain pending.

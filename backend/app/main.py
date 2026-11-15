@@ -27,6 +27,7 @@ from app.api.routes import (
     identity_bindings,
     finding_suppressions,
     finding_consolidations,
+    observation_publication,
 )
 from app.core.config import check_secret_key, settings
 from app.core.middleware import DOCUMENT_MAX_BYTES, SecurityHeadersMiddleware, UploadSizeLimitMiddleware
@@ -85,6 +86,7 @@ app.include_router(status_scoring.router, prefix=api_router_prefix)
 app.include_router(identity_bindings.router, prefix=api_router_prefix)
 app.include_router(finding_suppressions.router, prefix=api_router_prefix)
 app.include_router(finding_consolidations.router, prefix=api_router_prefix)
+app.include_router(observation_publication.router, prefix=api_router_prefix)
 
 
 @app.get(f"{api_router_prefix}/upload-limits", tags=["uploads"])

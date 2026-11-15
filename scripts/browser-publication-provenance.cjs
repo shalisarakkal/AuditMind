@@ -39,4 +39,38 @@ module.exports=async function({page:p,admin,viewer,base,org,list,check}) {
   assert.equal((await viewer.request(list+`/${target.id}/publication-status`)).status,200);
   assert.equal((await viewer.request(list+`/${target.id}/observations/${selected.id}/publication-preview`,'POST',{})).status,403);
   check('Read-only publication history and real native differences preserve scanner/workflow fields, expose no writer, enforce roles and pass mobile/Axe');
+  const actionRoot=org+'/observation-publication';
+  const configuration=await admin.request(actionRoot+'/settings');assert.equal(configuration.status,200);assert.equal(configuration.body.enabled,false);
+  assert.equal((await admin.request(actionRoot+'/settings','PATCH',{expected_version:0,enabled:true})).status,200);
+  await p.setViewportSize({width:1440,height:1000});
+  async function workflow(){
+    await p.goto(base+`/findings/lookup?org=${org.split('/').at(-1)}&finding_id=${target.id}`);
+    await p.getByRole('row').filter({has:p.getByText(name,{exact:true})}).getByRole('button',{name:'Workflow',exact:true}).click();
+    return p.getByRole('dialog',{name:'Finding workflow',exact:true});
+  }
+  const writing=await workflow();
+  await writing.getByRole('button',{name:'Show source observations',exact:true}).click();
+  const reviewed=writing.getByRole('listitem').filter({hasText:'publication-browser-later.nessus'});
+  await reviewed.getByRole('button',{name:'Preview scanner-field differences',exact:true}).click();
+  await reviewed.getByRole('button',{name:'Review publication',exact:true}).click();
+  const action=p.getByRole('dialog',{name:'Publish reviewed scanner fields',exact:true});
+  await expect(action.getByRole('button',{name:'Publish scanner fields',exact:true})).toBeDisabled();
+  await action.getByLabel('Publication review rationale',{exact:true}).fill('Reviewed native source acceptance');
+  await action.getByRole('checkbox').check();
+  for(const width of [320,1440]) {await p.setViewportSize({width,height:1000});assert.ok(await action.evaluate(node=>node.scrollWidth<=node.clientWidth));}
+  const actionAxe=await new AxeBuilder({page:p}).include('dialog[open]').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(actionAxe.violations.map(row=>row.id),[]);
+  await action.getByRole('button',{name:'Publish scanner fields',exact:true}).click();await expect(action).not.toBeVisible();
+  assert.equal((await admin.request(list+'?q='+encodeURIComponent(name))).body.items.find(row=>row.id===target.id).severity,'critical');
+  assert.deepEqual((await admin.request(list+`/${target.id}/workflow`)).body,beforeWorkflow);
+  assert.equal((await admin.request(actionRoot+'/settings','PATCH',{expected_version:1,enabled:false})).status,200);
+  const undoing=await workflow();await undoing.getByRole('button',{name:'Show publication history',exact:true}).click();
+  await undoing.getByRole('button',{name:'Review Undo publication',exact:true}).click();
+  const undo=p.getByRole('dialog',{name:'Undo scanner-field publication',exact:true});
+  await undo.getByLabel('Publication review rationale',{exact:true}).fill('Restore retained native snapshot');await undo.getByRole('checkbox').check();
+  await undo.getByRole('button',{name:'Undo publication',exact:true}).click();await expect(undo).not.toBeVisible();
+  assert.equal((await admin.request(list+'?q='+encodeURIComponent(name))).body.items.find(row=>row.id===target.id).severity,'medium');
+  assert.deepEqual((await admin.request(list+`/${target.id}/workflow`)).body,beforeWorkflow);
+  assert.equal((await admin.request(list+`/${target.id}/publication-status`)).body.status,'undone');
+  check('Default-off guarded Publish and policy-off Undo work in Chrome, preserve workflow, restore severity and pass mobile/Axe');
+
 };

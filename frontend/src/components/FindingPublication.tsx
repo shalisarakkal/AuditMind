@@ -5,6 +5,7 @@ import { api } from "@/lib/apiClient";
 import { useApi } from "@/lib/useApi";
 import { formatDateTime } from "@/lib/domain";
 import { enumLabel } from "@/lib/presentation";
+import PublicationAction from "./PublicationAction";
 import { DIALOG_NEUTRAL } from "./DialogActions";
 
 type Source = { id: string | null; filename: string | null; retained: boolean; archived: boolean; status: string | null };
@@ -20,7 +21,8 @@ function sourceLabel(source: Source) {
   return `${source.filename || (source.id ? "Import reference" : "No import linked")}${!source.retained && source.id ? " (no longer retained)" : source.archived ? " (archived)" : ""}`;
 }
 
-export default function FindingPublication({ orgId, findingId, disabled = false }: { orgId: string; findingId: string; disabled?: boolean }) {
+type Actions = { canReview?: boolean; hasWorkflowDraft?: boolean; onBusyChange?(busy: boolean): void; onChanged?(): void };
+export default function FindingPublication({ orgId, findingId, disabled = false, ...actions }: { orgId: string; findingId: string; disabled?: boolean } & Actions) {
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<number[]>([]);
   const before = pages.at(-1);
@@ -28,9 +30,10 @@ export default function FindingPublication({ orgId, findingId, disabled = false 
   return <section aria-label="Scanner-field publication history" className="mt-5 min-w-0 border-t border-white/15 pt-3">
     <button type="button" disabled={disabled} aria-expanded={open} className="text-cyan underline disabled:opacity-50" onClick={() => setOpen(value => !value)}>{open ? "Hide publication history" : "Show publication history"}</button>
     {open && <div className="mt-3 min-w-0 space-y-3 text-sm [overflow-wrap:anywhere]">
-      <p className="text-white/70">Read-only source provenance. Publish and Undo are unavailable. Workflow decisions and source ownership are preserved.</p>
+      <p className="text-white/70">Read-only source provenance. Publication actions require a separate fresh review. Workflow decisions and source ownership are preserved.</p>
       {history.loading ? <p role="status">Loading publication history...</p> : history.error ? <p role="alert">{history.error} <button type="button" className="text-cyan underline" onClick={history.reload}>Retry publication history</button></p> : history.data && <>
         <p className="font-semibold">{states[history.data.status] || "Unrecognized publication state"}</p>
+        {actions.canReview && actions.onChanged && history.data.status === "published" && history.data.current?.admission_contract === "observation-publication-consumers-v1" && <PublicationAction orgId={orgId} findingId={findingId} disabled={disabled} hasWorkflowDraft={actions.hasWorkflowDraft} onBusyChange={actions.onBusyChange} onChanged={actions.onChanged} />}
         {history.data.original_source && <p>Original owner import: {sourceLabel(history.data.original_source)}</p>}
         {history.data.current && <p>Current recorded generation: {history.data.current.version} · Decision source: {sourceLabel(history.data.current.source)}</p>}
         <p className="text-xs text-white/70">{history.data.message}</p>
@@ -64,10 +67,11 @@ function summaryText(summary: Summary, field: string) {
   return typeof summary.value === "string" ? field === "severity" ? enumLabel(summary.value) : summary.value : JSON.stringify(summary.value);
 }
 
-export function ObservationPublicationPreview({ orgId, findingId, observationId, disabled = false }: { orgId: string; findingId: string; observationId: string; disabled?: boolean }) {
+export function ObservationPublicationPreview({ orgId, findingId, observationId, disabled = false, ...actions }: { orgId: string; findingId: string; observationId: string; disabled?: boolean } & Actions) {
   const [open, setOpen] = useState(false);
   return <section aria-label="Read-only scanner-field preview" className="mt-3 min-w-0">
     <button type="button" disabled={disabled} aria-expanded={open} className="text-cyan underline disabled:opacity-50" onClick={() => setOpen(value => !value)}>{open ? "Hide scanner-field preview" : "Preview scanner-field differences"}</button>
+    {open && actions.canReview && actions.onChanged && <PublicationAction orgId={orgId} findingId={findingId} observationId={observationId} disabled={disabled} hasWorkflowDraft={actions.hasWorkflowDraft} onBusyChange={actions.onBusyChange} onChanged={actions.onChanged} />}
     {open && <PreviewBody key={`${orgId}:${findingId}:${observationId}`} orgId={orgId} findingId={findingId} observationId={observationId} disabled={disabled} onClose={() => setOpen(false)} />}
   </section>;
 }

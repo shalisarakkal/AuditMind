@@ -24,7 +24,7 @@ const reasons: Record<string, string> = {
   source_observed_time_invalid: "Source observed time is invalid or has no timezone offset",
 };
 
-export default function FindingObservations({ orgId, findingId, canReview = false, disabled = false, onBusyChange }: { orgId: string; findingId: string; canReview?: boolean; disabled?: boolean; onBusyChange?(busy: boolean): void }) {
+export default function FindingObservations({ orgId, findingId, canReview = false, disabled = false, onBusyChange, hasWorkflowDraft, onPublicationChanged }: { orgId: string; findingId: string; canReview?: boolean; disabled?: boolean; onBusyChange?(busy: boolean): void; hasWorkflowDraft?: boolean; onPublicationChanged?(): void }) {
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<string[]>([]);
   const before = pages.at(-1);
@@ -51,7 +51,7 @@ export default function FindingObservations({ orgId, findingId, canReview = fals
         </details>}
         {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityBinding orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
         {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <FindingIdentityComparison orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} onBusyChange={onBusyChange} onSaved={rows.reload} />}
-        {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <ObservationPublicationPreview orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} />}
+        {canReview && row.identity_assessment?.mapping === "nessus-plugin-service-v1" && <ObservationPublicationPreview canReview={canReview} hasWorkflowDraft={hasWorkflowDraft} onBusyChange={onBusyChange} onChanged={onPublicationChanged} orgId={orgId} findingId={findingId} observationId={row.id} disabled={disabled} />}
         <details><summary>Observation ID</summary><p className="break-all">{row.id}</p></details>
         <details><summary>Import ID</summary><p className="break-all">{row.import_id}</p></details>
       </li>)}</ol> : <p className="mt-3 text-sm">No source observations recorded.</p>}

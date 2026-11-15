@@ -42,7 +42,7 @@ SOURCE_KEYS = ('native_identity', 'candidate_key', 'identity_binding', 'observat
 
 
 class PublicationRequest(BaseModel):
-    """Internal request, absent from HTTP/OpenAPI. No replacement data accepted."""
+    """Strict reviewed-operation request. No replacement scanner data accepted."""
     model_config = ConfigDict(extra='forbid')
     request_id: uuid.UUID
     expected_version: int = Field(strict=True, ge=0, le=2_147_483_646)
