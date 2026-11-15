@@ -518,7 +518,7 @@ class _Runner:
                 duplicates += self.db.execute(
                     text(
                         "DELETE FROM findings f WHERE f.id = ANY(:ids) AND f.archived_at IS NOT NULL "
-                        "AND f.consolidation_history_id IS NULL AND f.suppression_history_id IS NULL AND f.suppression_id IS NULL AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
+                        "AND NOT EXISTS (SELECT 1 FROM observation_publication_decisions p WHERE p.org_id=f.org_id AND p.finding_id=f.id) AND f.consolidation_history_id IS NULL AND f.suppression_history_id IS NULL AND f.suppression_id IS NULL AND f.workflow_version = 0 AND f.source IS NOT NULL AND " + target +
                         " AND EXISTS (SELECT 1 FROM findings g WHERE g.org_id = f.org_id "
                         "AND g.archived_at IS NULL AND g.suppression_id IS NULL AND g.consolidation_alias_id IS NULL AND g.source = f.source AND " + identity + ")"
                     ),
@@ -657,14 +657,15 @@ def _check_consolidation_lifecycle(db,org_id,item_type,item_id):
 
 def _check_consolidation_restore_conflict(db,org_id,batch_id,identifiers=None):
     from sqlalchemy.orm import aliased
+    from app.models.observation_publication import ObservationPublicationDecision as Publication
     old,active=aliased(Finding),aliased(Finding)
     conditions=[old.org_id==org_id,old.archive_batch_id==batch_id,old.archived_at.is_not(None),
-        old.consolidation_history_id.is_not(None)]
+        or_(old.consolidation_history_id.is_not(None), select(Publication.id).where(Publication.org_id==old.org_id, Publication.finding_id==old.id).exists())]
     if identifiers is not None:conditions.append(old.id.in_(identifiers))
     conflict=select(active.id).where(active.org_id==org_id,active.id!=old.id,active.archived_at.is_(None),active.suppression_id.is_(None),active.consolidation_alias_id.is_(None),
-        active.consolidation_history_id.is_distinct_from(old.consolidation_history_id),
+        or_(old.consolidation_history_id.is_(None), active.consolidation_history_id.is_distinct_from(old.consolidation_history_id)),
         active.asset_id.is_not_distinct_from(old.asset_id),active.source.is_not_distinct_from(old.source),
         active.category.is_not_distinct_from(old.category),
         or_(old.category.is_not(None),active.description.is_not_distinct_from(old.description)))
     if db.scalar(select(old.id).where(*conditions,conflict.exists()).limit(1)):
-        raise ArchiveError('A restored consolidation history conflicts with another active payload; review the source conflict before restoring')
+        raise ArchiveError('A restored reviewed finding conflicts with another active payload; review the source conflict before restoring')

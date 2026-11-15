@@ -45,6 +45,10 @@ def finding_source(db: Session, org_id: uuid.UUID, source_id: uuid.UUID, *, lock
             if group_digest is None:
                 raise EvidenceSourceError('Current consolidated source context is unavailable; undo or review its retained sources')
             snapshot['group_source_digest']=group_digest
+    from app.services.publication_consumers import context
+    publication = context(db, org_id, finding.id)
+    if publication is not None:
+        snapshot["publication_context"] = publication
     return finding, source_hash(snapshot)
 
 
@@ -105,6 +109,10 @@ def inventory_progress(db: Session, org_id: uuid.UUID):
     consolidation_revision = revision(db,org_id)
     if consolidation_revision:
         digest.update(f':consolidation:{consolidation_revision}'.encode())
+    from app.services.publication_consumers import revision as publication_revision
+    published_revision = publication_revision(db, org_id)
+    if published_revision:
+        digest.update(f":publication:{published_revision}".encode())
     assets = findings = 0
     asset_columns = (Asset.id, Asset.type, Asset.subtype, Asset.type_known, Asset.hostname,
         Asset.ip, Asset.cloud_id, Asset.environment, Asset.criticality, Asset.tags, Asset.details)

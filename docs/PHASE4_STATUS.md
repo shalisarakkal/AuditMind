@@ -1,5 +1,11 @@
 # Phase 4 status and next milestone
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 Local Stage B follow-up (14 November): [private transaction core](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
 implemented with 210 passing targeted unit/integration/regression checks. This private checkpoint has
 no normal migration/restart or public writer is enabled. The earlier

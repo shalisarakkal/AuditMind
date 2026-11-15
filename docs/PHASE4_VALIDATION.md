@@ -1,5 +1,11 @@
 # Phase 4 remediation workflow validation
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 14 November local private-core scope: 210 targeted PostgreSQL/unit/regression
 checks passed in 397.22 seconds; compilation, high-severity Bandit and whitespace
 checks passed. See [transaction scope and open integration gates](OBSERVATION_PUBLICATION_TRANSACTIONS.md).

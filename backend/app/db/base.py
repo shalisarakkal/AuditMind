@@ -13,7 +13,7 @@ from app.models.finding import Finding
 from app.models.finding_verification import OrganizationRiskPolicy, FindingVerification
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
-from app.models.observation_publication import ObservationPublicationDecision, ObservationPublicationSnapshot, ObservationPublicationState, ObservationPublicationDependency, OrganizationPublicationSettings
+from app.models.observation_publication import ObservationPublicationDecision, ObservationPublicationSnapshot, ObservationPublicationState, ObservationPublicationDependency, OrganizationPublicationSettings, OrganizationPublicationRevision
 from app.models.finding_identity_binding import IdentityTool, ObservationIdentityBinding
 from app.models.finding_canonical import FindingCanonicalDecision
 from app.models.finding_consolidation import (FindingConsolidation, FindingConsolidationDecision,
@@ -53,6 +53,8 @@ register_consolidation_proof(Base.metadata)
 
 from app.db.publication_storage import register as register_publication_storage
 register_publication_storage(Base.metadata)
+from app.db.publication_lifecycle import register as register_publication_lifecycle
+register_publication_lifecycle(Base.metadata)
 
 __all__ = [
     "WorkerDispatch",
@@ -75,7 +77,7 @@ __all__ = [
     "ObservationPublicationSnapshot",
     "ObservationPublicationState",
     "ObservationPublicationDependency",
-    "OrganizationPublicationSettings",
+    "OrganizationPublicationSettings", "OrganizationPublicationRevision",
     "IdentityTool",
     "ObservationIdentityBinding",
     "FindingCanonicalDecision",

@@ -9,6 +9,8 @@ from app.models.finding_consolidation import FindingConsolidation, FindingConsol
 
 
 def ensure_free(db, org_id, kind, identifier):
+    from app.services.publication_lifecycle import ensure_free as publication_free
+    publication_free(db, org_id, kind, identifier)
     root=FindingConsolidation
     dependency=FindingConsolidationDependency
     published=exists(select(Finding.id).where(Finding.org_id==root.org_id,

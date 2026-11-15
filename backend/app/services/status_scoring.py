@@ -70,7 +70,24 @@ def eligible_exclusion(instant=None):
         FindingVerification.finding_id==Finding.id,FindingVerification.version==Finding.risk_verification_version,
         FindingVerification.attestation['group_context'].is_not(None))).correlate(Finding)
     scope=case((Finding.consolidation_id.is_(None),~old_group_record),else_=group_record)
-    return and_(scope, Finding.risk_verification_state=='approved',Finding.workflow_status.in_(('resolved','false_positive')),
+    from app.models.observation_publication import ObservationPublicationState as Publication, ObservationPublicationDecision as Receipt
+    publication = exists(select(Publication.finding_id).where(Publication.org_id == Finding.org_id,
+        Publication.finding_id == Finding.id)).correlate(Finding)
+    history = exists(select(Receipt.id).where(Receipt.org_id == Finding.org_id,
+        Receipt.finding_id == Finding.id)).correlate(Finding)
+    bound = exists(select(FindingVerification.id).join(Publication,
+        and_(Publication.org_id == FindingVerification.org_id, Publication.finding_id == FindingVerification.finding_id))
+        .join(Receipt, and_(Receipt.org_id == Publication.org_id, Receipt.id == Publication.decision_id,
+            Receipt.finding_id == Publication.finding_id, Receipt.version == Publication.version))
+        .where(Receipt.admission_contract.in_(('observation-publication-core-v1','observation-publication-consumers-v1')),
+            Receipt.mapping_version == 'nessus-observation-payload-v1', Receipt.source_context_hash.is_not(None),
+            Receipt.operation == case((Publication.state == 'active', 'publish'), else_='undo'),
+            FindingVerification.org_id == Finding.org_id, FindingVerification.finding_id == Finding.id,
+            FindingVerification.version == Finding.risk_verification_version,
+            FindingVerification.attestation['publication_context'] == func.jsonb_build_object(
+                'version', Publication.version, 'decision_id', cast(Publication.decision_id, String), 'state', Publication.state))).correlate(Finding)
+    publication_scope = case((publication, bound), else_=~history)
+    return and_(publication_scope, scope, Finding.risk_verification_state=='approved',Finding.workflow_status.in_(('resolved','false_positive')),
         Finding.risk_verified_workflow_version<=Finding.workflow_version,~status_changed,
         Finding.risk_verified_at<=instant,Finding.risk_verification_expires_at>instant,
         Finding.risk_verified_observation_count==observation_count(),
@@ -236,12 +253,16 @@ def _write_verification(db,org_id,finding_id,member,payload,*,review=False):
         FindingVerification.finding_id==finding_id).order_by(FindingVerification.version.desc()).limit(1))
     from app.services.consolidation_proof import capture as group_proof
     group_context=group_proof(db,org_id,finding) if not review or payload.decision=='approved' else None
+    from app.services.publication_consumers import context as publication_context
+    publication_scope = publication_context(db, org_id, finding.id) if not review or payload.decision == 'approved' else None
     if review:
         if latest is None:raise HTTPException(409,'Submit evidence before reviewing it')
         if payload.decision=='revoked':
             if latest.state!='approved':raise HTTPException(409,'Only an approved decision can be revoked')
         elif latest.state!='pending':raise HTTPException(409,'Submit new evidence before a new review')
         if payload.decision=='approved':
+            if latest.attestation.get('publication_context') != publication_scope:
+                raise HTTPException(409, 'Published source generation changed; submit current evidence again')
             if latest.attestation.get('group_context')!=group_context:
                 raise HTTPException(409,'Consolidated evidence context changed; submit current evidence again')
             changed=db.scalar(select(FindingHistory.id).where(FindingHistory.org_id==org_id,
@@ -275,6 +296,9 @@ def _write_verification(db,org_id,finding_id,member,payload,*,review=False):
     scope=group_context if not review else latest.attestation.get('group_context')
     if scope is not None:
         attestation['group_context']=scope
+    publication_scope = publication_scope if not review else latest.attestation.get('publication_context')
+    if publication_scope is not None:
+        attestation['publication_context'] = publication_scope
     finding.risk_verification_version+=1
     finding.risk_verification_state=state
     finding.risk_verified_workflow_version=finding.workflow_version if state=='approved' else None

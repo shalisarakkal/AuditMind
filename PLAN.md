@@ -1,5 +1,11 @@
 # AuditMind AI — Delivery Plan
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](docs/OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 Local work (14 November): [private Publish/Undo core](docs/OBSERVATION_PUBLICATION_TRANSACTIONS.md)
 implemented and verified with 210 targeted checks. This private checkpoint has no normal
 migration/restart or public write/setting route is enabled. Next are atomic

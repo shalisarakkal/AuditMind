@@ -1,5 +1,11 @@
 # Stage B private Publish/Undo core
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 14 November 2026 engineering increment after the hosted-verified storage
 foundation (`2751c3b`, documentation `62e86e6`). This is a separate private-core checkpoint. No normal database migration or application restart was performed.
 
@@ -90,21 +96,21 @@ Undo requests without selecting a newer payload as the restoration baseline.
 Undo previews show actual bounded source-field differences and full-value hashes.
 Only the source allowlist is restored, and the publication generation advances.
 
-## Integration gates still open
+## Integration follow-up
 
-- Add atomic list/count, Dashboard and evidence invalidation, including stale
-  in-flight Dashboard/evaluation capture fences and consumer provenance.
-- Bind proof/source digests to publication generation **even after Undo**, so
-  returning to equal fields cannot revive an earlier approval or evaluation.
-- Add admission and worker guards for affected archive/restore/purge, identity
-  reviews/tool changes and identity-relevant asset updates, including imports.
-  Protect reviewed history during restore duplicate cleanup. Include current
-  observations added after publication when checking affected resources.
-- Design recovery for changed/missing source context or history growth beyond
-  the supported review bound; never silently overwrite later scanner edits.
-- Add the default-off settings UI, guarded single-target actions, bounded
-  provenance/differences, unknown-outcome handling and Chrome verification.
-- Complete final review/regression and exact-commit Linux CI before activation.
+Atomic consumer/proof invalidation and lifecycle guards are implemented locally
+in the [private consumer increment](OBSERVATION_PUBLICATION_INTEGRATION.md), with
+verification in progress. The core-only and consumer-integrated receipt contracts
+remain separate. This does not open a public writer or activate migrations.
+
+Still required before public enablement:
+
+- Bounded user-facing provenance and recovery for changed/missing source context
+  or history beyond supported limits; never overwrite later edits or guess identity.
+- Default-off settings UI and guarded single-target actions, unknown-outcome
+  handling and Chrome verification of the new actions.
+- Final review/regression, commit/push, exact-commit Linux CI and coordinated
+  migration/application activation.
 
 Saved reports remain immutable. Manual Stage A acceptance remains TODO/deferred.
 

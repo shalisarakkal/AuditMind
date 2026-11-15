@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -107,3 +107,10 @@ class OrganizationPublicationSettings(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('organizations.id', ondelete='CASCADE'), primary_key=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text('false'))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+
+
+class OrganizationPublicationRevision(Base):
+    """Monotonic consumer fence, including completed Undo generations."""
+    __tablename__ = 'organization_publication_revisions'
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('organizations.id', ondelete='CASCADE'), primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default='0')

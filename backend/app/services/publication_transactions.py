@@ -189,7 +189,7 @@ def _observations(db, org_id, finding_id):
     return fingerprint, resources
 
 
-def _state(db, org_id, finding_id):
+def _state(db, org_id, finding_id, admission_contract=CONTRACT):
     row = db.get(State, (org_id, finding_id), populate_existing=True)
     if row is None:
         if db.scalar(select(Decision.id).where(Decision.org_id == org_id,
@@ -198,19 +198,19 @@ def _state(db, org_id, finding_id):
         return None, None
     receipt = db.get(Decision, row.decision_id, populate_existing=True)
     if (receipt is None or receipt.org_id != org_id or receipt.finding_id != finding_id
-            or receipt.version != row.version or receipt.admission_contract != CONTRACT
+            or receipt.version != row.version or receipt.admission_contract != admission_contract
             or receipt.mapping_version != payload_contract.MAPPING_VERSION or receipt.source_context_hash is None
             or receipt.operation != ('publish' if row.state == 'active' else 'undo')):
         blocked('Publication generation has an unsupported admission contract; it cannot be upgraded by replay')
     return row, receipt
 
 
-def _publish_prepare(db, org_id, actor_id, finding_id, observation_id):
+def _publish_prepare(db, org_id, actor_id, finding_id, observation_id, admission_contract=CONTRACT):
     plan = _prepare(db, org_id, actor_id, finding_id, observation_id, _private=True)
     policy = configuration(db, org_id)
     if not policy['enabled']:
         blocked('Observation payload publication is disabled for this organization')
-    state, receipt = _state(db, org_id, finding_id)
+    state, receipt = _state(db, org_id, finding_id, admission_contract)
     if state and state.state == 'active':
         if plan['_transaction']['context']['current_sha256'] != receipt.after_hash:
             blocked('Current scanner fields differ from the active publication; review recovery first')
@@ -222,7 +222,7 @@ def _publish_prepare(db, org_id, actor_id, finding_id, observation_id):
     version = state.version if state else 0
     if version >= 2_147_483_646 and not plan['no_op']:
         blocked('Publication generation is exhausted; reserve the final generation for Undo')
-    token = payload_contract.digest(dict(contract=CONTRACT, operation='publish',
+    token = payload_contract.digest(dict(contract=admission_contract, operation='publish',
         admission=plan['review_token'], policy=policy, expected_version=version,
         decision_id=str(receipt.id) if receipt else None, source_hash=source_hash, resources=resources,
         observations=observations))
@@ -251,9 +251,9 @@ def _snapshot_pair(db, org_id, finding_id, receipt):
     return result
 
 
-def _undo_prepare(db, org_id, actor_id, finding_id):
+def _undo_prepare(db, org_id, actor_id, finding_id, admission_contract=CONTRACT):
     _check_actor(db, org_id, actor_id)
-    state, receipt = _state(db, org_id, finding_id)
+    state, receipt = _state(db, org_id, finding_id, admission_contract)
     if state is None or state.state != 'active':
         blocked('An exact active publication is required for Undo')
     # Undo restores already-reviewed retained data; it does not select the latest
@@ -280,7 +280,7 @@ def _undo_prepare(db, org_id, actor_id, finding_id):
         for field in payload_contract.FIELDS
         if payload_contract.digest(current[field]) != payload_contract.digest(restored[field])]
     policy = configuration(db, org_id)
-    token = payload_contract.digest(dict(contract=CONTRACT, operation='undo',
+    token = payload_contract.digest(dict(contract=admission_contract, operation='undo',
         admission=plan['review_token'], policy=policy, expected_version=state.version,
         decision_id=str(receipt.id), source_hash=source_hash, resources=resources,
         snapshots={side: {k:v for k,v in snap.items() if k != 'values'} for side,snap in snapshots.items()},
@@ -289,7 +289,7 @@ def _undo_prepare(db, org_id, actor_id, finding_id):
         snapshots=snapshots, plan=plan, source_hash=source_hash, resources=resources, changes=changes)
 
 
-def _preview(db, org_id, actor_id, finding_id, observation_id=None):
+def _preview(db, org_id, actor_id, finding_id, observation_id=None, *, admission_contract=CONTRACT):
     """Private read-only plan. Its receipt contract is not publicly enabled."""
     if db.new or db.dirty or db.deleted:
         blocked('Complete pending ORM changes before preview')
@@ -298,10 +298,10 @@ def _preview(db, org_id, actor_id, finding_id, observation_id=None):
             snapshot.execute(text('SET TRANSACTION READ ONLY'))
             snapshot.execute(text("SET LOCAL TIME ZONE 'UTC'"))
             if observation_id is None:
-                result = _undo_prepare(snapshot, org_id, actor_id, finding_id)
+                result = _undo_prepare(snapshot, org_id, actor_id, finding_id, admission_contract)
             else:
-                result = _publish_prepare(snapshot, org_id, actor_id, finding_id, observation_id)
-            return dict(contract=CONTRACT, review_token=result['review_token'],
+                result = _publish_prepare(snapshot, org_id, actor_id, finding_id, observation_id, admission_contract)
+            return dict(contract=admission_contract, review_token=result['review_token'],
                 operation='publish' if observation_id is not None else 'undo', finding_id=str(finding_id),
                 expected_version=result['expected_version'], apply_available=False,
                 no_op=result['plan']['no_op'] if observation_id is not None else False,
@@ -325,7 +325,7 @@ def _receipt(row, replayed):
         admission_contract=row.admission_contract)
 
 
-def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
+def _stage(db, org_id, actor_id, finding_id, request, observation_id=None, *, admission_contract=CONTRACT):
     """PRIVATE core only. Savepoint-atomic; caller owns commit/rollback.
 
     Never wire this directly to HTTP or a background worker. Additional consumer
@@ -336,7 +336,7 @@ def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
     if request.confirm is not True:
         raise HTTPException(422, 'Explicit source-field review acknowledgment is required')
     operation = 'publish' if observation_id is not None else 'undo'
-    request_hash = payload_contract.digest(dict(contract=CONTRACT, operation=operation,
+    request_hash = payload_contract.digest(dict(contract=admission_contract, operation=operation,
         org_id=str(org_id), actor_id=str(actor_id), finding_id=str(finding_id),
         observation_id=str(observation_id) if observation_id else None, request=request.model_dump(mode='json')))
     try:
@@ -345,7 +345,7 @@ def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
             previous = db.scalar(select(Decision).where(Decision.org_id == org_id,
                 Decision.request_id == request.request_id))
             if previous:
-                if previous.request_hash != request_hash or previous.admission_contract != CONTRACT:
+                if previous.request_hash != request_hash or previous.admission_contract != admission_contract:
                     blocked('Request identifier was used for a different operation or admission contract')
                 return _receipt(previous, True)
             db.expire_all()
@@ -353,13 +353,13 @@ def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
                 .with_for_update(key_share=True, nowait=True).execution_options(populate_existing=True))
             if finding is None:
                 raise HTTPException(404, 'Finding not found')
-            prepared = (_publish_prepare(db, org_id, actor_id, finding_id, observation_id)
-                if observation_id is not None else _undo_prepare(db, org_id, actor_id, finding_id))
+            prepared = (_publish_prepare(db, org_id, actor_id, finding_id, observation_id, admission_contract)
+                if observation_id is not None else _undo_prepare(db, org_id, actor_id, finding_id, admission_contract))
             if request.expected_version != prepared['expected_version'] or request.review_token != prepared['review_token']:
                 blocked('Publication context changed; reload and review again')
             if observation_id is not None and prepared['plan']['no_op']:
                 return dict(decision_id=None, finding_id=str(finding_id), version=request.expected_version,
-                    operation='publish', replayed=False, no_op=True, apply_available=False, admission_contract=CONTRACT)
+                    operation='publish', replayed=False, no_op=True, apply_available=False, admission_contract=admission_contract)
             before = prepared['plan']['_transaction']['before']
             after = (prepared['plan']['_transaction']['after'] if observation_id is not None
                 else prepared['snapshots']['before']['values'])
@@ -369,7 +369,7 @@ def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
             row = Decision(org_id=org_id, finding_id=finding_id, observation_id=source,
                 source_scan_id=uuid.UUID(source_scan), request_id=request.request_id, request_hash=request_hash,
                 before_hash=payload_contract.digest(before), after_hash=payload_contract.digest(after),
-                mapping_version=prepared['plan']['mapping_version'], admission_contract=CONTRACT,
+                mapping_version=prepared['plan']['mapping_version'], admission_contract=admission_contract,
                 source_context_hash=prepared['source_hash'], version=request.expected_version + 1,
                 operation=operation, rationale=request.rationale, actor_id=actor_id, actor_label=actor_label(actor))
             db.add(row); db.flush()
@@ -394,7 +394,7 @@ def _stage(db, org_id, actor_id, finding_id, request, observation_id=None):
             record_event(db, 'finding_payload_published' if observation_id is not None else 'finding_payload_undone',
                 org_id=org_id, actor=actor, item=str(finding_id),
                 details=dict(finding_id=str(finding_id), observation_id=str(source),
-                    decision_id=str(row.id), version=row.version, admission_contract=CONTRACT))
+                    decision_id=str(row.id), version=row.version, admission_contract=admission_contract))
             db.flush()
             return _receipt(row, False)
     except DBAPIError as error:

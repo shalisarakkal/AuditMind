@@ -1,5 +1,11 @@
 # Verify the evidence-aware reporting changes
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 Local private-core follow-up: [Publish/Undo transaction contract](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
 passed 210 targeted checks. It is uncommitted/unactivated and adds no public
 write or settings control. There is no new GUI action for the user to test yet;

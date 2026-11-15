@@ -77,8 +77,10 @@ def read(db, org_id):
             row = snapshot.scalar(select(DashboardSnapshot).where(DashboardSnapshot.org_id == org_id))
             from app.services.finding_suppressions import revision as suppression_revision
             from app.services.consolidation_visibility import revision as consolidation_revision
+            from app.services.publication_consumers import revision as publication_revision
             if (not row.payload or row.payload["inventory"].get("suppression_revision", 0) != suppression_revision(snapshot, org_id)
-                    or row.payload['inventory'].get('consolidation_revision',0) != consolidation_revision(snapshot,org_id)):
+                    or row.payload['inventory'].get('consolidation_revision',0) != consolidation_revision(snapshot,org_id)
+                    or row.payload['inventory'].get('publication_revision',0) != publication_revision(snapshot,org_id)):
                 return DashboardPending(snapshot_refresh_status=row.status, snapshot_error=row.error_message)
             from app.api.routes.dashboard import build_dashboard, risk_policy_stamp
             result = build_dashboard(org_id, snapshot, row.payload["inventory"], row.captured_revision)
@@ -141,8 +143,10 @@ def process(db, job_id):
         row = db.scalar(select(DashboardSnapshot).where(DashboardSnapshot.id == job_id).with_for_update().execution_options(populate_existing=True))
         from app.services.finding_suppressions import revision as suppression_revision
         from app.services.consolidation_visibility import revision as consolidation_revision
+        from app.services.publication_consumers import revision as publication_revision
         if (payload["inventory"].get("suppression_revision", 0) != suppression_revision(db, org_id)
-                or payload['inventory'].get('consolidation_revision',0) != consolidation_revision(db,org_id)):
+                or payload['inventory'].get('consolidation_revision',0) != consolidation_revision(db,org_id)
+                or payload['inventory'].get('publication_revision',0) != publication_revision(db,org_id)):
             row.payload, row.status, row.requested_at = None, "pending", now()
             db.commit()
             return

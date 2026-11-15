@@ -1,5 +1,11 @@
 # Stage B publication storage
 
+Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
+verified locally: 2,070 full backend tests and 106 browser checks passed.
+This private checkpoint remains unactivated;
+public writers remain closed and normal schema stays 0055. Earlier checkpoints
+below are historical; guarded UI/provenance and activation remain separate.
+
 Local follow-up: the [private transaction core](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
 adds default-off policy and admission fields in migration 0057. It is uncommitted
 and unactivated; no public writer is enabled. The verification below belongs to

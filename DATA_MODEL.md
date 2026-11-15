@@ -280,3 +280,15 @@ current generation, source-only fields and Activity in a caller-owned savepoint.
 It never commits and has no route/worker caller. Consumer/proof invalidation and
 lifecycle guards remain prerequisites for exposing an integrated publisher.
 See [core contract and targeted verification](docs/OBSERVATION_PUBLICATION_TRANSACTIONS.md).
+
+
+## Stage B consumer fences (0058, not activated)
+
+`organization_publication_revisions` stores the monotonic organization consumer
+epoch. Private effective Publish/Undo transactions advance it atomically with
+evidence invalidation and source-field materialization. Risk verification
+attestations bind publication version/receipt/state even after Undo; Dashboard
+read/worker capture fences include the epoch. Indexed service/database guards
+protect current published source ownership and identity, including later
+observation owners. Full snapshots remain source-owned; retained minimal receipts
+are not purged-data recovery. See [integration contract](docs/OBSERVATION_PUBLICATION_INTEGRATION.md).

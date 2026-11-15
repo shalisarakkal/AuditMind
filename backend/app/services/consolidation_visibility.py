@@ -23,11 +23,11 @@ def revision(db, org_id):
         OrganizationConsolidationRevision.org_id == org_id)) or 0
 
 
-def _invalidate(db, org_id):
+def _invalidate(db, org_id, *, revision_model=OrganizationConsolidationRevision):
     # Finding UPDATE statement triggers invalidate list counts and seek cursors.
     # Explicit publication/evidence epochs also prevent old approvals returning
     # merely because undo restores the original physical inventory population.
-    for model in (OrganizationConsolidationRevision, OrganizationEvidenceRevision):
+    for model in (revision_model, OrganizationEvidenceRevision):
         db.execute(insert(model).values(org_id=org_id, revision=1).on_conflict_do_update(
             index_elements=[model.org_id], set_={'revision': model.revision + 1}))
     from app.services.dashboard_snapshots import configuration

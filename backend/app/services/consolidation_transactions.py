@@ -105,6 +105,9 @@ def _prepare(db, org_id, actor_id, identifier):
         raise HTTPException(409, dict(message="Pair prerequisites changed or are incomplete", blockers=pair["blockers"]))
     decision = db.get(FindingCanonicalDecision, identifier)
     ids = (decision.finding_a_id, decision.finding_b_id)
+    from app.services.publication_lifecycle import ensure_free as publication_free
+    for finding_id in ids:
+        publication_free(db, org_id, "finding", finding_id)
     findings = {row.id: row for row in db.scalars(select(Finding).options(defer(Finding.description),
         defer(Finding.raw_data), defer(Finding.details)).where(Finding.org_id == org_id, Finding.id.in_(ids)))}
     observations = db.scalars(select(FindingObservation).options(defer(FindingObservation.payload)).where(
