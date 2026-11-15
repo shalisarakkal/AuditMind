@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "a11y": "node scripts/a11y.js"
+    "a11y": "node scripts/a11y.js",
+    "test:dependency-security": "node scripts/check-minimatch-security.mjs"
   },
   "dependencies": {
     "next": "16.4.2",
@@ -41,6 +42,9 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
-    "postcss-selector-parser": "7.1.7"
+    "postcss-selector-parser": "7.1.7",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    }
   }
 }

@@ -1,5 +1,7 @@
 # Phase 4 remediation workflow validation
 
+15 November cleanup: [frontend dependency remediation](FRONTEND_DEPENDENCY_REMEDIATION.md) is locally verified: seven moderate findings reproduced and removed, zero full/production audit findings, clean-install security/parser regression, 602 frontend tests, lint, TypeScript and isolated build pass. Exact-commit hosted Linux CI is the post-push delivery gate for this increment. The Stage A/B application baseline remains activated at 0058 with publication Off; its previous exact-commit CI is separate.
+
 Latest local work (15 November): [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds the separate default-off organization setting and authorized single-finding Publish/Undo UI/API. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Prior checkpoint descriptions below are historical. Implementation `15ad820` is pushed; [all four hosted Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136). The local demo is activated at schema `0058`, rebuilt and healthy; publication remains Off for all organizations. Other installations require their own coordinated activation.
 
 Read-only checkpoint reviewed 15 November: [publication provenance and scanner-field preview](OBSERVATION_PUBLICATION_UI.md)

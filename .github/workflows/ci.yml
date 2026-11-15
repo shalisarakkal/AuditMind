@@ -54,6 +54,7 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm run lint
+      - run: npm run test:dependency-security
       - run: npm test
       - run: npm run build
       - name: Audit frontend dependencies

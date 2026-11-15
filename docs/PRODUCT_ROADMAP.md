@@ -1,94 +1,21 @@
 # AuditMind Product Roadmap
 
-Latest local work (15 November): [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds the separate default-off organization setting and authorized single-finding Publish/Undo UI/API. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Prior checkpoint descriptions below are historical. Implementation `15ad820` is pushed; [all four hosted Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136). The local demo is activated at schema `0058`, rebuilt and healthy; publication remains Off for all organizations. Other installations require their own coordinated activation.
+## Current delivery and next work - 15 November 2026
 
-Read-only checkpoint reviewed 15 November: [publication provenance and scanner-field preview](OBSERVATION_PUBLICATION_UI.md)
-verified locally: 120 post-review backend checks, 595 frontend tests and 107
-Chrome checks passed. No public writer, setting, migration or normal application
-restart is added. This read-only checkpoint remains unactivated; prior checkpoints below are historical.
+| Scope | Current status |
+| --- | --- |
+| Stage A reviewed native consolidation | Delivered and locally activated; separate default-off organization opt-in. Manual owner acceptance remains TODO/deferred. |
+| Stage B single-finding scanner-field publication | Delivered in `15ad820`; authorized Publish/Undo, retained snapshots, source/proof/lifecycle guards, atomic consumer invalidation and guarded UI. |
+| Hosted verification | [All four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136) for implementation `15ad820`; documentation-only closeout is `e74c253`. |
+| Local activation | Schema `0058`, verified backup, unchanged inventory counts, rebuilt/restarted services and passing HTTP smoke checks. Publication remains Off for all organizations. Other installations need their own activation. |
+| PB-1.3 remaining scope | Additional reviewed source mappings, group payload publication and automatic reconciliation remain future work. Bounded Stage A/B delivery does not close the entire backlog item. |
+| Next engineering item | PB-1.4: organization-managed asset owner, environment and business criticality, protected from import overwrites. Design/review precedes implementation. |
 
-Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
-verified locally: 2,070 full backend tests and 106 browser checks passed.
-This private checkpoint remains unactivated;
-public writers remain closed and normal schema stays 0055. Earlier checkpoints
-below are historical; guarded UI/provenance and activation remain separate.
+**Cleanup completed locally:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](FRONTEND_DEPENDENCY_REMEDIATION.md). This increment requires its own exact-commit hosted CI; the preceding application CI is not reused as evidence for these changes. Consult the current commit's Actions run for delivery verification.
 
-Local Stage B follow-up (14 November): [private transaction core](OBSERVATION_PUBLICATION_TRANSACTIONS.md)
-implemented; 210 targeted checks passed. This is not a full-suite or hosted result
-for the new work. Public writes remain closed and migration 0057 is unactivated.
-Next: consumer/proof invalidation and lifecycle guards, then guarded UI.
+**Retained holds:** Stage A manual acceptance, PB-0.2 pilot/customer approval, broader evidence-qualified scoring rollout, production deployment and SaaS load acceptance remain deferred. Status-aware scoring's approved default-On policy is separate. Current short-character search behavior remains unchanged. The project owner holds release/engineering/operations/security ownership; the local recovery rehearsal is complete.
 
-Current checkpoint (14 November): Stage B reserved publication storage is committed in `2751c3b`; full local regression verification passed. Normal schema remains `0055`; migration `0056` is not activated. Publish/Undo and its UI remain unavailable. Stage A stays default-off and manual acceptance remains deferred. See [storage review](OBSERVATION_PUBLICATION_STORAGE.md) and [hosted CI](https://github.com/shalisarakkal/AuditMind/actions/workflows/ci.yml?query=branch%3Amain). Earlier dated entries are historical checkpoints.
-
-## Next PB-1.3 design prepared - 11 November 2026
-
-The [reviewed consolidation/publication design](REVIEWED_FINDING_PUBLICATION_DESIGN.md) is prepared for review, not implemented
-or enabled. Recommended stage A is reversible native Nessus pair consolidation
-with pristine-alias and explicit proof/lifecycle guards. Stage B separately
-publishes a reviewed observation onto its own non-consolidated finding; group
-publication remains later work. No physical source/history movement, automatic
-matching, workflow overwrite or inherited approval is proposed.
-
-First implementation target: stage A schema/admission/preview and receipt
-foundation; writes remain unavailable until visibility, proof, lifecycle,
-consumer invalidation and guarded UI are complete. No migration, app setting or
-running data was changed by preparing this design.
-
-
-## Current delivery - 11 November 2026
-
-Committed application baseline: `e4c7488c1a0b40a99bc20efe60a6663fac7f62d3`.
-All four hosted Linux jobs (backend, frontend, dependency/security and browser)
-passed for both the suppression/retained-source delivery `f97a4fb` in [run 43129300797](https://github.com/shalisarakkal/AuditMind/actions/runs/43129300797)
-and the draft-save correction `e4c7488` in [run 43144443993](https://github.com/shalisarakkal/AuditMind/actions/runs/43144443993).
-
-- Migration 0050 is locally activated. Reviewed native Nessus suppression/clear,
-  atomic list/count/Dashboard/risk invalidation, possible-reappearance receipts,
-  source-purge retention and guarded UI are delivered.
-- Retained-source conflicts are fixed: clear refuses additional retained payloads;
-  restore checks reviewed identity as well as legacy duplicates, including aliases.
-- Save draft is disabled without persisted draft/binding changes. Identical valid
-  saves preserve version, timestamp, audit history and evidence revision. Stale
-  versions and source validation still apply; first saves create version 1.
-- Suppression acceptance: 120 expanded backend regressions, three final indexed
-  cases, 576 frontend tests and 103 Chrome checks. Draft-save acceptance: 54 backend
-  and 15 component tests, lint and production build. Scopes overlap; do not sum
-  them or treat targeted results as full-suite totals. Full hosted jobs are green.
-
-PB-1.3 remains partial: consolidation, source-payload publication, additional
-reviewed mappings and automatic reconciliation are not delivered. Recommended
-next work is a bounded consolidation/payload-publication design, then its reviewed
-implementation; PB-1.4 asset ownership/context follows. Pilot/production, broader
-evidence-qualified scoring and SaaS load gates retain their prior holds.
-[Release evidence](SUPPRESSION_RELEASE_REVIEW.md) and
-[verification steps](EVIDENCE_USER_VERIFICATION.md).
-
-## Prior absence-review delivery - 11 November 2026
-
-The durable absence-review queue is delivered on `main` through `60d957b`.
-All four hosted Linux jobs passed for exact commit
-`60d957b4f9f03383e797a26677e31fb60fce2077` in
-[run 43045746714](https://github.com/shalisarakkal/AuditMind/actions/runs/43045746714): backend, frontend, dependency/security
-and browser acceptance (including evidence/scoring and worker recovery).
-Local acceptance: 1,723 backend tests, 567 frontend tests and 99 Chrome checks.
-Migration 0049 was active at that checkpoint; current migration is 0050. CI uses preinstalled stable Chrome on Ubuntu
-24.04; the earlier Chromium installer failure did not recur on this path.
-This supersedes older pending/unmerged queue statements; dated checkpoints
-remain historical. It does not approve a pilot, production deployment or SaaS load.
-
-At that checkpoint, next was [imported-finding suppression and restore design](IMPORTED_FINDING_SUPPRESSION.md).
-Suppression, restore, reappearance handling, consolidation and payload publication
-are not delivered by the review queue. PB-1.3 remains open.
-
-
-11 November local integration: the authorized durable absence-review queue
-from the second worktree is now included with review corrections. It records
-historical keep-active/reopen notes without changing findings or scores;
-local acceptance passed (1,723 backend tests, 567 frontend tests, 99 Chrome
-checks, builds/security), and the app is active at 0049. Hosted CI is verified
-on the exact pushed SHA at delivery. [Current review](ABSENCE_REVIEW_RELEASE_REVIEW.md).
-This supersedes earlier statements that this feature is excluded; older dated
-test/CI results remain historical.
+See [publication actions](OBSERVATION_PUBLICATION_ACTIONS.md), [release gates](RELEASE_READINESS.md) and [the product backlog](PRODUCT_BACKLOG.md). Dated entries below retain their original checkpoint scope; they are historical evidence, not the current work queue. Earlier versions remain available in Git history.
 
 ## Goal
 
@@ -111,14 +38,11 @@ suppression/clear with source-lifecycle safeguards. Canonical designation does
 not merge records. New uploads do not inherit trusted identity bindings;
 possible reappearances remain visible for independent review.
 
-The next proposed engineering increment is reviewed consolidation and source-
-payload publication, with workflow/proof ownership and rollback rules designed
-before implementation. Additional source mappings and automatic reconciliation
-remain separate. PB-1.4 asset ownership/context and PB-1.5 controls/mappings follow.
+Reviewed native consolidation (Stage A) and single-finding scanner-field publication (Stage B) are delivered and locally activated through schema `0058`, under separate default-off policies. Their consumer/proof invalidation, lifecycle guards, retained receipts and guarded UI are complete for the documented bounded scope. Additional source mappings, group payload publication and automatic reconciliation remain future work.
 
-**Deferred decision:** resume PB-0.2 and approve a bounded pilot contract when
-the project owner resumes that gate. The native suppression/clear increment is complete; the
-next proposed PB-1.3 work is consolidation/payload-publication design.
+The next engineering item is PB-1.4 asset ownership/context, followed by PB-1.5 controls/mappings. These are proposed increments, not implemented features.
+
+**Deferred decision:** resume PB-0.2 only when the project owner resumes the pilot gate.
 The gate remains deferred until the project owner selects audience, environment,
 data, workflows, operating/support boundaries and acceptance criteria. The
 [release checklist](RELEASE_READINESS.md#pb-02-pilot-readiness-contract-decisions-required-to-close-the-gate)
@@ -188,9 +112,7 @@ frontend tests pass). Delivered through `24a5f66`, with all four hosted Linux jo
 passing in [run 42245252464](https://github.com/shalisarakkal/AuditMind/actions/runs/42245252464);
 [contract](SCAN_SNAPSHOTS.md).
 Existing matching and archive ownership remain unchanged. PB-1.3's explicit
-identity review increments are delivered; automated reconciliation, source
-payload publication, durable absence dispositions and suppression remain
-pending. The read-only candidate preview shipped through `d06d31e`, with all
+identity review increments are delivered; additional source mappings, group payload publication and automatic reconciliation remain pending. Durable absence review, native suppression/clear, Stage A consolidation and Stage B single-finding publication are now delivered; their separate policies and source-review requirements remain in force. The read-only candidate preview shipped through `d06d31e`, with all
 four hosted Linux jobs passing in
 [run 42529240560](https://github.com/shalisarakkal/AuditMind/actions/runs/42529240560).
 A preview candidate is not a recorded absence conclusion.
@@ -377,6 +299,10 @@ delivery plan. Reprioritize based on pilot feedback and measured operational
 evidence; do not treat this sequence as a commitment to implement every P5
 candidate.
 
+## Historical delivery log
+
+The dated entries below are retained as delivery evidence. Their then-pending work and then-current schema do not override the current delivery table. Original heading anchors are preserved.
+
 ## 12 November 2026: PB-1.3 read-only foundation
 
 Migration `0051` adds retained consolidation/decision ledgers and bounded read APIs.
@@ -557,8 +483,3 @@ Publish/Undo, proof and consumer invalidation, lifecycle guards and guarded UI.
 PB-1.3 remains partial; manual acceptance remains TODO/deferred. Hosted Linux CI
 is the post-push acceptance gate; see the main workflow and delivery confirmation
 for the exact pushed-commit result.
-
-
-### Guarded publication actions - local checkpoint, 2026-11-15
-
-See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Local demo activation to `0058` completed after successful CI; publication remains Off and legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Implementation `15ad820` is pushed; [hosted Linux CI passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136). Backup verification, migration to `0058`, unchanged inventory counts, service rebuild/restart and HTTP smoke checks completed for the local demo. No organization was opted in.
