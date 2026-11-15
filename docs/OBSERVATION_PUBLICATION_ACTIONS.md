@@ -1,6 +1,6 @@
 # Guarded scanner-field publication actions
 
-Local implementation checkpoint (2026-11-15). Normal application database activation remains separate. This increment adds no migration; it requires the retained publication storage, integrated consumer revisions and all seven lifecycle guards from migrations 0056 through 0058.
+Local implementation checkpoint (2026-11-15). The local demo was subsequently activated at schema 0058 after exact-commit CI and a verified backup. Other installations require separate coordinated activation. This increment adds no migration; it requires the retained publication storage, integrated consumer revisions and all seven lifecycle guards from migrations 0056 through 0058.
 
 ## Availability and authorization
 
@@ -42,6 +42,17 @@ Frontend: **602 tests passed**; TypeScript, ESLint and the isolated production b
 
 Evidence logs (ignored local artifacts): `temp/stageb-actions-final.log`, `temp/stageb-actions-regression.log`, `temp/stageb-actions-frontend-closeout.log` and `temp/stageb-actions-browser-full.log`. Chrome artifacts: `temp/testing/finding-workflow/phase3_browser_58aefef37cd0`.
 
-No commit/push, hosted CI or normal database activation is claimed for this increment.
+Implementation `15ad8207ffffb37c1b6e7114ed78cffcb69fc577` is committed and pushed. [All four hosted Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136).
 
 Review reproduction: removing the retained dependency table incorrectly left availability enabled. The new regression failed before the fix (`temp/stageb-actions-readiness-repro.log`); readiness now requires that table too. The post-fix 94-check run includes the formerly failing case and passes.
+
+
+## Local activation closeout - 15 November 2026
+
+After successful implementation CI, all six background-job categories were idle. Services were stopped before backup and migration. The custom-format schema backup completed in 122.7 seconds (1,743,989,916 bytes); its archive listing, SHA256 and backed-up `0055` revision were independently verified. Backup and manifest are retained locally under `temp/auditmind-demo/checkpoints/before-publication-0056-0058-20261115T151916Z.*` and are excluded from Git.
+
+Migrations `0056` through `0058` and metadata validation completed in 12.8 seconds. Organization, asset, finding and upload counts matched the pre-migration baseline. Lifecycle readiness passed and no invalid indexes remained. All six organizations retain the default-off policy; no publication decisions were created.
+
+The application was rebuilt and restarted at `http://localhost:3000/login`. API health, login and proxied authentication options returned HTTP 200. The new proxied settings endpoint rejected unauthenticated access with HTTP 401. Local verification receipts are `temp/stageb-actions-hosted-ci.json` and `temp/stageb-actions-live-verification.json`.
+
+This closeout changes documentation only. Application verification remains tied to implementation commit `15ad820`; no broader organization opt-in was performed.

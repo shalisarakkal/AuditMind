@@ -1,6 +1,6 @@
 # Read-only publication provenance and scanner-field preview
 
-Current local successor: [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds a separate default-off authorized HTTP/UI surface using the integrated consumer contract. The checkpoint description below is historical; legacy private entry points remain closed. Database activation remains separate.
+Current local successor: [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds a separate default-off authorized HTTP/UI surface using the integrated consumer contract. The checkpoint description below is historical; legacy private entry points remain closed. The local demo is now activated at `0058` after successful implementation CI; other installations require coordinated activation.
 
 Read-only checkpoint reviewed on 15 November 2026, following hosted-verified
 integration `7e20935`. This increment remains unactivated. No public Publish/Undo
@@ -109,4 +109,4 @@ coordinated activation.
 
 ### Guarded publication actions - local checkpoint, 2026-11-15
 
-See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Normal database activation remains pending; legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Commit/push, hosted CI and coordinated activation remain pending.
+See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Local demo activation to `0058` completed after successful CI; publication remains Off and legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Implementation `15ad820` is pushed; [hosted Linux CI passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136). Backup verification, migration to `0058`, unchanged inventory counts, service rebuild/restart and HTTP smoke checks completed for the local demo. No organization was opted in.

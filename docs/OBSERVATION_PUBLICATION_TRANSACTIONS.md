@@ -1,6 +1,6 @@
 # Stage B private Publish/Undo core
 
-Current local successor: [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds a separate default-off authorized HTTP/UI surface using the integrated consumer contract. The checkpoint description below is historical; legacy private entry points remain closed. Database activation remains separate.
+Current local successor: [guarded publication actions](OBSERVATION_PUBLICATION_ACTIONS.md) adds a separate default-off authorized HTTP/UI surface using the integrated consumer contract. The checkpoint description below is historical; legacy private entry points remain closed. The local demo is now activated at `0058` after successful implementation CI; other installations require coordinated activation.
 
 Local follow-up (14 November): [atomic consumer/proof invalidation and lifecycle guards](OBSERVATION_PUBLICATION_INTEGRATION.md)
 verified locally: 2,070 full backend tests and 106 browser checks passed.
