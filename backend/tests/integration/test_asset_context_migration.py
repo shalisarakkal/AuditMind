@@ -21,7 +21,11 @@ def test_migration_up_down_and_drift_preserves_existing_asset_defaults():
             org=uuid4();asset=uuid4()
             c.execute(text("INSERT INTO organizations(id,name,created_at) VALUES(:id,'Existing tenant',now())"),{'id':org})
             c.execute(text("INSERT INTO assets(id,org_id,type,hostname,environment,criticality,created_at) VALUES(:id,:org,'server','legacy.example','imported-prod','source-high',now())"),{'id':asset,'org':org});c.commit()
-            command.upgrade(config,'0059');c.commit()
+            command.upgrade(config,'0060');c.commit()
+            assert c.scalar(text("SELECT to_regclass('ix_asset_context_history_actor')")) is not None
+            command.downgrade(config,'0059');c.commit()
+            assert c.scalar(text("SELECT to_regclass('ix_asset_context_history_actor')")) is None;c.commit()
+            command.upgrade(config,'0060');c.commit()
             assert c.scalar(text('SELECT count(*) FROM asset_contexts'))==0
             assert c.execute(text('SELECT environment,criticality FROM assets WHERE id=:id'),{'id':asset}).one()==('imported-prod','source-high')
             config.attributes.pop("version_table_schema")
@@ -29,11 +33,16 @@ def test_migration_up_down_and_drift_preserves_existing_asset_defaults():
             config.attributes["version_table_schema"]=schema
             command.downgrade(config,'0058');c.commit()
             assert c.scalar(text("SELECT to_regclass(:t)"),{'t':schema+'.asset_contexts'}) is None;c.commit()
-            command.upgrade(config,'0059');c.commit()
+            command.upgrade(config,'0060');c.commit()
             c.execute(text("INSERT INTO asset_contexts(asset_id,org_id,version,environment,updated_at) VALUES(:a,:o,1,'Reviewed',now())"),{'a':asset,'o':org});c.commit()
             with pytest.raises(RuntimeError,match='Export retained asset context'):
                 command.downgrade(config,'0058')
+            # Alembic commits each revision: the index-only downgrade can
+            # finish before 0059 refuses to discard retained business data.
             c.rollback();assert c.scalar(text('SELECT version_num FROM alembic_version'))=='0059'
+            assert c.scalar(text('SELECT count(*) FROM asset_contexts'))==1;c.commit()
+            command.upgrade(config,'0060');c.commit()
+            assert c.scalar(text("SELECT to_regclass('ix_asset_context_history_actor')")) is not None
     finally:
         with engine.begin() as c:c.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         engine.dispose()

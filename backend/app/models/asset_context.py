@@ -30,6 +30,7 @@ class AssetContextHistory(Base):
     __table_args__ = (
         UniqueConstraint("asset_id", "version", name="uq_asset_context_history_version"),
         Index("ix_asset_context_history_org_asset", "org_id", "asset_id", "version"),
+        Index("ix_asset_context_history_actor", "actor_id", postgresql_where=text("actor_id IS NOT NULL")),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)

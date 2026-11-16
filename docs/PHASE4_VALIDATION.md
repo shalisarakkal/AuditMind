@@ -1,6 +1,6 @@
 # Phase 4 remediation workflow validation
 
-PB-1.4 local verification: [organization-managed asset context](ASSET_CONTEXT.md) passed 27 final focused backend checks, 613 frontend tests and 112 full Chrome checks. Lint, TypeScript, isolated production build and high-severity Bandit checks passed. Full backend regression passed 2,134 tests; hosted Linux CI and coordinated migration 0059 activation are pending. Normal application remains at 0058.
+PB-1.4 local verification: [organization-managed asset context](ASSET_CONTEXT.md) passed 27 final focused backend checks, 613 frontend tests and 112 full Chrome checks. Lint, TypeScript, isolated production build and high-severity Bandit checks passed. Full backend regression passed 2,134 tests; hosted Linux CI and coordinated migrations 0059-0060 activation are pending. Normal application remains at 0058.
 
 15 November cleanup: [frontend dependency remediation](FRONTEND_DEPENDENCY_REMEDIATION.md) is locally verified: seven moderate findings reproduced and removed, zero full/production audit findings, clean-install security/parser regression, 602 frontend tests, lint, TypeScript and isolated build pass. Exact-commit hosted Linux CI is the post-push delivery gate for this increment. The Stage A/B application baseline remains activated at 0058 with publication Off; its previous exact-commit CI is separate.
 

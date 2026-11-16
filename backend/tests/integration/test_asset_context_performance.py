@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 import pytest
 from sqlalchemy import insert,select,text
 from app.models.asset import Asset
-from app.models.asset_context import AssetContext
+from app.models.asset_context import AssetContext, AssetContextHistory
 from app.models.membership import OrgMembership
 from tests.conftest import requires_db
 from tests.helpers import register,first_org_id
@@ -25,6 +25,13 @@ def test_context_filters_use_scoped_indexes_and_read_only_selected_page(client,d
         plan=db_session.scalar(text(f'EXPLAIN (FORMAT JSON) SELECT asset_id FROM asset_contexts WHERE org_id=:o AND {column}=:value'),{'o':org,'value':value})
         assert any(name in str(plan) for name in index),plan
         assert "org_id" in str(plan) and column in str(plan)
+    # Account removal must locate retained actor references without scanning
+    # every unrelated context decision in the installation.
+    ids=db_session.scalars(select(Asset.id).where(Asset.org_id==org)).all()
+    db_session.execute(insert(AssetContextHistory),[dict(id=uuid.uuid4(),asset_id=i,org_id=org,actor_id=owner if i==target else None,actor_label='Synthetic reviewer',version=1,before={},after={},rationale='Synthetic history index probe',created_at=datetime.now(timezone.utc)) for i in ids]);db_session.commit()
+    db_session.execute(text('ANALYZE asset_context_history'));db_session.commit()
+    history_plan=db_session.scalar(text('EXPLAIN (FORMAT JSON) SELECT id FROM asset_context_history WHERE actor_id=:actor'),{'actor':owner})
+    assert 'ix_asset_context_history_actor' in str(history_plan),history_plan
     response=client.get(f'/api/v1/orgs/{org}/assets',headers=h,params={'managed_environment':'Distinct business context','limit':1})
     assert response.status_code==200,response.text
     body=response.json();assert body['total']==1 and len(body['items'])==1 and body['items'][0]['id']==str(target)
