@@ -1,3 +1,4 @@
+from app.models.control_catalog import ControlCatalog, CatalogControl, FindingControlRule, FindingControlDecision, FindingControlTarget
 from app.models.asset_context import AssetContext, AssetContextHistory, OrganizationAssetContextRevision
 from app.db.base_class import Base
 from app.models.dashboard_snapshot import DashboardSnapshot  # noqa: F401
@@ -58,6 +59,7 @@ from app.db.publication_lifecycle import register as register_publication_lifecy
 register_publication_lifecycle(Base.metadata)
 
 __all__ = [
+    "ControlCatalog", "CatalogControl", "FindingControlRule", "FindingControlDecision", "FindingControlTarget",
     "WorkerDispatch",
     "OrganizationEvidenceRevision",
     "EvidenceEvaluation",
@@ -112,3 +114,6 @@ __all__ = [
 
 from app.db.asset_context import register as register_asset_context
 register_asset_context(Base.metadata)
+
+from app.db.control_catalog import register as register_control_catalog
+register_control_catalog(Base.metadata)

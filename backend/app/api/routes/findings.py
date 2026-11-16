@@ -30,6 +30,7 @@ from app.models.finding import Finding
 from app.models.membership import OrgMembership
 from app.models.scan import Scan
 from app.models.user import User
+from app.services import control_catalog
 from app.schemas.finding import FindingAssigneeFacet, FindingCreate, FindingFacets, FindingListItem, FindingPage, FindingRead
 from app.schemas.ingestion import ImportResponse
 from app.services.archive_service import archiving_fields, unfinished_archives
@@ -455,6 +456,7 @@ def list_findings(
     position = {id_: i for i, id_ in enumerate(ids)}
     rows.sort(key=lambda row: position[row[0].id])
     unfinished = unfinished_archives(db, org_id, [f.id for f, *_ in rows if f.scan_id is None])
+    control_mappings = control_catalog.read_many(db, org_id, [row[0] for row in rows])
     items = [
         FindingListItem(
             **FindingRead.model_validate(finding).model_dump(),
@@ -462,6 +464,7 @@ def list_findings(
             asset_ip=ip,
             asset_cloud_id=cloud_id,
             assignee_label=assignee_label,
+            control_mapping=control_mappings[finding.id],
             **archiving_fields(unfinished, finding.id),
         )
         for finding, hostname, ip, cloud_id, assignee_label in rows

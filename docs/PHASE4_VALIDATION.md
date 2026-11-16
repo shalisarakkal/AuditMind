@@ -1,5 +1,7 @@
 # Phase 4 remediation workflow validation
 
+16 November PB-1.5 local gate: [versioned catalogs and reviewed category mappings](CONTROL_CATALOG.md) passed 2,161 full backend tests before the last retained-rule additions, then 55 final focused backend regressions, 632 final frontend tests, lint and isolated production/Chrome checks. Exact-commit Linux CI and coordinated migration 0061 activation remain pending. These scopes are not additive; older entries below are historical.
+
 16 November closeout: PB-1.4 final `fd9a140` passed [all four hosted Linux CI jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43789429856). Migrations 0059-0060 are activated locally after an idle-job check and verified backup; inventory counts are unchanged, frontend rebuilt, services restarted and HTTP/readiness checks passed. See [asset context evidence and limits](ASSET_CONTEXT.md). Earlier dated checkpoints below retain their original scope.
 
 PB-1.4 local verification: [organization-managed asset context](ASSET_CONTEXT.md) passed 27 final focused backend checks, 613 frontend tests and 112 full Chrome checks. Lint, TypeScript, isolated production build and high-severity Bandit checks passed. Full backend regression passed 2,134 tests; hosted Linux CI and coordinated migrations 0059-0060 activation are pending. Normal application remains at 0058.

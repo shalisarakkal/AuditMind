@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/activity", label: "Activity" },
   { href: "/reports", label: "Reports" },
   { href: "/documents", label: "Documents" },
+  { href: "/controls", label: "Control mappings" },
   { href: "/people", label: "People" },
   { href: "/settings", label: "Settings" },
 ];
@@ -34,6 +35,7 @@ const PLATFORM_ITEMS = [
   { href: `${PLATFORM_PATH}/scoring`, label: "Scoring settings" },
   { href: `${PLATFORM_PATH}/branding`, label: "Product branding" },
   { href: `${PLATFORM_PATH}/documents`, label: "Shared standards" },
+  { href: `${PLATFORM_PATH}/controls`, label: "Control catalog" },
 ];
 
 export default function Sidebar() {

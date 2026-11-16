@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import ArchiveProgress, Domain, Severity
 from app.schemas.paging import SeekPage
 from app.schemas.finding_workflow import WorkflowStatus
+from app.schemas.control_catalog import ControlMappingSummary
 
 
 class FindingCreate(BaseModel):
@@ -53,6 +54,7 @@ class FindingListItem(FindingRead):
     """A finding in the org's list, with its asset's identifiers for display
     (a cloud resource may have only a cloud ID)."""
 
+    control_mapping: ControlMappingSummary | None = None
     asset_hostname: str | None = None
     assignee_label: str | None = None
     asset_ip: str | None = None

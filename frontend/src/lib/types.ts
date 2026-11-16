@@ -216,6 +216,7 @@ export type EventDetails = {
 
 /** A finding in the org's paged list, with its asset's name. */
 export type FindingListItem = Finding & {
+  control_mapping?: import("./controlCatalog").ControlMappingSummary | null;
   due_timezone?: string | null;
   due_expires_at?: string | null;
   risk_review_timezone?: string | null;

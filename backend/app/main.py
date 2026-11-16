@@ -11,6 +11,7 @@ from app.api.routes import (
     archive,
     assets,
     asset_context,
+    control_catalog,
     auth,
     dashboard,
     documents,
@@ -73,6 +74,7 @@ app.include_router(people.router, prefix=api_router_prefix)
 app.include_router(platform.router, prefix=api_router_prefix)
 app.include_router(assets.router, prefix=api_router_prefix)
 app.include_router(asset_context.router, prefix=api_router_prefix)
+app.include_router(control_catalog.router, prefix=api_router_prefix)
 app.include_router(scans.router, prefix=api_router_prefix)
 app.include_router(findings.router, prefix=api_router_prefix)
 app.include_router(risk.router, prefix=api_router_prefix)

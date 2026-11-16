@@ -28,6 +28,9 @@ def test_migration_up_down_and_drift_preserves_existing_asset_defaults():
             command.upgrade(config,'0060');c.commit()
             assert c.scalar(text('SELECT count(*) FROM asset_contexts'))==0
             assert c.execute(text('SELECT environment,criticality FROM assets WHERE id=:id'),{'id':asset}).one()==('imported-prod','source-high')
+            # Keep the asset-specific round-trip pinned, but compare models at
+            # the current head so later additive migrations are represented.
+            command.upgrade(config,'head');c.commit()
             config.attributes.pop("version_table_schema")
             command.check(config);c.commit()
             config.attributes["version_table_schema"]=schema

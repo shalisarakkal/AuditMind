@@ -1,5 +1,27 @@
 # AuditMind user manual
 
+## Versioned control mappings
+
+After database activation, a platform administrator opens **Platform > Control
+catalog** and installs the verified NIST CSF baseline. Organization members open
+**Control mappings**, or **Controls** on a Findings row. Copy the full Finding ID
+from that row to look it up directly. An Unmapped state is explicit and does not
+mean a control passes or fails.
+
+Admins/auditors use **Propose mapping**, choose a catalog release and 1-20 controls,
+then enter a rationale. Organization admins review the exact proposal and use
+**Approve mapping**; a pending proposal does not replace an existing approval.
+**Withdraw mapping** removes the effective/pending relationship and retains history.
+All review dialogs show their fixed scope and require current generation checks.
+
+Use **Open retained category rule**, or lookup by **Rule ID**, to review a rule
+after the original finding/import is purged. Only the same organization and exact
+source/domain/category tuple are affected. **Show mapping history** displays actor,
+rationale and immutable catalog/control references. A mapping expresses relevance;
+it changes neither scoring, workflow, suppression nor saved reports. See
+[scope, permissions and verification](CONTROL_CATALOG.md).
+
+
 11 November addition: Uploads now includes an explicit historical absence-review
 queue. Compare eligible complete native scans, save candidates, then record a
 reasoned keep-active or reopen review. These actions never change finding

@@ -11,6 +11,8 @@ export const EVENT_LABELS: Record<string, string> = {
   purge: "Purge",
   asset_added: "Asset added",
   asset_context_changed: "Asset context changed",
+  control_catalog_installed: "Control catalog installed",
+  finding_control_mapping_changed: "Finding control mapping changed",
   finding_added: "Finding added",
   finding_workflow_changed: "Finding remediation changed",
   finding_verification_changed: "Scoring verification changed",

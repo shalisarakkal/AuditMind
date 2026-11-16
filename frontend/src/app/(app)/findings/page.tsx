@@ -7,6 +7,7 @@ import ImportStatus from "@/components/ImportStatus";
 import FindingSuppressionDialog, { type SuppressionTarget } from "@/components/FindingSuppressionDialog";
 import SuppressedFindingsDialog from "@/components/SuppressedFindingsDialog";
 import FindingWorkflowDialog from "@/components/FindingWorkflowDialog";
+import FindingControlLink from "@/components/FindingControlLink";
 import FindingReference from "@/components/FindingReference";
 import FindingActionDialog from "@/components/FindingActionDialog";
 import AddFindingDialog from "@/components/AddFindingDialog";
@@ -290,6 +291,7 @@ function Findings() {
                     <td className={`${ACTIONS_CELL} sticky right-0 z-10 bg-navy`}>
                       <div className="flex flex-wrap justify-end gap-3">
                       <button type="button" disabled={loading || !!f.archiving || selection.count > 0} title={selection.count ? "Clear selection to use individual row actions." : undefined} className={`${ROW_ACTION_VIEW} disabled:opacity-50`} onClick={() => { setBulk(null); setWorkflow({ scope: workflowScope, ids: [f.id], names: [nameOf(f)] }); }}>Workflow</button>
+                      <FindingControlLink orgId={org.id} findingId={f.id} summary={f.control_mapping} disabled={loading || !!f.archiving || selection.count > 0} />
                       {writer && f.scan_id !== null && f.source === "nessus" && <button type="button" className={`${ROW_ACTION_VIEW} disabled:opacity-50`}
                         disabled={loading || !!f.archiving || selection.count > 0} title={selection.count ? "Clear selection to use individual row actions." : "Review current identity before suppressing this finding."}
                         onClick={() => setSuppression({ action: "suppress", finding_id: f.id })}>Suppress</button>}

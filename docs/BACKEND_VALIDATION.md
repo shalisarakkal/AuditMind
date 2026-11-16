@@ -1,5 +1,7 @@
 # Backend validation — 2026-10-20
 
+16 November PB-1.5 local gate: [versioned catalogs and reviewed category mappings](CONTROL_CATALOG.md) passed 2,161 full backend tests before the last retained-rule additions, then 55 final focused backend regressions, 632 final frontend tests, lint and isolated production/Chrome checks. Exact-commit Linux CI and coordinated migration 0061 activation remain pending. These scopes are not additive; older entries below are historical.
+
 ## Current combined-tree gate — 26 October 2026
 
 **1,268 full PostgreSQL tests passed in 668.14s**, `--require-postgres -W error`,
