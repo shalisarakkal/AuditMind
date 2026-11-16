@@ -2,7 +2,7 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import func
+from sqlalchemy import func, or_, select, union
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_org_member, require_org_role
@@ -27,7 +27,7 @@ from app.models.organization import Organization
 from app.schemas.asset import AssetCreate, AssetFacets, AssetListItem, AssetRead
 from app.schemas.ingestion import ImportResponse
 from app.schemas.paging import SeekPage
-from app.services import list_pages
+from app.services import list_pages, asset_context
 from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.asset_types import resolve_asset_type
 from app.services.events import record_event
@@ -77,6 +77,9 @@ def list_assets(
     subtype: list[str] | None = Query(None, description=f"Subtype is one of these. {_BLANK_HELP}"),
     environment: list[str] | None = Query(None, description=f"Environment is one of these. {_BLANK_HELP}"),
     criticality: list[str] | None = Query(None, description=f"Criticality is one of these. {_BLANK_HELP}"),
+    managed_owner: list[str] | None = Query(None, max_length=100),
+    managed_environment: list[str] | None = Query(None, max_length=100),
+    business_criticality: list[str] | None = Query(None, max_length=100),
     sort: AssetSort = Query("created", description="Column to sort by"),
     order: SortOrder = Query("asc"),
     page: PageParams = Depends(page_params),
@@ -88,13 +91,33 @@ def list_assets(
     tag_text = func.array_to_string(Asset.tags, " ")
     search = any_of(contains(q, Asset.hostname, Asset.ip, Asset.cloud_id, Asset.subtype,
         Asset.environment, Asset.criticality, tag_text), labelled(q, Asset.type, _TYPE_LABELS))
+    ready = asset_context.available(db)
+    if not ready and any((managed_owner, managed_environment, business_criticality)):
+        asset_context.require_available(db)
+    source_search = search
+    context_ids = asset_context.search_ids(org_id, q) if ready else None
+    context_search = Asset.id.in_(context_ids) if context_ids is not None else None
+    if context_search is not None: search = or_(search, context_search)
     tag_filter = contains(tags, tag_text)
-    candidates = [(contains(value, search_expression(Asset)), original, contains_pattern(value))
-                  for value, original in ((q, search), (tags, tag_filter)) if useful_trigrams(value)]
+    q_index = contains(q, search_expression(Asset)) if useful_trigrams(q) else None
+    candidates = [(candidate, original, contains_pattern(value)) for value,candidate,original in (
+        (q,q_index,source_search),(tags,contains(tags,search_expression(Asset)),tag_filter))
+        if candidate is not None and useful_trigrams(value)]
+    selected = selective_candidates(db, Asset, org_id, candidates)
+    if context_ids is not None and any(c is q_index for c in selected):
+        # An OR with an IN subplan is often estimated at 50% of the entire
+        # inventory. Estimate the narrow context query directly instead; keep
+        # the existing source accelerator when context candidates are bounded.
+        if asset_context.estimated_rows(db,context_ids) <= 5000:
+            source_ids = select(Asset.id).where(Asset.org_id==org_id,Asset.archived_at.is_(None),source_search,q_index)
+            combined = Asset.id.in_(union(source_ids,context_ids))
+            selected = [combined if c is q_index else c for c in selected]
+        else:
+            selected = [c for c in selected if c is not q_index]
     conditions = [
         # Indexed candidate superset; retain the original per-field predicate
         # below to reject matches spanning field boundaries or type labels.
-        *selective_candidates(db, Asset, org_id, candidates),
+        *selected,
         search,
         contains(hostname, Asset.hostname),
         contains(ip, Asset.ip),
@@ -104,6 +127,7 @@ def list_assets(
         one_of(Asset.subtype, subtype),
         one_of(Asset.environment, environment),
         one_of(Asset.criticality, criticality),
+        *([asset_context.filter_condition(org_id, field, values) for field, values in (("owner_id", managed_owner), ("environment", managed_environment), ("business_criticality", business_criticality))] if ready else []),
     ]
     query = db.query(Asset).filter(
         Asset.org_id == org_id, Asset.archived_at.is_(None), *(c for c in conditions if c is not None)
@@ -111,13 +135,13 @@ def list_assets(
     key = {"q": (q or "").strip(), "hostname": (hostname or "").strip(), "ip": (ip or "").strip(),
         "cloud_id": (cloud_id or "").strip(), "tags": (tags or "").strip(),
         **{name: list_pages.choices(value) for name, value in (
-            ("type", type), ("subtype", subtype), ("environment", environment), ("criticality", criticality))}}
+            ("type", type), ("subtype", subtype), ("environment", environment), ("criticality", criticality), ("managed_owner", managed_owner), ("managed_environment", managed_environment), ("business_criticality", business_criticality))}}
     stamp = list_pages.revision_stamp(db, org_id, "assets")
     total = list_pages.exact_counts(db, stamp, "assets", key, query.count).value
     terms = [list_pages.Term(_SORT_COLUMNS[sort], order == "asc")]
     if sort != "created": terms.append(list_pages.Term(Asset.created_at))
     terms.append(list_pages.Term(Asset.id))
-    scope = list_pages.fingerprint({"kind": "assets-v1", "org": org_id, "filters": key, "sort": sort, "order": order})
+    scope = list_pages.fingerprint({"kind": "assets-v2-context", "org": org_id, "filters": key, "sort": sort, "order": order})
     positions = list_pages.page_rows(query.with_entities(Asset.id, *(term.column for term in terms)),
         terms, page, stamp, scope, indexed=sort in {"created", "hostname", "ip"}) if page.offset < total else []
     ids = [row[0] for row in positions]
@@ -126,10 +150,11 @@ def list_assets(
     position = {id_: index for index, id_ in enumerate(ids)}
     items.sort(key=lambda item: position[item.id])
     navigation = list_pages.navigation(positions, stamp, scope, page, total) if list_pages.revision_stamp(db, org_id, "assets") == stamp else {}
+    contexts = asset_context.read_many(db, org_id, [a.id for a in items], ready=ready)
     unfinished = unfinished_archives(db, org_id, [a.id for a in items])
     return SeekPage(
         items=[
-            AssetListItem(**AssetRead.model_validate(a).model_dump(), **archiving_fields(unfinished, a.id))
+            AssetListItem(**AssetRead.model_validate(a).model_dump(), context=contexts[a.id], **archiving_fields(unfinished, a.id))
             for a in items
         ],
         total=total,

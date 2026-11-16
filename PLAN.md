@@ -1,5 +1,7 @@
 # AuditMind AI — Delivery Plan
 
+PB-1.4: [organization-managed asset context](docs/ASSET_CONTEXT.md) adds separate owner, environment and business-criticality fields, versioned audit and import-preserving guards. Focused backend, frontend and Chrome checks pass; the full backend regression passed 2,134 tests. Migration 0059 is not activated in the normal application.
+
 ## Current delivery and next work - 15 November 2026
 
 | Scope | Current status |
@@ -9,9 +11,9 @@
 | Hosted verification | [All four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136) for implementation `15ad820`; documentation-only closeout is `e74c253`. |
 | Local activation | Schema `0058`, verified backup, unchanged inventory counts, rebuilt/restarted services and passing HTTP smoke checks. Publication remains Off for all organizations. Other installations need their own activation. |
 | PB-1.3 remaining scope | Additional reviewed source mappings, group payload publication and automatic reconciliation remain future work. Bounded Stage A/B delivery does not close the entire backlog item. |
-| Next engineering item | PB-1.4: organization-managed asset owner, environment and business criticality, protected from import overwrites. Design/review precedes implementation. |
+| Next engineering item | PB-1.4 organization-managed asset context is implemented locally verified (2,134 full backend tests, 27 focused checks, 613 frontend tests and Chrome acceptance); hosted CI and migration 0059 activation remain delivery gates. PB-1.5 controls/mappings follows. |
 
-**Cleanup completed locally:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](docs/FRONTEND_DEPENDENCY_REMEDIATION.md). This increment requires its own exact-commit hosted CI; the preceding application CI is not reused as evidence for these changes. Consult the current commit's Actions run for delivery verification.
+**Cleanup delivered:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](docs/FRONTEND_DEPENDENCY_REMEDIATION.md). Dependency cleanup `1eacedc` passed [all four hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43756657580). PB-1.4 requires its own exact-commit CI; this earlier run is not reused for the new feature.
 
 **Retained holds:** Stage A manual acceptance, PB-0.2 pilot/customer approval, broader evidence-qualified scoring rollout, production deployment and SaaS load acceptance remain deferred. Status-aware scoring's approved default-On policy is separate. Current short-character search behavior remains unchanged. The project owner holds release/engineering/operations/security ownership; the local recovery rehearsal is complete.
 
@@ -56,7 +58,7 @@ and the draft-save correction `e4c7488` in [run 43144443993](https://github.com/
 PB-1.3 remains partial: consolidation, source-payload publication, additional
 reviewed mappings and automatic reconciliation are not delivered. Recommended
 next work is a bounded consolidation/payload-publication design, then its reviewed
-implementation; PB-1.4 asset ownership/context follows. Pilot/production, broader
+implementation; PB-1.4 asset ownership/context is under delivery verification. Pilot/production, broader
 evidence-qualified scoring and SaaS load gates retain their prior holds.
 [Release evidence](docs/SUPPRESSION_RELEASE_REVIEW.md) and
 [verification steps](docs/EVIDENCE_USER_VERIFICATION.md).

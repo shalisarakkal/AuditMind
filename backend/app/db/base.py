@@ -1,3 +1,4 @@
+from app.models.asset_context import AssetContext, AssetContextHistory, OrganizationAssetContextRevision
 from app.db.base_class import Base
 from app.models.dashboard_snapshot import DashboardSnapshot  # noqa: F401
 from app.models.list_revision import OrganizationListRevision, OrganizationWorkflowRevision  # noqa: F401
@@ -68,7 +69,7 @@ __all__ = [
     "Organization",
     "User",
     "OrgMembership",
-    "Asset",
+    "Asset", "AssetContext", "AssetContextHistory", "OrganizationAssetContextRevision",
     "Scan",
     "Finding",
     "FindingHistory",
@@ -108,3 +109,6 @@ __all__ = [
     "PasswordHistory",
     "PlatformSetting",
 ]
+
+from app.db.asset_context import register as register_asset_context
+register_asset_context(Base.metadata)

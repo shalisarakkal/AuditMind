@@ -2,6 +2,9 @@
 
 import { Fragment, Suspense, useState } from "react";
 
+import AssetContextDialog from "@/components/AssetContextDialog";
+import AssetContextFilters from "@/components/AssetContextFilters";
+import { BUSINESS_CRITICALITY, ownerText } from "@/lib/assetContext";
 import ImportButton from "@/components/ImportButton";
 import ImportStatus from "@/components/ImportStatus";
 import BulkConfirm, { type BulkRequest, selectedText } from "@/components/BulkConfirm";
@@ -59,9 +62,12 @@ function Assets() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<JobRequest | null>(null);
   const selection = useSelection(list, org.id);
+  const [contextAsset, setContextAsset] = useState<Asset | null>(null);
+  const [contextRevision, setContextRevision] = useState(0);
   const [bulk, setBulk] = useState<BulkRequest | null>(null);
   useReloadOnImport(() => { selection.clear(); reload(); });
   useReloadOnImport(facets.reload);
+  useReloadOnImport(() => setContextRevision(x => x + 1));
 
   const assets = page?.items;
   const archive = (a: Asset) => {
@@ -92,7 +98,7 @@ function Assets() {
       ),
       confirmLabel: "Archive",
     });
-  const columns = writer ? 10 : 9;
+  const columns = writer ? 11 : 10;
   const toggle = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current);
@@ -121,7 +127,9 @@ function Assets() {
       <JobStatus />
       {confirming && <FindingActionDialog title={confirming.label} orgName={org.name} onClose={() => setConfirming(null)}><JobConfirm request={confirming} onClose={() => setConfirming(null)} /></FindingActionDialog>}
 
+      {contextAsset && <AssetContextDialog key={`${org.id}:${contextAsset.id}`} orgId={org.id} orgName={org.name} assetId={contextAsset.id} assetName={nameOf(contextAsset)} writer={writer} scannerEnvironment={contextAsset.environment} scannerCriticality={contextAsset.criticality} onClose={() => setContextAsset(null)} onSaved={() => { selection.clear(); reload(); setContextRevision(x => x + 1); }} />}
       <ListToolbar list={list} label="assets" />
+      <AssetContextFilters orgId={org.id} list={list} revision={contextRevision} />
       {writer && (
         <SelectionBar selection={selection}>
           <SelectionAction onClick={archiveSelected}>Archive selected</SelectionAction>
@@ -152,6 +160,7 @@ function Assets() {
                 <SortHeader label="Environment" column="environment" list={list} />
                 <SortHeader label="Criticality" column="criticality" list={list} />
                 <th className="px-4 py-2">Tags</th>
+                <th className="px-4 py-2">Organization context</th>
                 <th className="px-4 py-2">
                   <span className="sr-only">Details and actions</span>
                 </th>
@@ -182,7 +191,7 @@ function Assets() {
                 <th className="px-4 pb-2">
                   <TextFilter name="tags" label="tags" list={list} />
                 </th>
-                <th />
+                <th /><th />
               </tr>
             </thead>
             <tbody>
@@ -216,7 +225,9 @@ function Assets() {
                           </span>
                         ))}
                       </td>
+                      <td className="min-w-48 px-4 py-2 text-xs">{a.context?.available === false ? "Context not activated" : <><p>Owner: {a.context ? ownerText(a.context) : "Unassigned"}</p><p>Environment: {a.context?.environment || "Unknown"}</p><p>Business criticality: {BUSINESS_CRITICALITY[a.context?.business_criticality || ""] || "Unknown"}</p></>}</td>
                       <td className={ACTIONS_CELL}>
+                        <button type="button" className={ROW_ACTION_VIEW} disabled={!!selection.count || a.archiving === "running"} onClick={() => setContextAsset(a)}>{writer ? "Edit context" : "View context"}</button>
                         {details.length > 0 && (
                           <button
                             type="button"

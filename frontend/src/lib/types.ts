@@ -168,6 +168,7 @@ export type MyOrganization = Organization & {
 };
 
 export type Asset = {
+  context?: import("./assetContext").AssetContext | null;
   id: string;
   org_id: string;
   type: string;

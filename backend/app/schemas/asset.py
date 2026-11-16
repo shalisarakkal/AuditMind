@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import ArchiveProgress
+from app.schemas.asset_context import AssetContextRead
 
 
 class AssetCreate(BaseModel):
@@ -41,6 +42,7 @@ class AssetRead(BaseModel):
 
 
 class AssetListItem(AssetRead):
+    context: AssetContextRead | None = None
     # Its archive hasn't finished: running now, or stopped part-way; and that
     # archive (restore it to undo what it archived).
     archiving: ArchiveProgress | None = None

@@ -83,6 +83,7 @@ _TYPE_LABELS = {
     "restore": "Restore",
     "purge": "Purge",
     "asset_added": "Asset added",
+    "asset_context_changed": "Asset context changed",
     "finding_added": "Finding added",
     "finding_workflow_changed": "Finding remediation changed",
     "finding_verification_changed": "Scoring verification changed",

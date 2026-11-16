@@ -1,0 +1,39 @@
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import AssetContextDialog from "./AssetContextDialog";
+import { mockApi, json, callsTo } from "@/test/helpers";
+const path="/orgs/o/assets/a/context";
+const current={available:true,version:0,owner_id:null,owner_label:null,owner_status:"unassigned",environment:null,business_criticality:null,updated_at:null,asset_archived:false};
+const props={orgId:"o",orgName:"Organization",assetId:"a",assetName:"server.example",writer:true,scannerEnvironment:"scanner-prod",scannerCriticality:"scanner-high"};
+function setup(routes:Parameters<typeof mockApi>[0]={}){return mockApi({["GET "+path]:()=>current,"GET /orgs/o/members":()=>({items:[{id:"u",name:"Business Owner",email:"owner@example.io"}],total:1}),...routes});}
+async function edit(){await userEvent.type(await screen.findByLabelText("Organization-managed environment"),"Production");await userEvent.type(screen.getByLabelText("Change rationale"),"Reviewed context");}
+describe("Managed asset context",()=>{
+ it("keeps scanner attributes separate and disables unchanged or rationale-only saves",async()=>{
+  setup();render(<AssetContextDialog {...props} onClose={vi.fn()} onSaved={vi.fn()}/>);await screen.findByLabelText("Change rationale");expect(screen.getByText(/Scanner environment: scanner-prod/)).toHaveTextContent("Scanner criticality: scanner-high");expect(screen.getByRole("button",{name:"Save context"})).toBeDisabled();await userEvent.type(screen.getByLabelText("Change rationale"),"Only a note");expect(screen.getByRole("button",{name:"Save context"})).toBeDisabled();
+ });
+ it("saves fixed-target context with a version and does not send scanner data",async()=>{
+  const saved=vi.fn(),close=vi.fn();const calls=setup({["PATCH "+path]:()=>({...current,version:1,environment:"Production"})});render(<AssetContextDialog {...props} onClose={close} onSaved={saved}/>);await edit();await userEvent.click(screen.getByRole("button",{name:"Save context"}));expect(saved).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();const body=JSON.parse(String(callsTo(calls,"PATCH "+path)[0][1].body));expect(body).toEqual({expected_version:0,environment:"Production",business_criticality:null,rationale:"Reviewed context"});
+ });
+ it("blocks dismissal and duplicate submission while saving",async()=>{
+  let release!:(value:Response)=>void;const held=new Promise<Response>(resolve=>{release=resolve;});const close=vi.fn();const calls=setup({["PATCH "+path]:()=>held});render(<AssetContextDialog {...props} onClose={close} onSaved={vi.fn()}/>);await edit();await userEvent.click(screen.getByRole("button",{name:"Save context"}));expect(screen.getByRole("button",{name:"Cancel"})).toBeDisabled();fireEvent(screen.getByRole("dialog"),new Event("cancel",{bubbles:true,cancelable:true}));expect(close).not.toHaveBeenCalled();expect(callsTo(calls,"PATCH "+path)).toHaveLength(1);await act(async()=>{release(json({...current,version:1}));});expect(close).toHaveBeenCalledOnce();
+ });
+ it("preserves a stale draft until explicit application confirmation reloads it",async()=>{
+  let loads=0;setup({["GET "+path]:()=>++loads===1?current:{...current,version:1,environment:"Other reviewer"},["PATCH "+path]:()=>json({detail:"Asset context changed"},409)});render(<AssetContextDialog {...props} onClose={vi.fn()} onSaved={vi.fn()}/>);await edit();await userEvent.click(screen.getByRole("button",{name:"Save context"}));await screen.findByRole("alert");expect(screen.getByLabelText("Organization-managed environment")).toHaveValue("Production");await userEvent.click(screen.getByRole("button",{name:"Reload saved context"}));expect(screen.getByRole("button",{name:"Save context"})).toBeDisabled();await userEvent.click(screen.getByRole("button",{name:"Keep editing"}));expect(screen.getByLabelText("Change rationale")).toHaveValue("Reviewed context");await userEvent.click(screen.getByRole("button",{name:"Reload saved context"}));await userEvent.click(screen.getByRole("button",{name:"Reload and discard edits"}));expect(await screen.findByLabelText("Organization-managed environment")).toHaveValue("Other reviewer");expect(screen.getByLabelText("Change rationale")).toHaveValue("");
+ });
+ it("treats a lost response as unknown and refreshes on Close without retrying",async()=>{
+  const changed=vi.fn();const calls=setup({["PATCH "+path]:()=>json({detail:"Unavailable"},503)});render(<AssetContextDialog {...props} onClose={vi.fn()} onSaved={changed}/>);await edit();await userEvent.click(screen.getByRole("button",{name:"Save context"}));expect(await screen.findByRole("alert")).toHaveTextContent("Outcome unknown");expect(screen.getByRole("button",{name:"Save context"})).toBeDisabled();await userEvent.click(screen.getByRole("button",{name:"Close and refresh"}));expect(changed).toHaveBeenCalledOnce();expect(callsTo(calls,"PATCH "+path)).toHaveLength(1);
+ });
+ it("refreshes after Escape closes an unknown-outcome save",async()=>{
+  const changed=vi.fn(),close=vi.fn();setup({["PATCH "+path]:()=>json({detail:"Unavailable"},503)});render(<AssetContextDialog {...props} onClose={close} onSaved={changed}/>);await edit();await userEvent.click(screen.getByRole("button",{name:"Save context"}));await screen.findByRole("alert");fireEvent(screen.getByRole("dialog"),new Event("cancel",{bubbles:true,cancelable:true}));expect(close).toHaveBeenCalledOnce();expect(changed).toHaveBeenCalledOnce();
+ });
+ it("reads history without showing unchanged fields or raw owner IDs",async()=>{
+  setup({["GET "+path+"/history"]:()=>[{id:"h",actor_label:"Reviewer",version:1,created_at:"2026-11-15T12:00:00Z",rationale:"Reviewed",before:{owner_id:"old-id",owner_label:"Former Owner",environment:"Production",business_criticality:null},after:{owner_id:"new-id",owner_label:"New Owner",environment:"Production",business_criticality:null}}]});render(<AssetContextDialog {...props} writer={false} onClose={vi.fn()} onSaved={vi.fn()}/>);await screen.findByRole("button",{name:"Show context history"});expect(screen.queryByRole("button",{name:"Save context"})).not.toBeInTheDocument();await userEvent.click(screen.getByRole("button",{name:"Show context history"}));expect(await screen.findByText(/Owner: Former Owner/)).toHaveTextContent("New Owner");expect(screen.queryByText(/old-id|new-id/)).not.toBeInTheDocument();expect(screen.queryByText(/Environment: Production/)).not.toBeInTheDocument();
+ });
+ it("discards cached history pages when explicitly reloading saved context",async()=>{
+  let reads=0;setup({["GET "+path+"/history"]:()=>[{id:"h",actor_label:"Reviewer",version:++reads,created_at:"2026-11-15T12:00:00Z",rationale:reads===1?"Old history":"New history",before:{environment:null},after:{environment:"Production"}}]});render(<AssetContextDialog {...props} writer={false} onClose={vi.fn()} onSaved={vi.fn()}/>);await userEvent.click(await screen.findByRole("button",{name:"Show context history"}));await screen.findByText("Rationale: Old history");await userEvent.click(screen.getByRole("button",{name:"Reload saved context"}));await screen.findByRole("button",{name:"Show context history"});await userEvent.click(screen.getByRole("button",{name:"Show context history"}));expect(await screen.findByText("Rationale: New history")).toBeVisible();expect(screen.queryByText("Rationale: Old history")).not.toBeInTheDocument();
+ });
+ it("fails closed before activation",async()=>{
+  setup({["GET "+path]:()=>({...current,available:false})});render(<AssetContextDialog {...props} onClose={vi.fn()} onSaved={vi.fn()}/>);expect(await screen.findByText(/requires coordinated database activation/)).toBeVisible();expect(screen.queryByRole("button",{name:"Save context"})).not.toBeInTheDocument();
+ });
+});

@@ -553,6 +553,13 @@ Legacy saved reports preserve their original scoring labels.
 
 ## 5. Assets, findings and imports
 
+### Organization-managed asset context
+
+After migration 0059 activation, Assets shows managed owner, environment and business criticality alongside the scanner attributes. These start Unassigned/Unknown and imports do not overwrite them. Admins and auditors can clear row selections, choose **Edit context**, select an active organization member, enter the fields and a rationale, then **Save context**. Other members can use **View context**. Searching for an owner does not assign one until selected and saved.
+
+Use the managed filters to find assets by these fields. History records changed values, rationale and actor. Conflicting edits require explicit reload; an unchanged save does not add a version. Archive/restore retains context; permanent asset purge removes its context/history. These fields do not change scores or evidence qualification. See [Asset context](ASSET_CONTEXT.md) for lifecycle and validation details.
+
+
 ### Abort a queued or running import
 
 The uploader or an organization admin can choose **Abort import** in the

@@ -19,6 +19,7 @@ from functools import cmp_to_key
 from sqlalchemy import and_, false, func, or_, select, union_all
 from app.core.config import settings
 from app.models.list_revision import OrganizationListRevision, OrganizationWorkflowRevision
+from app.models.asset_context import OrganizationAssetContextRevision
 
 
 @dataclass(frozen=True)
@@ -32,12 +33,14 @@ class Stamp:
 
 
 def revision_stamp(db, org_id, kind):
-    row = db.execute(select(OrganizationListRevision.epoch,
-        OrganizationListRevision.asset_revision if kind == "assets" else
-        OrganizationListRevision.finding_revision + func.coalesce(OrganizationWorkflowRevision.revision, 0),
-        func.current_database(), func.current_schema(), func.pg_current_xact_id_if_assigned())
-        .outerjoin(OrganizationWorkflowRevision, OrganizationWorkflowRevision.org_id == OrganizationListRevision.org_id)
-        .where(OrganizationListRevision.org_id == org_id)).first()
+    context_ready = kind == "assets" and db.scalar(select(func.to_regclass("organization_asset_context_revisions"))) is not None
+    revision = OrganizationListRevision.asset_revision if kind == "assets" else OrganizationListRevision.finding_revision + func.coalesce(OrganizationWorkflowRevision.revision, 0)
+    if context_ready: revision = revision + func.coalesce(OrganizationAssetContextRevision.revision, 0)
+    query = select(OrganizationListRevision.epoch, revision,
+        func.current_database(), func.current_schema(), func.pg_current_xact_id_if_assigned()).outerjoin(
+        OrganizationWorkflowRevision, OrganizationWorkflowRevision.org_id == OrganizationListRevision.org_id)
+    if context_ready: query = query.outerjoin(OrganizationAssetContextRevision, OrganizationAssetContextRevision.org_id == OrganizationListRevision.org_id)
+    row = db.execute(query.where(OrganizationListRevision.org_id == org_id)).first()
     # Never publish counts from a writer's uncommitted transaction: rollback
     # could reuse its revision number for different future data.
     if row is None or row[4] is not None:

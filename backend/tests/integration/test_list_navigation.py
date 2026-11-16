@@ -148,7 +148,10 @@ def test_short_finding_filter_over_sample_limit_stays_exact(client, inventory, m
 def test_counts_reuse_across_sort_and_page_and_invalidate_on_raw_writes(client, inventory, db_session):
     statements = []
     def record(conn, cursor, statement, parameters, context, executemany):
-        if "count(" in statement.lower(): statements.append(statement)
+        # Readiness checks count a bounded catalog set. This assertion guards
+        # expensive inventory counts, not those metadata-only probes.
+        sql = statement.lower()
+        if "count(" in sql and ("from assets" in sql or "from findings" in sql): statements.append(statement)
     engine = db_session.get_bind()
     event.listen(engine, "before_cursor_execute", record)
     try:

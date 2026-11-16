@@ -633,3 +633,26 @@ describe("Settings page", () => {
     expect(screen.queryByRole("button", { name: /^(Copy|Edit|Delete) / })).not.toBeInTheDocument();
   });
 });
+
+
+describe("Organization-managed asset context",()=>{
+  it("filters by managed fields independently of scanner attributes",async()=>{
+    const {fetchMock}=await renderSignedIn(<AssetsPage/>,"viewer",{
+      "GET /orgs/org-1/assets":()=>page(ASSETS),
+      "GET /orgs/org-1/assets/context-facets":()=>({managed_owner:["owner-id"],managed_owner_labels:{"owner-id":"Business Owner"},managed_environment:["Production"],business_criticality:["critical"]}),
+    });
+    await screen.findByText("web-01.acme.io");
+    const owners=within(await screen.findByRole("group",{name:"managed owner values"}));
+    fireEvent.click(owners.getByLabelText("Business Owner"));
+    await waitFor(()=>expect(lastQuery(fetchMock,"/orgs/org-1/assets").getAll("managed_owner")).toEqual(["owner-id"]));
+    const environments=within(screen.getByRole("group",{name:"managed environment values"}));fireEvent.click(environments.getByLabelText("Unknown"));
+    await waitFor(()=>expect(lastQuery(fetchMock,"/orgs/org-1/assets").getAll("managed_environment")).toEqual([""]));
+    expect(lastQuery(fetchMock,"/orgs/org-1/assets").has("environment")).toBe(false);
+  });
+  it("disables row context editing while any assets are selected",async()=>{
+    await renderSignedIn(<AssetsPage/>,"admin",{"GET /orgs/org-1/assets":()=>page(ASSETS)});
+    await screen.findByText("web-01.acme.io");
+    const row=screen.getByRole("row",{name:/web-01.acme.io/});fireEvent.click(within(row).getByRole("checkbox"));
+    for(const action of screen.getAllByRole("button",{name:"Edit context"}))expect(action).toBeDisabled();
+  });
+});
