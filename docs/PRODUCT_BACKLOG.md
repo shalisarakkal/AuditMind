@@ -1,17 +1,17 @@
 # AuditMind Product Backlog
 
-## Current delivery and next work - 15 November 2026
+## Current delivery and next work - 16 November 2026
 
 | Scope | Current status |
 | --- | --- |
 | Stage A reviewed native consolidation | Delivered and locally activated; separate default-off organization opt-in. Manual owner acceptance remains TODO/deferred. |
 | Stage B single-finding scanner-field publication | Delivered in `15ad820`; authorized Publish/Undo, retained snapshots, source/proof/lifecycle guards, atomic consumer invalidation and guarded UI. |
-| Hosted verification | [All four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136) for implementation `15ad820`; documentation-only closeout is `e74c253`. |
-| Local activation | Schema `0058`, verified backup, unchanged inventory counts, rebuilt/restarted services and passing HTTP smoke checks. Publication remains Off for all organizations. Other installations need their own activation. |
+| Hosted verification | PB-1.4 final implementation `fd9a140`: [all four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43789429856). Foundation `39a6595` also passed its own run. Earlier Stage A/B verification remains historical evidence. |
+| Local activation | Schema `0060`, verified pre-activation backup, unchanged 6-organization/5,608,732-asset/5,961,209-finding/64-import counts, rebuilt/restarted services and passing HTTP/readiness checks. Context starts Unassigned/Unknown; scanner publication remains Off. Other installations need coordinated activation. |
 | PB-1.3 remaining scope | Additional reviewed source mappings, group payload publication and automatic reconciliation remain future work. Bounded Stage A/B delivery does not close the entire backlog item. |
-| Next engineering item | PB-1.4 organization-managed asset context is implemented locally verified (2,134 full backend tests, 27 focused checks, 613 frontend tests and Chrome acceptance); hosted CI and migrations 0059-0060 activation remain delivery gates. PB-1.5 controls/mappings follows. |
+| Next engineering item | PB-1.5: review a versioned control catalog and finding mappings. PB-1.4 organization-managed asset context is delivered and locally activated; it does not alter scoring or imported scanner fields. |
 
-**Cleanup delivered:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](FRONTEND_DEPENDENCY_REMEDIATION.md). Dependency cleanup `1eacedc` passed [all four hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43756657580). PB-1.4 requires its own exact-commit CI; this earlier run is not reused for the new feature.
+**Cleanup delivered:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](FRONTEND_DEPENDENCY_REMEDIATION.md). Dependency cleanup `1eacedc` passed [all four hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43756657580). PB-1.4 passed its own exact-commit CI; this earlier run was not reused for the new feature.
 
 **Retained holds:** Stage A manual acceptance, PB-0.2 pilot/customer approval, broader evidence-qualified scoring rollout, production deployment and SaaS load acceptance remain deferred. Status-aware scoring's approved default-On policy is separate. Current short-character search behavior remains unchanged. The project owner holds release/engineering/operations/security ownership; the local recovery rehearsal is complete.
 
@@ -291,7 +291,7 @@ Add organization-managed asset owner, environment, and business-criticality
 fields with clear unknown/unassigned states. Keep them separate from imported
 scanner attributes unless a source mapping is explicitly configured.
 
-**Implementation status:** Implemented and locally verified. [Asset context contract and review evidence](ASSET_CONTEXT.md). Focused PostgreSQL, frontend and Chrome checks pass; 2,134 full backend tests passed. Hosted CI and normal database activation remain gates. Existing scanner attributes and scoring are unchanged.
+**Implementation status:** Delivered and locally activated at schema 0060. [Contract, tests and operating details](ASSET_CONTEXT.md). Final implementation `fd9a140` passed [all four hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43789429856); the local application was backed up, migrated, rebuilt and smoke-checked. Scanner attributes, finding references and scoring are unchanged. Other installations need their own activation.
 
 **Acceptance criteria**
 
