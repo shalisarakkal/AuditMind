@@ -12,6 +12,7 @@ import FindingObservations from "./FindingObservations";
 import FindingConsolidation from "./FindingConsolidation";
 import FindingPublication from "./FindingPublication";
 import FindingRiskVerification from "./FindingRiskVerification";
+import FindingRemediationProof from "./FindingRemediationProof";
 
 type Props = { orgId: string; orgName: string; role: string; ids: string[]; names?: string[]; onClose(): void; onSaved(): void };
 type Member = { id: string; name: string | null; email: string; status: string };
@@ -187,6 +188,7 @@ export default function FindingWorkflowDialog({ orgId, orgName, role, ids, names
     {ids.length === 1 && <FindingObservations hasWorkflowDraft={!!(status || assignee !== "keep" || dueMode !== "keep" || reviewMode !== "keep" || rationale.trim() || verification.trim())} onPublicationChanged={() => { onSaved(); onClose(); }} key={`${orgId}-${ids[0]}`} orgId={orgId} findingId={ids[0]} canReview={role === "admin"} disabled={busy || loading || !!loadError || needsReload} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
     {ids.length === 1 && <FindingPublication canReview={role === "admin"} hasWorkflowDraft={!!(status || assignee !== "keep" || dueMode !== "keep" || reviewMode !== "keep" || rationale.trim() || verification.trim())} onBusyChange={value => { inFlight.current = value; setBusy(value); }} onChanged={() => { onSaved(); onClose(); }} key={`publication-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} disabled={busy || loading || !!loadError || needsReload} />}
     {ids.length === 1 && <FindingConsolidation key={`group-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} canReview={role === "admin"} disabled={busy || loading || !!loadError || needsReload} hasWorkflowDraft={!!(status || assignee !== "keep" || dueMode !== "keep" || reviewMode !== "keep" || rationale.trim() || verification.trim())} onBusyChange={value => { inFlight.current = value; setBusy(value); }} onChanged={() => { onSaved(); onClose(); }} />}
+    {ids.length === 1 && <FindingRemediationProof key={`remediation-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} disabled={busy || loading || !!loadError || needsReload} hasWorkflowDraft={!!(status || assignee !== "keep" || dueMode !== "keep" || reviewMode !== "keep" || rationale.trim() || verification.trim())} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
     {ids.length === 1 && <FindingRiskVerification key={`proof-${orgId}-${ids[0]}-${refresh}`} orgId={orgId} findingId={ids[0]} role={role} disabled={busy} onBusyChange={value => { inFlight.current = value; setBusy(value); }} />}
     <footer className={DIALOG_FOOTER}>
       <button type="button" disabled={busy} onClick={() => { if (!inFlight.current) onClose(); }} className={DIALOG_NEUTRAL}>Close</button>

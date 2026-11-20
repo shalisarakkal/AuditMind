@@ -1,6 +1,6 @@
 # PB-1.5 - Versioned control catalog and reviewed finding mappings
 
-Local implementation reviewed; hosted CI and activation pending. Normal application schema remains 0060. This work
+Implementation `e7546a7` passed all four [hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43906412468). Local schema is 0061; production rebuild, service restart and HTTP/readiness checks passed. This work
 does not enable AI calls, alter scoring or rewrite saved reports.
 
 ## First increment
@@ -110,9 +110,32 @@ an active primary finding; it never silently redirects an inactive finding.
 - High-severity Bandit gate passed. Lower-severity findings remain separately
   triaged; this is not a claim of zero findings at every severity.
 
-Migration 0061 adds five sidecar tables and guards, without a findings/assets
-backfill or scoring-policy changes. Normal application remains at 0060 until the
-exact pushed commit passes all four hosted Linux jobs, services are idle/stopped,
-and a verified local backup is recorded. Catalog installation is an explicit
+At the pre-delivery checkpoint, migration 0061 added five sidecar tables and guards,
+without a findings/assets backfill or scoring-policy changes. Activation required that the
+exact pushed commit pass all four hosted Linux jobs, services be idle/stopped,
+and a verified local backup be recorded. These gates passed as recorded below. Catalog installation is an explicit
 platform-admin action after activation; no actual category mapping is approved
 automatically.
+
+## Delivery follow-up, 16 November 2026
+
+Exact implementation commit `e7546a71d8fb7efcf211dcbe17ca3e1f3dc11b46`
+passed backend, frontend, browser and dependency/security jobs in hosted run
+43906412468. Local maintenance completed migration 0060 to 0061 after a
+verified custom-format backup (1,744,044,078 bytes; archive listing and SHA256
+recorded in the ignored local checkpoint manifest). Migration/model drift,
+index validity and catalog readiness checks passed. Inventory remained at six
+organizations, 5,608,732 assets, 5,961,209 findings and 64 imports. The five new
+tables were empty after migration; no catalog installation or mapping approval
+was performed. Local artifacts remain under `temp/pb15-*` and the ignored
+`temp/auditmind-demo/checkpoints` directory.
+
+Resume verification completed: the normal production frontend rebuild (including
+TypeScript) passed; API, one-slot worker and frontend restarted. `/health`,
+`/ready`, `/login` and proxied authentication options returned HTTP 200. Readiness
+reported database, uploads and worker healthy. Unauthenticated control-page
+requests also responded successfully; these HTTP checks do not replace the
+117 pre-delivery authenticated Chrome checks or deferred owner acceptance.
+Existing accounts/passwords were retained. The app is available at
+http://localhost:3000/login. Catalog installation remains an explicit platform-admin
+action; no real category mapping was approved during activation.

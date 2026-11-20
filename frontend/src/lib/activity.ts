@@ -16,6 +16,7 @@ export const EVENT_LABELS: Record<string, string> = {
   finding_added: "Finding added",
   finding_workflow_changed: "Finding remediation changed",
   finding_verification_changed: "Scoring verification changed",
+  remediation_proof_changed: "Remediation proof changed",
   identity_tool_created: "Identity tool instance registered",
   identity_tool_retired: "Identity tool instance retired",
   identity_binding_reviewed: "Finding identity binding reviewed",

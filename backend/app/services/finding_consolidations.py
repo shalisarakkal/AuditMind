@@ -109,8 +109,10 @@ def _preview(db, org_id, actor_id, identifier):
     recorded_work = db.scalar(select(or_(select(FindingHistory.id).where(FindingHistory.org_id == org_id,
         FindingHistory.finding_id == alias.id).exists(), select(FindingVerification.id).where(
             FindingVerification.org_id == org_id, FindingVerification.finding_id == alias.id).exists())))
+    from app.services.remediation_proof import has_history as has_remediation_proof
     if (alias.workflow_status != "open" or alias.workflow_version != 0 or alias.risk_verification_version != 0
             or alias.risk_verification_state != "unverified" or recorded_work
+            or has_remediation_proof(db, org_id, alias.id)
             or any(getattr(alias, name) is not None for name in optional)):
         block("alias_not_pristine", "The alias has independent workflow/proof work; stage A must not discard it")
     if any(row.risk_verification_state == "approved" for row in findings.values()):

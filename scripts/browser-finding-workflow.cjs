@@ -103,6 +103,12 @@ async function free(port) { await new Promise((resolve,reject) => { const server
       return {page,request,context,authorization:()=>token};
     }
     const admin=await session('admin'), p=admin.page, org=`/orgs/${seed.org}`, list=org+'/findings';
+    if(process.env.AUDITMIND_REMEDIATION_PROOF_ONLY==='1') {
+      const viewer=await session('viewer');
+      await require('./browser-remediation-proof.cjs')({page:p,admin,viewer,base,org,check,output});
+      assert.deepEqual(evidence.errors,[]);
+      return;
+    }
     if(process.env.AUDITMIND_CONTROL_CATALOG_ONLY==='1') {
       const viewer=await session('viewer');
       await require('./browser-control-catalog.cjs')({page:p,admin,viewer,session,base,org,check,output});
@@ -1792,6 +1798,7 @@ async function free(port) { await new Promise((resolve,reject) => { const server
     await require('./browser-publication-provenance.cjs')({page:p,admin,viewer,base,org,list,check});
     await require('./browser-asset-context.cjs')({page:p,admin,viewer,base,org,check});
     await require('./browser-control-catalog.cjs')({page:p,admin,viewer,session,base,org,check,output});
+    await require('./browser-remediation-proof.cjs')({page:p,admin,viewer,base,org,check,output});
     const stats=JSON.parse(cli('inspect')); assert.equal(stats.usage_count,0); assert.deepEqual(evidence.errors,[]); check('No AI usage or browser page errors');
   } catch(error) { evidence.failure=error.message; if(browser)try{await browser.contexts()[0]?.pages()[0]?.screenshot({path:path.join(output,'failure.png'),fullPage:true});}catch{} throw error; }
   finally { if(browser)await browser.close(); for(const child of children) {if(!child.pid||child.exitCode!==null)continue;try{if(process.platform==='win32')execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});else process.kill(-child.pid,'SIGTERM');}catch{}} if(prepared)cli('cleanup'); fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(evidence,null,2)); console.log(`${evidence.checks.length} checks; artifacts: ${output}`); }

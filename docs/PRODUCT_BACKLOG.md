@@ -1,15 +1,15 @@
 # AuditMind Product Backlog
 
-## Current delivery and next work - 16 November 2026
+## Current delivery and next work - 20 November 2026
 
 | Scope | Current status |
 | --- | --- |
 | Stage A reviewed native consolidation | Delivered and locally activated; separate default-off organization opt-in. Manual owner acceptance remains TODO/deferred. |
 | Stage B single-finding scanner-field publication | Delivered in `15ad820`; authorized Publish/Undo, retained snapshots, source/proof/lifecycle guards, atomic consumer invalidation and guarded UI. |
-| Hosted verification | PB-1.4 final implementation `fd9a140`: [all four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43789429856). Foundation `39a6595` also passed its own run. Earlier Stage A/B verification remains historical evidence. |
-| Local activation | Schema `0060`, verified pre-activation backup, unchanged 6-organization/5,608,732-asset/5,961,209-finding/64-import counts, rebuilt/restarted services and passing HTTP/readiness checks. Context starts Unassigned/Unknown; scanner publication remains Off. Other installations need coordinated activation. |
+| Hosted verification | PB-1.5 implementation `e7546a7`: [all four Linux CI jobs passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43906412468). PB-2.1 has no exact-commit hosted result yet; earlier feature runs remain historical evidence. |
+| Local activation | Schema `0061`, verified pre-activation backup, unchanged 6-organization/5,608,732-asset/5,961,209-finding/64-import counts, rebuilt/restarted services and passing HTTP/readiness checks. Context starts Unassigned/Unknown; scanner publication remains Off. Other installations need coordinated activation. |
 | PB-1.3 remaining scope | Additional reviewed source mappings, group payload publication and automatic reconciliation remain future work. Bounded Stage A/B delivery does not close the entire backlog item. |
-| Current engineering item | PB-1.5 [versioned control catalog and reviewed category mappings](CONTROL_CATALOG.md) is locally implemented and reviewed. Normal application remains at 0060; 117 final Chrome checks passed; exact-commit hosted Linux CI and coordinated migration 0061 activation remain delivery gates. PB-1.4 is complete. |
+| Current engineering item | PB-2.1 [open-finding remediation proof review](REMEDIATION_PROOF.md) passed local full validation: 2,193 PostgreSQL backend tests in 4,963.20 seconds with zero skips, 641 frontend tests across 71 files, 122 full Chrome workflow checks, production build, lint, dependency audits and the high-severity security gate. It adds retained submission/decision history while workflow remains Open. Normal schema remains 0061; coordinated migration 0062 and exact-commit hosted CI are pending. PB-1.5 is delivered and locally activated; catalog installation remains a platform-admin action. |
 
 **Cleanup delivered:** roadmap/backlog/handoff now separate current Stage A/B delivery from historical checkpoints. The seven moderate frontend development-chain findings are remediated; full and production audits report zero vulnerabilities. Clean install, the reproduced security regression, real parser compatibility, 602 frontend tests, lint, TypeScript and isolated production build pass. See [dependency remediation and evidence](FRONTEND_DEPENDENCY_REMEDIATION.md). Dependency cleanup `1eacedc` passed [all four hosted Linux jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/43756657580). PB-1.4 passed its own exact-commit CI; this earlier run was not reused for the new feature.
 
@@ -308,7 +308,7 @@ Create stable internal control IDs, versioned control descriptions, and
 traceable mappings from supported finding categories to controls. Display
 framework references only where the source and usage rights are established.
 
-**Implementation status:** Locally implemented; hosted CI and activation pending. [Scope, roles and validation gates](CONTROL_CATALOG.md). First increment uses the pinned verified NIST catalog, exact organization category rules, retained proposals/approvals and explicit Unmapped states. No scoring, saved-report rewrite or CIS/ISO full-text promotion. Normal schema remains 0060.
+**Implementation status:** Hosted CI passed for `e7546a7`; migration 0061 and database readiness verified. [Scope, roles and validation gates](CONTROL_CATALOG.md). First increment uses the pinned verified NIST catalog, exact organization category rules, retained proposals/approvals and explicit Unmapped states. No scoring, saved-report rewrite or CIS/ISO full-text promotion. Local schema is 0061; production rebuild, service restart and HTTP/readiness checks passed.
 
 **Acceptance criteria**
 
@@ -320,6 +320,8 @@ framework references only where the source and usage rights are established.
 ## Phase 2 — Evidence-backed remediation operations
 
 ### PB-2.1 — Attach remediation proof as a first-class record
+
+**Current implementation:** [Open-finding proof review](REMEDIATION_PROOF.md) adds a separate append-only reference/document-version ledger, pending review, administrator approval/rejection and retained reasons. Full local validation passed: 2,193 PostgreSQL backend tests with zero skips, 641 frontend tests and 122 full Chrome workflow checks. Migration 0062 is not activated. Workflow transition enforcement and new binary/group artifact flows remain open.
 
 **Status, 6 November:** PB-4.4 implements the protected reference/document-version
 submission and administrator decision ledger for scoring eligibility. This is a

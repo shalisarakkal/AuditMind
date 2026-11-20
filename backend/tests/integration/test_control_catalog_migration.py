@@ -34,6 +34,7 @@ def test_catalog_migration_roundtrip_drift_and_retained_data_guard():
             assert c.scalar(text("SELECT count(*) FROM control_catalogs")) == 0
             assert c.scalar(text("SELECT category FROM findings WHERE id=:id"), {"id": finding}) == "Existing category"
             config.attributes.pop("version_table_schema")
+            command.upgrade(config, "head")
             command.check(config)
             c.commit()
             config.attributes["version_table_schema"] = schema

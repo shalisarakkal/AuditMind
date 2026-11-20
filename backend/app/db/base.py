@@ -13,6 +13,7 @@ from app.models.asset import Asset
 from app.models.scan import Scan
 from app.models.finding import Finding
 from app.models.finding_verification import OrganizationRiskPolicy, FindingVerification
+from app.models.remediation_proof import RemediationProof
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.models.observation_publication import ObservationPublicationDecision, ObservationPublicationSnapshot, ObservationPublicationState, ObservationPublicationDependency, OrganizationPublicationSettings, OrganizationPublicationRevision
@@ -59,6 +60,7 @@ from app.db.publication_lifecycle import register as register_publication_lifecy
 register_publication_lifecycle(Base.metadata)
 
 __all__ = [
+    "RemediationProof",
     "ControlCatalog", "CatalogControl", "FindingControlRule", "FindingControlDecision", "FindingControlTarget",
     "WorkerDispatch",
     "OrganizationEvidenceRevision",
@@ -117,3 +119,6 @@ register_asset_context(Base.metadata)
 
 from app.db.control_catalog import register as register_control_catalog
 register_control_catalog(Base.metadata)
+
+from app.db.remediation_proof import register as register_remediation_proof
+register_remediation_proof(Base.metadata)

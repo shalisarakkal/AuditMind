@@ -36,6 +36,7 @@ from app.schemas.ingestion import ImportResponse
 from app.services.archive_service import archiving_fields, unfinished_archives
 from app.services.events import record_event
 from app.schemas.finding_workflow import HistoryRead, WorkflowBulk, WorkflowRead, WorkflowStatus, WorkflowTarget, WorkflowUpdate
+from app.schemas.remediation_proof import ProofSubmission as RemediationSubmission, ProofDecision as RemediationDecision
 from app.models.finding_history import FindingHistory
 from app.models.finding_observation import FindingObservation
 from app.schemas.finding_observation import FindingObservationRead
@@ -46,6 +47,30 @@ from app.services import list_pages
 from app.db.list_sort import severity_rank, finding_text_size, TEXT_SORT_BYTES
 
 router = APIRouter(prefix="/orgs/{org_id}", tags=["findings"])
+
+@router.get("/findings/{finding_id}/remediation-proof")
+def remediation_proof_read(org_id: uuid.UUID, finding_id: uuid.UUID, response: Response,
+        before: int | None = Query(None, ge=1), limit: int = Query(20, ge=1, le=100),
+        db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_member)):
+    from app.services.remediation_proof import read
+    response.headers["Cache-Control"] = "no-store"
+    return read(db, org_id, finding_id, member, before=before, limit=limit)
+
+
+@router.post("/findings/{finding_id}/remediation-proof")
+def remediation_proof_submit(org_id: uuid.UUID, finding_id: uuid.UUID, payload: RemediationSubmission,
+        response: Response, db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_member)):
+    from app.services.remediation_proof import write
+    response.headers["Cache-Control"] = "no-store"
+    return write(db, org_id, finding_id, member, payload)
+
+
+@router.post("/findings/{finding_id}/remediation-proof/review")
+def remediation_proof_review(org_id: uuid.UUID, finding_id: uuid.UUID, payload: RemediationDecision,
+        response: Response, db: Session = Depends(get_db), member: OrgMembership = Depends(require_org_member)):
+    from app.services.remediation_proof import write
+    response.headers["Cache-Control"] = "no-store"
+    return write(db, org_id, finding_id, member, payload, review=True)
 
 
 @router.get("/findings/{finding_id}/publication-status")

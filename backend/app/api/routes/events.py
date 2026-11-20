@@ -89,6 +89,7 @@ _TYPE_LABELS = {
     "finding_added": "Finding added",
     "finding_workflow_changed": "Finding remediation changed",
     "finding_verification_changed": "Scoring verification changed",
+    "remediation_proof_changed": "Remediation proof changed",
     "settings_changed": "Settings changed",
     "profile_created": "Import profile created",
     "profile_updated": "Import profile changed",
