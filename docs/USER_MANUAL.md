@@ -1137,7 +1137,7 @@ that is not installed is labeled unavailable pending database activation. See
 See [guarded scanner-field publication](OBSERVATION_PUBLICATION_ACTIONS.md) for the separate default-off organization setting, fresh single-finding Publish/Undo reviews, atomic invalidation and uncertain-outcome handling. Local demo activation to `0058` completed after successful CI; publication remains Off and legacy private entry points remain closed. Verified locally: 94 post-fix backend checks, 117 broader backend checks, 602 frontend tests and 108 full Chrome checks passed. TypeScript, ESLint and the isolated production build passed. Implementation `15ad820` is pushed; [hosted Linux CI passed](https://github.com/shalisarakkal/AuditMind/actions/runs/43726776136). Backup verification, migration to `0058`, unchanged inventory counts, service rebuild/restart and HTTP smoke checks completed for the local demo. No organization was opted in.
 
 
-## Remediation proof review (PB-2.1, pending activation)
+## Remediation proof review (PB-2.1)
 
 After coordinated activation of migration 0062, open an independent Open
 finding's Workflow and expand **Remediation proof**. Organization admins and
@@ -1153,5 +1153,6 @@ Viewers can inspect that history. Approved remediation proof does not close the
 workflow or grant a scoring exclusion. Stale context requires a new submission.
 Consolidated-pair remediation proof is not available in this increment.
 
-See [scope, retention and delivery gates](REMEDIATION_PROOF.md). This feature is
-not yet active in the normal local application; its schema remains 0061.
+See [scope, retention and delivery gates](REMEDIATION_PROOF.md). Migration 0062
+is active in the local application. Other deployment targets require their own
+coordinated activation.

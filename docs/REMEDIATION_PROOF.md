@@ -1,9 +1,10 @@
 # PB-2.1: Open-finding remediation proof review
 
 This increment adds a separate proof-review ledger and workflow panel for an
-independent, active finding whose remediation workflow is Open. Implementation
-and isolated verification are complete for this bounded scope. The running application remains at
-schema 0061; migration 0062 has not been activated on normal data.
+independent, active finding whose remediation workflow is Open. Implementation,
+full local/hosted validation and local-demo activation are complete. The local
+application is now at schema 0062 after a verified pre-migration backup; other
+deployment targets require their own coordinated rollout.
 
 ## User flow and authority
 
@@ -69,9 +70,10 @@ authorize workflow closure. Existing legacy transitions remain user assertions;
 proof approval must not be treated as automatic closure, remediation success,
 compliance certification or risk exclusion.
 
-Hosted CI for the exact implementation commit and coordinated backup/migration/
-service activation remain separate delivery gates. The Stage A manual acceptance,
-pilot/customer approval and production/SaaS rollout holds remain deferred.
+Hosted CI passed for exact implementation commit `702ef03`, and the local demo's
+backup, migration and service activation are complete. Other deployments need
+their own coordinated migration. The Stage A manual acceptance, pilot/customer
+approval and production/SaaS rollout holds remain deferred.
 
 
 ## Dependency follow-up, 20 November 2026
@@ -112,13 +114,10 @@ browser checks are recorded separately from earlier feature validation below.
   are separate from that failed attempt. Earlier 17/72-test backend and 639-test
   frontend results are overlapping historical checks, not additive totals.
 
-Local logs are under ignored `temp/pb21-*`. No hosted result is claimed for this
-uncommitted increment. The normal application's `/health`, `/ready` and `/login`
-return HTTP 200; database/uploads/worker readiness is healthy. A read-only check
-confirmed normal schema 0061 and no remediation-proof table. No migration,
-normal-service restart, proof submission or mapping approval was performed on
-normal data during PB-2.1 verification. PB-1.5 activation evidence remains a
-separate earlier checkpoint.
+Local logs are under ignored `temp/pb21-*`. The pre-activation check of the
+normal application returned HTTP 200 from `/health`, `/ready` and `/login` at
+schema 0061. The later local activation is recorded below. PB-1.5 activation
+evidence remains a separate earlier checkpoint.
 
 
 ## Pre-commit review, 20 November 2026
@@ -166,7 +165,37 @@ loss scenario was exercised against the real API; artifacts are under
 Python dependency checks, `pip check`, optional-embeddings audit, tracked-secret
 guard and the high-severity Bandit gate passed. The new SQL identifier quoting
 finding was reviewed as described above. All backend, frontend, build, browser,
-dependency and high-severity security gates passed locally. Exact-commit hosted
-CI and coordinated migration 0062 activation remain pending; normal data and
-service were not changed. The pilot script uses isolated synthetic data and does
-not close deferred owner/customer acceptance or authorize production rollout.
+dependency and high-severity security gates passed locally. The pilot script uses
+isolated synthetic data and does not close deferred owner/customer acceptance or
+authorize production rollout.
+
+
+## Hosted verification and local activation closeout, 20 November 2026
+
+Implementation `702ef03` passed all four [hosted CI jobs](https://github.com/shalisarakkal/AuditMind/actions/runs/44825416468): backend, frontend, browser and backend dependency audit.
+
+Before maintenance, the local app was confirmed to use the loopback PostgreSQL
+database `auditmind`, isolated schema `auditmind_demo`, revision `0061`, with no
+pending/running work in the import, archive, report, document-index, evidence or
+dashboard queues. Existing counts were 6 organizations, 5,608,732 assets,
+5,961,209 findings and 64 scans. The guarded demo launcher stopped the API,
+worker and frontend.
+
+A fresh custom-format archive was written to the ignored local checkpoint
+directory. Its archive listing and backed-up Alembic revision were verified;
+the revision is `0061`. SHA-256 is
+`1cabfc7c61a27b9243711a907fc43e0181666b18e99ebbb7d94cbe0e2461b785`; size is
+1,523,227,334 bytes. Manifest:
+`temp/auditmind-demo/checkpoints/before-remediation-proof-0062-20261121T012744Z.json`.
+
+The guarded `python scripts/demo.py prepare` applied migration `0062` and passed
+Alembic metadata drift checking. Counts remained unchanged; the new
+`remediation_proofs` table is empty, its append-only guard is enabled, and its
+finding index is valid. `start-demo.ps1` rebuilt the production frontend with
+Next.js 16.4.6 and restarted the API, worker and frontend. API health, readiness,
+login and authentication options returned HTTP 200; readiness reported database,
+uploads and worker healthy. OpenAPI exposes proof read/submit/review routes.
+
+No proof was submitted and no organization policy was changed. This activation is
+for the local application only; other installations and production remain
+separate deployment decisions.
